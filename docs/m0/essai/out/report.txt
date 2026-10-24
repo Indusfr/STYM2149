@@ -1,0 +1,23 @@
+== Fidelity: C++ port of the crate against the Rust crate (FFI), sample by sample ==
+tone3     48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+env_saw   48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+sq10k     48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+hihat     48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+buzzer    48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+full      48000 Hz: crate vs C++ port = 0 deviations / 192000; AtariAudio vs tick port = 0 deviations
+tone3     44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+env_saw   44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+sq10k     44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+hihat     44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+buzzer    44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+full      44100 Hz: crate vs C++ port = 0 deviations / 176400; AtariAudio vs tick port = 0 deviations
+
+== CPU: 60 s of audio, scenario 'full', 48 kHz (best of 3 passes) ==
+A. Rust crate via C ABI (OR decimation)         76.78 ms for 60 s  ->  0.128 % of one core; allocations during rendering: 0
+B. C++ port of the crate (OR decimation)       120.58 ms for 60 s  ->  0.201 % of one core; allocations during rendering: 0
+Original AtariAudio 1.26 (box average)          99.31 ms for 60 s  ->  0.166 % of one core; allocations during rendering: 0
+B'. C++ tick port (box average)                107.17 ms for 60 s  ->  0.179 % of one core; allocations during rendering: 0
+Kaiser sinc resampler 100 dB ->  48000 Hz (202 taps)   0.767 % of one core per mono channel
+Kaiser sinc resampler 100 dB ->  44100 Hz (392 taps)   1.356 % of one core per mono channel
+Kaiser sinc resampler 100 dB ->  96000 Hz (202 taps)   1.431 % of one core per mono channel
+16 channels x 6 voices (32 tick cores at 250 kHz, no resampling):   4.75 % of one core

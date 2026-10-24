@@ -1,0 +1,56 @@
+{
+ "kind": "drumkit",
+ "kit": {
+  "kick": {
+   "pitch": 50,
+   "sweep": 115,
+   "dec": 9,
+   "noise": 0,
+   "vol": 100
+  },
+  "snare": {
+   "body": 180,
+   "tone": 40,
+   "dec": 16,
+   "vol": 100
+  },
+  "clap": {
+   "space": 10,
+   "color": 35,
+   "tail": 30,
+   "vol": 100
+  },
+  "hat": {
+   "metal": 78,
+   "tune": 108,
+   "dec": 45,
+   "vol": 100
+  },
+  "ohat": {
+   "metal": 72,
+   "tune": 112,
+   "dec": 9,
+   "vol": 100
+  },
+  "chat": {
+   "metal": 90,
+   "tune": 134,
+   "dec": 120,
+   "vol": 100
+  },
+  "tom": {
+   "pitch": 110,
+   "sweep": 75,
+   "dec": 9,
+   "noise": 0,
+   "vol": 100
+  },
+  "tom2": {
+   "pitch": 150,
+   "sweep": 85,
+   "dec": 11,
+   "noise": 25,
+   "vol": 100
+  }
+ }
+}

@@ -1,0 +1,17 @@
+EmuTOS system fonts in STYM2149
+===============================
+
+The bitmap glyphs of the GEM interface (8x16, 8x8 and 6x6 system fonts, Atari ST
+encoding) come from EmuTOS, files bios/fnt_st_8x16.c, bios/fnt_st_8x8.c and
+bios/fnt_st_6x6.c, commit 02c2db75fc875265c1449efea014450466cf20b7
+(https://github.com/emutos/emutos). Each of these files carries this notice:
+
+    Copyright (C) 2001-2021 The EmuTOS development team
+
+    This file is distributed under the GPL, version 2 or at your
+    option any later version.  See doc/license.txt for details.
+
+STYM2149 uses them under the GNU GPL version 3, as part of a work distributed
+under the GNU Affero General Public License version 3 (see LICENSE). The
+converted glyph tables are in src/gemui/src/FontData.cpp and
+src/gemui/src/FontDataSmall.cpp of the STYM2149 source code.

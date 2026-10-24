@@ -1,0 +1,18 @@
+# Minimal C ABI layer around ym2149-rs (secondary oracle S3, tests only).
+[package]
+name = "ymffi"
+version = "0.0.1"
+edition = "2021"
+license = "AGPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+# Sources identical to commit 5e42228 of github.com/slippyex/ym2149-rs (crates/ym2149-core and ym2149-common).
+ym2149 = "=0.9.1"
+
+[profile.release]
+panic = "abort"
+opt-level = 3

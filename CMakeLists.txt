@@ -1,0 +1,45 @@
+# STYM2149
+# Programming: Pascal "Indus" Nowak (with Claude's help).
+# Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
+cmake_minimum_required(VERSION 3.22)
+project(STYM2149 VERSION 0.9.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
+option(STYM_BUILD_TOOLS "Build the tools (ym2wav)" ON)
+option(STYM_BUILD_TESTS "Build the tests" ON)
+option(STYM_ORACLE_CRATE "Build the secondary oracle ym2149-rs (S3, needs cargo)" OFF)
+option(STYM_BUILD_PLUGIN "Build the plugin (JUCE 8: VST3, AU, AAX, LV2, CLAP, Standalone)" OFF)
+set(STYM_REFDATA "${CMAKE_SOURCE_DIR}/refdata" CACHE PATH "Reference tunes (tools/fetch_refdata.sh)")
+
+include(cmake/Warnings.cmake)
+include(cmake/AtariAudio.cmake)
+
+add_subdirectory(src/ymcore)
+add_subdirectory(src/ymengine)
+add_subdirectory(src/ymio)
+add_subdirectory(src/ymseq)
+add_subdirectory(src/plugincore)
+add_subdirectory(src/gemui)
+add_subdirectory(src/pluginui)
+if(STYM_BUILD_PLUGIN)
+  include(cmake/Juce.cmake)
+  add_subdirectory(src/plugin)
+endif()
+if(STYM_BUILD_TOOLS OR STYM_BUILD_TESTS)
+  add_subdirectory(tools/common)
+  add_subdirectory(tools/gemshot)  # scenes shared with the visual regression test
+endif()
+if(STYM_BUILD_TOOLS)
+  add_subdirectory(tools/ym2wav)
+  add_subdirectory(tools/ymbench)
+endif()
+if(STYM_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

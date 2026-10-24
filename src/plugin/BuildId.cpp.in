@@ -1,0 +1,11 @@
+// STYM2149 — plugin: build identifier, written by CMake (D-211)
+// Programming: Pascal "Indus" Nowak (with Claude's help).
+// Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
+#include "BuildId.h"
+
+namespace stym::plugin {
+
+const char* const kBuildNumber = "@STYM_BUILD_NUMBER@";
+const char* const kBuildCommit = "@STYM_BUILD_COMMIT_SHORT@";
+
+}  // namespace stym::plugin
