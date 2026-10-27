@@ -7,8 +7,8 @@ repository; every statement points to the file that backs it. Items still open a
 
 Conventions you will meet everywhere:
 
-- Source comments are in French. Decisions are numbered `D-nnn` in `DECISIONS.md`; milestone reports live in
-  `docs/m0` to `docs/m8`; thresholds `S1` to `S11` come from `docs/m0/AUDIT_DSP.md` §5.
+- Source comments are in French. Comments cite decisions (`D-nnn`) and fidelity thresholds (`S1` to `S11`) from the
+  development records, which are not published in this repository.
 - Comments often cite `STYM2149_SPEC.md` (the specification) and `YM2149_Prototype.html` (the JavaScript
   prototype the product reproduces). Neither file is versioned in this repository; tools that need the prototype
   take its path as an argument (`tools/proto_golden/load.mjs`).

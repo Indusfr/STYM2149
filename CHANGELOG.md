@@ -141,7 +141,7 @@ STYM2149 is built in milestones (M0 to M8, see `STYM2149_SPEC.md` §11). Each mi
 - Application icon: a YM2149 DIP package with "YM" in the GEM font, for the standalone application and the Windows installer; on Linux, `install.sh` adds a menu entry with the icon (D-218).
 - Build number: Fuji > Information shows the number of the CI run that compiled the plugin and its commit after the version (`0.9.0 build 412 (fe71c0d)`, `build dev` for a local build); the Windows installer and the Linux archive carry it in their names (D-211).
 - `ymbench --hash` (FNV-1a fingerprint of the rendered output) and `--tracks` (separate track and chip outputs).
-- DAW test protocol (`docs/m8/TESTS_DAW.md`) for FL Studio 26, Ableton Live 11, Cubase Pro 15, ACID Pro 10, Maschine 3 and Reason 13 on Windows (D-177).
+- DAW test protocol for FL Studio 26, Ableton Live 11, Cubase Pro 15, ACID Pro 10, Maschine 3 and Reason 13 on Windows (D-177).
 - CI: on Linux, pluginval runs under gdb when the runner has it, to print every thread's stack if it crashes.
 - Tooltips in English, French, German, Spanish, Portuguese and Italian, chosen in Options > Tooltip language; by default the system language when it is one of the six, otherwise English (D-185). The GEM font gains the accented letters of the Atari ST character set, from EmuTOS. Menus and labels stay in English. The translations still need a review by native speakers.
 - Windows installer for all users, with administrator rights: VST3 and CLAP in `C:\Program Files\Common Files`, the standalone application in `C:\Program Files\Indus` (Inno Setup, D-181, D-199), and a Linux archive with `install.sh` for the home folder (D-182). The CI builds both on every run.
@@ -152,8 +152,8 @@ STYM2149 is built in milestones (M0 to M8, see `STYM2149_SPEC.md` §11). Each mi
 - GEM menus can flow into columns, as the prototype's Chord... menu of the Arpeggiator (P400, D-190).
 - Tab and Shift+Tab move between the buttons of a dialog box (D-191).
 - Licence texts of every component shipped with the packages, and the libraries that JUCE compiles into the plugin listed in `THIRD_PARTY.md` (D-186).
-- Written check that STYM2149 makes no network access (`docs/m8/NETWORK_AUDIT.md`); the internal "telemetry" between engine and editor is renamed engine status.
-- Parity with the prototype, row by row (`docs/m8/PARITY.md`); user manual in English and French (`docs/MANUAL.md`, `docs/MANUAL.fr.md`); README in English and French; architecture guide (`docs/ARCHITECTURE.md`).
+- Written check that STYM2149 makes no network access; the internal "telemetry" between engine and editor is renamed engine status.
+- Parity with the prototype, row by row; user manual in English and French (`docs/MANUAL.md`, `docs/MANUAL.fr.md`); README in English and French; architecture guide (`docs/ARCHITECTURE.md`).
 - Mixer: with a stereo output (16 channels, 3 channels with the STE), Master has a left and a right fader, a balance slider and a Link button; in 2x3 channels, a fader per chip and Link; new host parameters Master 2, Master Pan and Master Link (D-284).
 - Arpeggiator: 1/32T and 1/64 divisions (D-289).
 - Step Sequencer: a right click on the metronome button opens its volume, kept with the project (D-288).
