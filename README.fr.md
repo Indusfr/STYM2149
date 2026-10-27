@@ -94,7 +94,7 @@ Paquets : `packaging/linux/make_tarball.sh` construit l'archive Linux ; `packagi
 
 - [Manuel d'utilisation](docs/MANUAL.fr.md) ([English](docs/MANUAL.md))
 - [Guide d'architecture](docs/ARCHITECTURE.md)
-- [Journal des modifications](CHANGELOG.md), [décisions](DECISIONS.md), rapports des jalons dans `docs/m0` à `docs/m8`
+- [Journal des modifications](CHANGELOG.md)
 
 ## Licence
 

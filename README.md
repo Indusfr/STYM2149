@@ -94,7 +94,7 @@ On every pull request and push to `main`, on the project's self-hosted runners: 
 
 - [User manual](docs/MANUAL.md) ([français](docs/MANUAL.fr.md))
 - [Architecture guide](docs/ARCHITECTURE.md)
-- [Changelog](CHANGELOG.md), [decisions](DECISIONS.md), milestone reports in `docs/m0` to `docs/m8`
+- [Changelog](CHANGELOG.md)
 
 ## Licence
 
