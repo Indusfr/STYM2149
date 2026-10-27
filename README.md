@@ -84,7 +84,7 @@ Packages: `packaging/linux/make_tarball.sh` builds the Linux archive; `packaging
 - `ym2wav`: renders a YM file (LHA-compressed or not) to WAV.
 - `ymbench`: CPU load of the voice engine (`--seq --notes 6 --noise` for the worst case, `--hash` for a fingerprint of the output).
 - `gemshot`: renders the interface to PNG without a host or JUCE (visual tests).
-- `tools/proto_capture`, `tools/proto_golden`, `tools/gemfont`: reference captures, parity data and GEM fonts taken from the prototype and EmuTOS.
+- `tools/gemfont`: GEM fonts taken from the prototype and EmuTOS.
 
 ## Documentation
 
