@@ -3,7 +3,7 @@ pluginval 1.0.4 (JUCE 8.0.3): fix of the JUCE VST3 host run loop on Linux, taken
 Programming: Pascal "Indus" Nowak (with Claude's help).
 Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 The change itself is JUCE code (AGPLv3), ported unchanged; it is applied by the CI to the JUCE submodule of
-pluginval before building it on Linux (.github/workflows/ci.yml). It is never part of STYM2149.
+pluginval before building it on Linux. It is never part of STYM2149.
 
 Without it, pluginval may crash with SIGSEGV after "SUCCESS": the Linux event loop copies the callbacks of
 the ready file descriptors, then calls them one by one. When the callback of pluginval's own message queue

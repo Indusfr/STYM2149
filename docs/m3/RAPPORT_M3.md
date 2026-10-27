@@ -74,4 +74,4 @@ cargo install --locked clap-validator --git https://github.com/free-audio/clap-v
 clap-validator validate build-plugin/src/plugin/STYM2149_artefacts/Release/CLAP/STYM2149.clap
 ```
 
-Under Linux, JUCE needs the development packages of ALSA, JACK, FreeType, Fontconfig and X11 (list in `.github/workflows/ci.yml`); the processor tests, pluginval and clap-validator run under `xvfb-run` in the CI; clap-validator needs Rust 1.95 or newer.
+Under Linux, JUCE needs the development packages of ALSA, JACK, FreeType, Fontconfig and X11; the processor tests, pluginval and clap-validator run under `xvfb-run` in the CI; clap-validator needs Rust 1.95 or newer.

@@ -386,17 +386,6 @@ STYM2149-only scenes compared with renders in `tests/data/visual/stym` with no p
 | `tools/proto_golden` | Node | Parity data `tests/data/proto/*.txt` from the prototype |
 | `tools/gemfont` | Node | Generate and verify the GEM font files |
 
-**CI** (`.github/workflows/ci.yml`; `STYM_REQUIRE_REFDATA=1` for all jobs; push to `main`, `v*` tags, pull requests,
-manual runs):
-
-| Job | Runner | Content |
-|---|---|---|
-| `build-test` | self-hosted Linux x64 (with `STYM_ORACLE_CRATE=ON`) and Windows x64 (MSVC) | Build, `ctest -E oracle_s9`, `oracle_s9` on Linux only, `ym2wav` smoke test, `ymbench` worst case on Linux (warning above 2.7 % of a core, D-183, in the job summary), metrics upload |
-| `realtime-sanitizer` | self-hosted Linux, system clang | `STYM_RTSAN=ON`, `ctest -R realtime` |
-| `sanitizers` | self-hosted Linux, system clang | ASan + UBSan on `unit`, `ui`; TSan on `plugin` (D-184) |
-| `plugin` | self-hosted Linux and Windows | Formats + `plugin` test; pluginval 1.0.4 level 10 on VST3 (and LV2 on Linux; built from source and under gdb on Linux); Steinberg VST3 validator (vst3sdk v3.8.1_build_84); clap-validator 0.4.1; packages: Linux tarball (`packaging/linux/make_tarball.sh`), Windows Inno Setup installer (`packaging/windows/STYM2149.iss`) |
-| `build-test-macos`, `plugin-macos` | hosted `macos-14` | Only on `v*` tags or manual runs: universal build and tests; AU/VST3/AAX/CLAP/Standalone, `auval -strict`, pluginval, clap-validator |
-
 ## 8. Where to start for common changes
 
 ### Add a parameter
