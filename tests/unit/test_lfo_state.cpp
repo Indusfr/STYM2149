@@ -1,4 +1,4 @@
-// STYM2149 — LFO of a track (sixth DAW test, item 59, D-257) in the plugin state (TSEQ chunk), the Patches library
+// STYM2149 — LFO of a track (sixth DAW test, item 59) in the plugin state (TSEQ chunk), the Patches library
 // ("lfo" key, STYM2149 marker) and the instruments; values brought back into their ranges.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -39,7 +39,7 @@ TrackLfo lfo() {
     l.hz = 7.5;
     l.division = 7;
     l.depth = 350;
-    l.retrig = false;  // D-279
+    l.retrig = false;
     return l;
 }
 

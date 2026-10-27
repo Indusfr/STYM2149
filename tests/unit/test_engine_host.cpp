@@ -1,5 +1,5 @@
 // STYM2149 — sequencer of the engine: synchronisation to the host transport (start, position already begun, loop,
-// tempo, Song relocated, end without loop, stop), arpeggio on the grid of the host or at its tempo (Arp Sync, D-256),
+// tempo, Song relocated, end without loop, stop), arpeggio on the grid of the host or at its tempo (Arp Sync),
 // Quantize to VBL and metronome.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -148,7 +148,7 @@ TEST_CASE("Host sync: start at 0, one step per sixteenth note at the tempo of th
     CHECK(std::fabs(st[5].samples - 4800) < 1e-9);
 }
 
-TEST_CASE("Host sync: 1/64, sixteen steps per quarter note of the host (D-422)", "[engine][seq][host]") {
+TEST_CASE("Host sync: 1/64, sixteen steps per quarter note of the host", "[engine][seq][host]") {
     Rig r(SeqClock::Host);
     r.g.resolution = 7;
     r.global();
@@ -165,7 +165,7 @@ TEST_CASE("Host sync: 1/64, sixteen steps per quarter note of the host (D-422)",
     }
 }
 
-TEST_CASE("Host sync: 1/32T, twelve steps per quarter note of the host (D-433)", "[engine][seq][host]") {
+TEST_CASE("Host sync: 1/32T, twelve steps per quarter note of the host", "[engine][seq][host]") {
     Rig r(SeqClock::Host);
     r.g.resolution = 8;
     r.global();
@@ -381,7 +381,7 @@ TEST_CASE("Host sync: arpeggio on the clock, notes on the grid of the host", "[e
         INFO("start at quarter note " << start);
         Rig r(SeqClock::Host);
         r.g.arpClock = ArpClock::MidiClock;
-        r.g.arpDivision = 12;  // sixteenth note (half pulses, D-289)
+        r.g.arpDivision = 12;  // sixteenth note (half pulses)
         r.global();
         TrackParams tp;
         tp.mix.enabled = true;
@@ -423,7 +423,7 @@ TEST_CASE("Host sync: arpeggio on the clock, notes on the grid of the host", "[e
     }
 }
 
-TEST_CASE("Arp Sync: one step per division of the tempo, on the grid of the host while it plays (D-256)",
+TEST_CASE("Arp Sync: one step per division of the tempo, on the grid of the host while it plays",
           "[engine][seq][host][arp]") {
     // Note played by the keyboard arpeggio, and the samples between its changes.
     auto arpNote = [](Engine& e) {
@@ -463,7 +463,7 @@ TEST_CASE("Arp Sync: one step per division of the tempo, on the grid of the host
         REQUIRE(d.size() >= 4);
         for (const int64_t x : d) CHECK(std::abs(x - 8000) <= 10);
     }
-    SECTION("Free run: 1/64, three half pulses (D-289)") {
+    SECTION("Free run: 1/64, three half pulses") {
         Rig r(SeqClock::Internal);  // 90 BPM
         r.g.arpClock = ArpClock::Tempo;
         r.g.arpDivision = 3;  // 90 × 48 / 60 / 3 = 24 steps per second, 2000 samples
@@ -499,7 +499,7 @@ TEST_CASE("Arp Sync: one step per division of the tempo, on the grid of the host
         const auto grid = intervals(r, 36000);
         REQUIRE(grid.size() >= 2);
         for (const int64_t x : grid) CHECK(std::abs(x - 12000) <= 10);
-        // 1/64 on the host's grid: three half pulses, 1500 samples at 120 BPM (D-289).
+        // 1/64 on the host's grid: three half pulses, 1500 samples at 120 BPM.
         r.g.arpDivision = 3;
         r.global();
         const auto fine = intervals(r, 12000);
@@ -601,7 +601,7 @@ TEST_CASE("Metronome: one beep per beat, higher on the first beat", "[engine][se
     }
 }
 
-TEST_CASE("Metronome: its level scales the beeps, 0 mutes them (D-288)", "[engine][seq][metronome]") {
+TEST_CASE("Metronome: its level scales the beeps, 0 mutes them", "[engine][seq][metronome]") {
     auto run = [](bool metro, uint8_t level) {
         Rig r(SeqClock::Internal);
         r.g.tempo = 120;

@@ -1,4 +1,4 @@
-// STYM2149 — File menu tests (M7): fake host with an in-memory disk and the file dialogues, helpers for the menus
+// STYM2149 — File menu tests: fake host with an in-memory disk and the file dialogues, helpers for the menus
 // and the alerts.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -32,7 +32,7 @@ public:
     std::vector<FileDialog> opens, saves;
     std::function<void(const std::string&)> pending;
     std::vector<int> selects;  // patterns chosen (SeqCommand::Select)
-    int stops = 0;             // SeqCommand::Stop received (File > New, D-249)
+    int stops = 0;             // SeqCommand::Stop received (File > New)
     std::map<std::string, std::string> prefs;
     uint32_t rate = 0;  // host sample rate (0: unknown)
     Recorder rec;              // register recorder: state given by the test

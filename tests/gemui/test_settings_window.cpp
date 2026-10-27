@@ -1,9 +1,8 @@
-// STYM2149 — Settings window (Indus, 25/10/2026 19:33, D-430): opened by Options > Settings..., it holds what the
+// STYM2149 — Settings window (Indus, 25/10/2026 19:33): opened by Options > Settings..., it holds what the
 // Options menu held in submenus (Sound engine, Keyboard layout, Note names, Renderer, Pixels, Tooltips) and the Tuning
-// of A4 (D-429): frames, values shown on the buttons, the window following the parameters, the A4 typed in Hz,
-// preferences stored, the window kept open from one opening of the editor to the next; Cancel and OK (D-435), the box
-// that Cancel opens before changes are lost (D-437), the unit of Tuning A4 left out of the pointer's reverse video
-// (D-438).
+// of A4: frames, values shown on the buttons, the window following the parameters, the A4 typed in Hz,
+// preferences stored, the window kept open from one opening of the editor to the next; Cancel and OK, the box
+// that Cancel opens before changes are lost, the unit of Tuning A4 left out of the pointer's reverse video.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -30,7 +29,7 @@ const gemui::Button& button(pluginui::MainWindow& w, std::string_view id) {
     return *b;
 }
 
-// The GEM box that Cancel opens when changes would be lost (D-437); OK lets them go.
+// The GEM box that Cancel opens when changes would be lost; OK lets them go.
 void discard(pluginui::MainWindow& w) {
     const gemui::Alert* a = topAlert(w);
     REQUIRE(a);
@@ -50,7 +49,7 @@ void typeA4(pluginui::MainWindow& w, std::string_view text) {
 
 }  // namespace
 
-TEST_CASE("Settings: Options > Settings... opens the window, the Options menu keeps its other entries (D-430)",
+TEST_CASE("Settings: Options > Settings... opens the window, the Options menu keeps its other entries",
           "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -62,7 +61,7 @@ TEST_CASE("Settings: Options > Settings... opens the window, the Options menu ke
     pickItem(w, 9);
     REQUIRE(w.settingsWindow().isOpen());
 
-    // Three frames side by side, SOUND ENGINE, MIDI and INTERFACE (D-432), inside the window and the desktop.
+    // Three frames side by side, SOUND ENGINE, MIDI and INTERFACE, inside the window and the desktop.
     const gemui::Rect win = *w.rectOf("settingsWin"), engine = *w.rectOf("setEngine"), midi = *w.rectOf("setMidi"),
                       ui = *w.rectOf("setInterface");
     CHECK(win.x >= 0);
@@ -137,7 +136,7 @@ TEST_CASE("Settings: Options > Settings... opens the window, the Options menu ke
     CHECK(wheel.subCur == 2);
 }
 
-TEST_CASE("Settings: the window follows the parameters, the STE settings greyed out with Computer ST (D-206, D-430)",
+TEST_CASE("Settings: the window follows the parameters, the STE settings greyed out with Computer ST",
           "[ui][settings]") {
     UiHost h;
     h.p(Global::SteBass) = -6;
@@ -165,7 +164,7 @@ TEST_CASE("Settings: the window follows the parameters, the STE settings greyed 
     CHECK(button(w, "setBend").text() == "12 st");
 }
 
-TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only (D-432)", "[ui][settings]") {
+TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only", "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.settingsWindow().show();
@@ -226,7 +225,7 @@ TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only (D-
     CHECK(button(w, "setMpe").text() == "On");
 }
 
-TEST_CASE("Settings > Tuning A4: typed in Hz, 350 to 480 Hz with two decimals (D-429, D-430, D-434)",
+TEST_CASE("Settings > Tuning A4: typed in Hz, 350 to 480 Hz with two decimals",
           "[ui][settings]") {
     using pluginui::SettingsWindow;
     CHECK(SettingsWindow::parseA4("432") == 432.0);
@@ -250,7 +249,7 @@ TEST_CASE("Settings > Tuning A4: typed in Hz, 350 to 480 Hz with two decimals (D
     CHECK(w.settingsWindow().tuningField().text() == "441.75 Hz");
     typeA4(w, "999");
     CHECK(h.p(Global::A4Hz) == 480.0f);
-    typeA4(w, "392");  // below 400 Hz (Indus, 25/10/2026 21:50, D-434)
+    typeA4(w, "392");  // below 400 Hz (Indus, 25/10/2026 21:50)
     CHECK(h.p(Global::A4Hz) == 392.0f);
     CHECK(w.settingsWindow().tuningField().text() == "392.00 Hz");
     // Set by the host: shown at the next tick.
@@ -259,7 +258,7 @@ TEST_CASE("Settings > Tuning A4: typed in Hz, 350 to 480 Hz with two decimals (D
     CHECK(w.settingsWindow().tuningField().text() == "415.30 Hz");
 }
 
-TEST_CASE("Settings > Tuning A4: Hz shown while the value is typed (D-434)", "[ui][settings]") {
+TEST_CASE("Settings > Tuning A4: Hz shown while the value is typed", "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.settingsWindow().show();
@@ -282,7 +281,7 @@ TEST_CASE("Settings > Tuning A4: Hz shown while the value is typed (D-434)", "[u
     CHECK(f.shownText() == "395.50 Hz");
 }
 
-TEST_CASE("Settings: Note names and Keyboard layout stored as preferences, the windows follow (D-430)",
+TEST_CASE("Settings: Note names and Keyboard layout stored as preferences, the windows follow",
           "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -305,7 +304,7 @@ TEST_CASE("Settings: Note names and Keyboard layout stored as preferences, the w
     CHECK(button(w, "setLayout").text() == "AZERTY");
 }
 
-TEST_CASE("Settings: the window open again at the next opening of the editor, where it was (D-430)",
+TEST_CASE("Settings: the window open again at the next opening of the editor, where it was",
           "[ui][settings]") {
     UiHost h;
     gemui::Rect was;
@@ -321,7 +320,7 @@ TEST_CASE("Settings: the window open again at the next opening of the editor, wh
     w.settingsWindow().close();
 }
 
-TEST_CASE("Settings: Cancel, the default button, and OK centred under the frames (D-435)", "[ui][settings]") {
+TEST_CASE("Settings: Cancel, the default button, and OK centred under the frames", "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.settingsWindow().show();
@@ -341,7 +340,7 @@ TEST_CASE("Settings: Cancel, the default button, and OK centred under the frames
     CHECK(o.bottom() < win.bottom());
 }
 
-TEST_CASE("Settings: Cancel puts back the settings changed in the window, OK keeps them (D-435)", "[ui][settings]") {
+TEST_CASE("Settings: Cancel puts back the settings changed in the window, OK keeps them", "[ui][settings]") {
     UiHost h;
     h.languages = gemshot::installedLanguages();
     pluginui::MainWindow w(h);
@@ -407,7 +406,7 @@ TEST_CASE("Settings: Cancel puts back the settings changed in the window, OK kee
     CHECK(h.prefs["noteNames"] == "1");
 }
 
-TEST_CASE("Settings: the close box, Escape and Enter cancel; Enter types the A4 while it is edited (D-435)",
+TEST_CASE("Settings: the close box, Escape and Enter cancel; Enter types the A4 while it is edited",
           "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -449,7 +448,7 @@ TEST_CASE("Settings: the close box, Escape and Enter cancel; Enter types the A4 
     CHECK(h.p(Global::A4Hz) == 470.0f);
 }
 
-TEST_CASE("Settings: Cancel asks before the changes are lost, only when a setting differs (D-437)", "[ui][settings]") {
+TEST_CASE("Settings: Cancel asks before the changes are lost, only when a setting differs", "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
     pluginui::SettingsWindow& s = w.settingsWindow();

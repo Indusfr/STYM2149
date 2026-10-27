@@ -1,4 +1,4 @@
-// STYM2149 — ymio: small 68000 assembler for the routine of exported SNDH files (M7, A5, D-162)
+// STYM2149 — ymio: small 68000 assembler for the routine of exported SNDH files
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

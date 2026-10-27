@@ -1,4 +1,4 @@
-# STYM2149 tooltips: template of a new language (D-283).
+# STYM2149 tooltips: template of a new language.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #

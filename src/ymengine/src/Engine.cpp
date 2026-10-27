@@ -24,7 +24,7 @@ void Engine::prepare(const EngineConfig& config) {
     Impl& m = *impl_;
     m.config = config;
     const ymcore::RenderConfig& rc = config.render;
-    // Level of one channel alone (measured table, channels B and C at 0), normalised to index 31 (D-049).
+    // Level of one channel alone (measured table, channels B and C at 0), normalised to index 31.
     const double top = ymcore::tables::kMixTable[31];
     for (int i = 0; i < 32; ++i) m.tab1[size_t(i)] = ymcore::tables::kMixTable[i] / top;
     // A chip renders kMixTable / 32768 (ChipRenderer::render): gain3 brings it to the unit of tab1.
@@ -42,7 +42,7 @@ void Engine::prepare(const EngineConfig& config) {
     m.sR.assign(cap, 0);
     m.bufL.assign(2 * cap, 0);
     m.bufR.assign(2 * cap, 0);
-    // Delay (D-299): send buses with the same chain, their output, the lines.
+    // Delay: send buses with the same chain, their output, the lines.
     m.outSL.prepare(rc);
     m.outSR.prepare(rc);
     m.dSL.assign(cap, 0);
@@ -65,7 +65,7 @@ void Engine::prepare(const EngineConfig& config) {
         if (on && t < Impl::kShadows) m.shadow[size_t(t)].prepare(rc);
     }
     m.scratch.assign(m.trackMask ? kChunk : 0, 0);
-    // DMA voices in 3-channel mode (D-153): output of the buses before they are added to the chips.
+    // DMA voices in 3-channel mode: output of the buses before they are added to the chips.
     m.pcmHostL.assign(kChunk, 0);
     m.pcmHostR.assign(kChunk, 0);
     // 3-channel modes.
@@ -113,14 +113,14 @@ void Engine::reset() noexcept {
 
 void Engine::setGlobal(const GlobalParams& g) noexcept {
     Impl& m = *impl_;
-    // The machine changes the tracks played (DMA tracks in 3-channel mode): like a change of mode (D-153).
+    // The machine changes the tracks played (DMA tracks in 3-channel mode): like a change of mode.
     const bool modeChanged = g.mode != m.global.mode || g.ste != m.global.ste;
     const bool vblChanged = g.vblHz != m.global.vblHz;
     const bool jitterChanged = g.irqJitterCpuCycles != m.global.irqJitterCpuCycles;
     // Sequencer clock changed during playback: stop at the next block (the new clock starts again).
     if (g.seqClock != m.global.seqClock) m.clockChanged = true;
     if (g.speed != m.global.speed) m.seq.speed = std::clamp<int>(g.speed, 1, kSpeedMax);  // Ticks: replaces Sxx
-    if (g.tempo != m.global.tempo) m.seq.cmdBpm = 0;  // BPM: replaces Txx (D-243)
+    if (g.tempo != m.global.tempo) m.seq.cmdBpm = 0;  // BPM: replaces Txx
     const BendTarget bentWas = m.global.bendTarget;
     m.global = g;
     m.global.vblHz = std::clamp<uint32_t>(g.vblHz, 1, 1000);
@@ -140,7 +140,7 @@ void Engine::setGlobal(const GlobalParams& g) noexcept {
     }
     if (jitterChanged) m.jitter.configure(cpuCyclesToYmMaster(g.irqJitterCpuCycles), m.config.seed + 0x51u);
     if (m.prepared) {
-        // MIDI expression (D-432): the sounding notes follow a new target of the bend (their pitch let go of or taken
+        // MIDI expression: the sounding notes follow a new target of the bend (their pitch let go of or taken
         // up again) and start their frames for a new target of the wheel or the pressure.
         const uint64_t c = m.eventCycle();
         for (int i = 0; i < kVoices; ++i) {
@@ -214,7 +214,7 @@ const DigidrumSlot& Engine::digidrumSlot(int slot) const noexcept {
 
 void Engine::setDma(const DmaParams& p) noexcept {
     Impl& m = *impl_;
-    bool moved = false;  // a slot goes from mono to stereo or back: the right side's mixer comes or goes (D-459)
+    bool moved = false;  // a slot goes from mono to stereo or back: the right side's mixer comes or goes
     for (int k = 0; k < kDmaSlots; ++k) moved |= m.dmaBank.slot(k).stereo != p.slots[size_t(k)].stereo;
     m.dmaBank.setParams(p);
     if (!moved) return;
@@ -244,7 +244,7 @@ void Engine::noteOn(uint32_t offset, int note, int velocity, int track, int chan
         noteOff(offset, note, track, channel);
         return;
     }
-    const double ch = std::clamp(channel, 0, Impl::kMpeChannels - 1);  // MPE member channel in value (D-432)
+    const double ch = std::clamp(channel, 0, Impl::kMpeChannels - 1);  // MPE member channel in value
     if (Event* e = impl_->push(offset, EventType::NoteOn, note, std::min(velocity, 127), ch))
         e->track = int16_t(std::max(track, -1));
 }
@@ -372,7 +372,7 @@ Engine::SeqStatus Engine::seqStatus() const noexcept {
     SeqStatus st;
     st.playing = m.seq.on;
     st.clockRunning = m.seq.run;
-    // Rest or NoteOff entry of the Song: no pattern (D-158).
+    // Rest or NoteOff entry of the Song: no pattern.
     st.pattern = m.seq.pattern < kSeqPatterns ? m.seq.pattern : -1;
     st.queued = m.seq.queued < kSeqPatterns ? m.seq.queued : -1;
     st.step = m.seq.on ? m.seq.step : -1;
@@ -439,7 +439,7 @@ void Engine::render(const Outputs& out, uint32_t n) noexcept {
         m.arp.cur = -1;
     }
     m.arpWasEnabled = arpOn;
-    m.updateSendLive();  // delay switched on or off, change of mode (D-299)
+    m.updateSendLive();  // delay switched on or off, change of mode
     if (m.clockChanged) {  // sequencer clock changed: playback stops, the new clock starts again
         m.clockChanged = false;
         m.seqHalt(m.at());
@@ -473,7 +473,7 @@ void Engine::render(const Outputs& out, uint32_t n) noexcept {
             const uint64_t c = m.at();
             while (ev < m.eventCount && m.events[ev].offset <= i) m.applyEvent(m.events[ev++], c);
         }
-        // Arpeggio at internal cadence (Rate, or the tempo outside the host's playback: D-256): the phase advances at
+        // Arpeggio at internal cadence (Rate, or the tempo outside the host's playback): the phase advances at
         // each sample while a note is held or while the last note of the arpeggio is being released (arpTick of the
         // prototype).
         if (m.arpEnabled() && !m.arpOnPulses() && (m.heldCount > 0 || m.arpReleasing())) {
@@ -491,7 +491,7 @@ void Engine::render(const Outputs& out, uint32_t n) noexcept {
         }
         // Sequencer: clock (internal or host), gates, cuts, retriggers, arpeggios of the tracks.
         m.seqSample(dt);
-        if (g >= m.echoDue) m.echoRun();  // repeats of the notes (D-299)
+        if (g >= m.echoDue) m.echoRun();  // repeats of the notes
         if (i + 1 - m.rSeg >= kChunk) {
             m.flush(out, m.rSeg, i + 1);
             m.rSeg = i + 1;

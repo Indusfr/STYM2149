@@ -105,7 +105,7 @@ ymseq::Row laneRow(SeqLane l) noexcept {
     case SeqLane::Oct: return Row::Oct;
     case SeqLane::Ton: return Row::Ton;
     case SeqLane::Ins: return Row::Ins;
-    case SeqLane::Cmd: return Row::CmdArp;  // stands for the kinds of the CMD row in block and row operations (D-330)
+    case SeqLane::Cmd: return Row::CmdArp;  // stands for the kinds of the CMD row in block and row operations
     case SeqLane::Mix: return Row::Mix;
     case SeqLane::Fx: return Row::Fx;
     case SeqLane::Afl: return Row::CmdArpeggiator;  // Jxx since the twelfth DAW test (item 144)
@@ -140,7 +140,7 @@ SeqWindow::SeqWindow(MainWindow& main) : m_(main) {
 }
 
 void SeqWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&tr_, "seqTr"}, {&stepRec_, "seqStepRec"}, {&clear_, "seqClear"}, {&euclid_, "euclidBtn"},
             {&rotL_, "rotL"}, {&rotR_, "rotR"}, {&trDn_, "trDn"}, {&trUp_, "trUp"}, {&trOctDn_, "trOctDn"},
@@ -222,7 +222,7 @@ void SeqWindow::build() {
 
     add(grid_);
     add(tr_);
-    // A scroll bar against the right edge of the window (eighth DAW test, item 93, D-294): an arrow, one semitone; the
+    // A scroll bar against the right edge of the window (eighth DAW test, item 93): an arrow, one semitone; the
     // track, one octave; the thumb as long as the 13 rows shown.
     tr_.setRange(ymseq::kPlayLow, 108, 1);
     tr_.setPage(SeqGrid::kRows, 12);
@@ -337,7 +337,7 @@ void SeqWindow::wire() {
         m_.set(Global::FreeTempo, float(*v));
         return true;
     };
-    // Gate All on: the slider sets the global gate, otherwise that of the track shown (D-134).
+    // Gate All on: the slider sets the global gate, otherwise that of the track shown.
     auto setGate = [this](double v) {
         if (m_.iv(Global::GateAll)) m_.set(Global::Gate, float(v));
         else m_.set(Track::Gate, float(v));
@@ -402,7 +402,7 @@ void SeqWindow::wire() {
     };
     reso_.onClick = [this] { resolutionMenu(); };
     fig_.onClick = [this] { popup(fig_, figItems(), inputFigure()); };
-    fig_.setPadding(2, 6);  // the 16 px figure in the height of a 14 px text (D-382)
+    fig_.setPadding(2, 6);  // the 16 px figure in the height of a 14 px text
     chord_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = -1; i < int(ymengine::kChords.size()); ++i) {
@@ -450,7 +450,7 @@ void SeqWindow::wire() {
     next_.onClick = [this] { m_.songStep(1); };
     metro_.onClick = [this] { toggleMetro(); };
     metro_.onContext = [this](gemui::Point) {
-        // Volume of the metronome (seventh DAW test, item 87, D-288): the slider of the Modulation window's cells,
+        // Volume of the metronome (seventh DAW test, item 87): the slider of the Modulation window's cells,
         // 0 to 100 %, back to 100 on a right click on it; each move applies.
         gemui::Desktop& d = m_.desktop();
         d.closePopups();
@@ -534,7 +534,7 @@ bool SeqWindow::envPlays() const {
     return false;
 }
 // The rows of the switches: while the vibrato, LFO, modulation table or arpeggiator of the track is on, with the
-// preference or a value of theirs written; off, the row goes and keeps its values (D-380). The row of the envelope:
+// preference or a value of theirs written; off, the row goes and keeps its values. The row of the envelope:
 // with the preference where it can act, and wherever a value of its own is written (crossed if it cannot act, item
 // 145).
 bool SeqWindow::vibShown() const {
@@ -561,7 +561,7 @@ bool SeqWindow::smpShown() const {
 }
 bool SeqWindow::tunShown() const { return (!drum() && cmdPreference()) || written(ymengine::SeqCmd::Fine); }
 bool SeqWindow::crvShown() const {
-    // The curve of a slide, where a note slides (bugs of 24/10, D-387); a curve still written keeps the row so that it
+    // The curve of a slide, where a note slides (bugs of 24/10); a curve still written keeps the row so that it
     // can be cleared (crossed, item 145).
     if (drum()) return false;
     const ymseq::Lane& l = lane();
@@ -569,7 +569,7 @@ bool SeqWindow::crvShown() const {
            std::any_of(l.slc.begin(), l.slc.end(), [](auto v) { return v != 0; });
 }
 bool SeqWindow::bpmShown() const {
-    // The BPM row of the pattern (item 150), in the standalone application (D-342).
+    // The BPM row of the pattern (item 150), in the standalone application.
     if (!m_.host_.standalone()) return false;
     if (cmdPreference()) return true;
     const auto& bpm = proj().cur().bpm;
@@ -655,7 +655,7 @@ SeqWindow::StepSound SeqWindow::stepSound(int s) const {
 }
 
 bool SeqWindow::slideActs(ymengine::SeqCmd kind, int s) const {
-    // Thirteenth DAW test, bugs of 24/10 (D-386): a slide runs from its step until the next command of its kind, the
+    // Thirteenth DAW test, bugs of 24/10: a slide runs from its step until the next command of its kind, the
     // track looping (laneLineCmds); it can act if it moves a note of that span. Each step has the generator of its
     // note (GEN, INS, track: stepSound) and its source: its SRC cell, otherwise that of the instrument or of the track
     // (applyMix, applyMixDef); the Modulation table of the sound can change both on its steps (NOI, MIX and GEN rows,
@@ -712,7 +712,7 @@ bool SeqWindow::slideActs(ymengine::SeqCmd kind, int s) const {
 }
 
 std::string SeqWindow::stepBlocks(SeqLane row, int s) const {
-    // Thirteenth DAW test, item 165 (D-374): what the sound of the step forbids, so that an empty cell is crossed too
+    // Thirteenth DAW test, item 165: what the sound of the step forbids, so that an empty cell is crossed too
     // (GEN on SID Voice: ENV crossed below it). The rows of the drums are hidden there.
     if (drum()) return {};
     const StepSound k = stepSound(s);
@@ -884,9 +884,9 @@ void SeqWindow::edit(const std::function<void(plugin::NonParamState&)>& fn) {
 // ------------------------------------------------------------------------------------------- Ticks rate
 
 void SeqWindow::resolutionMenu() {
-    // Resolutions of the prototype (BPM rate), 1/64 after 1/32 (D-422), 1/32T after 1/16T (D-433), then, under a rule,
-    // the Ticks rate of STYM2149 (D-149): a line lasts Speed replay ticks plus those of the groove; Speed and Groove
-    // are set in either rate. The check mark counts the plain entries only, the rules left out (D-422: it fell one
+    // Resolutions of the prototype (BPM rate), 1/64 after 1/32, 1/32T after 1/16T, then, under a rule,
+    // the Ticks rate of STYM2149: a line lasts Speed replay ticks plus those of the groove; Speed and Groove
+    // are set in either rate. The check mark counts the plain entries only, the rules left out (it fell one
     // entry too low after a rule).
     const ymengine::GlobalParams& g = st().global;
     const bool ticks = g.timing == ymengine::SeqTiming::Ticks;
@@ -915,7 +915,7 @@ void SeqWindow::resolutionMenu() {
     gr.label = "Groove: " + ymseq::grooveText(g.groove, g.grooveLength) + "...";
     gr.pick = [this] { askGroove(); };
     items.push_back(std::move(gr));
-    // Rows of the step commands (D-150; CMD, BPM, VIB, ENV, DLY and CUT since the eleventh DAW test), preference shared
+    // Rows of the step commands (CMD, BPM, VIB, ENV, DLY and CUT since the eleventh DAW test), preference shared
     // by all projects.
     items.push_back(MenuItem::separatorItem());
     MenuItem cmd;
@@ -935,7 +935,7 @@ void SeqWindow::resolutionMenu() {
     popup(reso_, std::move(items), checked);
 }
 
-// Another grid with notes in the patterns (Indus, 26/10/2026, D-448): Fit moves and resizes them so that they keep
+// Another grid with notes in the patterns (Indus, 26/10/2026): Fit moves and resizes them so that they keep
 // their time (every pattern, the tracks' own lengths and the rests of the Song; one undo step); Keep leaves them on
 // their steps, which then last the new resolution's time, as before; Cancel, the default, changes nothing.
 void SeqWindow::setResolution(int i) {
@@ -1008,11 +1008,11 @@ void SeqWindow::askGroove() {
 }
 
 void SeqWindow::askCmd(int s) {
-    // Box of the commands of the step (tenth DAW test, items 121, 122 and 130: D-329, D-330, D-338). An absent command
+    // Box of the commands of the step (tenth DAW test, items 121, 122 and 130). An absent command
     // shows a value to start from: restart at tick 0, the song's ticks per line, sync mark 1; volume slide down a
     // quarter step per tick, buzzer and noise slides up one unit, offset 0, fine tune 0 cents. OK writes the kinds of
-    // the box only (eleventh DAW test: the VIB, BPM, ENV, DLY and CUT rows have the others, D-341, D-342, D-347 to
-    // D-349; Xyz and Pxy are retired, D-340, D-344).
+    // the box only (eleventh DAW test: the VIB, BPM, ENV, DLY and CUT rows have the others;
+    // Xyz and Pxy are retired).
     using ymengine::SeqCmd;
     const ymengine::GlobalParams& g = st().global;
     const auto start = [&g](SeqCmd k) {
@@ -1033,15 +1033,15 @@ void SeqWindow::askCmd(int s) {
         const uint16_t c = lane().cmdAt(k, s);
         spec.entries[size_t(i - 1)] = {c != 0, c ? int(ymengine::seqCmdParam(c)) : start(k)};
     }
-    // The slides that cannot act from this step are left out (D-386), but those written there, to be switched off. The
-    // Volume Slide is only that of an older project: the Slide of the VOL row replaces it (D-393).
+    // The slides that cannot act from this step are left out, but those written there, to be switched off. The
+    // Volume Slide is only that of an older project: the Slide of the VOL row replaces it.
     for (size_t i = 0; i < CmdBox::kOrder.size(); ++i) {
         const SeqCmd k = CmdBox::kOrder[i];
         if (k == SeqCmd::VolSlide) spec.shown[i] = lane().cmdAt(k, s) != 0;
         else if (k == SeqCmd::EnvSlide || k == SeqCmd::NoiseSlide)
             spec.shown[i] = lane().cmdAt(k, s) != 0 || slideActs(k, s);
     }
-    // 16 channels: the Buzzer and Noise slides take a curve, Kxx and Qxx (D-394); the 3-channel modes leave them as
+    // 16 channels: the Buzzer and Noise slides take a curve, Kxx and Qxx; the 3-channel modes leave them as
     // they are (straight slides of the replay).
     spec.curves = !mode3();
     spec.ok = [this, s, at = stepTarget(), curves = spec.curves](const CmdBox::Entries& entries) {
@@ -1239,7 +1239,7 @@ void SeqWindow::layout() {
     // Row 3: tempo, gate, swing (value and "%" without a gap).
     const double gw = gatev_.naturalWidth() + gatePct_.naturalWidth();
     const double sw = swingv_.naturalWidth() + swingPct_.naturalWidth();
-    // BPM (D-244) keeps the width of the prototype's "Tempo": the row does not move.
+    // BPM keeps the width of the prototype's "Tempo": the row does not move.
     FlexItem bpmLab = lab(labBpm_);
     bpmLab.width = std::max(bpmLab.width, gemui::Font::width("Tempo", labBpm_.px()));
     std::vector<FlexItem> r3 = {bpmLab, {&bpm_, 0, 16}, {&bpmv_, bpmv_.naturalWidth(), 16},
@@ -1251,7 +1251,7 @@ void SeqWindow::layout() {
     gatePct_.setBox({r3[5].box.x + gatev_.naturalWidth(), r3[5].box.y, gatePct_.naturalWidth(), 16});
     swingv_.setBox({r3[8].box.x, r3[8].box.y, swingv_.naturalWidth(), 16});
     swingPct_.setBox({r3[8].box.x + swingv_.naturalWidth(), r3[8].box.y, swingPct_.naturalWidth(), 16});
-    // All button of the global gate (D-134), after the Gate label: it takes its space from the Gate slider alone, the
+    // All button of the global gate, after the Gate label: it takes its space from the Gate slider alone, the
     // Tempo and Swing sliders keep the prototype's.
     {
         const gemui::Box g = r3[4].box;
@@ -1271,8 +1271,8 @@ void SeqWindow::layout() {
     const int gridH = grid_.naturalHeight();
     grid_.setBox({x, y + 8, double(SeqGrid::kWidth), double(gridH)});
     fitTrSlider();
-    // The scroll bar beside the whole grid, from the step numbers down to the last control row (D-294; ninth DAW test,
-    // item 108, D-309: over the note rows before); the prototype's slider stood 8 px above the note rows, beside the
+    // The scroll bar beside the whole grid, from the step numbers down to the last control row (ninth DAW test,
+    // item 108, over the note rows before); the prototype's slider stood 8 px above the note rows, beside the
     // grid.
     tr_.setBox({ox + kW - kInset - gemui::ScrollPane::kBar, y + 8, double(gemui::ScrollPane::kBar), double(gridH)});
     trProto_ = {x + SeqGrid::kWidth + 6 + 2, y + trTop_, 16, double(trHeight_)};
@@ -1283,7 +1283,7 @@ void SeqWindow::layout() {
     scroll_.setVisible(scrolling);
     scrollv_.setVisible(scrolling);
     if (scrolling) {
-        // Room for the widest readout ("193-256"): the slider's right arrow stays put while the view moves (D-297).
+        // Room for the widest readout ("193-256"): the slider's right arrow stays put while the view moves.
         FlexItem readout = lab(scrollv_);
         readout.width = std::max(readout.width, gemui::Font::width("000-000", scrollv_.px()));
         std::vector<FlexItem> rs = {{&scroll_, 0, 16}, readout};
@@ -1334,7 +1334,7 @@ void SeqWindow::layout() {
     y += th;
 
     // Overview (#overRow, margin-top 6) and its line, or the legend: the overview keeps its line alone (twelfth DAW
-    // test, item 151, D-360).
+    // test, item 151).
     overMap_.setVisible(ses().overview);
     overHint_.setVisible(ses().overview);
     hint_.setVisible(!ses().overview);
@@ -1352,7 +1352,7 @@ void SeqWindow::layout() {
 
     // Bottom of the window: margin of .mixbody (8), margin and border of .gwin (4 + 2).
     const double h = y + 8 + 4 + 2 - oy;
-    // Grown past the bottom of the desktop (every control row, the 2 px gaps of the grid, D-458): the window moves up
+    // Grown past the bottom of the desktop (every control row, the 2 px gaps of the grid): the window moves up
     // until its bottom shows, its top never above the menu bar.
     const gemui::Desktop& d = m_.desktop();
     const double top = std::max(double(d.workTop()), std::min(oy, double(d.height()) - h));
@@ -1390,8 +1390,8 @@ std::vector<MenuItem> SeqWindow::figItems() {
         MenuItem m;
         m.label = name + " " + std::to_string(n) + (n > 1 ? " steps" : " step");
         m.icon = &icons::kFigures[size_t(k)];
-        // A value that is not a whole number of steps is greyed, its length shown unrounded (Indus, 25/10/2026 17:21,
-        // D-425): a thirty-second note in 1/16 lasts half a step, a quarter-note triplet two steps and two thirds.
+        // A value that is not a whole number of steps is greyed, its length shown unrounded (Indus, 25/10/2026 17:21):
+        // a thirty-second note in 1/16 lasts half a step, a quarter-note triplet two steps and two thirds.
         if (!ymseq::figureFits(k, r)) {
             const double x = ymseq::figureStepsExact(k, r);
             std::string v = fmt2(x);
@@ -1428,7 +1428,7 @@ void SeqWindow::refresh() {
     EditorSession& s = ses();
     s.viewStart = std::clamp(s.viewStart, 0, std::max(0, steps() - SeqGrid::kCols));
     s.curStep = std::clamp(s.curStep, 0, ymseq::kSteps - 1);
-    // Deviation (D-282): on a drum track the cursor stays on the eight instrument rows (it could stay on a hidden row
+    // Deviation: on a drum track the cursor stays on the eight instrument rows (it could stay on a hidden row
     // left by a melodic track, where Enter wrote an instrument that does not exist).
     s.curRow = std::clamp(s.curRow, drum() ? SeqGrid::kRows - 8 : 0, SeqGrid::kRows - 1);
     if (!isOpen()) return;
@@ -1462,7 +1462,7 @@ void SeqWindow::refreshControls() {
     const bool midi = clock == ymengine::SeqClock::Midi, host = clock == ymengine::SeqClock::Host;
     const double tempo = m_.pv(Global::FreeTempo);
     if (!keep(bpm_)) bpm_.setValue(tempo);
-    // Ticks in Free run (D-149): the tempo no longer drives the lines; the value shows the resulting tempo (without the
+    // Ticks in Free run: the tempo no longer drives the lines; the value shows the resulting tempo (without the
     // groove); the swing is replaced by the groove.
     const bool ticksRun = g.timing == ymengine::SeqTiming::Ticks && !midi && !host;
     bpm_.setEnabled(!midi && !host && !ticksRun);
@@ -1483,7 +1483,7 @@ void SeqWindow::refreshControls() {
     if (!keep(swing_)) swing_.setValue(swing);
     swing_.setEnabled(!ticksRun);
     swingv_.setDim(ticksRun);
-    if (!swingv_.editing()) swingv_.setText(std::to_string(swing));  // without "%" (D-119)
+    if (!swingv_.editing()) swingv_.setText(std::to_string(swing));  // without "%"
 
     // Scale (refreshScale, refreshScaleEnable).
     const int sc = scale();
@@ -1515,7 +1515,7 @@ void SeqWindow::refreshControls() {
         reso_.setText(std::string(ymseq::kResolutions[size_t(resolution())].label));
         reso_.setTip("Value of one step");
     }
-    // The note drawn rather than its name (24/10/2026, D-382): Step, the note of the resolution.
+    // The note drawn rather than its name (24/10/2026): Step, the note of the resolution.
     static constexpr std::array<int, ymseq::kResolutionCount> kStepFigure = {3, 4, 5, 6, 11, 12, 13, 7, 14};
     const int fig = inputFigure();
     fig_.setText({});
@@ -1701,7 +1701,7 @@ void SeqWindow::setViewBase(int base) {
 
 void SeqWindow::togglePlay() {
     // seqPlay.onclick: Play or Stop; stopping clears the playhead and disarms Rec.
-    if (m_.seqClock() == ymengine::SeqClock::Host) return;  // the host drives the transport (D-110)
+    if (m_.seqClock() == ymengine::SeqClock::Host) return;  // the host drives the transport
     if (playing_) {
         m_.host_.seqCommand(Host::SeqCommand::Stop);
         playing_ = false;
@@ -1882,7 +1882,7 @@ SeqWindow::CutState SeqWindow::cutState() const {
     }
     c.cut = noteUnderCursor() >= 0;
     c.what = "Note";
-    c.paste = !drum() && ses().noteClip.has_value();  // a note is not pasted on a drum track (D-282), as Ctrl+V
+    c.paste = !drum() && ses().noteClip.has_value();  // a note is not pasted on a drum track, as Ctrl+V
     return c;
 }
 
@@ -1917,7 +1917,7 @@ void SeqWindow::copyNote(int s, bool cut) {
 }
 
 bool SeqWindow::pasteNote(int s, int row) {
-    // Deviation (D-282): not on a drum track, whose rows are instruments and whose ties are HLD (Edit > Paste wrote a
+    // Deviation: not on a drum track, whose rows are instruments and whose ties are HLD (Edit > Paste wrote a
     // hit there and held the steps that followed; Ctrl+V was already refused).
     if (!ses().noteClip || drum() || s < 0 || s >= length()) return false;
     pushUndo();
@@ -2164,12 +2164,12 @@ bool SeqWindow::cursorKey(const gemui::KeyEvent& e) {
     case Key::Enter: {
         pushUndo();
         const int c = s.curStep;
-        if (dr) s.curRow = std::clamp(s.curRow, 12 - 7, 12);  // the eight instruments (D-282)
+        if (dr) s.curRow = std::clamp(s.curRow, 12 - 7, 12);  // the eight instruments
         const int off = dr ? 12 - s.curRow : viewSemi() + 12 - s.curRow;
         bool wrote = false;
         editLane([&](ymseq::LaneEditor& ed, ymseq::Lane& l) {
             const bool same = l.pat[size_t(c)] >= 0 && (dr ? l.pat[size_t(c)] : ed.relNote(c)) == off;
-            if (same && !dr) {  // already there: remove it, with its hold (D-282: the hold went to the note before)
+            if (same && !dr) {  // already there: remove it, with its hold (the hold went to the note before)
                 ed.cutNoteAt(c);
             } else if (same) {
                 l.pat[size_t(c)] = -1;

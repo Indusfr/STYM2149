@@ -1,5 +1,5 @@
-// STYM2149 — plugincore: import of XM modules (M7, B5, D-166, D-173): notes, ties, volume, panning, the effects of
-// D-338 (Axy, 9xx, EDx, ECx, E5x; 0xy, 1xx and 2xx left out since D-340 and D-344), Song (jumps, pattern ends,
+// STYM2149 — plugincore: import of XM modules: notes, ties, volume, panning, the step
+// effects (Axy, 9xx, EDx, ECx, E5x; 0xy, 1xx and 2xx left out), Song (jumps, pattern ends,
 // restart), Ticks or BPM timing, instruments and DMA slots, render of the project.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -83,7 +83,7 @@ bool has(const XmImport& r, const std::string& line) {
 
 }  // namespace
 
-TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340)", "[xmimport]") {
+TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out", "[xmimport]") {
     XmModule m = module(3, {8});
     m.instruments = {instrument("lead", {tone(1000, 1, 0, 1000)})};
     put(m, 0, 0, 0, {49, 1, 0, 0, 0});           // C-4 at the sample's volume (48)
@@ -111,7 +111,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340
     CHECK(a.ins[0] == 1);
     CHECK(a.vol[0] == 11);  // 48 × 15 / 64
     CHECK((a.tie[0] && a.tie[1] && a.tie[2]));
-    CHECK((a.vol[1] == 11 && a.vol[2] == 11));  // the volume of the note over its held lines (D-345)
+    CHECK((a.vol[1] == 11 && a.vol[2] == 11));  // the volume of the note over its held lines
     CHECK(a.tie[3] == 0);  // release
     CHECK(a.pat[3] == -1);
     CHECK(a.pat[4] == 3);
@@ -130,7 +130,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340
     CHECK(b.pnr[1] == 201);  // hard right
     CHECK(b.pnr[7] == 201);  // panning held over the lines of the note
     CHECK(b.vol[4] == 11);
-    CHECK((b.vol[5] == 8 && b.vol[7] == 8));  // C20 during the note: VOL of the held lines (D-345)
+    CHECK((b.vol[5] == 8 && b.vol[7] == 8));  // C20 during the note: VOL of the held lines
     CHECK(p.lane(2).empty());
 
     CHECK(r.ticks);
@@ -146,7 +146,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340
     CHECK(st.dma.slots[0] == ymengine::DmaSlot{0, false, 60, true});
     CHECK(st.dmaSamples[0].size() == 748);  // 1000 frames from 8363 Hz to 6258 Hz
     CHECK(st.dmaSamples[0][0] < 0);
-    CHECK(st.dmaNames[0] == "tone");  // the name of the sample (D-445)
+    CHECK(st.dmaNames[0] == "tone");  // the name of the sample
     REQUIRE(st.seq.song.size() == 1);
     CHECK(st.seq.song.entries[0] == ymseq::SongEntry{0, 1, 0, ymseq::SongKind::Pattern, 0, false});
     CHECK(st.seq.used[0]);
@@ -164,7 +164,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340
     CHECK(msg[8] == "• Effects left out: 0xx (1), 3xx (1).");
 }
 
-TEST_CASE("XM import: Axy, 9xx, EDx, ECx and E5x as commands of the CMD row (D-338); 1xx and 2xx left out (D-344)",
+TEST_CASE("XM import: Axy, 9xx, EDx, ECx and E5x as commands of the CMD row; 1xx and 2xx left out",
           "[xmimport]") {
     using ymengine::seqCmd;
     XmModule m = module(1, {10});
@@ -268,7 +268,7 @@ TEST_CASE("XM import: Song walked like Fasttracker II (jumps, pattern ends, rest
     }
 }
 
-TEST_CASE("XM import: BPM timing, tempo of each entry, BPM row within a pattern (D-243, item 150)", "[xmimport]") {
+TEST_CASE("XM import: BPM timing, tempo of each entry, BPM row within a pattern (item 150)", "[xmimport]") {
     XmModule m = module(1, {4, 4, 4});
     m.instruments = {instrument("x", {tone(100)})};
     m.bpm = 140;
@@ -300,14 +300,14 @@ TEST_CASE("XM import: BPM timing, tempo of each entry, BPM row within a pattern 
     CHECK(msg[5] == "Tempo 140 BPM, STE machine.");
 }
 
-TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track (D-330)", "[xmimport]") {
+TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track", "[xmimport]") {
     XmModule m = module(2, {8});
     m.instruments = {instrument("x", {tone(100)})};
     m.bpm = 150;
     put(m, 0, 0, 0, {49, 1, 0, 0, 0});
     put(m, 0, 2, 1, {0, 0, 0, 0xF, 0x03});  // channel without notes: Sxx on track 1
     put(m, 0, 4, 0, {0, 0, 0, 0xF, 0x04});
-    put(m, 0, 6, 0, {0, 0, 0, 0x0, 0x47});  // 0xy: left out (D-340)
+    put(m, 0, 6, 0, {0, 0, 0, 0x0, 0x47});  // 0xy: left out
     put(m, 0, 6, 1, {0, 0, 0, 0xF, 0x02});
     NonParamState st;
     const XmImport r = run(m, VoiceMode::Studio16, st);
@@ -322,7 +322,7 @@ TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track (D-330)", "
                        [](const std::string& n) { return n.starts_with("Speed changes without"); }));
 }
 
-TEST_CASE("XM import: eight instruments at most, the most played; names of the DMA slots (D-445)", "[xmimport]") {
+TEST_CASE("XM import: eight instruments at most, the most played; names of the DMA slots", "[xmimport]") {
     XmModule m = module(1, {64});
     for (int i = 1; i <= 10; ++i) {
         XmSample s = tone(100);

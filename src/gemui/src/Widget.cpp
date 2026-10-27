@@ -44,7 +44,7 @@ void Widget::moveBy(int dx, int dy) {
     for (Widget* c : children_) c->moveBy(dx, dy);
 }
 
-// Used to lay a moved window out at its home place, then carry it back (MainWindow::layout, D-224).
+// Used to lay a moved window out at its home place, then carry it back (MainWindow::layout).
 void Widget::translate(int dx, int dy) noexcept {
     bounds_ = bounds_.translated(dx, dy);
     box_.x += dx;

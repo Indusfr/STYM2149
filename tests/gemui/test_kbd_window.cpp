@@ -1,6 +1,6 @@
-// STYM2149 — Computer Keyboard window (M5): opening, playing on the computer keyboard according to the layout, repeat
+// STYM2149 — Computer Keyboard window: opening, playing on the computer keyboard according to the layout, repeat
 // ignored, release of the played note, octave (buttons, Z and X, numeric keypad, drawing), Keep and Follow, drawing
-// clicked with the mouse, closing that cuts the playing, place kept (D-131).
+// clicked with the mouse, closing that cuts the playing, place kept.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -126,7 +126,7 @@ bool numpad(MainWindow& w, int n) {
     return w.desktop().keyDown(e);
 }
 
-// Entry of a menu opened below a button (its frame on the button's bottom rule, D-396; 20 px entries inside a 2 px
+// Entry of a menu opened below a button (its frame on the button's bottom rule; 20 px entries inside a 2 px
 // border).
 void pick(MainWindow& w, const std::string& anchor, int index) {
     const auto r = w.rectOf(anchor);
@@ -154,7 +154,7 @@ TEST_CASE("Computer Keyboard: keys according to the layout (kbdAction)", "[ui][k
     CHECK(act(U'x', "auto").kind == Kind::OctUp);
     CHECK(act(U'm', "auto").kind == Kind::Metro);
     CHECK(act(U'q', "auto").kind == Kind::None);
-    // AZERTY: Q Z S E D F T G Y H U J K O L P M ù; W and X for the octave, the comma for the metronome (D-131).
+    // AZERTY: Q Z S E D F T G Y H U J K O L P M ù; W and X for the octave, the comma for the metronome.
     const std::u32string azerty = U"qzsedftgyhujkolpmù";
     for (size_t i = 0; i < azerty.size(); ++i) {
         const KbdAction a = act(azerty[i], "azerty");
@@ -376,7 +376,7 @@ TEST_CASE("Computer Keyboard: the drawing plays with the mouse; AZERTY layout", 
     CHECK(down(w, U','));
 }
 
-TEST_CASE("Computer Keyboard: Auto takes the system's layout (second DAW test, item 14, D-215)", "[ui][kbd]") {
+TEST_CASE("Computer Keyboard: Auto takes the system's layout (second DAW test, item 14)", "[ui][kbd]") {
     TestHost h;
     h.system = "azerty";
     MainWindow w(h);
@@ -519,7 +519,7 @@ TEST_CASE("Sequencer: the notes of the playing step light the keyboard drawing (
     CHECK(h.take() == std::vector<Midi>{{kOn, 55, 127}, {kOff, 55, 0}});
 }
 
-TEST_CASE("Sequencer: overlapping notes all light the keyboard drawing, each for its own steps (D-281)", "[ui][kbd]") {
+TEST_CASE("Sequencer: overlapping notes all light the keyboard drawing, each for its own steps", "[ui][kbd]") {
     // Indus's case (21/10/2026): A3 held from step 4 to 8, G3 from step 6 to 10 and F3 from step 8 to 12, the two
     // last as chord voice 2 (the first free voice of the grid at their step). The prototype lit A3 alone.
     TestHost h;
@@ -586,7 +586,7 @@ TEST_CASE("Sequencer: a chord voice greyed out in the grid does not light the ke
     CHECK(lit(2, 0) == std::pair{true, false});  // Dual chip 2x3ch
 }
 
-TEST_CASE("Computer Keyboard: pads on a percussion track (fourth DAW test, item 31, D-229)", "[ui][kbd]") {
+TEST_CASE("Computer Keyboard: pads on a percussion track (fourth DAW test, item 31)", "[ui][kbd]") {
     TestHost h;
     auto gen = [&](ymengine::Generator g) {
         h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(g);

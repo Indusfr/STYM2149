@@ -1,4 +1,4 @@
-// STYM2149 — echo of the notes of a track (eighth DAW test, item 98, D-299) in the plugin state (TSEQ chunk), the
+// STYM2149 — echo of the notes of a track (eighth DAW test, item 98) in the plugin state (TSEQ chunk), the
 // Patches library ("echo" key, STYM2149 marker) and the instruments; values brought back into their ranges.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

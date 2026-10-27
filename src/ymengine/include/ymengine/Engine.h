@@ -5,13 +5,13 @@
 // Takes over the engine of the prototype (worklet YMProc: allocation and triggering of voices, generators, ADSR,
 // vibrato, modulation table, slides, arpeggio played on the keyboard) on top of the ymcore emulation:
 // - 16-channel mode: each voice is a virtual YM channel computed by events (VirtualChannel), mixed in floating
-//   point on two buses at the internal step, each resampled once (D-018, D-049);
+//   point on two buses at the internal step, each resampled once;
 // - 3-channel and dual-chip modes: the voices write the registers of real chips (ChipRenderer), noise and
-//   envelope shared according to the rules of D-050; mono output like the ST.
+//   envelope registers shared between the voices; mono output like the ST.
 // Timer effects go through the MFP 68901 (quantised) or are continuous (TimerMode::Free).
 //
 // Audio thread: render() and the event functions do not allocate, do not lock and make no system call.
-// prepare() allocates. The engine is not shared between threads: the plugin (M3) passes it settings and
+// prepare() allocates. The engine is not shared between threads: the plugin passes it settings and
 // events from its audio thread.
 #pragma once
 #include <array>
@@ -29,7 +29,7 @@
 
 namespace stym::ymengine {
 
-enum class VoiceTag : uint8_t { Manual, Arp, Sequencer, Chord, Echo };  // Echo: repeat of a note (D-299)
+enum class VoiceTag : uint8_t { Manual, Arp, Sequencer, Chord, Echo };  // Echo: repeat of a note
 
 // Outputs of a render. The separate outputs (plugin buses, STYM2149_SPEC.md §7) are mono and go through the same
 // output stage as the main mix (main level, tanh or linear):
@@ -39,8 +39,8 @@ enum class VoiceTag : uint8_t { Manual, Arp, Sequencer, Chord, Echo };  // Echo:
 //   preparation (EngineConfig::trackOutputs);
 // - chip: each chip of the 3-channel modes; silent in 16-channel mode (the channels are virtual there).
 // A null pointer: output not wanted for this render.
-// Frame of the register recorder (M6, B11, D-157): the state of a chip of the 3-channel modes at the start of a
-// replay tick, as a YM file player would replay it at each tick (YM6 and SNDH exports of M7):
+// Frame of the register recorder: the state of a chip of the 3-channel modes at the start of a
+// replay tick, as a YM file player would replay it at each tick (YM6 and SNDH exports):
 // - reg: R0 to R13 as written to the chip, writes dated at the start of the frame included; the muted channels
 //   (mute, solo) have a zero volume in it, as heard;
 // - r13: R13 written during the previous frame (envelope retrigger), or first frame of a take where a channel
@@ -51,7 +51,7 @@ enum class VoiceTag : uint8_t { Manual, Arp, Sequencer, Chord, Echo };  // Echo:
 //   restart: the timer of the channel fired during the previous frame (attack: a Digidrum restarts at the start
 //   of its sample), or it is the first frame of the take;
 // - sync: parameter of the last Zxx command of the sequencer since the previous frame (demo sync, written by the
-//   SNDH export, D-150), -1 without Zxx.
+//   SNDH export), -1 without Zxx.
 struct RegisterFrame {
     struct Effect {
         bool on = false;
@@ -68,7 +68,7 @@ struct RegisterFrame {
     bool operator==(const RegisterFrame&) const = default;
 };
 
-// STE DMA sound at a frame of the recorder (M7, D-162). Only one DMA channel on the hardware: the DMA voice started
+// STE DMA sound at a frame of the recorder. Only one DMA channel on the hardware: the DMA voice started
 // most recently takes it at its attack and keeps it until its end (older voices do not come back to it).
 struct DmaFrame {
     bool on = false;
@@ -77,7 +77,7 @@ struct DmaFrame {
     uint8_t voices = 0;    // DMA voices that sound (more than one: layered)
     float step = 1;        // pitch ratio (1: rate of the sample)
     float gain = 1;        // volume of the note, from 0 to 1
-    uint32_t start = 0;    // first frame of the slot read at the attack (its Start, D-444, then Oxx, D-338)
+    uint32_t start = 0;    // first frame of the slot read at the attack (its Start, then Oxx)
     bool operator==(const DmaFrame&) const = default;
 };
 
@@ -89,7 +89,7 @@ struct Outputs {
     std::array<float*, kTracks> track{};
     std::array<float*, 2> chip{};
     // Metronome alone, mono, added to what is there; null: added to left and right. The plugin adds it to its output
-    // after taking the oscilloscope and the output meters (third DAW test, item 27, D-226).
+    // after taking the oscilloscope and the output meters (third DAW test, item 27).
     float* click = nullptr;
 };
 
@@ -97,7 +97,7 @@ struct Outputs {
 // then makes every other call from the one thread that renders; the state lives in Impl (src/EngineImpl.h).
 class Engine {
 public:
-    // Voices of the prototype: 16 track voices, 80 sequencer chord voices (16 × 5, M5), 16 free voices.
+    // Voices of the prototype: 16 track voices, 80 sequencer chord voices (16 × 5), 16 free voices.
     // Indices: voice t (0 to 15) is the voice of track t, 16 + 5t + k the chord voice of rank k of track t, then the
     // free voices. In the 3-channel modes, voice 3 × chip + channel plays a channel of a chip, and voices 6 to 13 the
     // DMA tracks of the STE machine.
@@ -135,12 +135,12 @@ public:
     // Digidrum sample of a slot: 4-bit values (0-15) at 7 800 Hz, copied (truncated to kMaxUserSample). An empty
     // slot plays nothing.
     void setUserSample(int slot, std::span<const uint8_t> nibbles) noexcept;
-    // Playback of a Digidrum slot (rate, root note, fine tune, loop; M6, B9, D-154), read at the attack (the loop)
+    // Playback of a Digidrum slot (rate, root note, fine tune, loop), read at the attack (the loop)
     // and at each pitch computation (the rate). Values brought within their ranges.
     void setDigidrumSlot(int slot, const DigidrumSlot& s) noexcept;
     const DigidrumSlot& digidrumSlot(int slot) const noexcept;
 
-    // STE DMA bank (M6, B8, D-153), played by the DMA voices (Generator::Dma) with the STE machine
+    // STE DMA bank, played by the DMA voices (Generator::Dma) with the STE machine
     // (GlobalParams::ste): settings of the slots (rate, mono or stereo, root note, loop), read at the attack, and
     // signed bytes of a slot (copied, truncated to kDmaMaxBytes; the voices playing it stop). Without
     // allocation.
@@ -156,23 +156,23 @@ public:
     // applying only to the focused track. A track beyond the current mode (3-channel: 4 tracks per chip) is
     // ignored. noteOff(track ≥ 0) only releases the notes of this track. Velocity 1 to 127 (above: 127); 0 or less is
     // a noteOff.
-    // `channel` 1 to 15: a note of that MPE member channel (D-432), whose bend, pressure and slide its channel sets
+    // `channel` 1 to 15: a note of that MPE member channel, whose bend, pressure and slide its channel sets
     // (mpeBend, mpePressure, mpeSlide); noteOff then releases the note of that channel only.
     void noteOn(uint32_t offset, int note, int velocity, int track = -1, int channel = 0) noexcept;
     void noteOff(uint32_t offset, int note, int track = -1, int channel = 0) noexcept;
     // Pitch bend and wheel: all the tracks (`track` < 0) or only one. The bend drives what GlobalParams::bendTarget
-    // says (D-432), the pitch by default.
+    // says, the pitch by default.
     void pitchBend(uint32_t offset, double semitones, int track = -1) noexcept;
-    // Modulation wheel, 0 to 1: what GlobalParams::wheelTarget says, at the VBL cadence (D-432). By default a vibrato
+    // Modulation wheel, 0 to 1: what GlobalParams::wheelTarget says, at the VBL cadence. By default a vibrato
     // added to that of the track, up to GlobalParams::expressCents, at the speed of the track (like the vibrato of the
     // prototype). Drums have none.
     void modWheel(uint32_t offset, double amount, int track = -1) noexcept;
-    // Aftertouch (D-432): the pressure, 0 to 1, of a channel on all the tracks (`track` < 0) or one, and that of one
+    // Aftertouch: the pressure, 0 to 1, of a channel on all the tracks (`track` < 0) or one, and that of one
     // note (polyphonic aftertouch). A note takes the higher of the two; GlobalParams::aftertouch says what it drives,
     // at the VBL cadence like the wheel. Drums have none.
     void channelPressure(uint32_t offset, double amount, int track = -1) noexcept;
     void notePressure(uint32_t offset, int note, double amount, int track = -1) noexcept;
-    // MPE (D-432): the bend in semitones, the pressure (0 to 1) and the slide (CC74, 0 to 1, 0.5 changes nothing) of
+    // MPE: the bend in semitones, the pressure (0 to 1) and the slide (CC74, 0 to 1, 0.5 changes nothing) of
     // member channel 1 to 15, for its sounding notes and the next ones. The pressure drives what the aftertouch drives,
     // the slide what GlobalParams::mpeSlide says.
     void mpeBend(uint32_t offset, int channel, double semitones) noexcept;
@@ -188,16 +188,16 @@ public:
     void midiStop(uint32_t offset) noexcept;
     void midiContinue(uint32_t offset) noexcept;
     void midiSongPosition(uint32_t offset, int sixteenths) noexcept;  // SPP, in sixteenth notes
-    // Program Change (M6, B10, D-156): the track (`track` ≥ 0) or all the tracks (`track` < 0) from now on play
+    // Program Change: the track (`track` ≥ 0) or all the tracks (`track` < 0) from now on play
     // instrument `program` (1 to 32) instead of their sound, or their sound again (0), like the INS row: notes
     // played live (keyboard arpeggio included) and sequencer steps whose INS row is 00. The notes that are
     // sounding keep their sound; a drum track has no instrument. Above 32: ignored.
     void programChange(uint32_t offset, int program, int track = -1) noexcept;
 
-    // Sequencer (M5). The patterns and the Song come from an immutable snapshot, read by the audio thread: its
+    // Sequencer. The patterns and the Song come from an immutable snapshot, read by the audio thread: its
     // owner keeps it alive until another one has replaced it (next setSequence). nullptr: nothing.
     void setSequence(const SeqData* data) noexcept;
-    // Instruments of the project (M6, D-147), read like the patterns: its owner keeps the table alive until the
+    // Instruments of the project, read like the patterns: its owner keeps the table alive until the
     // next call. A melodic step whose INS row is n (1 to 32) plays instrument n instead of the sound of its track
     // (sound, volume and arpeggio; level, panning, gate and role of the track stay those of the track);
     // an empty slot, or nullptr: the sound of the track.
@@ -228,18 +228,18 @@ public:
     // Preview of an instrument of the Chipdrum kit (Audition button of the Drum Kit window, drumprev): its
     // 16-channel sample, played as is into the main output, whatever the track.
     void drumPreview(uint32_t offset, int slot) noexcept;
-    // Preview of a Digidrum slot (editor, D-154): from Start to End (D-443), at its rate and fine tune, through the
+    // Preview of a Digidrum slot (editor): from Start to End, at its rate and fine tune, through the
     // level table of the chip (one channel alone), added to the mix like the preview of the kit. With the slot's Loop
-    // on, the part repeats until digidrumStopPreview or until Loop goes off; otherwise it plays once (D-449).
+    // on, the part repeats until digidrumStopPreview or until Loop goes off; otherwise it plays once.
     void digidrumPreview(uint32_t offset, int slot) noexcept;
     void digidrumStopPreview(uint32_t offset) noexcept;
     // Preview of a DMA slot (DMA window): at its rate, centred, added to the mix like that of a Digidrum, whatever
-    // the machine, once or in a loop as a Digidrum's (D-449); only one at a time. The panic (allNotesOff) stops both.
+    // the machine, once or in a loop as a Digidrum's; only one at a time. The panic (allNotesOff) stops both.
     void dmaPreview(uint32_t offset, int slot) noexcept;
     void dmaStopPreview(uint32_t offset) noexcept;
 
     // State of the sequencer for the interface (read between two renders). queued: -1 when nothing is queued;
-    // pattern and queued are also -1 for a Rest or NoteOff entry of the Song (D-158).
+    // pattern and queued are also -1 for a Rest or NoteOff entry of the Song.
     struct SeqStatus {
         bool playing = false;
         bool clockRunning = false;   // MIDI clock: SYNC (Start/Continue received) or STOP
@@ -263,7 +263,7 @@ public:
     // track (last note played on the channel).
     static constexpr int kScopePoints = 128;
     static constexpr double kScopeRate = 6000;
-    // A stereo DMA sample (D-457): peak holds its left side's peaks, peakR its right side's (the same for the other
+    // A stereo DMA sample: peak holds its left side's peaks, peakR its right side's (the same for the other
     // voices), side half the difference of the right and left sides around scope, their mean (0 without one).
     struct TrackMeters {
         std::array<float, kTracks> peak{}, peakR{};
@@ -275,7 +275,7 @@ public:
 
     // Log of the sequencer decisions (parity tests with the prototype): filled without allocation as long as the
     // capacity reserved by the caller allows.
-    // The exports (M7, D-170) also read from it the track of an attack and the nominal tempo of each step, outside
+    // The exports also read from it the track of an attack and the nominal tempo of each step, outside
     // the comparison with the prototype.
     struct SeqLogRecord {
         uint64_t sample;   // sample since the reset
@@ -294,7 +294,7 @@ public:
     // Render with separate outputs.
     void render(const Outputs& out, uint32_t n) noexcept;
 
-    // Bass and treble settings of the STE chain (D-047), without reallocation: the filters keep their state.
+    // Bass and treble settings of the STE chain, without reallocation: the filters keep their state.
     void setBoardTone(int bassDb, int trebleDb) noexcept;
 
     // Delay of the resampling, in samples (to report to the host).
@@ -319,7 +319,7 @@ public:
         bool envelope = false;        // volume driven by the envelope (bit 4)
         uint8_t noisePeriod = 0;      // current noise period (LFO included)
         uint16_t envPeriod = 0;       // current envelope period (pitch matrix and LFO included)
-        double lfoPan = 0;            // panning added by the LFO, -1 to 1 (D-257)
+        double lfoPan = 0;            // panning added by the LFO, -1 to 1
         uint8_t adsrStage = 0;        // 0: frozen, 1 attack, 2 decay, 3 sustain, 4 release
         double adsrLevel = 1;         // level at the start of the stage
         double adsrNow = 1;           // level at the end of the last render (envelope tracking on screen)
@@ -327,10 +327,10 @@ public:
     };
     VoiceInfo voice(int index) const noexcept;
     // Notes played live that a sequencer or chord note took the voice of while they sounded, in the 3-channel modes or
-    // with no free voice in 16 channels (D-431): one counter per MIDI note, wrapping at 256. The interface lets go of
+    // with no free voice in 16 channels: one counter per MIDI note, wrapping at 256. The interface lets go of
     // their keys.
     const std::array<uint8_t, 128>& manualCuts() const noexcept;
-    // DMA voice (D-153): its slot, its frame and its read step (frames of the sample per frame of the stream), at
+    // DMA voice: its slot, its frame and its read step (frames of the sample per frame of the stream), at
     // the rate of the slot. dmaPreviewSlot and digidrumPreviewSlot: slot being previewed (-1: none).
     struct DmaInfo {
         bool on = false;
@@ -343,7 +343,7 @@ public:
     int digidrumPreviewSlot() const noexcept;
     uint8_t dmaPlayingSlots() const noexcept;  // bit k: slot k played by a voice or the preview
     int program(int track) const noexcept;      // instrument chosen by Program Change (0: the sound of the track)
-    // DMA track whose sample is stereo: the right side has its own fader, mute and solo (TrackMix, D-459).
+    // DMA track whose sample is stereo: the right side has its own fader, mute and solo (TrackMix).
     bool trackStereo(int track) const noexcept;
     int activeVoices() const noexcept;
     uint64_t droppedEvents() const noexcept;
@@ -351,7 +351,7 @@ public:
     // Chips of the 3-channel mode (0 or 1).
     const ymcore::ChipRenderer& chip(int index) const noexcept;
 
-    // Register recorder (M6, B11, D-157). Between two renders: start of a take on chip `chip` (0, or 1 in dual
+    // Register recorder. Between two renders: start of a take on chip `chip` (0, or 1 in dual
     // chip) at the current sample, one frame (RegisterFrame) per replay tick (GlobalParams::vblHz at the start,
     // kept for the whole take), written to `frames`, which the caller keeps alive until stopCapture().
     // No effect in 16-channel mode, on an absent chip or without room (capturing() stays false). The take stops by

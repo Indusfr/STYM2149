@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: register exports of the File menu (M7, A5, STYM2149_SPEC.md §8, D-160, D-163)
+// STYM2149 — plugincore: register exports of the File menu (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/RegisterExport.h"
@@ -23,7 +23,7 @@ std::optional<RegisterCapture> captureRegisters(OfflineRender::Source source, co
     RegisterCapture out;
     if (voiceMode(values) != ymengine::VoiceMode::Authentic3) return out;
     OfflineRender r(source, kCaptureRate, values, extras);
-    const uint32_t hz = std::max<uint32_t>(1, toGlobal(values, extras.global).vblHz);  // replay tick (D-149)
+    const uint32_t hz = std::max<uint32_t>(1, toGlobal(values, extras.global).vblHz);  // replay tick
     // One hour of frames, plus those that the last rendered chunk takes beyond the stop.
     const uint64_t maxSamples = uint64_t(kOfflineMaxSeconds * kCaptureRate);
     const size_t room = size_t(kOfflineMaxSeconds) * hz + 64;

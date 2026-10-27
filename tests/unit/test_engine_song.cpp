@@ -1,4 +1,4 @@
-// STYM2149 — extended Song of the engine (M6, B12, D-158): Rest and Note-off entries, backward jumps (Loop), restart
+// STYM2149 — extended Song of the engine: Rest and Note-off entries, backward jumps (Loop), restart
 // point, end without loop, jumps without nesting, host position (Host sync) in a Song with jumps.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

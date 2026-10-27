@@ -2,7 +2,7 @@
 
 Programming: Pascal "Indus" Nowak (with Claude's help) — Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 
-The editor writes its tooltips in English, the only language built into the plugin (D-283). Every other language is a gettext PO file, the format of translation tools such as Poedit: French, German, Spanish, Portuguese (Brazil) and Italian are `fr.po`, `de.po`, `es.po`, `pt.po` and `it.po` in `languages/` at the root of the sources. The installers put them in a folder of the computer, where the plugins and the application read them each time the Language menu of Options > Settings opens:
+The editor writes its tooltips in English, the only language built into the plugin. Every other language is a gettext PO file, the format of translation tools such as Poedit: French, German, Spanish, Portuguese (Brazil) and Italian are `fr.po`, `de.po`, `es.po`, `pt.po` and `it.po` in `languages/` at the root of the sources. The installers put them in a folder of the computer, where the plugins and the application read them each time the Language menu of Options > Settings opens:
 
 | System | Installed languages | Written by |
 |---|---|---|
@@ -28,7 +28,7 @@ A part of a line that varies (a number, a name) is written `{1}` to `{9}` in the
 
 A new language shipped with STYM2149 is one more PO file in `languages/` (a copy of `template.pot` with its header filled in): the installers take every `.po` file of the folder.
 
-The translations were written without a native speaker's review (TO CONFIRM, D-185).
+The translations were written without a native speaker's review (TO CONFIRM).
 
 ## Languages of the users
 

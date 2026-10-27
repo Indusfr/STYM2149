@@ -1,5 +1,5 @@
-// STYM2149 — Ticks timing in the Step Sequencer window (M6, B5, D-149): entries of the Resolution menu, typed speed
-// and groove, button and tempo shown; 100 and 200 Hz replay tick in Settings > VBL frequency (D-441).
+// STYM2149 — Ticks timing in the Step Sequencer window: entries of the Resolution menu, typed speed
+// and groove, button and tempo shown; 100 and 200 Hz replay tick in Settings > VBL frequency.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -137,11 +137,11 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(text(w, "seqReso") == "1/16");
     CHECK(enabled(w, "bpm"));
 
-    // Resolutions of the prototype (1/16 checked), 1/64 after 1/32 (D-422), 1/32T after 1/16T (D-433), then below a
+    // Resolutions of the prototype (1/16 checked), 1/64 after 1/32, 1/32T after 1/16T, then below a
     // rule the entries of the Ticks timing.
     click(w, "seqReso");
     std::vector<std::string> l = labels(w);
-    REQUIRE(l.size() == 16);  // then the CMD row preference (D-150)
+    REQUIRE(l.size() == 16);  // then the CMD row preference
     CHECK(l[3] == "1/32 thirty-second");
     CHECK(l[4] == "1/64 sixty-fourth");
     CHECK(l[5] == "---");
@@ -163,7 +163,7 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(text(w, "bpmVal") == "ticks 125.00");
 
     // Speed: brought into 1-31; a text that is not a number changes nothing. The check mark is on the Ticks entry,
-    // the tenth plain one (it fell on Groove before D-422, which counts the plain entries only).
+    // the tenth plain one (counting the plain entries only; it once fell on Groove).
     click(w, "seqReso");
     CHECK(menu(w).checked() == 9);
     pick(w, 12);
@@ -212,7 +212,7 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(enabled(w, "bpm"));
     CHECK(enabled(w, "swing"));
 
-    // 1/64 (D-422): saved as the eighth resolution, shown after 1/32; the check mark follows the order of the menu,
+    // 1/64: saved as the eighth resolution, shown after 1/32; the check mark follows the order of the menu,
     // that of a triplet the plain entries (1/4T is the sixth one, after the rule).
     click(w, "seqReso");
     pick(w, 4);
@@ -245,7 +245,7 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     click(w, "seqReso");
     CHECK(menu(w).checked() == 5);
 
-    // 1/32T (D-433): saved as the ninth resolution, shown after 1/16T, twelve steps per quarter note. The Note button
+    // 1/32T: saved as the ninth resolution, shown after 1/16T, twelve steps per quarter note. The Note button
     // draws the thirty-second-note triplet for Step, the last value of the Note menu, one step long.
     pick(w, 9);
     CHECK(h.state.global.resolution == 8);
@@ -271,7 +271,7 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     w.desktop().closePopups();
 }
 
-TEST_CASE("Ticks: Settings > VBL frequency, 50 to 200 Hz, out of the Options menu (D-441)", "[ui][ticks]") {
+TEST_CASE("Ticks: Settings > VBL frequency, 50 to 200 Hz, out of the Options menu", "[ui][ticks]") {
     // Indus, 26/10/2026 04:03: the VBL frequency belongs in the Settings window.
     TestHost h;
     MainWindow w(h);
@@ -328,8 +328,7 @@ bool undoKey(MainWindow& w) {
 
 }  // namespace
 
-TEST_CASE("Resolution: with notes in the patterns, an alert asks whether they fit the new grid (Indus, 26/10/2026, "
-          "D-448)",
+TEST_CASE("Resolution: with notes in the patterns, an alert asks whether they fit the new grid (Indus, 26/10/2026)",
           "[ui][seq]") {
     TestHost h;
     // 1/16: a note at step 4 held 4 steps (beat 2, one beat long), a tempo at step 8, a Rest of 16 steps in the Song.

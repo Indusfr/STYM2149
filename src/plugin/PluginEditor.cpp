@@ -30,7 +30,7 @@ juce::String str(std::string_view s) { return juce::String::fromUTF8(s.data(), i
 
 constexpr int kZoomMin = 50, kZoomMax = 200;
 // Size of the editor at a zoom: the 100 % zoom shows the desktop at 5/8 of its logical size, half of it (first DAW
-// test, item 5: D-202) made 25 % larger (second DAW test, item 15: D-216); 160 % shows it at its logical size.
+// test, item 5) made 25 % larger (second DAW test, item 15); 160 % shows it at its logical size.
 constexpr int kZoomFull = 160;
 constexpr int zoomed(int logicalSize, int zoom) noexcept { return logicalSize * zoom / kZoomFull; }
 
@@ -142,7 +142,7 @@ StymEditor::StymEditor(StymProcessor& owner, std::unique_ptr<juce::PropertiesFil
     const int stored = prefs_->getIntValue("zoom", 0);
     // Size the window was last given, otherwise one from the display, not remembered (prototype).
     zoom_ = stored >= kZoomMin && stored <= kZoomMax ? stored : autoZoom();
-    // Smooth pixels by default (Settings > Pixels, D-331; default again since the eleventh DAW test, item 130, D-339).
+    // Smooth pixels by default (Settings > Pixels; default again since the eleventh DAW test, item 130).
     cache_.setSharp(prefs_->getValue("pixels", "smooth") == "sharp");
     processor_.dropHostNotes();  // notes received while the window was closed: stale
     processor_.dropLearnMidi();  // likewise for learned messages (the window reads the map again and gives it back)
@@ -188,7 +188,7 @@ void StymEditor::resized() {
 
 void StymEditor::parentHierarchyChanged() { applyRenderer(); }
 
-// Windows (D-420): JUCE 8 shows a window through Direct2D by default, which uploads the whole image of the desktop to
+// Windows: JUCE 8 shows a window through Direct2D by default, which uploads the whole image of the desktop to
 // the graphics card at each paint, the image being drawn by the CPU (render). JUCE's software renderer copies only the
 // repainted areas; it is the default. With Direct2D, Indus saw a copy of the standalone application's window flicker
 // at the top right of the Windows desktop for a few seconds (24/10/2026 22:27). In a host, the window is the
@@ -221,14 +221,14 @@ juce::AffineTransform StymEditor::toScreen() const noexcept {
 }
 
 void StymEditor::paint(juce::Graphics& g) {
-    // The image has the screen pixels of the component (display scale included, D-201): drawn without scaling, one
+    // The image has the screen pixels of the component (display scale included): drawn without scaling, one
     // image pixel per screen pixel.
     const float s = g.getInternalContext().getPhysicalPixelScaleFactor();
     const int w = std::max(1, int(std::lround(float(getWidth()) * s)));
     const int h = std::max(1, int(std::lround(float(getHeight()) * s)));
     if (image_.getWidth() != w || image_.getHeight() != h) render(w, h);
     // A component spanning part of a screen pixel (1150 px at 125 %: 1437.5) leaves the image's last column or row
-    // partly covered: black below it, as below a desktop of other proportions, rather than what lay there (D-461).
+    // partly covered: black below it, as below a desktop of other proportions, rather than what lay there.
     if (std::abs(float(w) - float(getWidth()) * s) > 1e-3f || std::abs(float(h) - float(getHeight()) * s) > 1e-3f)
         g.fillAll(juce::Colours::black);
     g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
@@ -332,7 +332,7 @@ void StymEditor::mouseExit(const juce::MouseEvent&) {
 }
 
 void StymEditor::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) {
-    // Scroll step of juce::Viewport (14 × 16 px per wheel unit, D-118); deltaY > 0: wheel up.
+    // Scroll step of juce::Viewport (14 × 16 px per wheel unit); deltaY > 0: wheel up.
     constexpr double kPixelsPerUnit = 14.0 * 16.0;
     window_->desktop().mouseWheel(logical(e), -wheel.deltaX * kPixelsPerUnit, -wheel.deltaY * kPixelsPerUnit,
                                   mods(e.mods));
@@ -486,7 +486,7 @@ std::string StymEditor::midiStatus() const {
     return "host";  // in a host, MIDI comes through the track
 }
 
-// Version and build (D-211): "0.9.0 build 412 (fe71c0d)" from the CI, "0.9.0 build dev" from a local build.
+// Version and build: "0.9.0 build 412 (fe71c0d)" from the CI, "0.9.0 build dev" from a local build.
 std::string StymEditor::version() const {
     std::string v = std::string(JucePlugin_VersionString) + " build " + kBuildNumber;
     if (*kBuildCommit) v += std::string(" (") + kBuildCommit + ")";
@@ -496,7 +496,7 @@ std::string StymEditor::version() const {
 void StymEditor::quit() {
     if (!standalone()) return;
 #if JucePlugin_Build_Standalone
-    // Like the close box of the JUCE window: the state is kept and reopened at the next launch (P415).
+    // Like the close box of the JUCE window: the state is kept and reopened at the next launch.
     if (auto* holder = standaloneHolder()) holder->savePluginState();
 #endif
     juce::JUCEApplicationBase::quit();
@@ -523,8 +523,8 @@ void StymEditor::openAudioSettings() {
 }
 
 void StymEditor::loadDigidrum(int slot) {
-    // The prototype's loading at the slot's rate (7800 Hz by default); 8-bit source kept for the Digidrums editor
-    // (D-154), name taken from the file, loop reset to the whole sample.
+    // The prototype's loading at the slot's rate (7800 Hz by default); 8-bit source kept for the Digidrums editor,
+    // name taken from the file, loop reset to the whole sample.
     if (slot < 0 || slot >= ymengine::kDigidrumSlots) return;
     auto formats = std::make_shared<juce::AudioFormatManager>();
     formats->registerBasicFormats();
@@ -615,7 +615,7 @@ void StymEditor::clearRecording() { processor_.clearTake(); }
 RegisterTake StymEditor::recordedTake() const { return processor_.recordedTake(); }
 
 void StymEditor::loadDmaSample(int slot) {
-    // DMA track (D-153): audio file resampled at the slot's rate, mono or stereo depending on its format; .raw, .spl
+    // DMA track: audio file resampled at the slot's rate, mono or stereo depending on its format; .raw, .spl
     // or .sam file: signed bytes taken as they are.
     if (slot < 0 || slot >= ymengine::kDmaSlots) return;
     auto formats = std::make_shared<juce::AudioFormatManager>();
@@ -660,11 +660,11 @@ void StymEditor::loadDmaSample(int slot) {
                     settings.stereo ? std::span<const float>{buf.getReadPointer(ch - 1), size_t(len)} : std::span<const float>{};
                 data = toDmaSample(left, right, reader->sampleRate, rate);
             }
-            // Name taken from the file (D-445).
+            // Name taken from the file.
             const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
             self->processor_.editExtras([&](NonParamState& s) {
                 s.dmaSamples[size_t(slot)] = std::move(data);
-                s.dma.slots[size_t(slot)].start = s.dma.slots[size_t(slot)].end = 0;  // the whole sample (D-444)
+                s.dma.slots[size_t(slot)].start = s.dma.slots[size_t(slot)].end = 0;  // the whole sample
                 s.dmaNames[size_t(slot)] = name;
             });
         });
@@ -676,11 +676,11 @@ std::string StymEditor::preference(std::string_view key, std::string_view fallba
 
 void StymEditor::setPreference(std::string_view key, std::string_view value) {
     prefs_->setValue(str(key), str(value));
-    if (key == "pixels") {  // Settings > Pixels (D-331): the whole desktop drawn again
+    if (key == "pixels") {  // Settings > Pixels: the whole desktop drawn again
         cache_.setSharp(value == "sharp");
         image_ = {};
         repaint();
-    } else if (key == "renderer") {  // Settings > Renderer (Windows, D-420)
+    } else if (key == "renderer") {  // Settings > Renderer (Windows)
         applyRenderer();
     }
 }
@@ -696,7 +696,7 @@ std::string StymEditor::keyboardLayout() const {
     return layout_;
 }
 
-// Folders of the tooltip languages installed with STYM2149 (D-283), the first one first: on Windows,
+// Folders of the tooltip languages installed with STYM2149, the first one first: on Windows,
 // C:\ProgramData\STYM2149\Languages (Inno Setup installer); on macOS, /Library/Application Support/STYM2149/Languages;
 // on Linux, STYM2149/Languages in the XDG data folders, ~/.local/share first (install.sh), then /usr/local/share and
 // /usr/share. More exactly: $XDG_DATA_HOME first when it is an absolute path (~/.local/share otherwise), then each
@@ -720,7 +720,7 @@ static std::vector<juce::File> installedLanguageFolders() {
 #endif
 }
 
-// Tooltip languages (D-283): the .po files of the user's Languages folder, next to the preferences, then those of the
+// Tooltip languages: the .po files of the user's Languages folder, next to the preferences, then those of the
 // installed folders (a name already read in an earlier installed folder is left out; a user's file and the installed
 // file of the same name are both returned, and MainWindow::scanTipLanguages puts the user's lines first); at most 64
 // files of 1 MB each, by name.
@@ -797,7 +797,7 @@ void StymEditor::setDmaLibrary(const std::string& json) {
     f.replaceWithText(str(json));
 }
 
-// ---- Files (M7) ----
+// ---- Files ----
 
 void StymEditor::loadProject(const ParamValues& values, const NonParamState& extras) {
     processor_.loadProject(values, extras);

@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: project instruments (M6, B1, D-147)
+// STYM2149 — plugincore: project instruments
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

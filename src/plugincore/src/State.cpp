@@ -163,7 +163,7 @@ void writeTrack(Writer& w, const TrackParams& t) {
     w.u8(t.arp.octaves);
     for (int8_t v : t.arp.table) w.i8(v);
     w.u8(t.arp.length);
-    // M6: DMA sample of the track, written only when not default (-1: depending on its position, D-153); a field
+    // DMA sample of the track, written only when not default (-1: depending on its position); a field
     // added after it will have to write it always.
     if (p.dmaSlot != -1) w.i8(p.dmaSlot);
 }
@@ -195,7 +195,7 @@ void readTrack(Reader r, TrackParams& t) {
     if (r.has(1)) p.dmaSlot = r.i8();
 }
 
-// Instrument sequences and pitch settings of a track (TSEQ chunk, D-148).
+// Instrument sequences and pitch settings of a track (TSEQ chunk).
 bool defaultSequences(const TrackPatch& p) {
     const TrackPatch d;
     return p.rows == d.rows && p.fixedNote == d.fixedNote && p.detuneCents == d.detuneCents &&
@@ -218,33 +218,33 @@ void writeSequences(Writer& w, const TrackPatch& p) {
     w.u8(p.hardSync ? 1 : 0);
     w.u8(p.link);
     w.u16(p.pitchMatrix);
-    w.u8(p.sidWaveLen);  // timer waves (B6, D-151)
+    w.u8(p.sidWaveLen);  // timer waves
     for (uint8_t v : p.sidWave) w.u8(v);
     w.u8(p.buzzLen);
     for (uint8_t v : p.buzzShapes) w.u8(v);
-    w.u8(p.envTuned ? 1 : 0);  // buzzer (B7, D-152)
+    w.u8(p.envTuned ? 1 : 0);  // buzzer
     w.u8(p.envRatioN);
     w.u8(p.envRatioD);
     w.f64(p.envFineCents);
     w.u8(p.ymPad ? 1 : 0);
-    w.u8(p.lfo.on ? 1 : 0);  // LFO (D-257)
+    w.u8(p.lfo.on ? 1 : 0);  // LFO
     w.u8(uint8_t(p.lfo.shape));
     w.u8(uint8_t(p.lfo.target));
     w.u8(p.lfo.sync ? 1 : 0);
     w.f64(p.lfo.hz);
     w.u8(p.lfo.division);
     w.f64(p.lfo.depth);
-    w.u8(p.lfo.retrig ? 1 : 0);  // D-279
-    w.u8(p.echo.on ? 1 : 0);     // echo of the notes (D-299)
+    w.u8(p.lfo.retrig ? 1 : 0);
+    w.u8(p.echo.on ? 1 : 0);     // echo of the notes
     w.u8(p.echo.division);
     w.u8(p.echo.repeats);
     w.u8(p.echo.drop);
     w.i8(p.echo.target);
-    w.u8(ymengine::sineForm(p.sidForm) ? 1 : 0);  // Sine lit (D-402; a Bounce for an older version, D-414)
-    w.u8(p.sidWavePhase);                         // its phase (D-405)
-    w.u8(p.sidWavePeriod);                        // its period (D-406)
-    w.u8(p.sidWidth);                             // width of the square wave (D-408)
-    w.u8(uint8_t(p.sidForm));                     // form of the SID wave (D-411)
+    w.u8(ymengine::sineForm(p.sidForm) ? 1 : 0);  // Sine lit (a Bounce for an older version)
+    w.u8(p.sidWavePhase);                         // its phase
+    w.u8(p.sidWavePeriod);                        // its period
+    w.u8(p.sidWidth);                             // width of the square wave
+    w.u8(uint8_t(p.sidForm));                     // form of the SID wave
 }
 
 // Reads the fields present, like readTrack.
@@ -286,7 +286,7 @@ void readSequences(Reader r, TrackPatch& p) {
         p.lfo.depth = r.f64();
     }
     if (r.has(1)) p.lfo.retrig = r.u8() != 0;
-    if (r.has(5)) {  // echo of the notes (D-299)
+    if (r.has(5)) {  // echo of the notes
         p.echo.on = r.u8() != 0;
         p.echo.division = r.u8();
         p.echo.repeats = r.u8();
@@ -294,17 +294,17 @@ void readSequences(Reader r, TrackPatch& p) {
         p.echo.target = r.i8();
     }
     bool sine = false;
-    if (r.has(1)) sine = r.u8() != 0;  // Sine lit (D-402)
-    if (r.has(1)) p.sidWavePhase = uint8_t(r.u8() % ymengine::kSidWaveSteps);  // its phase (D-405)
-    // Its period (D-406). A chunk without it was written while a lit Sine was one cycle over the 16 bars: its bars keep
+    if (r.has(1)) sine = r.u8() != 0;  // Sine lit
+    if (r.has(1)) p.sidWavePhase = uint8_t(r.u8() % ymengine::kSidWaveSteps);  // its phase
+    // Its period. A chunk without it was written while a lit Sine was one cycle over the 16 bars: its bars keep
     // that period; with the Sine out, the period by default waits for the next Sine.
     if (r.has(1))
         p.sidWavePeriod = uint8_t(std::clamp<int>(r.u8(), ymengine::kSidWavePeriodMin, ymengine::kSidWaveSteps));
     else if (sine) p.sidWavePeriod = uint8_t(ymengine::kSidWaveSteps);
     const bool width = r.has(1);
-    if (width) p.sidWidth = uint8_t(std::clamp<int>(r.u8(), 1, ymengine::kSidWidthMax));  // square width (D-408)
-    // Form of the SID wave (D-411). A chunk without it: Steps 2 or more played the bars, Sine lit or not, a lit Sine
-    // being drawn on the chip's levels, the Bounce now (D-414); less, the plain square, whose width counted sixteenths
+    if (width) p.sidWidth = uint8_t(std::clamp<int>(r.u8(), 1, ymengine::kSidWidthMax));  // square width
+    // Form of the SID wave. A chunk without it: Steps 2 or more played the bars, Sine lit or not, a lit Sine
+    // being drawn on the chip's levels, the Bounce now; less, the plain square, whose width counted sixteenths
     // of its period, 8 being half and half: another width becomes the Square of 16 Steps, the same sound, half and half
     // Base, with the width by default for the next Square.
     if (r.has(1)) p.sidForm = ymengine::sidFormOf(r.u8());
@@ -342,15 +342,15 @@ void readGlobal(Reader r, GlobalParams& g) {
         for (auto& v : g.slideTable) v = r.f32();
 }
 
-// ---- Sequencer (M5) ----
+// ---- Sequencer ----
 
 // Rows of a pattern track in the state: the 16 rows of the prototype (ymseq::Row up to TON), then for each chord
-// voice its note, its octave and its duration (16 to 30), then the rows of M6 in the order of ymseq::Row (31: INS,
-// 32 to 37: the CMD rows Xyz, Sxx, Rxx, Zxx, Txx, Vxx, D-330; 38 to 46: Axy, Pxy, Dxx, Cxx, Bxy, Nxy, Exx, Oxx, Fxx,
-// D-338; 47 to 49: Lxx, Mxx, Jxx, twelfth DAW test; 50 to 52: Gxx, Kxx, Qxx, D-393, D-394; before D-330, row 32
-// held every kind of command: a command read there goes to the row of its kind). Xyz and Pxy are retired (D-340,
-// D-344): their rows are no longer written and a value read for them is dropped. An M5 state does not have the last
-// ones; M5 ignores their ids. The ARP flags (row 3) and the Txx of a state written before the twelfth DAW test become
+// voice its note, its octave and its duration (16 to 30), then the later rows in the order of ymseq::Row (31: INS,
+// 32 to 37: the CMD rows Xyz, Sxx, Rxx, Zxx, Txx, Vxx; 38 to 46: Axy, Pxy, Dxx, Cxx, Bxy, Nxy, Exx, Oxx, Fxx;
+// 47 to 49: Lxx, Mxx, Jxx, twelfth DAW test; 50 to 52: Gxx, Kxx, Qxx; in an older state, row 32
+// held every kind of command: a command read there goes to the row of its kind). Xyz and Pxy are retired:
+// their rows are no longer written and a value read for them is dropped. An older state may lack the last
+// ones; an older version ignores their ids. The ARP flags (row 3) and the Txx of a state written before the twelfth DAW test become
 // Jxx and the BPM row of the pattern.
 constexpr int kChordRow0 = ymseq::kProtoRows;
 constexpr int kChordRowEnd = kChordRow0 + 3 * ymseq::kExtraVoices;
@@ -361,7 +361,7 @@ constexpr ymseq::Row laterRow(int id) noexcept { return ymseq::Row(ymseq::kProto
 // Range and empty value of a state row (PATN id), used by setLaneCell to clamp a cell (or empty it, `drop`).
 struct RowRange {
     int lo, hi, empty;
-    bool drop = false;  // value out of range: empty cell rather than clamped (unknown command, D-150)
+    bool drop = false;  // value out of range: empty cell rather than clamped (unknown command)
 };
 RowRange rowRange(int id) noexcept {
     using ymseq::Row;
@@ -369,7 +369,7 @@ RowRange rowRange(int id) noexcept {
         switch (laterRow(id)) {
         case Row::Ins: return {0, ymseq::kInstrumentMax, 0};
         default:
-            if (ymseq::isCmdRow(laterRow(id))) return {0, ymengine::kSeqCmdMax, 0, true};  // letter × 256 + xx (D-150)
+            if (ymseq::isCmdRow(laterRow(id))) return {0, ymengine::kSeqCmdMax, 0, true};  // letter × 256 + xx
             return {0, 0, 0};
         }
     }
@@ -383,7 +383,7 @@ RowRange rowRange(int id) noexcept {
     switch (Row(id)) {
     case Row::Pat: return {-1, 12, -1};
     case Row::Vol: return {0, 15, 15};
-    case Row::Mix: return {0, ymengine::kSeqMixMax, 0};  // Env entries (D-277)
+    case Row::Mix: return {0, ymengine::kSeqMixMax, 0};  // Env entries
     case Row::Slt: return {0, 8, 0};
     case Row::Fx: return {0, 4, 0};
     case Row::Oct: return {-3, 9, 0};
@@ -479,7 +479,7 @@ void writeSeqSettings(Writer& w, const GlobalParams& g, const ymseq::Project& p)
         w.u8(uint8_t(t.octave));
         w.u16(uint16_t(t.length));
     }
-    w.u8(g.metronomeLevel);  // D-288
+    w.u8(g.metronomeLevel);
 }
 
 void readSeqSettings(Reader r, GlobalParams& g, ymseq::Project& p) {
@@ -509,7 +509,7 @@ void readSeqSettings(Reader r, GlobalParams& g, ymseq::Project& p) {
         p.tracks[size_t(t)].octave = octave;
         p.tracks[size_t(t)].length = length;
     }
-    g.metronomeLevel = r.has(1) ? uint8_t(std::min<int>(r.u8(), 100)) : 100;  // D-288; full level before
+    g.metronomeLevel = r.has(1) ? uint8_t(std::min<int>(r.u8(), 100)) : 100;  // full level before
 }
 
 }  // namespace
@@ -621,18 +621,18 @@ void sanitize(NonParamState& s) {
         for (auto& v : smp) v = uint8_t(std::min<int>(v, 15));
     }
     for (auto& n : s.trackNames) n = cleanTrackName(n);
-    // DMA bank (D-153).
+    // DMA bank.
     for (DmaSlot& sl : s.dma.slots) {
         sl.rate = uint8_t(std::min<int>(sl.rate, kDmaRates - 1));
         sl.root = uint8_t(std::min<int>(sl.root, 127));
-        sl.cents = std::isfinite(sl.cents) ? std::clamp(sl.cents, -kDmaCentsMax, kDmaCentsMax) : 0.0;  // D-452
-        sl.end = std::min<uint32_t>(sl.end, kDmaMaxBytes);  // frames (D-444); End 0: to the end of the sample
+        sl.cents = std::isfinite(sl.cents) ? std::clamp(sl.cents, -kDmaCentsMax, kDmaCentsMax) : 0.0;
+        sl.end = std::min<uint32_t>(sl.end, kDmaMaxBytes);  // frames; End 0: to the end of the sample
         sl.start = std::min(sl.start, sl.end > 0 ? sl.end : kDmaMaxBytes);
     }
     for (auto& smp : s.dmaSamples)
         if (smp.size() > kDmaMaxBytes) smp.resize(kDmaMaxBytes);
     for (auto& n : s.dmaNames) n = cleanDigidrumName(n);
-    // Digidrum editor (D-154).
+    // Digidrum editor.
     for (DigidrumSlotState& ds : s.digiSlots) {
         ds.name = cleanDigidrumName(ds.name);
         DigidrumSlot& p = ds.play;
@@ -685,7 +685,7 @@ void sanitize(NonParamState& s) {
         e.pat = std::clamp(e.pat, 0, ymseq::kPatterns - 1);
         e.rep = std::clamp(e.rep, 1, ymseq::kSongRepeatMax);
         e.bpm = e.bpm <= 0 ? 0 : std::clamp(e.bpm, ymseq::kSongBpmMin, ymseq::kSongBpmMax);
-        // Extended Song (D-158): length of the Rest and Note-off entries, entries replayed by a jump; one restart.
+        // Extended Song: length of the Rest and Note-off entries, entries replayed by a jump; one restart.
         switch (e.kind) {
             case ymseq::SongKind::Pattern: e.arg = 0; break;
             case ymseq::SongKind::Rest:
@@ -763,7 +763,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
     }
     w.end(c);
 
-    // Track names: chunk written only if a track is named (a state without names stays the M3 one).
+    // Track names: chunk written only if a track is named (a state without names keeps the older layout).
     const auto& names = state.extras.trackNames;
     if (std::any_of(names.begin(), names.end(), [](const std::string& n) { return !n.empty(); })) {
         c = w.begin(kName);
@@ -776,7 +776,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         w.end(c);
     }
 
-    // Sequencer (M5).
+    // Sequencer.
     const ymseq::Project& p = state.extras.seq;
     c = w.begin(kSeqs);
     writeSeqSettings(w, state.extras.global, p);
@@ -821,7 +821,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         w.u16(uint16_t(std::clamp(e.bpm, 0, 65535)));
     }
     w.end(c);
-    // Extended Song (D-158): chunk written only if an entry is special or marks the restart.
+    // Extended Song: chunk written only if an entry is special or marks the restart.
     const auto& song = p.song.entries;
     if (std::any_of(song.begin(), song.end(), [](const ymseq::SongEntry& e) { return e.special() || e.restart; })) {
         c = w.begin(kSngx);
@@ -835,7 +835,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         w.end(c);
     }
 
-    // Instruments (M6): chunk written only if an instrument exists (a state without instruments stays the M5 one).
+    // Instruments: chunk written only if an instrument exists (a state without instruments keeps the older layout).
     const auto& inst = state.extras.instruments;
     const int used = int(std::count_if(inst.begin(), inst.end(), [](const Instrument& i) { return i.used; }));
     if (used > 0) {
@@ -850,7 +850,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         }
         w.end(c);
     }
-    // Instrument sequences of the tracks (D-148): chunk written only if a track has some.
+    // Instrument sequences of the tracks: chunk written only if a track has some.
     const auto& tracks = state.extras.tracks;
     const int seqTracks = int(std::count_if(tracks.begin(), tracks.end(),
                                             [](const TrackParams& t) { return !defaultSequences(t.patch); }));
@@ -867,7 +867,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         }
         w.end(c);
     }
-    // Ticks timing of the sequencer (D-149): chunk written only when the settings are not the defaults.
+    // Ticks timing of the sequencer: chunk written only when the settings are not the defaults.
     const GlobalParams& g = state.extras.global;
     const GlobalParams gdef{};
     if (g.timing != gdef.timing || g.speed != gdef.speed || g.grooveLength != gdef.grooveLength || g.groove != gdef.groove) {
@@ -878,7 +878,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         for (uint8_t v : g.groove) w.u8(v);
         w.end(c);
     }
-    // STE DMA bank (D-153): chunk written only when not default.
+    // STE DMA bank: chunk written only when not default.
     const NonParamState& x = state.extras;
     if (!(x.dma == DmaParams{}) ||
         std::any_of(x.dmaSamples.begin(), x.dmaSamples.end(), [](const auto& v) { return !v.empty(); }) ||
@@ -896,12 +896,12 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             w.u32(uint32_t(n));
             w.bytes(std::string_view(reinterpret_cast<const char*>(smp.data()), n));
         }
-        // After the slots (older readers stop there): Start and End of each slot, in frames (D-444).
+        // After the slots (older readers stop there): Start and End of each slot, in frames.
         for (const DmaSlot& sl : x.dma.slots) {
             w.u32(sl.start);
             w.u32(sl.end);
         }
-        // Then the names of the slots (D-445), and their fine tune (D-452).
+        // Then the names of the slots, and their fine tune.
         for (const std::string& n : x.dmaNames) {
             const std::string name = cleanDigidrumName(n);
             w.u8(uint8_t(name.size()));
@@ -910,7 +910,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         for (const DmaSlot& sl : x.dma.slots) w.f64(sl.cents);
         w.end(c);
     }
-    // Digidrum editor (D-154): chunk written only when not default.
+    // Digidrum editor: chunk written only when not default.
     if (std::any_of(x.digiSlots.begin(), x.digiSlots.end(),
                     [](const DigidrumSlotState& slot) { return !(slot == DigidrumSlotState{}); })) {
         c = w.begin(kDigs);
@@ -932,7 +932,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         }
         w.end(c);
     }
-    // Register recorder take (D-157): chunk written only if there is one.
+    // Register recorder take: chunk written only if there is one.
     if (const RegisterTake& t = state.take; !t.empty()) {
         c = w.begin(kRecd);
         w.u8(t.chip);
@@ -944,7 +944,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         for (size_t i = 0; i < n; ++i) {
             const RegisterFrame& f = t.frames[i];
             for (uint8_t v : f.reg) w.u8(v);
-            // Bit 0: R13 written; bits 1 to 3: start of the effect of each channel (M7).
+            // Bit 0: R13 written; bits 1 to 3: start of the effect of each channel.
             uint8_t flags = f.r13 ? 1 : 0;
             for (size_t k = 0; k < f.fx.size(); ++k) flags = uint8_t(flags | (f.fx[k].restart ? 2u << k : 0u));
             w.u8(flags);
@@ -956,7 +956,7 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             }
         }
         w.end(c);
-        // Zxx of the take (D-150), separately: RECD keeps its frame size, earlier versions ignore it.
+        // Zxx of the take, separately: RECD keeps its frame size, earlier versions ignore it.
         std::vector<std::pair<uint32_t, uint8_t>> syncs;
         for (size_t i = 0; i < n; ++i)
             if (t.frames[i].sync >= 0) syncs.emplace_back(uint32_t(i), uint8_t(t.frames[i].sync));
@@ -1140,14 +1140,14 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 smp.resize(std::min<size_t>(n, kDmaMaxBytes));
                 if (!smp.empty()) std::memcpy(smp.data(), bytes.data(), smp.size());
             }
-            // Start and End (D-444), absent from older states: the whole sample.
+            // Start and End, absent from older states: the whole sample.
             for (int k = 0; k < count && b.has(8); ++k) {
                 const uint32_t start = b.u32(), end = b.u32();
                 if (k >= kDmaSlots) continue;
                 d.slots[size_t(k)].start = start;
                 d.slots[size_t(k)].end = end;
             }
-            // Names (D-445), absent from older states: none.
+            // Names, absent from older states: none.
             for (int k = 0; k < count && b.has(1); ++k) {
                 const uint8_t n = b.u8();
                 const auto text = b.take(n);
@@ -1156,7 +1156,7 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 st.extras.dmaNames[size_t(k)] =
                     cleanDigidrumName(std::string_view(reinterpret_cast<const char*>(text.data()), text.size()));
             }
-            // Fine tune (D-452), absent from older states: 0.
+            // Fine tune, absent from older states: 0.
             for (int k = 0; k < count && b.has(8); ++k) {
                 const double cents = b.f64();
                 if (k < kDmaSlots) d.slots[size_t(k)].cents = cents;

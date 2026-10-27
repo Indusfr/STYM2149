@@ -1,4 +1,4 @@
-// STYM2149 — ymio: uncompressed ZIP archive of the stems (M7, A4)
+// STYM2149 — ymio: uncompressed ZIP archive of the stems
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "ymio/Zip.h"

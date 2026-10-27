@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: MIDI learn (P462)
+// STYM2149 — plugincore: MIDI learn
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

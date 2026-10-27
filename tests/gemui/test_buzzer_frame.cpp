@@ -1,6 +1,6 @@
-// STYM2149 — Sync Buzzer settings of the GENERATOR frame (D-227), which replaced the Buzzer window (M6, B7, D-152;
-// fourth DAW test, item 40, D-238): tuned envelope (N, D, fine tuning), YM Pad, presets as one undo step, the Sync
-// Buzzer steps of the former Timer Wave window (D-252, D-278); Env freq greyed out when the envelope is tuned.
+// STYM2149 — Sync Buzzer settings of the GENERATOR frame, which replaced the Buzzer window (
+// fourth DAW test, item 40): tuned envelope (N, D, fine tuning), YM Pad, presets as one undo step, the Sync
+// Buzzer steps of the former Timer Wave window; Env freq greyed out when the envelope is tuned.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -137,7 +137,7 @@ const gemui::ValueField& field(MainWindow& w, std::string_view id) {
     return *f;
 }
 
-// Clicks a typed value, empties it, types `text` and confirms with Enter (D-264).
+// Clicks a typed value, empties it, types `text` and confirms with Enter.
 void typeValue(MainWindow& w, const std::string& id, std::string_view text) {
     click(w, id);
     REQUIRE(field(w, id).editing());
@@ -153,7 +153,7 @@ void typeValue(MainWindow& w, const std::string& id, std::string_view text) {
 }
 
 // A Sync Buzzer on track 1.
-// Picks a form of the SID wave in its menu (D-411).
+// Picks a form of the SID wave in its menu.
 void form(MainWindow& w, const std::string& name) {
     click(w, "waveForm");
     const std::vector<std::string> l = labels(w);
@@ -169,7 +169,7 @@ void syncBuzzer(TestHost& h) {
 }  // namespace
 
 TEST_CASE("GENERATOR frame of a Sync Buzzer: the settings and presets of the former Buzzer window, then its steps "
-          "(third DAW test, item 28, D-227; sixth DAW test, items 54 and 80, D-252, D-278)",
+          "(third DAW test, item 28; sixth DAW test, items 54 and 80)",
           "[ui][buzzer][generator]") {
     TestHost h;
     syncBuzzer(h);
@@ -226,7 +226,7 @@ TEST_CASE("GENERATOR frame of a Sync Buzzer: the settings and presets of the for
 }
 
 TEST_CASE("Buzzer: tuned envelope, N, D, fine tuning; Env freq greyed out on a Sync Buzzer only (fourth DAW test, "
-          "item 34, D-232)",
+          "item 34)",
           "[ui][buzzer][undo]") {
     TestHost h;
     syncBuzzer(h);
@@ -259,7 +259,7 @@ TEST_CASE("Buzzer: tuned envelope, N, D, fine tuning; Env freq greyed out on a S
     press(w, {ef.x + 4, ef.y + ef.h / 2});
     CHECK(param(h, Track::EnvPeriod) != ep);
 
-    // Chip Voice: the tuning kept in the patch no longer applies (D-231), Env freq sets the period (D-232).
+    // Chip Voice: the tuning kept in the patch no longer applies, Env freq sets the period.
     click(w, "genTuned");
     CHECK(p.envTuned);
     w.pickGenerator(int(ymengine::Generator::Chip));
@@ -275,7 +275,7 @@ TEST_CASE("Buzzer: tuned envelope, N, D, fine tuning; Env freq greyed out on a S
     CHECK_FALSE(w.rectOf("genTuned"));
 }
 
-TEST_CASE("Buzzer: presets in a menu keep the Sync Buzzer, a single undo step (fourth DAW test, item 32, D-230)",
+TEST_CASE("Buzzer: presets in a menu keep the Sync Buzzer, a single undo step (fourth DAW test, item 32)",
           "[ui][buzzer][undo]") {
     TestHost h;
     syncBuzzer(h);
@@ -323,8 +323,7 @@ TEST_CASE("Buzzer: presets in a menu keep the Sync Buzzer, a single undo step (f
     }
 }
 
-TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixth DAW test, items 53 and 80, D-251, "
-          "D-278)",
+TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixth DAW test, items 53 and 80)",
           "[ui][generator]") {
     TestHost h;
     h.values[size_t(paramIndex(0, Track::Generator))] = float(ymengine::Generator::Sid);
@@ -333,7 +332,7 @@ TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixt
     CHECK_FALSE(w.rectOf("genTuned"));
     CHECK_FALSE(w.rectOf("buzz0"));
     CHECK_FALSE(w.rectOf("timerWave"));
-    // Base, the plain square: the menu alone, no bars and no Steps (Indus, 24/10/2026 20:30, D-417).
+    // Base, the plain square: the menu alone, no bars and no Steps (Indus, 24/10/2026 20:30).
     CHECK(w.rectOf("waveForm"));
     CHECK_FALSE(w.rectOf("waveGrid"));
     CHECK_FALSE(w.rectOf("waveSteps"));
@@ -342,11 +341,11 @@ TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixt
     const gemui::Rect frame = *w.rectOf("genFrame"), grid = *w.rectOf("waveGrid");
     CHECK(grid.w == pluginui::SidWaveGrid::kWidth);
     CHECK(grid.h == pluginui::SidWaveGrid::kHeight);
-    // SID min vol ends with Timer ratio (thirteenth DAW test, item 163, D-372); both start at the frame's inner edge.
+    // SID min vol ends with Timer ratio (thirteenth DAW test, item 163); both start at the frame's inner edge.
     const gemui::Rect ratio = *w.rectOf("ratio"), vmin = *w.rectOf("vmin");
     CHECK(vmin.x == ratio.x);
     CHECK(vmin.right() == ratio.right());
-    // The menu of the SID wave's forms above the grid, after its name (D-411), Steps under it.
+    // The menu of the SID wave's forms above the grid, after its name, Steps under it.
     for (const char* id : {"waveGrid", "waveSteps", "waveForm"}) {
         CAPTURE(id);
         const gemui::Rect r = *w.rectOf(id);
@@ -363,7 +362,7 @@ TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixt
 }
 
 TEST_CASE("GENERATOR frame: N, D, Fine and the Steps of the Sync Buzzer and of the SID wave typed (sixth DAW test, "
-          "item 66, D-264)",
+          "item 66)",
           "[ui][buzzer][undo]") {
     TestHost h;
     syncBuzzer(h);
@@ -394,7 +393,7 @@ TEST_CASE("GENERATOR frame: N, D, Fine and the Steps of the Sync Buzzer and of t
     undoKey(w);
     CHECK(p.buzzLen == 0);
 
-    // SID wave: Steps hidden at Base (D-411, D-417); with Custom, typed, from 2 to 16.
+    // SID wave: Steps hidden at Base; with Custom, typed, from 2 to 16.
     w.pickGenerator(int(ymengine::Generator::Sid));
     w.tick(0);
     CHECK_FALSE(w.rectOf("waveStepsv"));
@@ -405,8 +404,8 @@ TEST_CASE("GENERATOR frame: N, D, Fine and the Steps of the Sync Buzzer and of t
     typeValue(w, "waveStepsv", "1");
     CHECK(p.sidWaveLen == 2);
 
-    // Sine keeps the number of Steps and fills the 16 bars, those beyond the Steps faded (Indus, 24/10/2026 11:24,
-    // D-401); from Base, as many as its Period, 8 (D-426).
+    // Sine keeps the number of Steps and fills the 16 bars, those beyond the Steps faded (Indus, 24/10/2026 11:24);
+    // from Base, as many as its Period, 8.
     typeValue(w, "waveStepsv", "6");
     form(w, "Sine");
     w.tick(0);

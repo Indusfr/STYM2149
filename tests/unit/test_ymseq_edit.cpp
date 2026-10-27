@@ -4,7 +4,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Data: tests/data/proto/edit.txt, produced by tools/proto_golden/edit.mjs from YM2149_Prototype.html
-// (deviations D-090 to D-096 and D-280 applied in the generator).
+// (intended deviations applied in the generator).
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
 #include <fstream>
@@ -28,7 +28,7 @@ std::vector<std::string> split(const std::string& s, char sep) {
     return out;
 }
 
-// Value of key k of LANEKEYS (16 rows, then pat2-pat6, oct2-oct6, dur2-dur6). The M6 rows are not in it:
+// Value of key k of LANEKEYS (16 rows, then pat2-pat6, oct2-oct6, dur2-dur6). The later rows are not in it:
 // the prototype does not have them.
 int keyValue(const Lane& l, int k, int s) {
     if (k < kProtoRows) return l.get(Row(k), s);
@@ -212,7 +212,7 @@ TEST_CASE("Prototype: sequencer track edits", "[proto][ymseq]") {
             ctx.mono = f[4] == "1";
             ctx.threeVoice = f[5] == "1";
             const int fig = std::stoi(f[6]);
-            ctx.figure = fig >= 7 ? fig + 1 : fig;  // the prototype has no 1/64, which comes after 1/32 (D-422)
+            ctx.figure = fig >= 7 ? fig + 1 : fig;  // the prototype has no 1/64, which comes after 1/32
             ctx.resolution = std::stoi(f[7]);
             ctx.chord = std::stoi(f[8]);
             ctx.scale = std::stoi(f[9]);

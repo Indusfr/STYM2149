@@ -17,7 +17,7 @@ std::string_view cmdTag(ymengine::SeqCmd k) noexcept {
 std::string cmdCellText(const ymengine::SeqLane& l, int s) {
     std::string_view tag = "-";
     for (int k = 1; k < ymengine::kSeqCmds; ++k) {
-        const auto kind = ymengine::SeqCmd(k);  // a slide's curve goes with its slide (D-394)
+        const auto kind = ymengine::SeqCmd(k);  // a slide's curve goes with its slide
         if (!ymengine::seqCmdInBox(kind) || ymengine::seqCmdCurve(kind) || !l.cmdAt(kind, s)) continue;
         if (tag != "-") return "MUL";
         tag = cmdTag(ymengine::SeqCmd(k));

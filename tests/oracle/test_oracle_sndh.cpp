@@ -1,4 +1,4 @@
-// STYM2149 — reading SNDH files (M7, A2, D-159) against the SndhRenderer of AtariAudio 1.26: Ice decompression,
+// STYM2149 — reading SNDH files against the SndhRenderer of AtariAudio 1.26: Ice decompression,
 // header tags, then the sound, bit for bit, of the write capture replayed by ymcore. Reference tunes skipped (SKIP)
 // if they are missing, unless STYM_REQUIRE_REFDATA is set (CI); the "square-sync" is checked on an SNDH built here.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -255,7 +255,7 @@ uint8_t ymRead(AtariMachine& m, uint8_t reg) {
 
 }  // namespace
 
-// The init and exit of an exported SNDH (D-162) on the AtariAudio machine, MFP set beforehand as by the system:
+// The init and exit of an exported SNDH on the AtariAudio machine, MFP set beforehand as by the system:
 // out-of-range subsong brought back to the first, MFP registers saved at the first init only, then restored by the
 // exit (bits of timers A, B and D), vectors restored, sound cut.
 TEST_CASE("Exported SNDH: init (out-of-range subsong) and exit (MFP restored, sound cut)", "[sndh][oracle]") {

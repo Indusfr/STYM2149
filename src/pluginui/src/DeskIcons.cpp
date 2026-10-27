@@ -4,7 +4,7 @@
 //
 // Do not edit by hand: run `python3 tools/icon/make_desk_icons.py icon.rsc` again. The pictures and their masks are
 // those of the EmuTOS desktop (© The EmuTOS development team, GPL; THIRD_PARTY.md), read from its desk/icon.rsc at
-// Indus's request for the AGPLv3 (25/10/2026 16:09, D-423): SHA-256 ce16d833b8e12260…, ICONBLKs 1 and 3.
+// Indus's request for the AGPLv3 (25/10/2026 16:09): SHA-256 ce16d833b8e12260…, ICONBLKs 1 and 3.
 #include "pluginui/DeskIcons.h"
 
 #include <array>

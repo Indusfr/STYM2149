@@ -54,7 +54,7 @@ TEST_CASE("S7 maximal LFSR: period 131 071 and MAME sequence", "[S7][noise]") {
     CHECK(mismatches == 0);
 }
 
-TEST_CASE("S7 AtariAudio LFSR: period 114 681 (not maximal, measured in M0)", "[S7][noise]") {
+TEST_CASE("S7 AtariAudio LFSR: period 114 681 (not maximal, as measured)", "[S7][noise]") {
     CHECK(lfsrPeriod(NoiseLfsr::AtariAudio) == 114681);
 }
 

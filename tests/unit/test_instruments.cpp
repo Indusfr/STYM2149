@@ -1,4 +1,4 @@
-// STYM2149 — project instruments (M6, B1, D-147): capture of the sound of a track, exchange with the Patches library,
+// STYM2149 — project instruments: capture of the sound of a track, exchange with the Patches library,
 // loading into a track, INST chunk of the state, table played by the engine.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -108,7 +108,7 @@ TEST_CASE("Instruments: names, incomplete entry, engine table", "[instruments]")
     const Instrument a = instrumentFromEntry(e);
     CHECK(a.used);
     CHECK(a.patch.volume == 4);
-    CHECK(a.patch.generator == Generator::Dma);  // last type (M6), kept whatever the machine
+    CHECK(a.patch.generator == Generator::Dma);  // last type, kept whatever the machine
     CHECK(a.patch.envPeriod == 12800);
     CHECK(a.arp.table == ymengine::TrackArp{}.table);
     CHECK(a.level == 0.75);

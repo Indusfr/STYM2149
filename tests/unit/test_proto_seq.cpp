@@ -5,17 +5,17 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Data: tests/data/proto/seq.txt, produced by tools/proto_golden/seq.mjs from YM2149_Prototype.html (the
-// prototype is not under version control), deviations D-097 to D-106, D-205, D-281, D-343, D-345 and D-421 applied to
+// prototype is not under version control), the intended deviations applied to
 // the worklet. Each log line: "sample operation voice a b x y z" (trailing zero fields omitted); operations:
 //   @ step played (a = step, b = absolute step, x = pattern, y = duration of the step in samples)
 //   T trigger (a = generator, b = 1 chord voice, x = note, y = level, z = drum transposition)
-//   K cut of the track voice (a = 1: immediate)   R release of a chord voice (or of the note moved there, D-421)
+//   K cut of the track voice (a = 1: immediate)   R release of a chord voice (or of the note moved there)
 //   O chord silenced
 //   S slide armed (a = steps, b = curve, x = target note)   H slide reshaped (a = steps, b = curve)
-//   G end of slide (a = 1: note settled on its target, D-105)   N pitch adjusted (x = note)
+//   G end of slide (a = 1: note settled on its target)   N pitch adjusted (x = note)
 //   L level of the target note of a slide (x)   M MIX (a = tone, b = noise)   F generator changed (a)
 //   P step panning (voice = track, x = pan, 9 = that of the mixer)   Q pattern switch (a)   ! stop
-//   A level of a held note (x, D-345)
+//   A level of a held note (x)
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <cstdint>

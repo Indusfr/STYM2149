@@ -1,4 +1,4 @@
-// STYM2149 — ymio: exported SNDH files (M7, A5, B2, D-162): 68000 routine played by the AtariAudio machine (Musashi).
+// STYM2149 — ymio: exported SNDH files: 68000 routine played by the AtariAudio machine (Musashi).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -390,7 +390,7 @@ TEST_CASE("Exported SNDH: STE DMA sound, copies at the pitch and volume of the a
     for (const Played& q : play(load(st.data), 1, 25)) CHECK(q.dac.empty());
 }
 
-TEST_CASE("Exported SNDH: STE DMA sound started at a sample offset (Oxx, D-338)", "[sndhwriter]") {
+TEST_CASE("Exported SNDH: STE DMA sound started at a sample offset (Oxx)", "[sndhwriter]") {
     std::vector<int8_t> pcm;
     for (int i = 0; i < 2000; ++i) pcm.push_back(int8_t((i * 7) % 200 - 100));
     std::vector<RegisterFrame> frames(30);
@@ -498,8 +498,8 @@ TEST_CASE("SNDH of a captured pattern: registers, SID and DMA replayed by AtariA
     CHECK((dmaFirst == 75 || dmaFirst == 76));
 }
 
-// The part of a DMA sample from Start to End (D-444): the capture starts it at Start, the file stops it at End.
-TEST_CASE("SNDH of a project: the DMA sample plays from Start to End (D-444)", "[sndhwriter][regexport]") {
+// The part of a DMA sample from Start to End: the capture starts it at Start, the file stops it at End.
+TEST_CASE("SNDH of a project: the DMA sample plays from Start to End", "[sndhwriter][regexport]") {
     using namespace stym::plugin;
     ParamValues v = defaultValues();
     NonParamState x;
@@ -538,7 +538,7 @@ TEST_CASE("SNDH of a project: the DMA sample plays from Start to End (D-444)", "
     for (size_t i = 400; i < dac.size(); ++i) CHECK(dac[i] == 0);  // stopped at End
 }
 
-TEST_CASE("SNDH of a captured pattern: Zxx commands in the sync byte, address in A0 (D-150)",
+TEST_CASE("SNDH of a captured pattern: Zxx commands in the sync byte, address in A0",
           "[sndhwriter][regexport]") {
     using namespace stym::plugin;
     using ymengine::SeqCmd;

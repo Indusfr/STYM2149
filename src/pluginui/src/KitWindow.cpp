@@ -142,7 +142,7 @@ KitWindow::KitWindow(MainWindow& main) : m_(main) {
 }
 
 void KitWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&play_, "kitPlay"}, {&reset_, "kitReset"}, {&bank_, "kitBank"}})
         w->setId(id);

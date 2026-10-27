@@ -1,4 +1,4 @@
-// STYM2149 — plugin editor (M4), with JUCE: zoom, image of the GEM desktop at the screen's pixels, on-screen playing down
+// STYM2149 — plugin editor, with JUCE: zoom, image of the GEM desktop at the screen's pixels, on-screen playing down
 // to the sound, setting of a parameter with a gesture, preferences, non-automatable state, engine status.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -56,8 +56,8 @@ double play(StymProcessor& p, int blocks) {
 }
 
 // Screen of `scale` pixels per component pixel (the display scale): each logical pixel of the desktop becomes a k × k
-// block of the screen (whole number of screen pixels per desktop pixel, D-201). The Atari logo of the menu bar aside
-// when k > 1: its outline is filled at the screen's resolution (D-404), its box only has to hold ink.
+// block of the screen (whole number of screen pixels per desktop pixel). The Atari logo of the menu bar aside
+// when k > 1: its outline is filled at the screen's resolution, its box only has to hold ink.
 bool sameAsDesktop(StymEditor& editor, float scale, int k) {
     const juce::Image shot = editor.createComponentSnapshot(editor.getLocalBounds(), true, scale);
     gemui::Desktop& desk = editor.window().desktop();
@@ -92,7 +92,7 @@ struct GestureListener : juce::AudioProcessorListener {
 
 }  // namespace
 
-TEST_CASE("Editor: GEM desktop in blocks of screen pixels at a whole scale (zoom 80 and 160 %, D-201, D-216)",
+TEST_CASE("Editor: GEM desktop in blocks of screen pixels at a whole scale (zoom 80 and 160 %)",
           "[editor]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
@@ -167,10 +167,10 @@ TEST_CASE("Editor: size set by resizing the window, kept in the preferences (ten
         f->setValue("zoom", 100);
         StymEditor editor(p, std::move(f));
         pluginui::Host& host = editor;
-        // 100 %: 5/8 of the logical size, 25 % more than half of it (second DAW test, item 15, D-216).
+        // 100 %: 5/8 of the logical size, 25 % more than half of it (second DAW test, item 15).
         CHECK(editor.getWidth() == pluginui::MainWindow::kWidth * 5 / 8);
         CHECK(editor.getHeight() == pluginui::MainWindow::kHeight * 5 / 8);
-        // No Zoom entry in the Options menu (D-335).
+        // No Zoom entry in the Options menu.
         editor.window().openMenu(3);
         const auto* menu = dynamic_cast<const gemui::MenuList*>(editor.window().desktop().topPopup());
         REQUIRE(menu);
@@ -193,7 +193,7 @@ TEST_CASE("Editor: size set by resizing the window, kept in the preferences (ten
     CHECK(host.preference("absent", "x") == "x");
 }
 
-TEST_CASE("Editor: Settings > Renderer offered on Windows only, the preference kept (D-420)", "[editor]") {
+TEST_CASE("Editor: Settings > Renderer offered on Windows only, the preference kept", "[editor]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
     StymProcessor p;
@@ -213,7 +213,7 @@ TEST_CASE("Editor: Settings > Renderer offered on Windows only, the preference k
     CHECK(static_cast<const pluginui::Host&>(editor).preference("renderer", "software") == "direct2d");
 }
 
-TEST_CASE("Editor: Fuji > Information names the build, the CI run number and its commit (D-211)", "[editor]") {
+TEST_CASE("Editor: Fuji > Information names the build, the CI run number and its commit", "[editor]") {
     juce::ScopedJuceInitialiser_GUI gui;
     StymProcessor p;
     juce::TemporaryFile prefs(".settings");
@@ -226,7 +226,7 @@ TEST_CASE("Editor: Fuji > Information names the build, the CI run number and its
     else CHECK(host.version() == build);
 }
 
-TEST_CASE("Editor: Patches library in Patches.json, next to the preferences (D-141)", "[editor]") {
+TEST_CASE("Editor: Patches library in Patches.json, next to the preferences", "[editor]") {
     juce::ScopedJuceInitialiser_GUI gui;
     StymProcessor p;
     juce::TemporaryFile prefs(".settings");
@@ -282,7 +282,7 @@ TEST_CASE("Editor: Preferences.settings takes over the old STYM2149.settings onc
     CHECK(dir.deleteRecursively());
 }
 
-TEST_CASE("Editor: MIDI learn, map from the preferences given to the processor, learned CC up to the slider (D-146)",
+TEST_CASE("Editor: MIDI learn, map from the preferences given to the processor, learned CC up to the slider",
           "[editor][learn]") {
     juce::ScopedJuceInitialiser_GUI gui;
     StymProcessor p;
@@ -368,7 +368,7 @@ TEST_CASE("Editor: parameter set by the window with a host gesture", "[editor]")
     p.removeListener(&listener);
 }
 
-TEST_CASE("Editor: YM Player, dump loaded then played in place of the engine (D-169)", "[editor][ymplayer]") {
+TEST_CASE("Editor: YM Player, dump loaded then played in place of the engine", "[editor][ymplayer]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
     StymProcessor p;
@@ -442,7 +442,7 @@ TEST_CASE("Processor: engine status published for the editor at 30 Hz", "[proces
 }
 
 // Images, not a test: `STYM_SHOT_DIR=dir stym_plugin_tests "[shot]"` writes the editor with the demo pattern and the
-TEST_CASE("Editor: layout of the system keyboard from the keys at the places of Q and Y (D-215)", "[editor]") {
+TEST_CASE("Editor: layout of the system keyboard from the keys at the places of Q and Y", "[editor]") {
     CHECK(layoutOfKeys(U'q', U'y') == "qwerty");
     CHECK(layoutOfKeys(U'a', U'y') == "azerty");  // French, Belgian
     CHECK(layoutOfKeys(U'A', U'Y') == "azerty");
@@ -460,7 +460,7 @@ TEST_CASE("Editor: layout of the system keyboard from the keys at the places of 
     CHECK(static_cast<const pluginui::Host&>(editor).keyboardLayout() == here);
 }
 
-// Step Sequencer at the zooms 100 and 200 % on displays at 100, 125 and 150 % (D-201, D-216), to look at them.
+// Step Sequencer at the zooms 100 and 200 % on displays at 100, 125 and 150 %, to look at them.
 TEST_CASE("Editor: images at the display scales", "[.][shot][editor]") {
     const char* dir = std::getenv("STYM_SHOT_DIR");
     if (dir == nullptr) SKIP("STYM_SHOT_DIR not set");

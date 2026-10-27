@@ -1,10 +1,10 @@
-// STYM2149 — pluginui: instrument sequences of the focused track (M6, B2, D-148), a part of the Modulation window
-// (fifth DAW test, D-240)
+// STYM2149 — pluginui: instrument sequences of the focused track, a part of the Modulation window
+// (fifth DAW test)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // A STYM2149 addition (the prototype has none), inside the Modulation table that it extends, between its pitch rows
-// and its NSE and VOL rows (sixth DAW test, item 72, D-270): same columns (steps of 10 px spaced by 1 px), played
+// and its NSE and VOL rows (sixth DAW test, item 72): same columns (steps of 10 px spaced by 1 px), played
 // with it (on/off, length, loop and rate of the table). Its settings below the table.
 // Rows: PER (tone period offset), NP (noise period), MIX (channel mode 0 to 7), GEN (generator), FIX (fixed note),
 // then OUT, the pitch played at each step by a C4 (YM-Tracker preview, Y43). Settings: fixed note, detune, analog
@@ -52,9 +52,9 @@ public:
         uint16_t notePeriod = 478;
         int refNote = 60;
         double clockHz = 2'000'000;
-        double a4Hz = 440;  // Tuning A4 (D-429)
+        double a4Hz = 440;  // Tuning A4
         bool latin = false;  // Do Ré Mi note names
-        // Why a row moves nothing on this track (NP, MIX and GEN on a DMA track, D-463), empty when it applies: the
+        // Why a row moves nothing on this track (NP, MIX and GEN on a DMA track), empty when it applies: the
         // row is drawn faded, takes no click nor wheel, and its tooltip gives the reason.
         std::array<std::string, kRowCount> off{};
         bool operator==(const State&) const = default;
@@ -68,7 +68,7 @@ public:
     // Writes requested by the mouse; one wheel notch is one on its own (onWheel, otherwise onSet).
     std::function<void(Row row, int step, int value)> onSet, onWheel;
     // Click on a MIX or GEN cell: menu of the values. Right click on a PER or NP cell: setting with a slider (sixth
-    // DAW test, item 74, D-272; the other rows go back to 0).
+    // DAW test, item 74; the other rows go back to 0).
     std::function<void(Row row, int step, const gemui::Rect& cell)> onMenu, onSliderMenu;
 
     void paint(gemui::Painter& p) override;
@@ -110,7 +110,7 @@ public:
     void addTo(gemui::Widget& window);
     // Values of the focused track (the window's refresh).
     void refresh();
-    // Places the rows at (x, y), shown when `show` (the table on), inside the table (D-270).
+    // Places the rows at (x, y), shown when `show` (the table on), inside the table.
     void placeRows(double x, double y, bool show);
     // Places a rule from edge to edge of the content (x - pad to x + width + pad), then the settings, from `y` down;
     // returns the bottom of the settings.
@@ -137,7 +137,7 @@ private:
     void build();
     void wire();
     bool drum() const noexcept;
-    bool dma() const noexcept;  // a DMA track: what moves no sample is greyed (Indus, 26/10/2026, D-463)
+    bool dma() const noexcept;  // a DMA track: what moves no sample is greyed (Indus, 26/10/2026)
     const ymengine::TrackPatch& patch() const noexcept;  // the focused track's patch, as MainWindow last read it
     // Changes it in the state; one undo step of the track per gesture (MainWindow::pushCur).
     void editPatch(const std::function<void(ymengine::TrackPatch&)>& fn);
@@ -149,7 +149,7 @@ private:
     Rule sep_;
     SeqRowsGrid grid_;
 
-    // The values right of the sliders are typed too (sixth DAW test, item 77, D-275).
+    // The values right of the sliders are typed too (sixth DAW test, item 77).
     gemui::Label labFix_{"Fix", 14}, labDet_{"Detune", 14}, labAna_{"Analog", 14};
     gemui::ValueField fixv_, detv_, anav_;
     gemui::Slider fix_, det_, ana_;

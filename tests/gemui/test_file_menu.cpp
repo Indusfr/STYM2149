@@ -1,5 +1,5 @@
-// STYM2149 — File menu (M7, A1): Load, Save and Save as of a preset, a pattern, a Song and a kit, Import and Export
-// of the Patches library, through the host's dialogues (D-168); alerts of the prototype; undo steps of the loads.
+// STYM2149 — File menu: Load, Save and Save as of a preset, a pattern, a Song and a kit, Import and Export
+// of the Patches library, through the host's dialogues; alerts of the prototype; undo steps of the loads.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -193,7 +193,7 @@ TEST_CASE("File: Load of a pattern, a Song and a kit, one undo step each", "[ui]
     }
 }
 
-TEST_CASE("File: files from a newer version (B6), read and reported", "[ui][files]") {
+TEST_CASE("File: files from a newer version, read and reported", "[ui][files]") {
     FileHost h;
     MainWindow w(h);
     w.tick(0);
@@ -275,7 +275,7 @@ TEST_CASE("Patches: Import adds the patches of the file, Export writes the libra
     CHECK(h.disk["/l/out.json"] == h.patches);
 }
 
-TEST_CASE("File: New, at once on a new project, after a confirm otherwise (third DAW test, item 26, D-225)",
+TEST_CASE("File: New, at once on a new project, after a confirm otherwise (third DAW test, item 26)",
           "[ui][files]") {
     FileHost h;
     MainWindow w(h);
@@ -337,7 +337,7 @@ TEST_CASE("File: New, at once on a new project, after a confirm otherwise (third
     CHECK_FALSE(w.desktop().hasModal());
 }
 
-TEST_CASE("File: New stops the sequencer and disarms Rec, except in Host sync (sixth DAW test, item 51, D-249)",
+TEST_CASE("File: New stops the sequencer and disarms Rec, except in Host sync (sixth DAW test, item 51)",
           "[ui][files]") {
     FileHost h;
     h.state.global.seqClock = ymengine::SeqClock::Internal;

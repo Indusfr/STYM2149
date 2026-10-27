@@ -89,9 +89,9 @@ void DmaWindow::build() {
     root_.setTip("Root note: the note that plays the sample at its rate");
     root_.setId("dmaRoot");
     rootv_.setPx(14);
-    rootv_.setWholeText(true);  // a note name: C#4, Sol3 or a MIDI number (D-264)
+    rootv_.setWholeText(true);  // a note name: C#4, Sol3 or a MIDI number
     rootv_.setTip("Click to type a note (C#4, Sol3) or a MIDI note number");
-    // Fine tune (D-452), as in the Digidrums window: its unit stays in normal video under the pointer (D-451).
+    // Fine tune, as in the Digidrums window: its unit stays in normal video under the pointer.
     fine_.setRange(-ymengine::kDmaCentsMax, ymengine::kDmaCentsMax, 1);
     fine_.setTip("Fine tuning of this slot in cents");
     fine_.setId("dmaFine");
@@ -125,7 +125,7 @@ void DmaWindow::build() {
 
 void DmaWindow::wire() {
     onClose = [this] {
-        stopPreview();  // a loop never plays on behind a closed window (D-449)
+        stopPreview();  // a loop never plays on behind a closed window
         m_.syncWindowButtons();
     };
     useSte_.onClick = [this] { m_.setComputer(1); };  // 1: STE
@@ -140,7 +140,7 @@ void DmaWindow::wire() {
     wave_.onClick = [this] { m_.host_.loadDmaSample(sel_); };
     load_.onClick = [this] { m_.host_.loadDmaSample(sel_); };
     // With Loop on, Play starts the part in a loop and a click while it loops stops it, as does Loop switched off
-    // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once (D-449).
+    // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once.
     play_.onClick = [this] {
         if (looping()) return stopPreview();
         m_.host_.seqCommand(Host::SeqCommand::DmaPreview, sel_);
@@ -148,7 +148,7 @@ void DmaWindow::wire() {
         play_.setOn(looping());
     };
     clear_.onClick = [this] { editBytes([](DmaSlot&, std::vector<int8_t>& b) { b.clear(); }); };
-    // The part played (D-444), in frames, with or without Loop: Start stays before End (at least one frame). End 0
+    // The part played, in frames, with or without Loop: Start stays before End (at least one frame). End 0
     // (never set) or past a shorter sample is its end (sampleSpan): a moved Start writes End too.
     bindSlider(start_, startArmed_, [this](DmaSlot& s, double v) {
         const ymengine::SampleSpan part = ymengine::sampleSpan(s.start, s.end, frames());
@@ -175,7 +175,7 @@ void DmaWindow::wire() {
     endv_.onCommit = typeInto(end_);
     for (int k = 0; k < ymengine::kDmaRates; ++k)
         rates_[size_t(k)].onClick = [this, k] { setRate(k); };
-    // An option of the window, kept in the preferences like the other settings of the interface (D-454).
+    // An option of the window, kept in the preferences like the other settings of the interface.
     banksBtn_.onClick = [this] { banksMenu(); };
     resample_.onClick = [this] {
         m_.host_.setPreference("dmaResample", resample_.on() ? "0" : "1");
@@ -207,7 +207,7 @@ void DmaWindow::wire() {
         m_.pullExtras();
     };
 
-    // The tools of the Digidrums window and Sign and Gain, each one undo step (D-450); L and R choose the channels of a
+    // The tools of the Digidrums window and Sign and Gain, each one undo step; L and R choose the channels of a
     // stereo sample they work on, one of them always lit.
     normalize_.onClick = [this] { tool(plugin::DmaTool::Normalize); };
     reverse_.onClick = [this] { tool(plugin::DmaTool::Reverse); };
@@ -304,7 +304,7 @@ void DmaWindow::editBytes(const std::function<void(DmaSlot&, std::vector<int8_t>
     std::string name = m_.extras_.dmaNames[size_t(slot)];
     DmaSlot& s = p.slots[size_t(slot)];
     fn(s, b);
-    // Start and End within the new length (D-444): End at most the frames, Start before the end; an empty slot plays
+    // Start and End within the new length: End at most the frames, Start before the end; an empty slot plays
     // the whole of its next sample.
     const auto n = uint32_t(b.size() / (s.stereo ? 2 : 1));
     s.end = std::min(s.end, n);
@@ -312,7 +312,7 @@ void DmaWindow::editBytes(const std::function<void(DmaSlot&, std::vector<int8_t>
     s.start = std::min(s.start, last ? last - 1 : 0);
     if (n == 0) {
         s.start = s.end = 0;
-        name.clear();  // the name goes with the sample (D-445)
+        name.clear();  // the name goes with the sample
     }
     if (p == params() && b == bytes() && name == m_.extras_.dmaNames[size_t(slot)]) return;
     pushUndo(slot);
@@ -379,7 +379,7 @@ void DmaWindow::rename() {
     });
 }
 
-// ------------------------------------------------------------------------------------------- banks (D-462)
+// ------------------------------------------------------------------------------------------- banks
 
 // As in the Digidrums window: the library is a file shared by every project and every instance (Host::dmaLibrary), so
 // each bank action reads it again first. An empty text is an empty library; a text that does not parse marks it
@@ -555,7 +555,7 @@ void DmaWindow::refresh() {
         const size_t n = m_.extras_.dmaSamples[size_t(k)].size();
         const std::string& nm = m_.extras_.dmaNames[size_t(k)];
         sb.setTip("Slot " + std::to_string(k + 1) + (nm.empty() ? "" : " \"" + nm + "\"") + ": " +
-                  (n ? std::to_string(n) + " bytes" : "empty"));  // the name too (D-445)
+                  (n ? std::to_string(n) + " bytes" : "empty"));  // the name too
     }
     const std::string& name = m_.extras_.dmaNames[size_t(sel_)];
     name_.setText(name.empty() ? std::string("(none)") : name);
@@ -563,7 +563,7 @@ void DmaWindow::refresh() {
     const ymengine::SampleSpan part = ymengine::sampleSpan(s.start, s.end, n);
     wave_.setSample(sel_, b, ymengine::kDmaRateHz[s.rate], s.stereo, s.loop, part.start, part.end, name);
     // Start runs over the frames (0 to frames - 1), End over the positions after them (1 to frames); the ranges keep
-    // at least one step for an empty slot. They set the part played with or without Loop (Indus, 26/10/2026, D-444).
+    // at least one step for an empty slot. They set the part played with or without Loop (Indus, 26/10/2026).
     const bool has = n > 0;
     start_.setRange(0, std::max(1.0, double(n) - 1), 1);
     end_.setRange(std::min(1.0, double(n)), std::max(1.0, double(n)), 1);
@@ -625,7 +625,7 @@ void DmaWindow::layout() {
     sep_.setBox({x - kPad, y, contentW + 2 * kPad, 2});
     y += 2 + 8;
 
-    // On the model of the Digidrums window (Indus, 26/10/2026, D-446). Slot column: labels as wide as "Name", the
+    // On the model of the Digidrums window (Indus, 26/10/2026). Slot column: labels as wide as "Name", the
     // eight slots, the name, the four rates and the root note. Sample column: its label, with Load, Play and Clear
     // flush right on the same line; the 360 × 72 drawing; Loop, Start and End, End's slider under Start's; format and
     // tools.
@@ -640,14 +640,14 @@ void DmaWindow::layout() {
     std::vector<FlexItem> rt = {lab(labRate_, lw)};
     for (auto& b : rates_) rt.push_back(btn(b));
     y1 += flexRow(x, y1, col1, rt, 4, false) + 4;
-    std::vector<FlexItem> rs = {btn(resample_)};  // under the rates (D-454)
+    std::vector<FlexItem> rs = {btn(resample_)};  // under the rates
     rs.front().marginLeft = lw + 4;
     y1 += flexRow(x, y1, col1, rs, 4, false) + 6;
     std::vector<FlexItem> rr = {lab(labRoot_, lw), sld(root_, 134), {&rootv_, Font::width("C#10", 14), 16}};
     y1 += flexRow(x, y1, col1, rr, kGap, false) + 6;
     std::vector<FlexItem> fn = {lab(labFine_, lw), sld(fine_, 134), {&finev_, Font::width("+100 ct", 14), 16}};
     y1 += flexRow(x, y1, col1, fn, kGap, false) + 10;
-    std::vector<FlexItem> bk = {btn(banksBtn_)};  // as in the Digidrums window (D-462)
+    std::vector<FlexItem> bk = {btn(banksBtn_)};  // as in the Digidrums window
     y1 += flexRow(x, y1, col1, bk, kGap, false);
 
     double y2 = y0;
@@ -668,7 +668,7 @@ void DmaWindow::layout() {
     y2 += flexRow(x2, y2, col2, fm, 4, false) + 6;
     std::vector<FlexItem> tl = {lab(labTools_, lw2), btn(normalize_), btn(reverse_), btn(fade_)};
     y2 += flexRow(x2, y2, col2, tl, 4, false) + 6;
-    // Sign and Gain under them; L and R flush right (D-450).
+    // Sign and Gain under them; L and R flush right.
     std::vector<FlexItem> gn = {btn(sign_), btn(gainDown_), btn(gainUp_)};
     gn.front().marginLeft = lw2 + 4;
     flexRow(x2, y2, col2, gn, 4, false);

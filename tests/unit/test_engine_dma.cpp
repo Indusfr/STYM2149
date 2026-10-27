@@ -1,4 +1,4 @@
-// STYM2149 — STE DMA sound (M6, B8, D-153): DMA sound type played per track, bank of eight samples, STE machine;
+// STYM2149 — STE DMA sound: DMA sound type played per track, bank of eight samples, STE machine;
 // rate, pitch to the semitone, mono and stereo, loop and sample played to the end, DMA tracks in 3-channel mode
 // (5 to 12, 9 to 16 in Dual chip), mixer of the track, chords, mix before the LMC1992, panic, meters, preview.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -166,7 +166,7 @@ TEST_CASE("DMA: STE rates and pitch to the semitone", "[engine][dma]") {
     }
 }
 
-TEST_CASE("DMA: Fine raises the slot by up to 100 cents, notes and preview (Indus, 26/10/2026, D-452)",
+TEST_CASE("DMA: Fine raises the slot by up to 100 cents, notes and preview (Indus, 26/10/2026)",
           "[engine][dma]") {
     for (const double cents : {50.0, -100.0, 500.0}) {
         CAPTURE(cents);
@@ -241,7 +241,7 @@ TEST_CASE("DMA: loop, sample played to the end, end of the sample", "[engine][dm
     CHECK(rms(g.outL) > 0.01);
 }
 
-TEST_CASE("DMA: Start and End bound the part played, with or without loop (D-444)", "[engine][dma]") {
+TEST_CASE("DMA: Start and End bound the part played, with or without loop", "[engine][dma]") {
     // Frames 200 to 599 of 1 000: the voice starts at Start and stops at End (400 frames at 25 033 Hz ≈ 16 ms).
     DmaParams p = params(2, false, false);
     p.slots[0].start = 200;
@@ -634,7 +634,7 @@ TEST_CASE("DMA: preview of a slot from Start to End, whatever the machine", "[en
         g.e.dmaStopPreview(0);
         g.run(48);
         CHECK(g.e.dmaPreviewSlot() == -1);
-        // From Start to End (D-444): 500 frames, 20 ms.
+        // From Start to End: 500 frames, 20 ms.
         DmaParams p = params(2, false, false);
         p.slots[0].start = 2000;
         g.e.setDma(p);
@@ -646,7 +646,7 @@ TEST_CASE("DMA: preview of a slot from Start to End, whatever the machine", "[en
     }
 }
 
-TEST_CASE("DMA: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026, D-449)",
+TEST_CASE("DMA: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026)",
           "[engine][dma]") {
     Rig g(VoiceMode::Studio16, true);
     DmaParams p = params(2, false, true);
@@ -685,7 +685,7 @@ TEST_CASE("DMA: with Loop on, the preview repeats the part until stopped or Loop
     CHECK(g.e.dmaPreviewSlot() == -1);
 }
 
-TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of each side (Indus, 26/10/2026, D-457)",
+TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of each side (Indus, 26/10/2026)",
           "[engine][dma][mixer]") {
     // Left side silent, right side a sine: left = scope − side stays at zero, right = scope + side carries the sine.
     // 16 channels (track 1) and Authentic 3ch with the STE (track 5, the first DMA track).
@@ -740,7 +740,7 @@ TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of ea
     }
 }
 
-TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and solo (Indus, 26/10/2026, D-459)",
+TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and solo (Indus, 26/10/2026)",
           "[engine][dma][mixer]") {
     // Track A plays a stereo sample (both sides the same sine), centred; track B a mono sample, hard left. 16 channels
     // (tracks 1 and 2) and Authentic 3ch with the STE (tracks 5 and 6, DMA tracks).
@@ -816,7 +816,7 @@ TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and so
     }
 }
 
-TEST_CASE("DMA: the right side's mixer applies live, and when the sample becomes stereo (D-459)",
+TEST_CASE("DMA: the right side's mixer applies live, and when the sample becomes stereo",
           "[engine][dma][mixer]") {
     Rig g;
     g.dmaTrack(0, 0);

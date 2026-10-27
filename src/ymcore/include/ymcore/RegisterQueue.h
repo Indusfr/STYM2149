@@ -16,7 +16,7 @@ struct RegisterWrite {
 
 // Fixed-capacity queue, without allocation, for a single producer and a single consumer on the same thread
 // (the audio thread). Writes stay in order: a write dated before the previous one is brought to the date of the
-// previous one (D-037). Ring buffer: head_ is the oldest write, count_ the number queued.
+// previous one. Ring buffer: head_ is the oldest write, count_ the number queued.
 class RegisterQueue {
 public:
     static constexpr uint32_t kCapacity = 4096;

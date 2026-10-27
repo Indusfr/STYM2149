@@ -1,4 +1,4 @@
-// STYM2149 — Digidrum editor (M6, B9, D-154): opening (Edit > Samples), slots, loading and listening, name, rate and
+// STYM2149 — Digidrum editor: opening (Edit > Samples), slots, loading and listening, name, rate and
 // presets, root note, fine tuning, sustain loop, 4-bit conversion, tools, undo steps (settings alone or bytes),
 // named banks (save, reload, delete, unreadable file), session; Digidrum frame of the main window (rate of the slot)
 // and tooltip of the SID ratio.
@@ -258,7 +258,7 @@ TEST_CASE("Digidrums: loading, listening, Clear and its undo step", "[ui][digidr
     w.tick(0);
     click(w, "digPlay");
     CHECK(h.previews == std::vector<int>{2});
-    CHECK(w.digidrums().slider("digStart")->enabled());  // Start and End without Loop (D-443)
+    CHECK(w.digidrums().slider("digStart")->enabled());  // Start and End without Loop
     CHECK_FALSE(w.digidrums().playLit());
 
     click(w, "digClear");
@@ -276,8 +276,7 @@ TEST_CASE("Digidrums: loading, listening, Clear and its undo step", "[ui][digidr
 }
 
 
-TEST_CASE("Digidrums: with Loop on, Play loops the slot; Play again, Loop or closing stops it (Indus, 26/10/2026, "
-          "D-449)", "[ui][digidrum]") {
+TEST_CASE("Digidrums: with Loop on, Play loops the slot; Play again, Loop or closing stops it (Indus, 26/10/2026)", "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
     open(h, w);
@@ -351,11 +350,11 @@ TEST_CASE("Digidrums: name, rate, presets, root note, fine tuning; one step per 
     CHECK(h.slot(0).name.empty());
 }
 
-TEST_CASE("Digidrums: Start and End with or without Loop, Start before End (D-443)", "[ui][digidrum]") {
+TEST_CASE("Digidrums: Start and End with or without Loop, Start before End", "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
     open(h, w);
-    // Slot from before M6: values, no loop, End at 0 (the end of the sample, shown as its length).
+    // Older slot: values, no loop, End at 0 (the end of the sample, shown as its length).
     h.editExtras([](plugin::NonParamState& s) { s.digidrums[0] = std::vector<uint8_t>(500, 8); });
     w.tick(0);
     CHECK(w.digidrums().slider("digStart")->enabled());
@@ -432,7 +431,7 @@ TEST_CASE("Digidrums: 4-bit conversion and tools on the source, steps with the b
     CHECK(h.state.digidrums[0] == std::vector<uint8_t>{0, 4, 8, 11, 15});
 }
 
-TEST_CASE("Digidrums: Sign of the DMA window; Reverse mirrors Start and End (Indus, 26/10/2026, D-450)",
+TEST_CASE("Digidrums: Sign of the DMA window; Reverse mirrors Start and End (Indus, 26/10/2026)",
           "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
@@ -459,7 +458,7 @@ TEST_CASE("Digidrums: Sign of the DMA window; Reverse mirrors Start and End (Ind
     CHECK(h.slot(0).source == std::vector<int8_t>{-128, -64, 0, 64, 127});
 }
 
-TEST_CASE("Digidrums: -3 dB after a clipped +3 dB gives the source back (D-453)", "[ui][digidrum]") {
+TEST_CASE("Digidrums: -3 dB after a clipped +3 dB gives the source back", "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
     open(h, w);
@@ -603,8 +602,7 @@ TEST_CASE("Digidrums: Delete and Load act on the bank named in the confirmation,
     CHECK(h.state.digidrums[0].empty());
 }
 
-TEST_CASE("Main window: the Digidrum frame prints the slot's name and own rate, not always 7800 Hz (P270, D-154, "
-          "D-445)",
+TEST_CASE("Main window: the Digidrum frame prints the slot's name and own rate, not always 7800 Hz",
           "[ui][digidrum]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Digidrum);
@@ -624,8 +622,7 @@ TEST_CASE("Main window: the Digidrum frame prints the slot's name and own rate, 
     CHECK(frame->caption() == "slot 1: empty");
 }
 
-TEST_CASE("Main window: Digidrum samples under slots 5 to 8 opens the editor on the slot; the drawing loads nothing "
-          "(D-213)",
+TEST_CASE("Main window: Digidrum samples under slots 5 to 8 opens the editor on the slot; the drawing loads nothing ",
           "[ui][digidrum]") {
     for (const bool m3 : {false, true}) {
         CAPTURE(m3);
@@ -656,7 +653,7 @@ TEST_CASE("Main window: Digidrum samples under slots 5 to 8 opens the editor on 
     }
 }
 
-TEST_CASE("Main window: the SID timer ratio explains the ratio, not a Digidrum rate (P033, D-029)", "[ui][digidrum]") {
+TEST_CASE("Main window: the SID timer ratio explains the ratio, not a Digidrum rate", "[ui][digidrum]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Sid);
     MainWindow w(h);
@@ -670,7 +667,7 @@ TEST_CASE("Main window: the SID timer ratio explains the ratio, not a Digidrum r
                        [](const std::string& t) { return t.find("Digidrum playback rate") != std::string::npos; }));
 }
 
-TEST_CASE("Digidrums: rate, root note, fine tuning and loop typed (sixth DAW test, item 66, D-264)",
+TEST_CASE("Digidrums: rate, root note, fine tuning and loop typed (sixth DAW test, item 66)",
           "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);

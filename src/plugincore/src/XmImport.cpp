@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: import of XM modules (M7, B5, D-056, D-166, D-173)
+// STYM2149 — plugincore: import of XM modules
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/XmImport.h"
@@ -111,14 +111,14 @@ void applyRow(const XmModule& m, Chan& ch, const XmCell& x) noexcept {
     else if (x.effect == kFxPan) ch.pan = x.param;
 }
 
-// Sample of a DMA slot (D-166): signed 8-bit at the STE rate closest to that of its C4.
+// Sample of a DMA slot: signed 8-bit at the STE rate closest to that of its C4.
 struct DmaBuild {
     std::vector<int8_t> bytes;
     uint8_t rate = 0;
     bool loop = false;
     bool unrolled = false;  // loop that does not start at the beginning: attack and loop passes unrolled, no loop
     bool cut = false;       // longer than 32 KB at the lowest rate
-    double scale = 1;       // frames of the DMA sample per frame of the XM sample (9xx: Oxx, D-338)
+    double scale = 1;       // frames of the DMA sample per frame of the XM sample (9xx: Oxx)
 };
 
 DmaBuild buildDma(const XmSample& s) {
@@ -285,14 +285,14 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         }
     }
 
-    // Speed and tempo of the first visit of each pattern, its first line included (Txx, D-243).
+    // Speed and tempo of the first visit of each pattern, its first line included (Txx).
     std::vector<std::pair<int, int>> startOf(xmOf.size(), {0, 0});
     for (const Visit& v : visits) {
         const int k = stymOf[size_t(v.pattern)];
         if (k >= 0 && !startOf[size_t(k)].first) startOf[size_t(k)] = {v.speed, v.bpm};
     }
 
-    // ---- Instruments: the most played that have a sample (D-166) ----
+    // ---- Instruments: the most played that have a sample ----
     struct Pick {
         int inst = 0, sample = 0, plays = 0;
     };
@@ -355,9 +355,9 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
             ymseq::Lane& l = pat.edit(t);
             const int octave = state.seq.tracks[size_t(t)].octave;
             bool holding = true;  // first lines: the note of the previous position continues
-            // Effects of D-338: memories of the parameters (xx = 00: the previous one), slide that runs (an XM slide
+            // Step effects: memories of the parameters (xx = 00: the previous one), slide that runs (an XM slide
             // lasts its line, the slides of STYM2149 until their 00) and fine tune of the last note. The arpeggio 0xy
-            // and the portamentos 1xx and 2xx are left out: their commands are retired (D-340, D-344).
+            // and the portamentos 1xx and 2xx are left out: their commands are retired.
             int volMem = 0, offsetMem = 0;
             bool volRuns = false, tuned = false;
             for (int row = 0; row < rows; ++row) {
@@ -382,7 +382,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
                     }
                 } else if (x.note == ymio::kXmKeyOff) {
                     holding = false;
-                } else if (holding) {  // the volume of the channel at each line of the note (VOL of a held step, D-345)
+                } else if (holding) {  // the volume of the channel at each line of the note (VOL of a held step)
                     l.tie[s] = 1;
                     l.vol[s] = uint8_t(std::clamp(int(std::lround(cs.vol * 15 / 64.0)), 0, 15));
                 }
@@ -400,7 +400,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
                 if (x.effect == kFxArp && x.param == 0) {  // 000: no effect
                 } else if (x.effect == kFxSpeed) {
                     if (x.param == 0) ++effects["F00"];
-                } else if (x.effect == kFxVolSlide) {  // Axy: up x (first) or down y, units of 1/64 ≈ 1/60 (D-338)
+                } else if (x.effect == kFxVolSlide) {  // Axy: up x (first) or down y, units of 1/64 ≈ 1/60
                     const int v = x.param ? x.param : volMem;
                     volMem = v;
                     if (v) l.setCmd(row, seqCmd(SeqCmd::VolSlide, v >> 4 ? v & 0xF0 : v & 15));
@@ -441,7 +441,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
             }
         }
         // A command on the channel's track, otherwise on an imported track that has no command of its kind on that
-        // row (a step holds one of each kind, D-330).
+        // row (a step holds one of each kind).
         auto place = [&](int row, int from, uint16_t cmd) {
             const ymengine::SeqCmd kind = ymengine::seqCmdKind(cmd);
             if (from >= 0 && !pat.lane(from).cmdAt(kind, row)) {
@@ -458,7 +458,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         };
         if (!r.ticks) {
             // BPM timing: a tempo change below the first line (Fxx, speed or tempo) goes to the BPM row of the pattern
-            // at its line (D-243; twelfth DAW test, item 150), from the speed and tempo of the first visit of the
+            // at its line (twelfth DAW test, item 150), from the speed and tempo of the first visit of the
             // pattern (its first line is the tempo of the entry).
             int speed = startOf[k].first, bpm = startOf[k].second;
             long tempo = tempoOf(speed, bpm);
@@ -499,7 +499,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     }
 
     // ---- Song: one entry per position played, repeats grouped ----
-    // With Txx (D-243), every entry has its own tempo: the tempo of a Txx holds until an entry that has one.
+    // With Txx, every entry has its own tempo: the tempo of a Txx holds until an entry that has one.
     r.tempo = float(std::clamp(tempoOf(visits[0].speed, visits[0].bpm), 60L, 240L));
     ymseq::Song song;
     int restartEntry = -1;
@@ -547,7 +547,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         dst.patch.dmaSlot = int8_t(k);
         state.dma.slots[k] = {builds[k].rate, false, 60, builds[k].loop};  // mono, root note 60
         state.dmaSamples[k] = std::move(builds[k].bytes);
-        // Name of the slot (D-445): that of the sample, otherwise that of the instrument.
+        // Name of the slot: that of the sample, otherwise that of the instrument.
         state.dmaNames[k] = cleanDigidrumName(ins.samples[size_t(picks[k].sample)].name);
         if (state.dmaNames[k].empty()) state.dmaNames[k] = cleanDigidrumName(ins.name);
     }

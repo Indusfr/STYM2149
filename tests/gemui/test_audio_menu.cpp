@@ -1,4 +1,4 @@
-// STYM2149 — File menu, audio exports (M7, A4, D-164, D-171): Export pattern > WAV and Stems (ZIP), Export song > WAV
+// STYM2149 — File menu, audio exports: Export pattern > WAV and Stems (ZIP), Export song > WAV
 // and Stems (ZIP); GEM format dialogue (choice rows of the alert), preferences, worker thread under the bee, file
 // written as the rendering goes, alerts at the end.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -157,7 +157,7 @@ TEST_CASE("Export pattern > WAV: Format and Rate dialogue, preferences kept, fil
     pressKey(w, gemui::Key::Escape);
 }
 
-TEST_CASE("Export pattern > WAV: Tab moves the focus to Cancel then Export, Enter activates that button (P417)",
+TEST_CASE("Export pattern > WAV: Tab moves the focus to Cancel then Export, Enter activates that button",
           "[ui][wav][keyboard]") {
     FileHost h;
     project(h);

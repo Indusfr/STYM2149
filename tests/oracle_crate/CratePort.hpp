@@ -3,8 +3,8 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Line-by-line port of crates/ym2149-core (generators.rs, mixer.rs, chip.rs, dc_filter.rs, tables.rs), © slippyex,
-// MIT licence; original algorithm AtariAudio, © Arnaud Carré, MIT licence. Taken from the M0 trial
-// (docs/m0/essai/cpp/port_crate.hpp). It reproduces the crate, deviations included (D-011 to D-014): it is not ymcore.
+// MIT licence; original algorithm AtariAudio, © Arnaud Carré, MIT licence. Taken from the initial trial.
+// It reproduces the crate, deviations included: it is not ymcore.
 #pragma once
 #include <cstdint>
 #include <cstring>

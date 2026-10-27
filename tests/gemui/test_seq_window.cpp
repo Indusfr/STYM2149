@@ -1,5 +1,5 @@
-// STYM2149 — Step Sequencer window (M5): All button of the gate (D-134), Gate slider, Clock selector (D-188);
-// Settings > Quantize to VBL (D-111, D-430); moved up when it grows past the bottom of the desktop (D-458).
+// STYM2149 — Step Sequencer window: All button of the gate, Gate slider, Clock selector;
+// Settings > Quantize to VBL; moved up when it grows past the bottom of the desktop.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -71,7 +71,7 @@ void click(MainWindow& w, const char* id) {
 }
 
 // Press at the left or right edge of the Gate track: the thumb goes there, minimum or maximum.
-// Ends of a slider's track, inside its arrows (D-297).
+// Ends of a slider's track, inside its arrows.
 int trackEnd(const gemui::Rect& r, bool max) {
     return max ? r.right() - 1 - gemui::Slider::kArrow : r.x + gemui::Slider::kArrow;
 }
@@ -106,7 +106,7 @@ void pick(MainWindow& w, const std::string& label) {
 
 }  // namespace
 
-TEST_CASE("Step Sequencer: All button of the global gate, on the row of the Gate slider (D-134)", "[ui][seq]") {
+TEST_CASE("Step Sequencer: All button of the global gate, on the row of the Gate slider", "[ui][seq]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();
@@ -145,7 +145,7 @@ TEST_CASE("Step Sequencer: All button of the global gate, on the row of the Gate
     CHECK(h.v("gate") == 5.0f);
 }
 
-TEST_CASE("Step Sequencer: Clock on MIDI ext, BPM slider greyed out (D-188)", "[ui][seq]") {
+TEST_CASE("Step Sequencer: Clock on MIDI ext, BPM slider greyed out", "[ui][seq]") {
     TestHost h;
     h.state.global.seqClock = ymengine::SeqClock::Internal;
     MainWindow w(h);
@@ -170,7 +170,7 @@ TEST_CASE("Step Sequencer: Clock on MIDI ext, BPM slider greyed out (D-188)", "[
     CHECK(h.v("freeTempo") == 60.0f);
 }
 
-TEST_CASE("Settings > Quantize to VBL, state setting (D-111, D-430)", "[ui][seq]") {
+TEST_CASE("Settings > Quantize to VBL, state setting", "[ui][seq]") {
     TestHost h;
     MainWindow w(h);
     w.settingsWindow().show();
@@ -187,7 +187,7 @@ TEST_CASE("Settings > Quantize to VBL, state setting (D-111, D-430)", "[ui][seq]
     CHECK_FALSE(h.state.global.quantizeVbl);
 }
 
-TEST_CASE("Step Sequencer: right click on the metronome, its volume by slider (D-288)", "[ui][seq][metronome]") {
+TEST_CASE("Step Sequencer: right click on the metronome, its volume by slider", "[ui][seq][metronome]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();
@@ -212,13 +212,13 @@ TEST_CASE("Step Sequencer: right click on the metronome, its volume by slider (D
     CHECK(h.state.global.metronomeLevel <= 55);
 }
 
-TEST_CASE("Step Sequencer: grown past the bottom of the desktop, the window moves up until its bottom shows (D-458)",
+TEST_CASE("Step Sequencer: grown past the bottom of the desktop, the window moves up until its bottom shows",
           "[ui][seq]") {
     TestHost h;
     MainWindow w(h);
     pluginui::SeqWindow& s = w.sequencer();
     s.show();
-    // Moved low by its bar: its bottom on the desktop's, never below (Indus, 26/10/2026, D-460).
+    // Moved low by its bar: its bottom on the desktop's, never below (Indus, 26/10/2026).
     const gemui::Rect b0 = s.bounds();
     const int low = MainWindow::kHeight - b0.h;
     s.place({double(b0.x), double(MainWindow::kHeight - b0.h / 2), double(b0.w), double(b0.h)});

@@ -1,4 +1,4 @@
-// STYM2149 — Drum Kit window (M6, A2): opening (button, Ctrl+K, Edit menu), content inert outside Chipdrum, choice of
+// STYM2149 — Drum Kit window: opening (button, Ctrl+K, Edit menu), content inert outside Chipdrum, choice of
 // the instrument, settings (slider, typed input), Audition, Reset, Kits, kit name, undo.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -159,14 +159,14 @@ TEST_CASE("Drum Kit: button, Ctrl+K and Edit menu open the window; boxes of the 
     CHECK(letter(w, U'k', true));
     CHECK(w.drumKit().isOpen());
     key(w, gemui::Key::Escape);
-    w.openMenu(2);  // Edit > Drum kit (eighth entry since Effects, D-312, below the bar)
+    w.openMenu(2);  // Edit > Drum kit (eighth entry since Effects, below the bar)
     const gemui::Rect edit = *w.rectOf("mEdit");
     press(w, {edit.x + 20, edit.bottom() + 2 + 7 * 20 + 10});
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(w.drumKit().isOpen());
 }
 
-TEST_CASE("Drum Kit: Edit > Drum kit and Ctrl+K only on a Chipdrum track (second DAW test, item 18, D-219)",
+TEST_CASE("Drum Kit: Edit > Drum kit and Ctrl+K only on a Chipdrum track (second DAW test, item 18)",
           "[ui][kit][menu]") {
     TestHost h;
     MainWindow w(h);
@@ -281,7 +281,7 @@ TEST_CASE("Drum Kit: Audition, Reset of the instrument, banks of the Kits menu",
     CHECK(h.commands[0].second == int(DrumSlot::Hat));
     CHECK(h.editor.undo.undoSize() == 0);
 
-    // Kits: 13 banks sorted ignoring case; TR-808-ish (eleventh, D-245).
+    // Kits: 13 banks sorted ignoring case; TR-808-ish (eleventh).
     click(w, "kitBank");
     REQUIRE(w.desktop().hasPopups());
     const gemui::Rect b = *w.rectOf("kitBank");

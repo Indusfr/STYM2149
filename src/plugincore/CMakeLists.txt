@@ -1,4 +1,4 @@
-# plugincore: the plugin core without JUCE (parameters, state, MIDI, engine driver) (M3).
+# plugincore: the plugin core without JUCE (parameters, state, MIDI, engine driver).
 add_library(stym_plugincore STATIC
   src/AudioExport.cpp
   src/Parameters.cpp

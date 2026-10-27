@@ -7,8 +7,8 @@ repository; every statement points to the file that backs it. Items still open a
 
 Conventions you will meet everywhere:
 
-- Source comments are in French. Comments cite decisions (`D-nnn`) and fidelity thresholds (`S1` to `S11`) from the
-  development records, which are not published in this repository.
+- Source comments are in English. Comments cite fidelity thresholds (`S1` to `S11`) from the development records,
+  which are not published in this repository.
 - Comments often cite `STYM2149_SPEC.md` (the specification) and `YM2149_Prototype.html` (the JavaScript
   prototype the product reproduces). Neither file is versioned in this repository; tools that need the prototype
   take its path as an argument.
@@ -24,7 +24,7 @@ STYM2149 is a stack of static libraries. Only `src/plugin` includes JUCE; every 
 | Module (CMake target) | Responsibility | Key files |
 |---|---|---|
 | `src/ymcore` (`ymcore`) | YM2149F model at clk/8 (250 kHz at 2 MHz), ported from AtariAudio 1.26; measured 32×32×32 mixing table (DAC); timestamped register writes; chip → host rate (`OutputMode::Raw` Kaiser sinc, `RawBox` AtariAudio averaging, `Retro` last internal step); DC removal; ST/STE board filters | `Ym2149.h`, `ChipRenderer.h`, `SincResampler.h`, `RegisterQueue.h`, `BoardFilters.h`, `TickStreamOutput.h`, `ChipConfig.h` |
-| `src/ymengine` (`ymengine`) | Voice engine: 16 lane + 80 chord + 16 pool voices (`Engine::kVoices`, `Engine.h`); modes `Studio16` (virtual channels, stereo), `Authentic3` and `Dual3` (real chips, mono like the ST; stereo with the STE DMA sound, D-153); MFP 68901 timers; generators Chip, SID, Digidrum, Sync Buzzer, Chipdrum, DMA (STE); ADSR, vibrato, LFO, arpeggio, slides; echo of the notes (repeats on `VoiceTag::Echo` voices, every mode) and the 16 ch stereo delay fed by send buses (`StereoDelay`, D-299); sequencer playback; register capture | `Engine.h`, `src/EngineImpl.h`, `src/StereoDelay.h`, `src/Sequencer.cpp`, `VirtualChannel.h`, `Mfp68901.h`, `DrumKit.h`, `Dma.h`, `Pitch.h`, `Sequence.h`, `Params.h` |
+| `src/ymengine` (`ymengine`) | Voice engine: 16 lane + 80 chord + 16 pool voices (`Engine::kVoices`, `Engine.h`); modes `Studio16` (virtual channels, stereo), `Authentic3` and `Dual3` (real chips, mono like the ST; stereo with the STE DMA sound); MFP 68901 timers; generators Chip, SID, Digidrum, Sync Buzzer, Chipdrum, DMA (STE); ADSR, vibrato, LFO, arpeggio, slides; echo of the notes (repeats on `VoiceTag::Echo` voices, every mode) and the 16 ch stereo delay fed by send buses (`StereoDelay`); sequencer playback; register capture | `Engine.h`, `src/EngineImpl.h`, `src/StereoDelay.h`, `src/Sequencer.cpp`, `VirtualChannel.h`, `Mfp68901.h`, `DrumKit.h`, `Dma.h`, `Pitch.h`, `Sequence.h`, `Params.h` |
 | `src/ymseq` (`ymseq`) | Sequencer editing model: patterns of up to 256 steps (32 patterns, 4 banks × 8), lane edits, euclidean generator, Song (extended with Rest/Note-off/Loop), Ticks timing, CMD row, undo history (50 steps) | `Pattern.h`, `Edit.h`, `Song.h`, `Project.h`, `Undo.h`, `Timing.h`, `Commands.h`, `Euclid.h` |
 | `src/ymio` (`ymio`) | File formats (section 5): YM, LHA, SNDH (+ICE), SMF, WAV, ZIP, XM, register dumps | `YmFile.h`, `YmPlayer.h`, `Sndh.h`, `SndhWriter.h`, `YmWriter.h`, `Lzh.h`, `Smf.h`, `Wav.h`, `Zip.h`, `Xm.h` |
 | `src/plugincore` (`stym_plugincore`) | Plugin core without JUCE: parameter table, parameter→engine mapping, plugin state, `Driver` (runs the engine on the audio thread), lock-free primitives, offline render, exports/imports, MIDI learn, `EngineStatus` | `Parameters.h`, `Mapping.h`, `State.h`, `Driver.h`, `Mailbox.h`, `TripleBuffer.h`, `EngineStatus.h`, `Offline.h` |
@@ -91,7 +91,7 @@ separate `ServiceTimer` object, detached and destroyed safely in `~StymProcessor
   1024 per `render()`; full FIFOs drop messages.
 - Exceptions, documented in code: offline rendering (`isNonRealtime()`) rebuilds the engine immediately, allocating
   (`Driver::requestConfig`, `Driver.cpp:318`); `Engine::setKit` recomputes the Chipdrum kit on the audio thread
-  ("a few hundred microseconds, known limit of M3", `Driver.cpp:291`).
+  ("a few hundred microseconds, known limit", `Driver.cpp:291`).
 
 How tests enforce them:
 
@@ -146,7 +146,7 @@ each Digidrum sample and each DMA sample, and publishes `makeSnapshot()` (`Plugi
 (`ymengine::SeqData`) shares its lanes with the editing model: `ymseq` stores lanes as `shared_ptr<const Lane>`,
 copied only when modified (`Pattern.h`, `Sequence.h`), so publishing patterns copies pointers, not steps.
 
-**Engine rebuilds.** A change of clock (the Custom clock's frequency included, D-237), output chain or resampling
+**Engine rebuilds.** A change of clock (the Custom clock's frequency included), output chain or resampling
 (`ConfigKey`, `Mapping.h:66`) needs
 `Engine::prepare` (allocations). The audio thread publishes the wanted key in `request_`, `Driver::service` builds
 the `EngineSlot` on the message thread and posts it; the audio thread fades out, swaps and retires the old slot
@@ -178,14 +178,14 @@ There are three kinds of persistent data; keep them apart.
 builds JUCE parameters from it (`makeParameter`, `PluginProcessor.cpp:15`): `Bool`, `Choice`, `Int` (step 1,
 linear) or `Float` with a custom range (geometric for `envPeriod`).
 
-- IDs are stable and never renamed once published (D-057): globals in camelCase (`master`, `voiceMode`,
+- IDs are stable and never renamed once published: globals in camelCase (`master`, `voiceMode`,
   `chipClock`, …, `computer`, `chipClockHz`), track parameters `tNN_<field>` (`t01_level` … `t16_gate`). Display names
   "T3 Env Period"; JUCE groups `global` and `t01`…`t16`.
-- `ParamSpec::version` is the JUCE `ParameterID` version (needed by AU): 1 for the M3 set, 2 for `freeTempo`,
+- `ParamSpec::version` is the JUCE `ParameterID` version (needed by AU): 1 for the first set, 2 for `freeTempo`,
   `swing`, `gate`, `gateAll`, `tNN_gate`, 3 for `computer`, 4 for `chipClockHz` (`since(...)` in `Parameters.cpp`).
 - Not automatable: the six MIDI settings `midiRouting`, `velocity`, `bendRange`, `wheelDepth`, `arpClock`,
   `arpDivision` (`isMidiSetting`, `Parameters.cpp:146`), and `chipClockHz`, the frequency of the Custom chip clock
-  (16 ch only, D-237), since each value builds a new engine.
+  (16 ch only), since each value builds a new engine.
 - Values travel "in clear" (table units) in `ParamValues`. The driver diffs them against the last applied values
   at each block start (`Driver::sync`); a prototype MIDI CC that changes a parameter splits the render at its
   sample and is reported to the host (`Driver::controlChange`, `Driver.cpp:547`).
@@ -204,26 +204,26 @@ linear) or `Float` with a custom range (geometric for `envPeriod`).
 | `KIT ` | always | Chipdrum kit, 8 × 5 `f64` |
 | `DIGI` | always | Digidrum samples, 4-bit values packed two per byte |
 | `NAME` | if a track is named | Track names (ASCII, 8 chars max) |
-| `SEQS`, `PATN`, `SONG` | always (M5) | Sequencer settings, created patterns (non-empty cells only), Song entries |
-| `SNGX` | if a Song entry is special or a restart point | Extended Song (D-158) |
+| `SEQS`, `PATN`, `SONG` | always | Sequencer settings, created patterns (non-empty cells only), Song entries |
+| `SNGX` | if a Song entry is special or a restart point | Extended Song |
 | `INST` | if an instrument exists | Project instruments as compact JSON (Patches format) |
-| `TSEQ` | if a track has instrument sequences | Sequences, timer waves, tuned buzzer, LFO (D-257), echo (D-299) |
+| `TSEQ` | if a track has instrument sequences | Sequences, timer waves, tuned buzzer, LFO, echo |
 | `TIMG` | if not default | Ticks timing and groove |
-| `DMAS` | if not default | STE DMA bank: the eight slots, then Start and End of each (D-444), then their names (D-445) |
+| `DMAS` | if not default | STE DMA bank: the eight slots, then Start and End of each, then their names |
 | `DIGS` | if not default | Digidrum editor slots (name, playback with Start and End, 8-bit source) |
 | `RECD` | if a take exists | Register recorder take |
 
-Versioning: new data is added as new chunks or trailing fields while staying at version 1 (D-065). Readers ignore
+Versioning: new data is added as new chunks or trailing fields while staying at version 1. Readers ignore
 unknown chunks and parameters, default missing ones, clamp values, and default missing trailing track fields. A
 newer version or unreadable blob is refused and `setStateInformation` keeps the current state
-(`PluginProcessor.cpp:453`). Golden files `tests/data/state_v1.bin` (M3) and `tests/data/state_v1_m5.bin` (M5)
+(`PluginProcessor.cpp:453`). Golden files `tests/data/state_v1.bin` and `tests/data/state_v1_m5.bin`
 are read by `tests/unit/test_plugincore.cpp` (both) and `tests/plugin/test_processor.cpp` (`state_v1.bin`);
-`STYM_STATE_GOLDEN_OUT=<file>` writes the M5 reference state to a file, to regenerate it on purpose. After a
+`STYM_STATE_GOLDEN_OUT=<file>` writes the reference state to a file, to regenerate it on purpose. After a
 state load, a CLAP instance asks the host to rescan values (`is_clap`, `PluginProcessor.cpp:465`).
 
 JSON project files have their own versioning: STYM2149 additions sit under a `"stym"` key with `v: 1`; a preset's
 `"stym"` carries the full plugin state in base64 (without the recorder take), and newer files are read for what
-is known, with an alert (`plugincore/ProjectFiles.h`, D-174).
+is known, with an alert (`plugincore/ProjectFiles.h`).
 
 ### Preferences
 
@@ -234,18 +234,18 @@ The JUCE Standalone app keeps its audio and MIDI devices in its own `STYM2149.se
 that name too, so on Windows both shared one file and every save by the Standalone app put back the preferences it
 had read at launch. `StymEditor::openPreferences` copies the editor's keys from an old `STYM2149.settings` of the same
 folder the first time `Preferences.settings` is created, leaving the Standalone app's keys (`audioSetup`,
-`filterState`, `windowX`...) where they are (D-069). `createPluginFilter` reads `midiMap` from it so learned CCs work
+`filterState`, `windowX`...) where they are. `createPluginFilter` reads `midiMap` from it so learned CCs work
 with the editor closed (`PluginProcessor.cpp`).
 
 | Key / file | Used for |
 |---|---|
 | `zoom` | Editor window size 50-200 %, 100 % = 5/8 of the desktop's logical size, set by resizing the window (absent: chosen from the screen size, `autoZoom`) |
 | `lastFolder` | Last folder of the file dialogs |
-| `tooltips`, `tipLanguage` | Tooltips on/off, tooltip language (`en`, built in, or the code of a language file: `fr`, `de`, `es`, `pt`, `it` installed, others added by the user, D-283) |
+| `tooltips`, `tipLanguage` | Tooltips on/off, tooltip language (`en`, built in, or the code of a language file: `fr`, `de`, `es`, `pt`, `it` installed, others added by the user) |
 | `midiMap` | MIDI learn map (JSON) |
-| `noteNames`, `kbdLayout`, `seqCmdRow`, `wavFormat`, `wavRate` | Note naming, computer keyboard layout, display of the step command rows CMD, BPM, ENV, VIB, DLY and CUT (on when absent, D-318), WAV dialog defaults |
-| `deskIcons` | Places of the desktop icons A, B and trash (D-303) |
-| `pixels` | `sharp` (absent) or `smooth`: glyphs and icons of the JUCE editor at a scale that is not whole (`JucePainter::Cache::setSharp`, D-331) |
+| `noteNames`, `kbdLayout`, `seqCmdRow`, `wavFormat`, `wavRate` | Note naming, computer keyboard layout, display of the step command rows CMD, BPM, ENV, VIB, DLY and CUT (on when absent), WAV dialog defaults |
+| `deskIcons` | Places of the desktop icons A, B and trash |
+| `pixels` | `sharp` (absent) or `smooth`: glyphs and icons of the JUCE editor at a scale that is not whole (`JucePainter::Cache::setSharp`) |
 | `Patches.json` (sibling file) | Patch library (`plugincore/Patches.h`) |
 | `Digidrums.json` (sibling file) | Digidrum banks (`plugincore/DigidrumBanks.h`) |
 
@@ -288,24 +288,24 @@ knows only logical pixels and a time given by the caller, dispatches mouse and k
 `tick(nowMs)`, and tracks up to `kMaxDirty = 16` disjoint dirty rectangles; `paint()` repaints them and exposes
 `painted()`. Controls reproduce the prototype's CSS rules (`Controls.h`: `Label`, `Button`, `Slider`, `ValueField`,
 `TextField`, `GroupBox`, `WindowFrame`, `TitleBar`, `FloatWindow`), plus `MenuBar`/`MenuList` (`Menu.h`),
-`Alert`, `ScrollPane` and `ScrollBar` (`Scroll.h`; a vertical `Slider` drawn with the pane's arrow cells, D-294).
-A horizontal `Slider` has an arrow at each end that moves it by one step (D-297) and passes a right click to
-`onContext` (D-300). `DeskIcon` is a decorative desktop icon that a held press drags (D-303), and
-`Desktop::workTop` keeps the windows below the menu bar across the top of the desktop (D-302).
+`Alert`, `ScrollPane` and `ScrollBar` (`Scroll.h`; a vertical `Slider` drawn with the pane's arrow cells).
+A horizontal `Slider` has an arrow at each end that moves it by one step and passes a right click to
+`onContext`. `DeskIcon` is a decorative desktop icon that a held press drags, and
+`Desktop::workTop` keeps the windows below the menu bar across the top of the desktop.
 
 **Fonts.** EmuTOS glyphs (GPL v2 or later): the 8×16 system font (bitmaps for 8 to 16 px, quarter-pixel origins)
 in `src/gemui/src/FontData.cpp`, and the 8×8 and 6×6 fonts for small texts in `FontDataSmall.cpp`. Both are
 generated, versioned files (`tools/gemfont/extract.mjs`, `emutos_small.mjs`; see `tools/gemfont/README.md`): 151
 characters, including the accented Atari ST letters used by translated tooltips. Each 8×16 glyph keeps its place in
-the EmuTOS cell (D-266); the prototype's TrueType started each one at the origin, and gemshot draws the prototype's
+the EmuTOS cell; the prototype's TrueType started each one at the origin, and gemshot draws the prototype's
 scenes with that placement (`tools/gemshot/PrototypeFont.cpp`, `Font::useSizes`). Characters outside the font
 render as "?" (`Font.h`). Icons and drawn cursors come from `src/pluginui/src/IconData.cpp`, rasterised from
 the prototype's SVGs; the desktop icons are drawn for STYM2149 in `src/pluginui/src/DeskIcons.cpp`.
 
 **pluginui.** `MainWindow` (`MainWindow.h`) is a `gemui::Widget` owning the `Desktop` of 1344 × 984 logical pixels
-(`kWidth`, `kHeight`, D-067, D-461), the main window and the floating windows (`SeqWindow`, `SongWindow`, `MixerWindow`,
-`ArpWindow`, `ModulationWindow` (with its `SequencesPanel`, D-240, and `LfoPanel`, D-257), `KitWindow`, `PatchesWindow`, `InstrumentsWindow`,
-`EchoWindow` (the Effects window, D-299, D-311), `DmaWindow`, `RecorderWindow`, `YmPlayerWindow`, `DigidrumWindow`,
+(`kWidth`, `kHeight`), the main window and the floating windows (`SeqWindow`, `SongWindow`, `MixerWindow`,
+`ArpWindow`, `ModulationWindow` (with its `SequencesPanel`, and `LfoPanel`), `KitWindow`, `PatchesWindow`, `InstrumentsWindow`,
+`EchoWindow` (the Effects window), `DmaWindow`, `RecorderWindow`, `YmPlayerWindow`, `DigidrumWindow`,
 `CurveWindow`, `KbdWindow`, `HelpWindow`, and one `ScopeWindow` per track created on demand). It knows neither JUCE nor the
 processor: everything goes through `pluginui::Host` (`Host.h`), on the message thread. Hosts are `StymEditor`,
 `FakeHost` in `tools/gemshot/Scenes.cpp`, and the `TestHost`/`FileHost` classes of `tests/gemui`.
@@ -314,22 +314,22 @@ processor: everything goes through `pluginui::Host` (`Host.h`), on the message t
 and a `pluginui::Host`; it owns the `MainWindow` on the heap. Every 30 Hz `frame()` calls `MainWindow::tick` then
 `flush()`, which takes the desktop's pending zones (`Desktop::takePending`) and draws each one, with the widgets
 around it, into a software ARGB `juce::Image` at the screen's pixels (`draw`), then repaints those areas. The drawing
-goes through `JucePainter` (`src/plugin/JucePainter.cpp`, D-201), a second backend of `gemui::Painter`: rectangles
+goes through `JucePainter` (`src/plugin/JucePainter.cpp`), a second backend of `gemui::Painter`: rectangles
 on screen pixels, borders of one thickness, pattern cells and glyph or icon masks (juce::Path filled with
 anti-aliasing) made once and cached, the framebuffer enlarged into whole blocks at a whole scale. `paint()` reads the
 physical scale of its context (`getPhysicalPixelScaleFactor`), draws the whole desktop again when the image's size no
 longer matches (`render`), then copies the image one to one. Mouse positions map back to logical pixels (`logical`),
 keys to `gemui::KeyEvent`, GEM pointers to JUCE or drawn cursors. The size is 50 to 200 % (`kZoomMin/Max`), 100 % being
-5/8 of the desktop's logical size and 160 % all of it (`zoomed`, `kZoomFull`, D-202, D-216): the editor is resizable with a fixed aspect ratio, and a host or
-user resize becomes the stored `zoom` preference (`resized`); there is no Zoom menu (D-335).
+5/8 of the desktop's logical size and 160 % all of it (`zoomed`, `kZoomFull`): the editor is resizable with a fixed aspect ratio, and a host or
+user resize becomes the stored `zoom` preference (`resized`); there is no Zoom menu.
 
 **Tooltips.** The desktop shows a widget's tooltip after `kTipDelayMs = 700` ms when tooltips are on and passes each
 one through `Desktop::translateTip` (`Desktop.h:97`). `MainWindow` sets that hook to `TipBook::translate` of the
 chosen language: the `tipLanguage` preference, else the system language (`Host::systemLanguage`) when a file gives
-it, else English. Tooltips are written in English in the code; menus and labels stay in English (D-178). English is
+it, else English. Tooltips are written in English in the code; menus and labels stay in English. English is
 the only language built in: `src/pluginui/src/TipCatalog.cpp` (`tipcatalog::kLines`, generated by
 `tools/tipcatalog/tipcatalog.py` from `tools/tipcatalog/en.txt`) lists every English line, for the template of a new
-language and the tests. Every other language is a gettext PO file (D-283): French, German, Spanish, Portuguese and
+language and the tests. Every other language is a gettext PO file: French, German, Spanish, Portuguese and
 Italian are `languages/*.po` in the sources, installed by the installers into `C:\ProgramData\STYM2149\Languages`,
 `~/.local/share/STYM2149/Languages` (Linux, also the other XDG data folders) or `/Library/Application
 Support/STYM2149/Languages` (macOS); the user's own files are in the Languages folder next to the preferences.
@@ -338,7 +338,7 @@ each time Options opens (a user's file first, over the installed file of its cod
 `TipBook` translates line by line (`'\n'`) through its files, the first one first: exact lines through a hash map;
 otherwise English patterns with placeholders `{1}`…`{9}`, each capturing a non-empty part of the line, the most
 specific pattern (longest literal text) winning, the captures substituted into the translation. A line missing from
-every file stays in English. Native-speaker review of the translations is still open (D-185, **TO CONFIRM**).
+every file stays in English. Native-speaker review of the translations is still open (**TO CONFIRM**).
 
 ## 7. Build and tests
 
@@ -373,7 +373,7 @@ Test environment: without `refdata/` tune tests are skipped unless `STYM_REQUIRE
 
 **Visual tests** (`tests/gemui/test_visual.cpp`, scenes in `tools/gemshot/Scenes.cpp`): 45 prototype scenes
 compared with captures in `tests/data/visual` (a pixel differs when a channel is off by more than 4/255; under 1 %
-of the M4 desktop, 2 % for `seq`, `seq_demo`, `song`, `song_demo`; declared masked zones excepted, D-086), and 18
+of the original 1016 × 944 desktop, 2 % for `seq`, `seq_demo`, `song`, `song_demo`; declared masked zones excepted), and 18
 STYM2149-only scenes compared with renders in `tests/data/visual/stym` with no pixel allowed to differ. See
 `tests/data/visual/README.md` for regenerating references.
 
@@ -397,7 +397,7 @@ STYM2149-only scenes compared with renders in `tests/data/visual/stym` with no p
    live in `Driver::controlChange` (`:547`; the prototype's controllers, CC 7 and 70-84).
 4. Wire the control in `MainWindow.cpp` through `Host::beginGesture/setParam/endGesture`.
 5. Update `tests/unit/test_plugincore.cpp` (count at `:252`; the byte-for-byte rewrite of `state_v1_m5.bin` needs
-   the new `PARM` entry, as `withComputerParam` does) and add a decision to `DECISIONS.md`.
+   the new `PARM` entry, as `withComputerParam` does).
 
 ### Add a floating window
 

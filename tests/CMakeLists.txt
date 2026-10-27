@@ -1,4 +1,4 @@
-# STYM2149 tests (fidelity thresholds S1-S11, DECISIONS.md and docs/m0/AUDIT_DSP.md §5).
+# STYM2149 tests (fidelity thresholds S1-S11).
 include(FetchContent)
 FetchContent_Declare(Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -86,7 +86,7 @@ stym_warnings(stym_unit)
 add_test(NAME unit COMMAND stym_unit)
 set_tests_properties(unit PROPERTIES TIMEOUT 600)
 
-# GEM interface (M4 to M6): text, alerts, menus, PNG, floating windows, scroll bars, and visual regression against
+# GEM interface: text, alerts, menus, PNG, floating windows, scroll bars, and visual regression against
 # the captures of the prototype.
 add_executable(stym_ui
   gemui/test_arp_window.cpp
@@ -137,7 +137,7 @@ target_link_libraries(stym_ui PRIVATE gemui stym_gemshot_scenes stym_tools_commo
 target_compile_definitions(stym_ui PRIVATE STYM_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data")
 stym_warnings(stym_ui)
 # A MainWindow weighs nearly 400 KB and some tests build two in a row (window reopened at its place): the 1 MB
-# stack of MSVC overflows (M7), so it gets the 8 MB of Linux. The plugin creates its window on the heap.
+# stack of MSVC overflows, so it gets the 8 MB of Linux. The plugin creates its window on the heap.
 if(MSVC)
   target_link_options(stym_ui PRIVATE /STACK:8388608)
 endif()
@@ -205,7 +205,7 @@ if(STYM_ORACLE_CRATE)
   add_test(NAME oracle_crate COMMAND stym_oracle_crate)
 endif()
 
-# Plugin processor (M3) and editor (M4) with JUCE: shared code of the formats, replaced allocation operators.
+# Plugin processor and editor with JUCE: shared code of the formats, replaced allocation operators.
 if(STYM_BUILD_PLUGIN)
   add_executable(stym_plugin_tests plugin/test_processor.cpp plugin/test_editor.cpp plugin/test_stress.cpp
     plugin/test_tooltips.cpp plugin/test_juce_painter.cpp)

@@ -185,7 +185,7 @@ void RegisterMonitor::paint(Painter& p) {
         const Rect c = Box{x0, y, x1 - x0, h}.snapped();
         if (head) p.fill(c, colors::kBlack);
         if (!last) p.fill({c.right() - 2, c.y, 2, c.h}, colors::kBlack);
-        // Headers in the 6×6 font: "R11 EPlo" in 8×8 would fill the whole cell (D-071).
+        // Headers in the 6×6 font: "R11 EPlo" in 8×8 would fill the whole cell.
         const int px = head ? 10 : 14;
         const gemui::Face face = head ? gemui::Face::kSmall : gemui::Face::kSystem;
         const double content = x1 - x0 - (last ? 0 : 2);
@@ -510,7 +510,7 @@ double AdsrCurve::liveTime(const Shape& s, int stage, double level) noexcept {
 
 void AdsrCurve::paint(Painter& p) {
     // Canvas of the rounded size of the box (cv.width = round(width)): 52 px high in the prototype, 74 under the ADSR
-    // frame (sixth DAW test, D-268).
+    // frame (sixth DAW test).
     const int W = int(std::lround(box().w)), H = int(std::lround(box().h));
     const int ox = snap(box().x), oy = snap(box().y);
     // Margins in canvas pixels (top and bottom, left and right, the letters' strip at the bottom) and the time drawn
@@ -537,7 +537,7 @@ void AdsrCurve::paint(Painter& p) {
         line(px(X(t)), int(PAD), px(X(t)), int(BOT) - 1, colors::kCurveGuide);
     }
 
-    // Not applicable: the ADSR ENVELOPE frame dims the whole drawing (D-220).
+    // Not applicable: the ADSR ENVELOPE frame dims the whole drawing.
     const Color ink = colors::kBlack;
     int cx = rnd(X(0)), cy = rnd(Y(0));
     auto to = [&](double x, double y) {
@@ -585,7 +585,7 @@ void AdsrCurve::paint(Painter& p) {
     letter(t2, t3, "S");
     letter(t3, t4, "R");
 
-    // Position of each voice sounding (D-403), the newest drawn last, over the others: the point stops on the plateau
+    // Position of each voice sounding, the newest drawn last, over the others: the point stops on the plateau
     // as long as the note holds. The time is found back from the level, as if each segment were a straight line:
     // attack 0 → 1, decay 1 → S, the middle of the plateau for the sustain, release S → 0 (above S, the decay line:
     // liveTime).
@@ -607,7 +607,7 @@ void AdsrCurve::paint(Painter& p) {
 
 namespace {
 
-// Line of text of a waveform, in the GEM 6×6 font at the screen's pixels (third DAW test, items 23 and 30, D-222): at
+// Line of text of a waveform, in the GEM 6×6 font at the screen's pixels (third DAW test, items 23 and 30): at
 // the place and on the baseline it has in the design (kW × kH, stretched to the inside of the box), on a white band so
 // that the drawing under it does not bite into the letters. While it is too wide, the clause after its last ", " or
 // " / " goes, then the characters that do not fit.
@@ -657,12 +657,12 @@ int columnOf(const Rect& area, size_t n, size_t i) noexcept {
     return area.x + int(std::min(c, w - 1));
 }
 
-// A sample drawn over the columns of `area` at the painter's pixels (26/10/2026, D-447): before, a canvas of 360
+// A sample drawn over the columns of `area` at the painter's pixels (26/10/2026): before, a canvas of 360
 // columns stretched into the box dropped or doubled columns and rows (a third of them in the GENERATOR frame), and its
 // columns did not join, so the curve looked chopped. Now, with at least as many samples as columns, column x covers its
 // samples, [n x / w, n (x + 1) / w), and the last one of the column before, from the lowest to the highest: the
 // columns join where the wave jumps. With fewer samples, a line joins each sample to the next one (anti-aliased by
-// the plugin's painter, D-214). level(i): height of sample i, 0 at the bottom of the area and 1 at its top;
+// the plugin's painter). level(i): height of sample i, 0 at the bottom of the area and 1 at its top;
 // played(a, b): whether samples [a, b) are inside the part played (black), otherwise grey.
 template <class Level, class Played>
 void drawWave(Painter& p, const Rect& area, size_t n, Level level, Played played) {
@@ -691,7 +691,7 @@ void drawWave(Painter& p, const Rect& area, size_t n, Level level, Played played
     }
 }
 
-// The part played (D-443, D-444) of n samples, under the sample: grey lines at Start and End across `area` and the
+// The part played of n samples, under the sample: grey lines at Start and End across `area` and the
 // row above it, joined along that row when the part loops. Nothing when the part is not valid, or is the whole sample
 // without a loop.
 void drawPart(Painter& p, const Rect& area, size_t n, uint32_t start, uint32_t end, bool loop) {
@@ -709,10 +709,10 @@ DrumWave::DrumWave() { setSample(0, {}); }
 void DrumWave::setSample(int slot, std::span<const uint8_t> data, double rateHz, std::string_view name) {
     nibbles_.assign(data.begin(), data.end());
     const std::string head = "slot " + std::to_string(slot + 1) + ": ";
-    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    // The name first: the clauses after it go first when the line is too wide (drawCaption).
     const std::string named = head + (name.empty() ? "" : std::string(name) + ", ");
     if (data.empty()) {
-        // An empty slot plays nothing: the "built-in DrumNoise" text of the prototype was wrong (D-029).
+        // An empty slot plays nothing: the "built-in DrumNoise" text of the prototype was wrong.
         caption_ = head + "empty";
         baseline_ = 14;
     } else {
@@ -762,7 +762,7 @@ void DmaWave::setSample(int slot, std::span<const int8_t> data, double rateHz, b
     bytes_.assign(data.begin(), data.end());
     repaint();
     const std::string head = "sample " + std::to_string(slot + 1) + ": ";
-    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    // The name first: the clauses after it go first when the line is too wide (drawCaption).
     const std::string named = head + (name.empty() ? "" : name_ + ", ");
     if (data.empty()) {
         caption_ = head + (loads_ ? "empty - click to load a file" : "empty");
@@ -801,7 +801,7 @@ void DmaWave::paint(Painter& p) {
             drawWave(
                 p, band, frames, [&](size_t i) { return (bytes_[i * size_t(ch) + size_t(c)] + 128) / 255.0; },
                 [&](size_t a, size_t b) { return !part || (b > start_ && a < end_); });
-            // In stereo, L or R at the top right of the band, on white like the line of text (D-456): the end of a
+            // In stereo, L or R at the top right of the band, on white like the line of text: the end of a
             // sample is usually quieter than its start.
             if (ch > 1) {
                 const std::string mark = c == 0 ? "L" : "R";
@@ -841,7 +841,7 @@ void DigiWave::setSample(int slot, std::span<const uint8_t> data, double rateHz,
     nibbles_.assign(data.begin(), data.end());
     repaint();
     const std::string head = "sample " + std::to_string(slot + 1) + ": ";
-    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    // The name first: the clauses after it go first when the line is too wide (drawCaption).
     const std::string named = head + (name.empty() ? "" : name_ + ", ");
     if (data.empty()) {
         caption_ = head + "empty - click to load a file";
@@ -906,7 +906,7 @@ void SidWaveGrid::paint(Painter& p) {
     const Font::LineBox lb = Font::lineBox("0", 9);
     const int baseline = snap(r.y + kBarH + kGap + std::floor((kDigitH - lb.height()) / 2) + lb.ascent);
     for (int c = 0; c < kSteps; ++c) {
-        const bool dead = c >= st_.length;  // beyond Steps (Base: its two steps, D-411)
+        const bool dead = c >= st_.length;  // beyond Steps (Base: its two steps)
         auto shade = [dead](Color k) { return dead ? gemui::mix(k, colors::kWhite, kWaveDeadAlpha) : k; };
         const Rect cr = cellRect(c);
         p.fill(cr, colors::kWhite);
@@ -942,7 +942,7 @@ int SidWaveGrid::valueAt(double y) const noexcept {
 void SidWaveGrid::mouseDown(const gemui::MouseEvent& e) {
     const int c = stepAt(e.pos);
     if (c < 0 || st_.square) return;
-    if (e.button == gemui::MouseButton::Right) {  // its slider (D-285), or the step returns to 0
+    if (e.button == gemui::MouseButton::Right) {  // its slider, or the step returns to 0
         if (onMenu) onMenu(c, cellRect(c));
         else if (onSet) onSet(c, 0);
         return;

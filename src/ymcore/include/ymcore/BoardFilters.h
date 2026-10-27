@@ -3,13 +3,13 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Component values taken from Hatari (sound.c and dmaSnd.c, analyses by David Savinkoff): **TO CONFIRM**
-// on hardware (D-006: no recording of a real ST). Only the values are reused, not the code (GPL).
+// on hardware (no recording of a real ST). Only the values are reused, not the code (GPL).
 #pragma once
 #include <cstdint>
 
 namespace stym::ymcore {
 
-// Analogue chain after the chip (D-047). The monitor has no source with figures: not offered (D-048).
+// Analogue chain after the chip. The monitor has no source with figures: not offered.
 enum class BoardChain : uint8_t {
     Raw,  // chip output, no board filter. Default.
     ST,   // STF: capacitor C10 (asymmetric low-pass) then output coupling (high-pass)

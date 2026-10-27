@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: YM PLAYER window (#ymWin of the prototype, M7, A2, D-169)
+// STYM2149 — pluginui: YM PLAYER window (#ymWin of the prototype)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

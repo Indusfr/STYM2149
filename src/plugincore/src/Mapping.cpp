@@ -87,7 +87,7 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     GlobalParams g = base;
     g.mode = voiceMode(v);
     g.master = double(value(v, Global::Master)) / 100.0;
-    g.master2 = value(v, Global::MasterLink) >= 0.5f ? g.master : double(value(v, Global::Master2)) / 100.0;  // D-284
+    g.master2 = value(v, Global::MasterLink) >= 0.5f ? g.master : double(value(v, Global::Master2)) / 100.0;
     g.masterPan = std::clamp(double(value(v, Global::MasterPan)) / 100.0, -1.0, 1.0);
     g.softClip = value(v, Global::SoftClip) >= 0.5f;
     g.vblHz = kVblRates[size_t(std::clamp(intValue(v, Global::VblRate), 0, int(kVblRates.size()) - 1))];
@@ -100,7 +100,7 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     case 2: g.velocity = VelocityMode::Off; break;
     default: g.velocity = VelocityMode::Accent; break;
     }
-    // MIDI ext: the MIDI clock; Internal: the Rate of the arpeggio, or the tempo with Arp Sync (D-256).
+    // MIDI ext: the MIDI clock; Internal: the Rate of the arpeggio, or the tempo with Arp Sync.
     g.arpClock = intValue(v, Global::ArpClock) == 1 ? ArpClock::MidiClock
                  : intValue(v, Global::ArpSync) == 1 ? ArpClock::Tempo
                                                      : ArpClock::Hz;
@@ -110,7 +110,7 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     g.tempo = double(value(v, Global::FreeTempo));
     g.swing = double(value(v, Global::Swing));
     g.ste = steMachine(v);
-    // Audio delay (D-299).
+    // Audio delay.
     ymengine::DelayParams& d = g.delay;
     d.on = value(v, Global::DelayOn) >= 0.5f;
     d.sync = intValue(v, Global::DelaySync) == 1;
@@ -120,8 +120,8 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     d.hiCutHz = double(value(v, Global::DelayHiCut));
     d.level = double(value(v, Global::DelayLevel)) / 100.0;
     d.pingPong = value(v, Global::DelayPingPong) >= 0.5f;
-    g.a4Hz = double(value(v, Global::A4Hz));  // D-429
-    // MIDI expression (D-432).
+    g.a4Hz = double(value(v, Global::A4Hz));
+    // MIDI expression.
     g.bendTarget = BendTarget(std::clamp(intValue(v, Global::BendTarget), 0, 2));
     g.bendRange = double(value(v, Global::BendRange));
     g.wheelTarget = ExpressTarget(std::clamp(intValue(v, Global::WheelTarget), 0, 4));
@@ -139,7 +139,7 @@ TrackMix toMix(const ParamValues& v, int t) noexcept {
     m.mute = value(v, t, Track::Mute) >= 0.5f;
     m.solo = value(v, t, Track::Solo) >= 0.5f;
     m.send = double(value(v, t, Track::Send)) / 100.0;
-    m.link = value(v, t, Track::Link) >= 0.5f;  // the right side of a stereo DMA sample (D-459)
+    m.link = value(v, t, Track::Link) >= 0.5f;  // the right side of a stereo DMA sample
     m.levelR = double(value(v, t, Track::LevelR)) / 100.0;
     m.muteR = value(v, t, Track::MuteR) >= 0.5f;
     m.soloR = value(v, t, Track::SoloR) >= 0.5f;
@@ -177,7 +177,7 @@ TrackParams toTrack(const ParamValues& v, int t, const TrackParams& base) noexce
 
 namespace {
 // Clocks in the order of the ChipClock choice (kClocks of Parameters.cpp). Entry 0: the Custom clock, whose frequency
-// comes from the key (D-237).
+// comes from the key.
 constexpr ymcore::MasterClock kClocks[] = {ymcore::clocks::kDefault, ymcore::clocks::kAtariStfPal,
                                            ymcore::clocks::kZxSpectrum, ymcore::clocks::kAmstradCpc};
 
@@ -196,7 +196,7 @@ ConfigKey configKey(const ParamValues& v) noexcept {
     ConfigKey k;
     k.clock = uint8_t(std::clamp(intValue(v, Global::ChipClock), 0, 3));
     // Custom clock: 16 channels only (Indus, fourth DAW test); the 2 MHz of the entry it replaces in the other modes,
-    // the clock of the register exports (D-237).
+    // the clock of the register exports.
     if (k.clock == 0)
         k.hz = voiceMode(v) == ymengine::VoiceMode::Studio16 ? customClockHz(v) : uint32_t(kCustomClockDefaultHz);
     k.chain = uint8_t(std::clamp(intValue(v, Global::OutputChain), 0, 2));
@@ -214,7 +214,7 @@ EngineConfig engineConfig(const ConfigKey& key, const ParamValues& v, uint32_t h
     c.render.hostRate = hostRate;
     c.render.mode = kModes[key.resampling];
     // AtariAudio averaging and Retro: at least one internal step (clk/8) per sample. Beyond that (Amstrad CPC at
-    // 176.4 or 192 kHz, Atari clocks at 352.8 or 384 kHz), sinc (D-058).
+    // 176.4 or 192 kHz, Atari clocks at 352.8 or 384 kHz), sinc.
     if (c.render.mode != ymcore::OutputMode::Raw && double(hostRate) > c.render.chip.clock.hz() / 8.0)
         c.render.mode = ymcore::OutputMode::Raw;
     c.render.board.chain = kChains[key.chain];
@@ -226,9 +226,9 @@ EngineConfig engineConfig(const ConfigKey& key, const ParamValues& v, uint32_t h
 
 uint32_t envPeriodFromCc(int v) noexcept {
     // Same operations as the prototype (EF_LO, efToHz, "ef" slider) for identical rounding. The prototype's envelope
-    // frequency is 2 MHz / (256 × 32 × EP) (D-010): efLo is that of EP 65535, and the 4000 steps of the slider raise
+    // frequency is 2 MHz / (256 × 32 × EP): efLo is that of EP 65535, and the 4000 steps of the slider raise
     // it geometrically up to 65535 × efLo (EP 1). The frequency is then turned back into the prototype's EP, which
-    // × 32 gives the chip period (D-021).
+    // × 32 gives the chip period.
     constexpr double kSteps = 4000, kSpan = 65535;
     const double efLo = 2000000.0 / (256.0 * 32.0 * 65535.0);
     const double ef = std::floor(double(std::clamp(v, 0, 127)) / 127.0 * kSteps + 0.5);

@@ -1,5 +1,5 @@
-// STYM2149 — JSON files of the File menu (M7, A1): preset, pattern, Song and kit written like the prototype (files of
-// tools/proto_golden/files.mjs), read back field by field or through the complete STYM2149 state (D-165, D-168).
+// STYM2149 — JSON files of the File menu: preset, pattern, Song and kit written like the prototype (files of
+// tools/proto_golden/files.mjs), read back field by field or through the complete STYM2149 state.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -148,9 +148,9 @@ Project stymProject() {
     ymseq::Lane& l = p.x.seq.patterns[5].edit(2);
     l.ins[0] = 4;
     l.setCmd(4, ymengine::seqCmd(ymengine::SeqCmd::Speed, 3));
-    l.setCmd(4, ymengine::seqCmd(ymengine::SeqCmd::Vibrato, 1));  // several commands on a step (D-330)
+    l.setCmd(4, ymengine::seqCmd(ymengine::SeqCmd::Vibrato, 1));  // several commands on a step
     l.setCmd(6, ymengine::seqCmd(ymengine::SeqCmd::Vibrato, 0));
-    // D-338 and the twelfth DAW test, items 142 and 143 (Pxy dropped; Jxx would be written as ARP flags).
+    // Step effects and the twelfth DAW test, items 142 and 143 (Pxy dropped; Jxx would be written as ARP flags).
     for (int k = int(ymengine::SeqCmd::VolSlide); k <= int(ymengine::SeqCmd::Mod); ++k)
         l.setCmd(7, ymengine::seqCmd(ymengine::SeqCmd(k), k));
     l.setCmd(9, ymengine::seqCmd(ymengine::SeqCmd::Arpeggiator, 0));  // a J00 that ARP flags do not give back
@@ -160,7 +160,7 @@ Project stymProject() {
     p.x.seq.song.entries[1].restart = true;
     p.x.global.timing = ymengine::SeqTiming::Ticks;
     p.x.global.speed = 3;
-    p.x.global.metronomeLevel = 40;  // D-288
+    p.x.global.metronomeLevel = 40;
     p.x.dmaSamples[1] = {1, -2, 3, -4};
     p.x.digidrums[2] = {1, 2, 3, 15};
     p.x.digiSlots[2].name = "Snare";
@@ -313,7 +313,7 @@ TEST_CASE("STYM2149 preset: the complete state read back identically", "[files]"
     CHECK(lane.find("cmdV")->items()[6].number() == ymengine::seqCmd(ymengine::SeqCmd::Vibrato, 0));
     const char* const keys[] = {"cmdA", "cmdP", "cmdD", "cmdC", "cmdB", "cmdN",
                                 "cmdE", "cmdO", "cmdF", "cmdL", "cmdM"};
-    CHECK_FALSE(lane.find("cmd"));  // Xyz and Pxy retired (D-340, D-344): not written
+    CHECK_FALSE(lane.find("cmd"));  // Xyz and Pxy retired: not written
     CHECK_FALSE(lane.find("cmdP"));
     // Jxx that ARP flags cannot give back: written as they are, the prototype's "afl" left empty (item 144).
     REQUIRE(lane.find("cmdJ"));
@@ -466,8 +466,8 @@ TEST_CASE("Pattern: file read back, STYM2149 rows, refusal", "[files]") {
     CHECK(l.vol[0] == 15);
     CHECK(l.oct[0] == 9);
     CHECK_FALSE(l.hasCmd(0));
-    CHECK_FALSE(l.hasCmd(1));  // X00: Xyz retired (D-340), dropped
-    // T8C in "cmd" (before D-330): the row of its kind, then the BPM row of the pattern (item 150).
+    CHECK_FALSE(l.hasCmd(1));  // X00: Xyz retired, dropped
+    // T8C in "cmd" (older file): the row of its kind, then the BPM row of the pattern (item 150).
     CHECK(l.cmdAt(ymengine::SeqCmd::Tempo, 2) == 0);
     CHECK(old->bpm[2] == 0x8c);
     CHECK(l.ins[0] == 32);
@@ -545,7 +545,7 @@ TEST_CASE("Kit: file read back, merge per instrument, old format, refusal", "[fi
     CHECK_FALSE(parseKitFile("", def));
 }
 
-TEST_CASE("Versioned files (B6): stym key of the STYM2149 additions, more recent version reported", "[files]") {
+TEST_CASE("Versioned files: stym key of the STYM2149 additions, more recent version reported", "[files]") {
     const std::string mark = ",\"stym\":{\"v\":1}}";
     auto endsWith = [](const std::string& s, const std::string& end) {
         return s.size() >= end.size() && s.compare(s.size() - end.size(), end.size(), end) == 0;
@@ -562,7 +562,7 @@ TEST_CASE("Versioned files (B6): stym key of the STYM2149 additions, more recent
     CHECK(newer);
     CHECK(parsePatternFile(later)->sameContent(p.x.seq.cur()));  // what is known is read
 
-    // Song: extended entries (D-158) or STYM2149 rows in its patterns.
+    // Song: extended entries or STYM2149 rows in its patterns.
     const std::string song = dumpSongFile(p.x.seq, true);
     CHECK(endsWith(song, mark));
     CHECK_FALSE(parseSongFile(song)->newer);
@@ -578,6 +578,6 @@ TEST_CASE("Versioned files (B6): stym key of the STYM2149 additions, more recent
     CHECK(newer);
     REQUIRE(parseKitFile(R"({"kind":"drumkit","kit":{},"stym":{"v":1}})", p.x.kit, &newer));
     CHECK_FALSE(newer);
-    // Preset: the "stym" key already carries its version (D-168).
+    // Preset: the "stym" key already carries its version.
     CHECK(dumpPreset(p.v, p.x).find(",\"stym\":{\"v\":1,\"state\":") != std::string::npos);
 }

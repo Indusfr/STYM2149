@@ -1,4 +1,4 @@
-// STYM2149 — register recorder in the plugin (M6, B11, D-157): RECD chunk of the state, take armed by the message
+// STYM2149 — register recorder in the plugin: RECD chunk of the state, take armed by the message
 // thread, started and stopped by playback (host transport, sequencer), stops (disarming, mode, engine).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -36,7 +36,7 @@ RegisterTake sampleTake() {
         for (size_t r = 0; r < f.reg.size(); ++r) f.reg[r] = uint8_t(i * 16 + r);
         f.r13 = i == 1;
     }
-    t.frames[2].fx[1] = {true, ymengine::Generator::Digidrum, 5, {4, 256}, true};  // start of the effect (M7)
+    t.frames[2].fx[1] = {true, ymengine::Generator::Digidrum, 5, {4, 256}, true};  // start of the effect
     t.frames[2].fx[2] = {true, ymengine::Generator::Sid, 13, {1, 37}};
     return t;
 }
@@ -97,7 +97,7 @@ TEST_CASE("Recorder: RECD chunk of the state, absent without a take, read back i
     CHECK(partial.state.take.empty());
 }
 
-TEST_CASE("Recorder: Zxx of the take in the RSYN chunk, absent without Zxx (D-150)", "[recorder][state]") {
+TEST_CASE("Recorder: Zxx of the take in the RSYN chunk, absent without Zxx", "[recorder][state]") {
     PluginState st;
     st.take = sampleTake();
     CHECK_FALSE(hasChunk(encodeState(st), "RSYN"));

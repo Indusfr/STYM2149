@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: MIDI import and export of the File menu (M7, A3, D-170)
+// STYM2149 — plugincore: MIDI import and export of the File menu
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/MidiFiles.h"
@@ -94,16 +94,16 @@ std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mo
             // MIDI note = 12 × (octave + 1) + semitone; a note below octave 0 becomes the C of octave 0.
             const int oc = std::clamp(n.note / 12 - 1, 0, 9);
             L.pat[s0] = int16_t(std::clamp(n.note - (oc + 1) * 12, 0, 12));
-            // Deviation (D-170): octCode; the prototype wrote oc (0: octave of the track).
+            // Deviation: octCode; the prototype wrote oc (0: octave of the track).
             L.oct[s0] = int8_t(ymseq::octaveCode(oc, project.tracks[size_t(tracks[i])].octave));
             // The steps the note holds get a tie unless a note already starts there.
             for (int64_t s = a + 1; s < std::min<int64_t>(b, int64_t(T)); ++s)
                 if (L.pat[size_t(s)] < 0) L.tie[size_t(s)] = 1;
-            // Deviation (D-170): TIE also on the first step of a held note (stretchNote), otherwise it did not hold.
+            // Deviation: TIE also on the first step of a held note (stretchNote), otherwise it did not hold.
             if (std::min<int64_t>(b, int64_t(T)) > a + 1) L.tie[s0] = 1;
         }
         L.vol[s0] = uint8_t(std::clamp<int64_t>(jsRound(n.velocity / 127.0 * 15), 1, 15));
-        // The VOL of each step of a held note applies (D-345): the velocity over the whole note.
+        // The VOL of each step of a held note applies: the velocity over the whole note.
         for (int64_t s = a + 1; s < std::min<int64_t>(b, int64_t(T)) && n.channel != 9; ++s)
             if (L.pat[size_t(s)] < 0 && L.tie[size_t(s)]) L.vol[size_t(s)] = L.vol[s0];
     }
@@ -118,7 +118,7 @@ std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mo
         r.on[size_t(tracks[i])] = true;
         r.drum[size_t(tracks[i])] = order[i] == 9;
     }
-    // Tempo outside the range of the free tempo: carried by the Song entries (deviation, D-170).
+    // Tempo outside the range of the free tempo: carried by the Song entries (deviation).
     const int entryBpm = r.bpm == std::clamp(r.bpm, 60, 240) ? 0 : r.bpm;
     project.song.entries.clear();
     for (int k = 0; k < nPat; ++k) {

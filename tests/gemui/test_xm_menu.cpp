@@ -1,4 +1,4 @@
-// STYM2149 — File menu, Import > XM module (M7, B5, D-166): dialogue, STE machine, tracks, instruments and DMA slots,
+// STYM2149 — File menu, Import > XM module: dialogue, STE machine, tracks, instruments and DMA slots,
 // timing, alert, one undo step for the whole import, refusal without change.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

@@ -1,9 +1,9 @@
-// STYM2149 — pluginui: long job outside the message thread (exports of the File menu, M7, D-170)
+// STYM2149 — pluginui: long job outside the message thread (exports of the File menu)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // The prototype ran its exports in the page, which stayed frozen under the bee (busyWrap); here, the offline render
-// runs on a thread of its own (PLAN_M7, D-167) and the editor stays alive. One job at a time: `work` runs on the
+// runs on a thread of its own (PLAN_M7) and the editor stays alive. One job at a time: `work` runs on the
 // thread, without touching the editor (it works on its copies), and reads `cancel` to stop early; poll, called by the
 // message thread at each editor tick, calls `done` on that thread once `work` has finished. Destruction (editor
 // closed) asks for the stop and waits for the thread, without calling `done`.

@@ -1,4 +1,4 @@
-# gemshot: scenes of the main window (M4), rendered to PNG and compared with the captures of the prototype.
+# gemshot: scenes of the main window, rendered to PNG and compared with the captures of the prototype.
 add_library(stym_gemshot_scenes STATIC Scenes.cpp PrototypeFont.cpp)
 target_include_directories(stym_gemshot_scenes PUBLIC .)
 target_link_libraries(stym_gemshot_scenes PUBLIC stym_pluginui stym_tools_common)

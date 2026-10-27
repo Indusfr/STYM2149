@@ -20,8 +20,8 @@ function(stym_atariaudio_options target)
   endif()
 endfunction()
 
-# AtariAudio's Atari machine (Musashi 68000, MFP 68901, STE DAC, blitter, chip): reading of SNDH files by ymio
-# (M7, D-159), and oracle of the tests. Musashi is AtariAudio's version, one instance per machine (thread safe).
+# AtariAudio's Atari machine (Musashi 68000, MFP 68901, STE DAC, blitter, chip): reading of SNDH files by ymio,
+# and oracle of the tests. Musashi is AtariAudio's version, one instance per machine (thread safe).
 add_library(stym_atariaudio_machine STATIC
   "${STYM_ATARIAUDIO_DIR}/AtariMachine.cpp"
   "${STYM_ATARIAUDIO_DIR}/Blitter.cpp"
@@ -36,7 +36,7 @@ set_target_properties(stym_atariaudio_machine PROPERTIES POSITION_INDEPENDENT_CO
 
 # Rest of AtariAudio, compiled as is: oracle of the tests (S1, S2, S9, LZH, SNDH). Never linked into the plugin. Its
 # LZH decompressor (H. Okumura, K. F. Medina, no formal licence) only serves the oracle: the product uses the port
-# of pylzh (src/ymio/src/Lzh.cpp, D-043). The same goes for its ICE decompressor and its SNDH duration database
+# of pylzh (src/ymio/src/Lzh.cpp). The same goes for its ICE decompressor and its SNDH duration database
 # (timedb): the product has its own bounded ICE decompressor (src/ymio/src/Ice.cpp).
 if(STYM_BUILD_TESTS)
   add_library(stym_atariaudio STATIC

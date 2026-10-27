@@ -1,7 +1,7 @@
-// STYM2149 — STE DMA sound in the plugin (M6, B8, D-153): DMAS chunk of the state (bank), DMA sample of the track
+// STYM2149 — STE DMA sound in the plugin: DMAS chunk of the state (bank), DMA sample of the track
 // (TRKX, Patches), values brought back into their ranges, Computer parameter (ST or STE machine), notes of the DMA
 // tracks through the driver, machine change, preview; conversion of a file (rate, mono, stereo, 32 KB), raw bytes,
-// Sign and Gain tools; named DMA banks (D-462).
+// Sign and Gain tools; named DMA banks.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_approx.hpp>
@@ -68,7 +68,7 @@ TEST_CASE("DMA: DMAS chunk of the state, absent by default, read back identicall
     CHECK(back.state.extras.dmaSamples == st.extras.dmaSamples);
     CHECK(encodeState(back.state) == enc);
 
-    // After the eight slots: Start and End of each slot (D-444), then its name (D-445), then its fine tune (D-452). A
+    // After the eight slots: Start and End of each slot, then its name, then its fine tune. A
     // state from before the fine tune reads 0; one from before the names reads none; one from before Start and End
     // also reads the whole samples.
     st.extras.dma.slots[5].start = 1;
@@ -114,7 +114,7 @@ TEST_CASE("DMA: DMAS chunk of the state, absent by default, read back identicall
     CHECK(old.state.extras.dmaSamples == st.extras.dmaSamples);
     CHECK(old.state.extras.dmaNames == std::array<std::string, ymengine::kDmaSlots>{});
 
-    // A name alone is enough to write the chunk (D-445).
+    // A name alone is enough to write the chunk.
     PluginState named;
     named.extras.dmaNames[2] = "Bell";
     CHECK(hasChunk(encodeState(named), "DMAS"));
@@ -161,12 +161,12 @@ TEST_CASE("DMA: out-of-range values brought back, sample truncated to 32 KB, nam
     n.tracks[4].patch.dmaSlot = 12;
     n.tracks[5].patch.dmaSlot = -9;
     n.dmaSamples[1] = bytes(ymengine::kDmaMaxBytes + 100, 3);
-    n.dma.slots[3] = {2, false, 60, false, 900, 400};  // Start past End (D-444)
+    n.dma.slots[3] = {2, false, 60, false, 900, 400};  // Start past End
     n.dma.slots[4].end = ymengine::kDmaMaxBytes + 5;
     n.dma.slots[6].start = 300;                          // End 0: to the end of the sample, Start kept
-    n.dma.slots[5].cents = 250;                          // fine tune: ±100 cents (D-452)
+    n.dma.slots[5].cents = 250;                          // fine tune: ±100 cents
     n.dma.slots[7].cents = std::numeric_limits<double>::quiet_NaN();
-    n.dmaNames[0] = "  A name far too long\tfor a slot ";  // 16 GEM characters, edges trimmed (D-445)
+    n.dmaNames[0] = "  A name far too long\tfor a slot ";  // 16 GEM characters, edges trimmed
     sanitize(n);
     CHECK(n.dmaNames[0] == "A name far too l");
     CHECK(n.dma.slots[3].start == 400);
@@ -250,13 +250,13 @@ TEST_CASE("DMA: notes of a DMA track through the driver, machine change, preview
     run({pv});
     CHECK(d.engine().dmaPreviewSlot() == 4);
     CHECK(d.engine().dmaPlayingSlots() == 1u << 4);
-    // The same command with data[1] 1 stops it (Play of a looping preview, D-449).
+    // The same command with data[1] 1 stops it (Play of a looping preview).
     pv.data = {4, 1, 0};
     run({pv});
     CHECK(d.engine().dmaPreviewSlot() == -1);
 }
 
-TEST_CASE("DMA: the right side of a stereo sample through the driver, its LED (Indus, 26/10/2026, D-459)",
+TEST_CASE("DMA: the right side of a stereo sample through the driver, its LED (Indus, 26/10/2026)",
           "[dma][driver]") {
     // Track 1 plays slot 0, stereo, both sides the same square wave.
     Snapshot snap;
@@ -368,8 +368,7 @@ TEST_CASE("DMA: raw bytes, Sign and Gain", "[dma][sample]") {
     CHECK(q == std::vector<int8_t>{50, -50, 5});
 }
 
-TEST_CASE("DMA: the Digidrums tools, on the left, right or both channels of a stereo sample (Indus, 26/10/2026, "
-          "D-450)",
+TEST_CASE("DMA: the Digidrums tools, on the left, right or both channels of a stereo sample (Indus, 26/10/2026)",
           "[dma][sample]") {
     // Mono: the whole sample, whatever the channels.
     std::vector<int8_t> m = {1, 2, 3, 4};
@@ -420,7 +419,7 @@ TEST_CASE("DMA: the Digidrums tools, on the left, right or both channels of a st
     CHECK(b[3] == 100);
 }
 
-TEST_CASE("Gain steps in a row: a step down gives back the peaks a step up clipped (Indus, 26/10/2026, D-453)",
+TEST_CASE("Gain steps in a row: a step down gives back the peaks a step up clipped (Indus, 26/10/2026)",
           "[dma][sample]") {
     const std::vector<int8_t> orig = {100, -100, 10, 0};
     GainRun run;
@@ -448,7 +447,7 @@ TEST_CASE("Gain steps in a row: a step down gives back the peaks a step up clipp
     CHECK(run.total() == Approx(3));
 }
 
-TEST_CASE("Sample part mirrored by Reverse (D-450)", "[dma][sample]") {
+TEST_CASE("Sample part mirrored by Reverse", "[dma][sample]") {
     uint32_t start = 10, end = 30;
     ymengine::mirrorSpan(start, end, 100);
     CHECK(start == 70);
@@ -470,7 +469,7 @@ TEST_CASE("Sample part mirrored by Reverse (D-450)", "[dma][sample]") {
     CHECK(end == 0);
 }
 
-TEST_CASE("Resample: the sample keeps its length in time at the new rate, 32 KB at most (D-454)", "[dma][sample]") {
+TEST_CASE("Resample: the sample keeps its length in time at the new rate, 32 KB at most", "[dma][sample]") {
     // Same rate: the bytes come back as they were.
     const std::vector<int8_t> mono = {0, 64, 127, -128, -64, 5};
     CHECK(plugin::dmaResample(mono, false, 25033, 25033) == mono);
@@ -492,7 +491,7 @@ TEST_CASE("Resample: the sample keeps its length in time at the new rate, 32 KB 
     CHECK(plugin::dmaResample({}, false, 6258, 50066).empty());
 }
 
-TEST_CASE("DMA: named banks, read back identically, tolerant reading (Indus, 26/10/2026, D-462)", "[dma][banks]") {
+TEST_CASE("DMA: named banks, read back identically, tolerant reading (Indus, 26/10/2026)", "[dma][banks]") {
     NonParamState st;
     st.dmaSamples[0] = {-128, 127, 0, -70, 5, 6};
     st.dmaNames[0] = "Break";

@@ -1,4 +1,4 @@
-// STYM2149 — File menu, MIDI files (M7, A3, D-170): Import > MIDI file (patterns, Song, tracks and tempo in one undo
+// STYM2149 — File menu, MIDI files: Import > MIDI file (patterns, Song, tracks and tempo in one undo
 // step, alerts of the prototype), Export pattern > MIDI and Export song > MIDI (worker thread, bee, alert at the end).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -71,7 +71,7 @@ TEST_CASE("Import > MIDI file: dialogue, tracks, patterns, Song, tempo, alert, o
     CHECK(h.p(Global::FreeTempo) == 150.0f);
     const ymseq::Lane& l0 = h.state.seq.patterns[0].lane(0);
     CHECK(l0.pat[0] == 0);
-    CHECK(l0.tie[0] == 1);  // D-170: the held note carries TIE from its first step
+    CHECK(l0.tie[0] == 1);  // the held note carries TIE from its first step
     CHECK(l0.tie[1] == 1);
     CHECK(l0.tie[2] == 1);
     CHECK(l0.tie[3] == 0);

@@ -4,7 +4,7 @@
 //
 // Model of the YM2149F chip at clk/8 (250 kHz for 2 MHz), ported from AtariAudio 1.26 (ym2149c.cpp),
 // © 2026 Arnaud Carré (Leonard/Oxygene), MIT licence (third_party/AtariAudio/LICENSE).
-// Deliberate deviations from AtariAudio: D-012 (noise of choice), D-019 (state reset to zero),
+// Deliberate deviations from AtariAudio: maximal noise LFSR, state reset to zero,
 // registers R14/R15 kept for read-back.
 #pragma once
 #include <cstdint>
@@ -15,7 +15,7 @@ namespace stym::ymcore {
 namespace tables {
 // Envelope shapes: 10 shapes × 128 5-bit levels (phases 0-1 played once, 2-3 looped).
 extern const uint8_t (&kEnvData)[10 * 128];
-// Measured 32×32×32 mixing table (index = A | B << 5 | C << 10), values 0..32767 (D-013).
+// Measured 32×32×32 mixing table (index = A | B << 5 | C << 10), values 0..32767.
 extern const uint16_t (&kMixTable)[32 * 32 * 32];
 }  // namespace tables
 
@@ -57,7 +57,7 @@ public:
     void setConfig(const ChipConfig& config) noexcept { config_ = config; }
     const ChipConfig& config() const noexcept { return config_; }
 
-    // Power-on state: all zero (D-019), R7 = $3F, tone edges drawn from the seed.
+    // Power-on state: all zero, R7 = $3F, tone edges drawn from the seed.
     void reset() noexcept;
 
     // Writes a register (0-15). Unwired bits are masked as on the chip.
@@ -112,7 +112,7 @@ inline int Ym2149::tick() noexcept {
         }
     }
 
-    // One envelope step every EP internal steps: clk / (8·EP), i.e. clk / (256·EP) per cycle of 32 steps (D-010).
+    // One envelope step every EP internal steps: clk / (8·EP), i.e. clk / (256·EP) per cycle of 32 steps.
     // envPos_ climbs from -64 (R13 write) to 0 once, then wraps within 0..63: the last two phases of the shape loop.
     if (++envCounter_ >= envPeriod_) {
         ++envPos_;
@@ -136,7 +136,7 @@ inline int Ym2149::tick() noexcept {
     }
 
     const uint32_t env = tables::kEnvData[envBase_ + uint32_t(envPos_ + 64)];
-    // Fixed volume v → level 2v + 1 (D-011); bit 4 = envelope.
+    // Fixed volume v → level 2v + 1; bit 4 = envelope.
     uint32_t lv = ((regs_[8] & 0x10) ? env : ((uint32_t(regs_[8]) << 1) | 1u))
                 | (((regs_[9] & 0x10) ? env : ((uint32_t(regs_[9]) << 1) | 1u)) << 5)
                 | (((regs_[10] & 0x10) ? env : ((uint32_t(regs_[10]) << 1) | 1u)) << 10);

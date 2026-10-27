@@ -1,5 +1,5 @@
-// STYM2149 — MIDI import and export (M7, A3, D-170): import against the prototype (tools/proto_golden/midi.mjs,
-// deviations of D-170 included); export rendered by the offline sequencer (pattern, Song, tempos, swing, 3 voices,
+// STYM2149 — MIDI import and export: import against the prototype (tools/proto_golden/midi.mjs,
+// intended deviations included); export rendered by the offline sequencer (pattern, Song, tempos, swing, 3 voices,
 // percussion).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -169,7 +169,7 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> metas(const std::vector<u
 
 }  // namespace
 
-TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (deviations of D-170)", "[midi][proto]") {
+TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (intended deviations)", "[midi][proto]") {
     const std::vector<GoldenCase> cases = loadGolden();
     REQUIRE(cases.size() >= 120);
     for (const GoldenCase& c : cases) {

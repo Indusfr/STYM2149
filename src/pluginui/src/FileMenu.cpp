@@ -1,10 +1,10 @@
-// STYM2149 — pluginui: File menu, JSON files of the prototype (M7, A1, D-165, D-168)
+// STYM2149 — pluginui: File menu, JSON files of the prototype
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Load, Save and Save as of a preset, a pattern, a Song and a kit (File menu of the prototype), through the file
-// dialogues of the host; Import > YM dump to the YM Player (A2); Import > MIDI file, Export pattern > MIDI and Export
-// song > MIDI (A3, D-170); Import > XM module (B5, D-166). The refusals reuse the alerts of the prototype; loading a
+// dialogues of the host; Import > YM dump to the YM Player; Import > MIDI file, Export pattern > MIDI and Export
+// song > MIDI; Import > XM module. The refusals reuse the alerts of the prototype; loading a
 // pattern, a Song or a kit and the MIDI and XM imports take an undo step (pushUndo, pushSongUndo, pushKitUndo). The
 // exports (MIDI, WAV and stems, registers) run on a worker thread, under the busy bee, and end with an alert (PLAN_M7).
 //
@@ -85,7 +85,7 @@ std::string duration(double seconds) {
     return buf;
 }
 
-// WAV dialogue (D-164): formats and rates, and their keys in the preferences ("host": the host's own rate, like the
+// WAV dialogue: formats and rates, and their keys in the preferences ("host": the host's own rate, like the
 // prototype, which rendered at the rate of its AudioContext).
 constexpr std::array<const char*, 3> kWavFormatNames = {"16-bit", "24-bit", "32-bit float"};
 constexpr std::array<const char*, 3> kWavFormatKeys = {"16", "24", "32f"};
@@ -214,7 +214,7 @@ void MainWindow::loadMidiBytes(std::string_view bytes, const std::string& fileNa
     gemui::Alert::open(desk_, std::move(spec));
 }
 
-// File > Import > XM module (B5, D-056): Fasttracker II module.
+// File > Import > XM module: Fasttracker II module.
 void MainWindow::importXm() {
     Host::FileDialog d;
     d.title = "Import an XM module";
@@ -249,7 +249,7 @@ void MainWindow::loadXmBytes(std::string_view bytes, const std::string& fileName
     e.xm = true;
     e.slots = m.instruments;
     host_.session().undo.push(undoEntryLike(e));
-    // STE machine (DMA sound, D-153), tracks switched on or off, DMA type of the tracks in 16-channel mode (in
+    // STE machine (DMA sound), tracks switched on or off, DMA type of the tracks in 16-channel mode (in
     // 3-channel mode, the DMA tracks are DMA anyway), VBL rate (Ticks) or free tempo (BPM).
     auto gesture = [this](int idx, float v) {
         if (host_.param(idx) == v) return;
@@ -293,7 +293,7 @@ void MainWindow::loadXmBytes(std::string_view bytes, const std::string& fileName
     gemui::Alert::open(desk_, std::move(spec));
 }
 
-// File from a newer version of STYM2149 (key "stym", B6, D-174): read for what is known of it.
+// File from a newer version of STYM2149 (key "stym"): read for what is known of it.
 void MainWindow::newerFileAlert() {
     gemui::Alert::Spec spec;
     spec.lines = {{"This file comes from a newer STYM2149."}, {"Settings this version does not know are not used."}};
@@ -323,7 +323,7 @@ void MainWindow::exportMidi(bool song) {
     Host::FileDialog d;
     d.title = song ? "Export the song as MIDI" : "Export the pattern as MIDI";
     d.patterns = "*.mid;*.midi";
-    d.name = song ? "stym2149-song.mid" : "stym2149-pattern.mid";  // prism-ym2149-*.mid of the prototype (D-060)
+    d.name = song ? "stym2149-song.mid" : "stym2149-pattern.mid";  // prism-ym2149-*.mid of the prototype
     host_.chooseFileToSave(d, [this, song](const std::string& chosen) {
         const std::string path = plugin::ensureExtension(chosen, {".mid", ".midi"});
         if (path.empty()) return;
@@ -355,7 +355,7 @@ void MainWindow::exportMidi(bool song) {
 }
 
 // File > Export pattern > WAV and Stems (ZIP), Export song > WAV and Stems (ZIP) (exportWav, exportStems,
-// exportSongWav, exportSongStems of the prototype): GEM dialogue for the format (D-164), dialogue of the host, then the
+// exportSongWav, exportSongStems of the prototype): GEM dialogue for the format, dialogue of the host, then the
 // render written as it goes by the worker thread, alert at the end.
 void MainWindow::exportAudio(bool stems, bool song) {
     if (song && extras_.seq.song.entries.empty()) {  // requireSong
@@ -387,7 +387,7 @@ void MainWindow::exportAudio(bool stems, bool song) {
     spec.maxWidth = 640;
     gemui::Alert::open(desk_, std::move(spec), [this, stems, song](int button, const std::vector<int>& picks) {
         if (button != 1 || picks.size() != 2) return;
-        // Choice kept in the preferences: the next dialogue offers it (D-069).
+        // Choice kept in the preferences: the next dialogue offers it.
         const size_t fi = size_t(std::clamp(picks[0], 0, int(kWavFormatKeys.size()) - 1));
         const size_t ri = size_t(std::clamp(picks[1], 0, int(plugin::kWavRates.size())));
         host_.setPreference("wavFormat", kWavFormatKeys[fi]);
@@ -406,7 +406,7 @@ void MainWindow::saveAudio(bool stems, bool song, const plugin::WavSettings& ws)
     d.title = stems ? (song ? "Export the song stems" : "Export the pattern stems")
                     : (song ? "Export the song as WAV" : "Export the pattern as WAV");
     d.patterns = stems ? "*.zip" : "*.wav";
-    // prism-ym2149-pattern.wav, prism-ym2149-song-stems.zip... of the prototype (D-060).
+    // prism-ym2149-pattern.wav, prism-ym2149-song-stems.zip... of the prototype.
     d.name = std::string("stym2149-") + (song ? "song" : "pattern") + (stems ? "-stems.zip" : ".wav");
     host_.chooseFileToSave(d, [this, stems, song, ws](const std::string& chosen) {
         const std::string path = plugin::ensureExtension(chosen, {stems ? ".zip" : ".wav"});
@@ -512,8 +512,8 @@ uint32_t dosNow() {
 }  // namespace
 
 // File > Export song > VBL dump, YM3, YM6, SNDH (exportSongVbl, exportSongYm3, exportSongSndh of the prototype; YM6 of
-// STYM2149, D-161) and export of the recorder take (B3): dialogue of the host, capture and writing by the worker
-// thread, alert at the end with what the file does not render (D-172).
+// STYM2149) and export of the recorder take: dialogue of the host, capture and writing by the worker
+// thread, alert at the end with what the file does not render.
 void MainWindow::exportRegisters(plugin::RegisterFormat format) {
     if (extras_.seq.song.entries.empty()) {  // requireSong
         showMessage("Song is empty. Add entries first.");
@@ -526,7 +526,7 @@ void MainWindow::exportRegisters(plugin::RegisterFormat format) {
     Host::FileDialog d;
     d.title = exportTitle(format, false);
     d.patterns = filePatterns(format);
-    d.name = plugin::registerFileName(format, false);  // prism-ym2149-song.* of the prototype (D-060)
+    d.name = plugin::registerFileName(format, false);  // prism-ym2149-song.* of the prototype
     host_.chooseFileToSave(d, [this, format](const std::string& chosen) {
         const std::string path = withExtension(chosen, format);
         if (path.empty()) return;
@@ -546,7 +546,7 @@ void MainWindow::exportRegisters(plugin::RegisterFormat format) {
     });
 }
 
-// Export of the recorder's take (Recorder window, B3): the frames are already captured, so the job only builds the
+// Export of the recorder's take (Recorder window): the frames are already captured, so the job only builds the
 // file, and it cannot be cancelled.
 void MainWindow::exportTakeFile(plugin::RegisterFormat format) {
     if (exporting()) {

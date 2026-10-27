@@ -6,12 +6,12 @@
 // horizontal at the bottom, 26 px thick (like the title bar), halftoned corner when there are both. Drawing read in
 // Chromium 141 (prototype at 100 %):
 // - arrow at the top and at the bottom (on the left and on the right): white cell, 2 px rules except on the side of
-//   the window frame, the prototype's 8 × 10 glyph centred in the cell; a single arrow at each end (D-117);
+//   the window frame, the prototype's 8 × 10 glyph centred in the cell; a single arrow at each end;
 // - track: pattern of dots (1,1) and (3,3) on 4 × 4 from its corner, 2 px left (top) rule;
 // - thumb: white cell, 2 px rules except on the side of the frame; length rounded in proportion to the visible part,
 //   at least 15 px; position truncated (Chromium's ScrollbarTheme).
 // Scrolling: 40 px per arrow, 87.5 % of the visible part per press on the track, repeated after 250 ms then every
-// 50 ms as long as the button stays down; dragged thumb; wheel (D-118).
+// 50 ms as long as the button stays down; dragged thumb; wheel.
 //
 // The content is made of the area's children, placed from contentOrigin(); scrolling moves them all.
 #pragma once
@@ -92,7 +92,7 @@ private:
     Desktop::TimerId repeat_ = 0;
 };
 
-// Scroll bar on its own (the notes of the Step Sequencer, eighth DAW test, item 93, D-294): a vertical slider drawn
+// Scroll bar on its own (the notes of the Step Sequencer, eighth DAW test, item 93): a vertical slider drawn
 // and driven like ScrollPane's vertical bar, its right side against a window frame. The maximum at the top: an arrow
 // moves the value by one, a press on the track by `jump` towards the pointer (both repeated like ScrollPane's), the
 // thumb, as long as `page` of the range plus the page, is dragged; the wheel moves by one per notch. Its gestures

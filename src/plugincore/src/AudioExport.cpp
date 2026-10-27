@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: WAV and stem exports of the File menu (M7, A4, STYM2149_SPEC.md §8, D-163, D-164, D-171)
+// STYM2149 — plugincore: WAV and stem exports of the File menu (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/AudioExport.h"
@@ -89,7 +89,7 @@ ParamValues isolated(const ParamValues& values, int track) {
     for (int t = 0; t < kTracks; ++t)
         for (const Track f : {Track::Solo, Track::SoloR}) v[size_t(paramIndex(t, f))] = t == track ? 1.0f : 0.0f;
     v[size_t(paramIndex(track, Track::Mute))] = 0.0f;
-    v[size_t(paramIndex(track, Track::MuteR))] = 0.0f;  // both sides of a stereo DMA sample (D-459)
+    v[size_t(paramIndex(track, Track::MuteR))] = 0.0f;  // both sides of a stereo DMA sample
     return v;
 }
 

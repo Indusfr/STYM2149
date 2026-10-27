@@ -8,24 +8,24 @@
 // from the 4-bit volume), no pan. Positions and sizes: the prototype's CSS boxes at 100 % (window at 110, 110, as
 // wide as its strips or as the row of outputs). The 1344 × 984 px desktop never makes the window overflow (92 % of
 // the width, 70 % of the height of the prototype): no scroll bars; placed or grown near its right or bottom edge, it
-// moves back inside (D-460).
+// moves back inside.
 //
 // VU meters (drawMeters): 48 dB scale, peak hold that falls by 50 % of the height per second (2.5 % per message at
 // 20 Hz in the prototype; here counted by the publications of the engine status), red #B00000 from 0.999.
 // Oscilloscopes (drawScopes): 26 points taken from the last 128 of the track, y = 9 - v × 15.3.
 //
-// DMA strip (M6, D-153): with the STE output chain only, after the track strips, in both modes (fader and pan
+// DMA strip: with the STE output chain only, after the track strips, in both modes (fader and pan
 // active: parameters DMA Level, DMA Pan, DMA Mute, DMA Solo); its label opens the DMA window. In 3-channel mode, the
 // DMA track can be stereo: Out L and Out R are then shown.
 //
-// A DMA track playing a stereo sample (D-457, D-459): two oscilloscopes, two faders each with its meter, two values,
+// A DMA track playing a stereo sample: two oscilloscopes, two faders each with its meter, two values,
 // two M and two S, the left side's then the right side's, and Link on a row of its own (one Volume for both sides).
 //
-// Values (eighth DAW test, item 99, D-300): each fader's and pan's value under it, in the 6×6 font; a right click on
+// Values (eighth DAW test, item 99): each fader's and pan's value under it, in the 6×6 font; a right click on
 // any of the window's sliders opens a menu: Value... (typed) and Reset (the parameter's default). A click on a value
-// types it in place, Enter confirms, Escape cancels (24/10/2026, D-415), as the Value... box does.
+// types it in place, Enter confirms, Escape cancels (24/10/2026), as the Value... box does.
 //
-// Send (eighth DAW test, item 98, D-299): in 16 channels, under the pan, the level that each track sends to the delay
+// Send (eighth DAW test, item 98): in 16 channels, under the pan, the level that each track sends to the delay
 // (Edit > Effects), after its fader, with its value ("Send 35").
 #pragma once
 #include <array>
@@ -89,8 +89,7 @@ private:
     bool clip_ = false;
 };
 
-// input.pfader: a double click puts it back in the centre. Without the arrows of the other horizontal sliders
-// (D-297).
+// input.pfader: a double click puts it back in the centre. Without the arrows of the other horizontal sliders.
 class PanSlider : public gemui::Slider {
 public:
     PanSlider() { setArrows(false); }
@@ -117,19 +116,19 @@ public:
 
     // Rectangle of a control by the prototype's id (captures, tests): "mixWin", "mixFad3", "mixPan3", "vuhL",
     // "vuhR"; "mixLab3", "mixScope3", "mixVu3", "mixMute3", "mixSolo3" for the other elements of the fourth strip;
-    // with a stereo sample (D-457), "mixScopeR3" and "mixVuR3" for the right side's, "mixFadR3", "mixFadRVal3",
-    // "mixMuteR3", "mixSoloR3" and "mixLink3" (D-459);
-    // "mixSep", "mixMasterLab", "mixMaster" for the Master fader (D-276); with two Masters, "mixMaster2", "mixLink",
-    // the labels "mixMaster1Lab" / "mixMaster2Lab" and, with stereo outputs, "mixMasterPan" (D-284); "mixMasterArea":
-    // all of them. Values (D-300): "mixFadVal3", "mixPanVal3", "mixMasterVal", "mixMaster2Val", "mixMasterPanVal".
-    // Send of the delay (D-299): "mixSend3", "mixSendVal3".
+    // with a stereo sample, "mixScopeR3" and "mixVuR3" for the right side's, "mixFadR3", "mixFadRVal3",
+    // "mixMuteR3", "mixSoloR3" and "mixLink3";
+    // "mixSep", "mixMasterLab", "mixMaster" for the Master fader; with two Masters, "mixMaster2", "mixLink",
+    // the labels "mixMaster1Lab" / "mixMaster2Lab" and, with stereo outputs, "mixMasterPan"; "mixMasterArea":
+    // all of them. Values: "mixFadVal3", "mixPanVal3", "mixMasterVal", "mixMaster2Val", "mixMasterPanVal".
+    // Send of the delay: "mixSend3", "mixSendVal3".
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     // Text of a value (tests): the ids of rectOf ending in "Val".
     std::string valueText(std::string_view id) const;
-    // Its field, typed in place (tests, D-415).
+    // Its field, typed in place (tests).
     const gemui::ValueField* field(std::string_view id) const { return valueField(id); }
     // VU meter of a strip, of the left (-1) or right (-2) output (tests); `right`: the right side's of a stereo
-    // sample (D-457).
+    // sample.
     const VuMeter& meter(int strip, bool right = false) const noexcept;
     // A Master slider (tests): "mixMaster", "mixMaster2", "mixMasterPan".
     const gemui::Slider* slider(std::string_view id) const noexcept;
@@ -139,17 +138,17 @@ public:
 
 private:
     // One track's strip (.mstrip). The fader is the track's Level (0-100), or its 4-bit Volume (0-15) for a chip
-    // channel in 3-channel mode (D-260).
-    // A DMA track whose sample is stereo (D-457): two oscilloscopes and two meters, the left side's (scope, vu) and
-    // the right side's (scopeR, vuR); the right side's fader, value, M and S, and Link (D-459).
+    // channel in 3-channel mode.
+    // A DMA track whose sample is stereo: two oscilloscopes and two meters, the left side's (scope, vu) and
+    // the right side's (scopeR, vuR); the right side's fader, value, M and S, and Link.
     struct Strip {
         gemui::Button label;
         MiniScope scope, scopeR;
         gemui::Slider fader, faderR;
         VuMeter vu, vuR;
         PanSlider pan;
-        gemui::Slider send;              // D-299
-        gemui::ValueField faderVal, faderRVal, panVal, sendVal;  // D-300, typed in place (D-415)
+        gemui::Slider send;
+        gemui::ValueField faderVal, faderRVal, panVal, sendVal;  // typed in place
         gemui::Button mute{"M"}, solo{"S"}, muteR{"M"}, soloR{"S"}, link{"Link"};
         double hold = 0, holdR = 0;  // peak hold of the meters, in % of their height
         bool stereo = false;
@@ -162,35 +161,35 @@ private:
     void layout();
     int strips() const noexcept;  // strips shown (NVOICES)
     void pushUndo();              // pushMixUndo
-    void pushTrackUndo(int track);  // fader of a chip channel: its Volume, a setting of the track (D-260)
+    void pushTrackUndo(int track);  // fader of a chip channel: its Volume, a setting of the track
     void toggle(int track, plugin::Track field);
     bool stereoOut() const noexcept;           // Out L and Out R
-    bool perChip() const noexcept;             // 2x3 channels: a Master per chip (D-284)
+    bool perChip() const noexcept;             // 2x3 channels: a Master per chip
     bool twoMasters() const noexcept;          // two Master faders: stereo outputs (left, right), or one per chip
     bool panned(int track) const noexcept;     // pan and fader: 16-channel mode, or DMA track in 3-channel mode
-    bool stereo(int track) const noexcept;     // DMA track whose sample is stereo (D-457)
-    void setMaster(bool right, double v);       // a Master fader, both with Link (D-284)
-    void setRight(int track, double v);         // the right side's fader of a stereo sample, both with Link (D-459)
-    // Right click on a slider (D-300): Value... and Reset, applied like a move of the slider (its undo step); `param`
+    bool stereo(int track) const noexcept;     // DMA track whose sample is stereo
+    void setMaster(bool right, double v);       // a Master fader, both with Link
+    void setRight(int track, double v);         // the right side's fader of a stereo sample, both with Link
+    // Right click on a slider: Value... and Reset, applied like a move of the slider (its undo step); `param`
     // gives the default.
     void sliderMenu(gemui::Slider& s, gemui::Point at, std::string name, std::function<int()> param,
                     std::function<void(double)> apply);
     void typeValue(gemui::Slider& s, const std::string& name, std::function<void(double)> apply);
-    // A value under its slider typed in place (D-415): through `apply`, like Value....
+    // A value under its slider typed in place: through `apply`, like Value....
     static void typeUnder(gemui::ValueField& f, gemui::Slider& s, std::function<void(double)> apply);
     const gemui::ValueField* valueField(std::string_view id) const;
 
     MainWindow& m_;
     std::array<Strip, plugin::kTracks> strips_;
-    Rule masterSep_;  // Master fader set apart from the tracks (sixth DAW test, item 78, D-276)
+    Rule masterSep_;  // Master fader set apart from the tracks (sixth DAW test, item 78)
     gemui::Label masterLab_{"Master"};
     gemui::Slider master_;
-    // Two Masters (seventh DAW test, item 83, D-284): with stereo outputs, left (master_) and right faders and the
+    // Two Masters (seventh DAW test, item 83): with stereo outputs, left (master_) and right faders and the
     // balance; in 2x3 channels, chip 1 (master_) and chip 2 faders, without balance; Link.
     gemui::Label master1Lab_{"L", 11}, master2Lab_{"R", 11};
     gemui::Slider master2_;
     PanSlider masterPan_;
-    gemui::ValueField masterVal_, master2Val_, masterPanVal_;  // D-300, D-415
+    gemui::ValueField masterVal_, master2Val_, masterPanVal_;
     gemui::Button link_{"Link"};
     gemui::Label outLab_{"Out L"}, outRLab_{"Out R"};
     VuMeter outL_{true}, outR_{true};

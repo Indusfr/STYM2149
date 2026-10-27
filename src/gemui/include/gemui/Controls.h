@@ -39,7 +39,7 @@ public:
     const std::string& text() const noexcept { return text_; }
     void setPx(int px);
     int px() const noexcept { return px_; }
-    // Font of a small text (Font.h): 6×6 where the 8×8 does not fit in the prototype's space (D-071).
+    // Font of a small text (Font.h): 6×6 where the 8×8 does not fit in the prototype's space.
     void setFace(Face f);
     void setColor(Color c);
     void setLetterSpacing(double s);
@@ -86,7 +86,7 @@ public:
     void setStyle(Style s);
     Style style() const noexcept { return style_; }
     void setPx(int px);
-    // Font of a small text (Font.h): 6×6 in the prototype's narrow spaces (D-071).
+    // Font of a small text (Font.h): 6×6 in the prototype's narrow spaces.
     void setFace(Face f);
     // Reverse video (.on): a toggle that is on, the current choice of a group.
     void setOn(bool on);
@@ -148,9 +148,9 @@ private:
     double minWidth_ = 0;
 };
 
-// Arrow cell of the scroll bars (::-webkit-scrollbar-button, D-117): white, 2 px rules on the sides `rules` names,
-// the prototype's 8 × 10 glyph centred inside them, pointing the way `arrow` names. ScrollPane, ScrollBar (D-294),
-// horizontal Slider (D-297).
+// Arrow cell of the scroll bars (::-webkit-scrollbar-button): white, 2 px rules on the sides `rules` names,
+// the prototype's 8 × 10 glyph centred inside them, pointing the way `arrow` names. ScrollPane, ScrollBar,
+// horizontal Slider.
 enum class Arrow : uint8_t { Up, Down, Left, Right };
 struct ArrowRules {
     bool top = true, left = true, bottom = true, right = true;
@@ -161,7 +161,7 @@ void paintArrowCell(Painter& p, const Rect& cell, Arrow arrow, ArrowRules rules 
 // square white thumb with a 2 px border. A press on the track brings the thumb's centre there, a press on the thumb
 // grabs it where it is. Vertical: the prototype's track rotated by -90° (.trwrap), minimum at the bottom,
 // checkerboard rotated with it.
-// Horizontal: an arrow cell at each end (D-297), drawn like the scroll bars' (16 px, sharing its inner rule with the
+// Horizontal: an arrow cell at each end, drawn like the scroll bars' (16 px, sharing its inner rule with the
 // track): a press moves the value by one step, again after 250 ms and every 50 ms while held, in one gesture.
 class Slider : public Widget {
 public:
@@ -182,14 +182,14 @@ public:
     // set, then onChange, without a gesture.
     void input(double v);
 
-    // Arrows at the ends of a horizontal slider: on by default; off for the Mixer's pans (D-297).
+    // Arrows at the ends of a horizontal slider: on by default; off for the Mixer's pans.
     void setArrows(bool on);
     bool arrows() const noexcept { return arrows_ && !vertical_; }
     // Arrow cell (tests, layout): left (false) or right (true); empty without arrows.
     Rect arrowRect(bool right) const noexcept;
 
     // onChange: each new value during a drag or an arrow press. The gesture brackets a whole press, from the press to
-    // the release, arrow repeats included (one undo step in the editor, D-297).
+    // the release, arrow repeats included (one undo step in the editor).
     std::function<void(double)> onChange;
     std::function<void()> onGestureStart, onGestureEnd;
     std::function<void(Point)> onContext;  // right click
@@ -262,12 +262,12 @@ public:
     // Without a mask: the input starts from the whole text (a note name such as C#4), not from its first number.
     void setWholeText(bool w) { wholeText_ = w; }
     // Without a mask: unit that ends the text (" Hz", " ct") and is not typed; like a mask's, the pointer leaves it in
-    // normal video (Indus, 26/10/2026 15:25, D-451; every unit of the interface, 26/10/2026 20:41-20:44, D-464).
+    // normal video (Indus, 26/10/2026 15:25; every unit of the interface, 26/10/2026 20:41-20:44).
     void setUnit(std::string u);
     const std::string& unit() const noexcept { return unit_; }
-    // Font of a small value (Font.h): the Mixer's, in the 6×6 font (D-300).
+    // Font of a small value (Font.h): the Mixer's, in the 6×6 font.
     void setFace(Face f);
-    // Value centred in the field, without the dashes (the Mixer's, under their slider, D-415): reverse video over
+    // Value centred in the field, without the dashes (the Mixer's, under their slider): reverse video over
     // the field on hover, the input centred too.
     void setCentered(bool c);
     void setEditable(bool e);
@@ -396,7 +396,7 @@ public:
 };
 
 // .titlebar: 26 px (2 px bottom rule included); 24 px close box on the left and full-screen box on the right (GEM
-// glyphs E005 and E007 of the 8×8 font, square, at twice their size: D-418, D-424), hatched central area (2×2
+// glyphs E005 and E007 of the 8×8 font, square, at twice their size), hatched central area (2×2
 // squares on a 4×4 grid), title centred on a white background (12 px padding). Pointers of the prototype: hand on the
 // close box, move on a movable bar.
 class TitleBar : public Widget {
@@ -436,8 +436,8 @@ private:
 };
 
 // The prototype's .gwin: floating window, WindowFrame's frame and a title bar with a close box only, moved by its bar
-// (left and top edges never negative, mkWinDrag; the top edge never above Desktop::workTop either, D-302). It never
-// overflows the right and bottom edges of the desktop either (D-460): moved, placed or opened, it stays inside.
+// (left and top edges never negative, mkWinDrag; the top edge never above Desktop::workTop either). It never
+// overflows the right and bottom edges of the desktop either: moved, placed or opened, it stays inside.
 // Hidden when created; open() shows it in front of the other windows, where it was left.
 class FloatWindow : public WindowFrame {
 public:
@@ -447,7 +447,7 @@ public:
     void setTitle(std::string t) { bar_.setTitle(std::move(t)); }
     // Position and size, frame included; the title bar follows. Moved, with its content, to stay on the desktop.
     void place(const Box& b);
-    // Moves the window, with its content, so that it is on the desktop (D-460): right and bottom edges inside it; the
+    // Moves the window, with its content, so that it is on the desktop: right and bottom edges inside it; the
     // left edge never negative and the top never above the work area win for a window larger than the desktop.
     void keepOnDesktop();
     // Top-left corner of the content: inside the frame, below the title bar.
@@ -457,7 +457,7 @@ public:
 
     void open();
     void close();  // hides the window then calls onClose
-    // Closed by the user (its close box, Escape): close(), unless the window asks first (Settings, D-437).
+    // Closed by the user (its close box, Escape): close(), unless the window asks first (Settings).
     virtual void requestClose() { close(); }
     bool isOpen() const noexcept { return visible(); }
     std::function<void()> onClose;
@@ -486,7 +486,7 @@ public:
 
     void setPicture(const Bitmap* data, const Bitmap* mask) noexcept;
     // Character drawn in the picture (0: none) in the AES's SMALL font (6×6), as gr_gicon draws ib_char, its cell's
-    // top-left corner at (x, y) of the picture (D-419).
+    // top-left corner at (x, y) of the picture.
     void setLetter(char c, int x, int y) noexcept;
     void setName(std::string name);
     const std::string& name() const noexcept { return name_; }

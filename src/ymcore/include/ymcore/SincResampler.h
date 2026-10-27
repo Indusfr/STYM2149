@@ -7,15 +7,15 @@
 
 namespace stym::ymcore {
 
-// Streaming resampler, Kaiser-windowed sinc, exact rational ratio (D-014).
+// Streaming resampler, Kaiser-windowed sinc, exact rational ratio.
 // Input at inNum / inDen Hz (chip stream at clk/8), output at outRate Hz.
 // Output n is the input signal at the instant (n - latency()) / outRate: whole-sample delay.
 // prepare() allocates; reset(), push(), pull() do not allocate.
 // Positions are exact: the centre of the next output is ipos_ + rem_ / Q_ input samples, advanced by the reduced step
-// inNum / Q with integer arithmetic, so the phase never drifts however long the stream (D-039).
+// inNum / Q with integer arithmetic, so the phase never drifts however long the stream.
 class SincResampler {
 public:
-    // Filter design (D-039): passband, stopband and attenuation give the Kaiser β and the number of taps.
+    // Filter design: passband, stopband and attenuation give the Kaiser β and the number of taps.
     struct Design {
         double passHz = 0;   // passband kept (0 → 20 kHz from 44.1 kHz up, otherwise 0.45 × output)
         double stopHz = 0;   // start of the stopband (0 → min(output - pass, input / 2))
@@ -23,14 +23,14 @@ public:
         int phases = 1024;   // phases of the table, linear interpolation between two phases
         // When the frequency ratio has a denominator Q at most equal to this value (2 MHz to 32, 44.1, 48,
         // 88.2, 96, 176.4 or 192 kHz: Q ≤ 441), the table holds the Q exact phases and the computation needs no
-        // interpolation (D-053). 0: always interpolate.
+        // interpolation. 0: always interpolate.
         uint32_t maxExactPhases = 2048;
     };
 
     void prepare(uint64_t inNum, uint64_t inDen, uint32_t outRate, const Design& design);
     void reset() noexcept;
     // Position and history of `other` (prepared with the same ratio and design), without allocation; clearHistory()
-    // then makes the input pushed so far silent. Used to start a stream in the middle of another (D-299).
+    // then makes the input pushed so far silent. Used to start a stream in the middle of another.
     void copyStateFrom(const SincResampler& other) noexcept;
     void clearHistory() noexcept;
 

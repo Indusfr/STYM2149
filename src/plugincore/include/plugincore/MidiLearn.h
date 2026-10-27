@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: MIDI learn (P462), map of the learned controls and capture of the messages on the audio thread
+// STYM2149 — plugincore: MIDI learn, map of the learned controls and capture of the messages on the audio thread
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -7,7 +7,7 @@
 // like the localStorage of the prototype), in the format of JSON.stringify(midiMap).
 //
 // Audio thread: MidiCapture tells which messages go to the interface rather than to the engine: those of a learned
-// key (a learned note does not play, a learned CC comes before the controllers of the prototype, D-061), and, when a
+// key (a learned note does not play, a learned CC comes before the controllers of the prototype), and, when a
 // control is armed, the first CC or the first note played, taken for it. Channel mode messages (CC 120 to 127) are
 // never learned: they keep their meaning (all off, reset).
 #pragma once

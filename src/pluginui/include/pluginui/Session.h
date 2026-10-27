@@ -31,7 +31,7 @@
 namespace stym::pluginui {
 
 // Modulation table of a track (orn* fields of the prototype's patch), STYM2149 instrument sequences played with it
-// (M6, D-148) and LFO (D-257), kept by an undo step of the track. Each field is a copy of the ymengine::TrackPatch
+// and LFO, kept by an undo step of the track. Each field is a copy of the ymengine::TrackPatch
 // field of the same name (ornament* for the first seven), whose meaning and range Params.h gives.
 struct TrackOrnament {
     bool on = false;
@@ -47,20 +47,20 @@ struct TrackOrnament {
     bool hardSync = false;
     uint8_t link = 0;
     uint16_t pitchMatrix = ymengine::kPitchMatrixDefault;
-    std::array<uint8_t, ymengine::kSidWaveSteps> sidWave{};  // timer waves (B6, D-151)
+    std::array<uint8_t, ymengine::kSidWaveSteps> sidWave{};  // timer waves
     uint8_t sidWaveLen = ymengine::kSidSquareSteps;
-    ymengine::SidForm sidForm = ymengine::SidForm::Base;  // D-411
-    uint8_t sidWavePhase = ymengine::kSidWavePhase;       // D-405
-    uint8_t sidWavePeriod = ymengine::kSidWavePeriod;     // D-406
-    uint8_t sidWidth = ymengine::kSidWidth;               // D-408
+    ymengine::SidForm sidForm = ymengine::SidForm::Base;
+    uint8_t sidWavePhase = ymengine::kSidWavePhase;
+    uint8_t sidWavePeriod = ymengine::kSidWavePeriod;
+    uint8_t sidWidth = ymengine::kSidWidth;
     std::array<uint8_t, ymengine::kBuzzSteps> buzzShapes{};
     uint8_t buzzLen = 0;
-    bool envTuned = false;  // buzzer (B7, D-152)
+    bool envTuned = false;  // buzzer
     uint8_t envRatioN = 1, envRatioD = 1;
     double envFineCents = 0;
     bool ymPad = false;
-    ymengine::TrackLfo lfo;  // D-257
-    ymengine::TrackEcho echo;  // D-299
+    ymengine::TrackLfo lfo;
+    ymengine::TrackEcho echo;
 
     bool operator==(const TrackOrnament&) const = default;
     static TrackOrnament of(const ymengine::TrackPatch& p) {
@@ -105,8 +105,8 @@ struct TrackOrnament {
 };
 
 // Undo step (undoEntry, songUndoEntry, chanUndoEntry, mixUndoEntry, kitUndoEntry of the prototype; Dma: DMA track of
-// the STE, M6, D-153; Digi: a Digidrum slot of the editor, M6, D-154; Import: import of a MIDI file, M7, D-170; Grid:
-// a resolution change that fits the notes, D-448).
+// the STE; Digi: a Digidrum slot of the editor; Import: import of a MIDI file; Grid:
+// a resolution change that fits the notes).
 struct UndoEntry {
     enum class Kind : uint8_t { Pattern, Song, Track, Mix, Kit, Dma, Digi, Import, Grid };
     Kind kind = Kind::Pattern;
@@ -122,7 +122,7 @@ struct UndoEntry {
     ymengine::KitParams kit;          // Kit: the eight instruments of the Chipdrum kit
     ymengine::DmaParams dma;          // Dma, Import XM: settings of the track and of its samples
     std::vector<int8_t> dmaBytes;     // Dma: bytes of sample `index`
-    std::array<std::string, ymengine::kDmaSlots> dmaNames;  // Dma, Import XM: names of the samples (D-445)
+    std::array<std::string, ymengine::kDmaSlots> dmaNames;  // Dma, Import XM: names of the samples
     plugin::DigidrumSlotState digi;   // Digi: settings of slot `index` (and its source if digiBytes)
     std::vector<uint8_t> digiNibbles; // Digi: 4-bit values played (if digiBytes)
     bool digiBytes = false;           // Digi: the step keeps the source and the values (otherwise settings only)
@@ -130,7 +130,7 @@ struct UndoEntry {
     std::bitset<ymseq::kPatterns> used;    // Import: created patterns
     std::array<int, ymseq::kTracks> lengths{};  // Grid: own lengths of the tracks (ymseq::TrackSeq::length)
     int current = 0;                       // Import: current pattern
-    // Import XM (B5, D-166): instruments and DMA slots 0 to slots-1, sequencer rate (timing, speed).
+    // Import XM: instruments and DMA slots 0 to slots-1, sequencer rate (timing, speed).
     bool xm = false;
     int slots = 0;
     std::vector<plugin::Instrument> instruments;
@@ -184,7 +184,7 @@ struct WindowPlace {
 // Kept by the processor (StymProcessor::editorSession) and reached through Host::session; message thread only.
 struct EditorSession {
     // Sequencer: tool (TOOLS: 0 Move, 1 Draw, 2 Erase, 3 Split, 4 Join, 5 Select), follow playback, ghost notes (on
-    // when the editor starts, where the prototype started with ghostOn = 0: D-209), overview, step input, recording,
+    // when the editor starts, where the prototype started with ghostOn = 0), overview, step input, recording,
     // Snap, input note value (FIGS) and chord (CHORDS).
     int tool = 1;
     bool follow = true, ghost = true, overview = false, stepRec = false, record = false, snap = false;
@@ -192,13 +192,13 @@ struct EditorSession {
     // View: first step shown, absolute note at the bottom of the grid (C3), edit cursor (step, row 0 at the top).
     int viewStart = 0, viewAbsBase = 48;
     int curStep = 0, curRow = 6;
-    // Keyboard cursor of the arpeggio table (arpCur, arpRow: step, row 0 at the top = +24, D-322).
+    // Keyboard cursor of the arpeggio table (arpCur, arpRow: step, row 0 at the top = +24).
     int arpCur = 0, arpRow = 24;
     // Keyboard cursor of the Modulation table (ornCur, ornRow: step, row 0 at the top = +12).
     int ornCur = 0, ornRow = 12;
     // Instrument shown in the Drum Kit window (kitInst: slot 0 kick to 7 tom 2).
     int kitInst = 0;
-    // Slot shown in the Digidrums editor (M6, D-154).
+    // Slot shown in the Digidrums editor.
     int digiSlot = 0;
     // Computer keyboard: the held notes follow an octave change (Follow) or keep their pitch (Keep, kbdFollow of the
     // prototype).
@@ -218,9 +218,9 @@ struct EditorSession {
     std::map<std::string, WindowPlace> windows;
 
     // File of each kind (plugin::FileKind) chosen by the last Save or Save as: the one that Save rewrites (fileNames
-    // of the prototype, forgotten with the page); empty: Save opens the dialog (M7, D-168).
+    // of the prototype, forgotten with the page); empty: Save opens the dialog.
     std::array<std::string, plugin::kFileKinds> files{};
-    // Last file imported into the YM Player (M7, A2), last imported MIDI file (A3) and last imported XM module (B5):
+    // Last file imported into the YM Player, last imported MIDI file and last imported XM module:
     // suggested by the next dialog.
     std::string ymFile, midiFile, xmFile;
 };

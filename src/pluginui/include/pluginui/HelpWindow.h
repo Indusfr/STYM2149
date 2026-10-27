@@ -9,7 +9,7 @@
 // heading (h4: letter spacing 1 px, 2 px rule under its line, margins 10 px above and 4 px below, none above the first)
 // then a two-column table (rows of one 16 px line per text line plus 1 px above and below; first column 160 px wide,
 // padding included, or as wide as its longest key plus its 10 px padding; second column wrapped at spaces and after a
-// hyphen between letters). STYM2149 adds the shortcuts the prototype's list lacks after its rows (D-189), and says
+// hyphen between letters). STYM2149 adds the shortcuts the prototype's list lacks after its rows, and says
 // "metronome" for M, which the list called "mute".
 #pragma once
 #include <optional>

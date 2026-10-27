@@ -16,7 +16,7 @@
 namespace stym::ymengine {
 
 // Frequency of A4 (MIDI note 69), the reference of every note: 440 Hz by default, set from 350 to 480 Hz (Settings >
-// Tuning A4; Indus, 25/10/2026 19:29, D-429; below 400 Hz, 21:50, D-434).
+// Tuning A4; Indus, 25/10/2026 19:29; below 400 Hz, 21:50).
 inline constexpr double kA4Hz = 440.0, kA4MinHz = 350.0, kA4MaxHz = 480.0;
 
 // Frequency of a MIDI note in equal temperament from A4 at `a4` Hz, shifted by bend semitones.
@@ -54,22 +54,22 @@ struct ProtoXorshift {
     }
 };
 
-// Preview of the table of a sound (YM-Tracker Y43, D-148): tone period that the engine gives at step `step` (0 to
+// Preview of the table of a sound (YM-Tracker Y43): tone period that the engine gives at step `step` (0 to
 // 63) of a note `note` played with sound `p`: pitch of the table and PER and FIX rows according to the matrix
 // (Table to the square), detune included; without slide, vibrato, wheel, pitch bend or analog randomness. Table
 // off: the period of the note. The step is brought within the length of the table. Notes tuned from A4 at `a4` Hz.
 uint16_t tablePeriod(const TrackPatch& p, int note, int step, ymcore::MasterClock clock, double a4 = kA4Hz) noexcept;
 
-// Sine-SID wave (YM-Tracker Y41, D-151): one volume per bar of the SID wave (16), a sine sampled half a step after the
-// middle of each bar, so that no step lies on a trough (D-395), drawn on the scale of the volumes 0 to 15 as the bars
-// show them (24/10/2026, D-410; before, the volumes whose levels in the measured mixing table best approximated a sine,
-// which the bars drew as a bounce). Its highest samples are at volume `high`, its lowest at volume `low` (D-402), the
+// Sine-SID wave (YM-Tracker Y41): one volume per bar of the SID wave (16), a sine sampled half a step after the
+// middle of each bar, so that no step lies on a trough, drawn on the scale of the volumes 0 to 15 as the bars
+// show them (24/10/2026; before, the volumes whose levels in the measured mixing table best approximated a sine,
+// which the bars drew as a bounce). Its highest samples are at volume `high`, its lowest at volume `low`, the
 // volumes between them following the sine. One cycle spans `period`
-// bars (2 to 16; 24/10/2026, D-406: 8 by default, two cycles over the 16 bars; 16 is the one cycle of D-401). Each
-// `phase` above 8 moves the bars one place to the right (D-405; 8, the default, puts the cycle's peak on the 2nd and
-// 3rd bars at period 8, on the 4th and 5th at period 16). The Steps of the wave keep their number (D-401; before:
+// bars (2 to 16; 24/10/2026, 8 by default, two cycles over the 16 bars; 16 is the former single cycle). Each
+// `phase` above 8 moves the bars one place to the right (8, the default, puts the cycle's peak on the 2nd and
+// 3rd bars at period 8, on the 4th and 5th at period 16). The Steps of the wave keep their number (before:
 // 8 volumes, Steps set to 8). The 8 volumes of TAO are not published: TO CONFIRM.
-// With `bounce`, the Bounce form of the SID wave (Indus, 24/10/2026 18:41, D-414), the Sine-SID before D-410: the
+// With `bounce`, the Bounce form of the SID wave (Indus, 24/10/2026 18:41), the former Sine-SID: the
 // volumes whose levels in the measured mixing table of ymcore (one channel alone, the other two at volume 0) best
 // approximate the sine, from the level of `low` to that of `high`; a sine in the sound, which the bars, drawing the
 // volumes, show as a bounce (flat tops, a sharp trough).
@@ -77,18 +77,18 @@ std::array<uint8_t, kSidWaveSteps> sineSidWave(int low = 3, int high = 15, int p
                                                int period = kSidWavePeriod, bool bounce = false) noexcept;
 
 // The Sine-SID (or the Bounce) between the lowest and highest volumes of `wave` (one volume apart at least), at `phase`
-// and `period` (D-405, D-406): what a bar moved or the Period slider draws while Sine (or Bounce) is chosen.
+// and `period`: what a bar moved or the Period slider draws while Sine (or Bounce) is chosen.
 std::array<uint8_t, kSidWaveSteps> sineSidWaveAt(const std::array<uint8_t, kSidWaveSteps>& wave, int phase, int period,
                                                  bool bounce = false) noexcept;
 
-// The phase (0 to 15) after bar `step` was moved to `volume` (24/10/2026, D-405; D-402 before moved the highest or
+// The phase (0 to 15) after bar `step` was moved to `volume` (24/10/2026; formerly it moved the highest or
 // lowest volume): the one whose sine of `period` bars, between the volumes of `wave`, brings the bar nearest `volume`;
 // on a tie, the nearest `phase`, the bars moved to the left rather than to the right between two as near.
 int sineSidWavePhase(const std::array<uint8_t, kSidWaveSteps>& wave, int phase, int period, int step, int volume,
                      bool bounce = false) noexcept;
 
-// Tuned envelope (D-152): R11-R12 period that makes the envelope play frequency hz. A cycle of 32 steps lasts
-// 256 · EP clock periods (D-010); the looped triangles ($A, $E) chain two of them per period. Clamped to
+// Tuned envelope: R11-R12 period that makes the envelope play frequency hz. A cycle of 32 steps lasts
+// 256 · EP clock periods; the looped triangles ($A, $E) chain two of them per period. Clamped to
 // 1-65535; 0 if hz is not positive.
 int envelopeRamps(int shape) noexcept;  // cycles of 32 steps per period of the shape: 2 for $A and $E, otherwise 1
 uint16_t tunedEnvPeriod(double hz, int shape, ymcore::MasterClock clock) noexcept;

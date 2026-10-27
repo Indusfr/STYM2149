@@ -1,4 +1,4 @@
-// STYM2149 — ymio: writing register dumps (M7, A5, B1, STYM2149_SPEC.md §8)
+// STYM2149 — ymio: writing register dumps (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -9,7 +9,7 @@
 //   read by ymio::parseYm);
 // - YM6 (preferred format of §8): "YM6!" and "LeOnArD!" header (ST-Sound format documentation, as parseYm reads
 //   it), interleaved 16-byte frames, timer effects in the free bits of R1, R3, R6, R8, R14 and R15, as YmPlayer
-//   decodes them (AtariAudio rules, D-044): at most two effects per frame (SID, Digidrum, Sync Buzzer), digidrums as
+//   decodes them (AtariAudio rules): at most two effects per frame (SID, Digidrum, Sync Buzzer), digidrums as
 //   4-bit values.
 // VBL and YM3 have no timer effects: they are frozen there in their base state (prototype): SID at the high volume,
 // Digidrum at zero volume, Sync Buzzer without R13 retrigger by its timer (R13 rewritten only at its attack).
@@ -56,7 +56,7 @@ struct Ym6Report {
     uint32_t frozenDrums = 0;     // digidrum the player does not play (started with no place, or looped after its end)
     uint32_t cutDrums = 0;        // digidrum stopped before its end by the engine (one timer period of deviation)
 };
-// Uncompressed YM6 (ymio::packLzh compresses it, D-161). `report`, when given, receives what the file could not carry.
+// Uncompressed YM6 (ymio::packLzh compresses it). `report`, when given, receives what the file could not carry.
 std::vector<uint8_t> ym6File(std::span<const ymengine::RegisterFrame> frames, const Ym6Info& info,
                              Ym6Report* report = nullptr);
 

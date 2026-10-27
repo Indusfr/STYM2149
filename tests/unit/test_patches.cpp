@@ -1,4 +1,4 @@
-// STYM2149 — JSON of the prototype files and Patches library (M6, A3, D-141)
+// STYM2149 — JSON of the prototype files and Patches library
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -138,7 +138,7 @@ TEST_CASE("Patches: a tweaked sound is written like the prototype and read back 
 }
 
 TEST_CASE("Patches: missing keys, out-of-range values, short arrays", "[patches]") {
-    // Missing keys: new track (mkCh); EP beyond 2047 capped at 65535 (D-021); the rest within its range.
+    // Missing keys: new track (mkCh); EP beyond 2047 capped at 65535; the rest within its range.
     const auto e = json::parse(R"({"name":"x","patch":{"EP":3000,"vol4":99,"NP":0,"effect":7,"ornLen":200,
         "ornTable":[30,-30,"a",3],"ornNse":[2],"ornVol":[-4,40],"sidRatio":1e9,"vibRate":7.3,"slot":12},
         "arp":{"mode":9,"oct":0,"table":[5,99,-1],"tlen":40},"level":2,"gate":0})");
@@ -151,7 +151,7 @@ TEST_CASE("Patches: missing keys, out-of-range values, short arrays", "[patches]
     CHECK(param(w, 0, Track::EnvPeriod) == 65535.0f);
     CHECK(param(w, 0, Track::Volume) == 15.0f);
     CHECK(param(w, 0, Track::NoisePeriod) == 1.0f);
-    CHECK(param(w, 0, Track::Generator) == 5.0f);  // last type (DMA since M6)
+    CHECK(param(w, 0, Track::Generator) == 5.0f);  // last type (DMA)
     CHECK(param(w, 0, Track::SidRatio) == 8.0f);
     CHECK(param(w, 0, Track::VibRate) == 7.5f);
     CHECK(param(w, 0, Track::Level) == 100.0f);
@@ -212,7 +212,7 @@ TEST_CASE("Patches: library file, bare array, invalid entries, renaming", "[patc
     CHECK(dumpPatchLibrary({}) == "{\n \"kind\": \"patchlib\",\n \"patches\": []\n}");
 }
 
-TEST_CASE("Patches: stym key when a patch carries STYM2149 keys (B6)", "[patches]") {
+TEST_CASE("Patches: stym key when a patch carries STYM2149 keys", "[patches]") {
     // Patch of the prototype: file unchanged; STYM2149 key (sequence, DMA...): version of the additions at the end.
     const auto plain = parsePatchLibrary(R"({"kind":"patchlib","patches":[{"name":"A","patch":{"vol4":5}}]})");
     REQUIRE(plain);
@@ -232,7 +232,7 @@ TEST_CASE("Patches: stym key when a patch carries STYM2149 keys (B6)", "[patches
     CHECK_FALSE(newer);
 }
 
-TEST_CASE("Patches: vibrato Off written as a STYM2149 key, On when absent (sixth DAW test, D-254)", "[patches]") {
+TEST_CASE("Patches: vibrato Off written as a STYM2149 key, On when absent (sixth DAW test)", "[patches]") {
     ParamValues v = defaultValues();
     param(v, 0, Track::VibOn) = 0;
     const std::vector<PatchEntry> lib = {snapPatch("No vib", v, NonParamState{}, 0)};

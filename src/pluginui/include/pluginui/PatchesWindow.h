@@ -3,7 +3,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Save current (the sound of the focused track, under a name asked for), one button per patch (click: loaded into
-// the focused track; right click: Load, Rename, Overwrite, Delete), Import and Export (files: M7, D-141). Positions
+// the focused track; right click: Load, Rename, Overwrite, Delete), Import and Export (files). Positions
 // and sizes: the prototype's CSS boxes at 100 % (window at 160, 160, 360 px wide).
 //
 // The library is shared by every project (Host::patchLibrary, plugincore/Patches.h): read again when the window
@@ -38,11 +38,11 @@ public:
     void refresh();
 
     const std::vector<plugin::PatchEntry>& library() const noexcept { return lib_; }
-    // For the Instruments window (D-147): library read again from the file; entry added at the end and file
+    // For the Instruments window: library read again from the file; entry added at the end and file
     // rewritten (an unreadable file is not overwritten, an alert says so).
     const std::vector<plugin::PatchEntry>& reload();
     void append(plugin::PatchEntry e);
-    // Import button (M7): patches of a library file added at the end; the prototype's alert if it is refused.
+    // Import button: patches of a library file added at the end; the prototype's alert if it is refused.
     void importText(const std::string& text);
 
     // Rectangle of an element by the prototype's id (captures, tests): "libWin", "libSave", "libImport",

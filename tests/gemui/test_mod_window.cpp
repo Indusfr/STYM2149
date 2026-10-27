@@ -1,4 +1,4 @@
-// STYM2149 — Modulation window (M6, A1): opening (button, Ctrl+R, Edit menu), on/off, length, Loop / Hold, rate,
+// STYM2149 — Modulation window: opening (button, Ctrl+R, Edit menu), on/off, length, Loop / Hold, rate,
 // Clear, drawing with the mouse (pitch, NSE, VOL), VOL setting by slider, keyboard, undo.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -140,8 +140,8 @@ TEST_CASE("Modulation: button, Ctrl+R and Edit menu open the window; not applica
     CHECK_FALSE(w.desktop().hasModal());  // no more "not available yet" alert
     CHECK(w.modulation().titleBar().title() == "MODULATION - 1");
     // Off: the row, controls disabled, at (140, 140); the place of the On button (boxes of the prototype). Below it,
-    // the settings of the sequences (D-240), 152 px high, 724 px wide: the slider of the row takes that width; then
-    // the LFO (D-257), off: 42 px high, its label and button only (D-298).
+    // the settings of the sequences, 152 px high, 724 px wide: the slider of the row takes that width; then
+    // the LFO, off: 42 px high, its label and button only.
     CHECK(w.rectOf("ornWin")->x == 140);
     CHECK(w.rectOf("ornWin")->y == 140);
     CHECK(w.rectOf("ornWin")->h == 78 + 152 + 42);
@@ -181,8 +181,8 @@ TEST_CASE("Modulation: on/off, length, Loop / Hold, rate, Clear", "[ui][orn]") {
     click(w, "ornOn");
     CHECK(h.patch().ornamentOn);
     // On: the notes and the grid; window as wide as the notes (131 characters of 6 px). The notes of the sequence
-    // rows join the table's, three lines (D-271); the rows are inside the table, between the pitch rows and NSE / VOL
-    // (438 px, D-270). Below, the settings (152 px, D-240) and the LFO, off (42 px, D-257, D-298).
+    // rows join the table's, three lines; the rows are inside the table, between the pitch rows and NSE / VOL
+    // (438 px). Below, the settings (152 px) and the LFO, off (42 px).
     CHECK(OrnGrid::kHeight == 438);
     CHECK(w.rectOf("ornWin") == gemui::Rect{140, 140, 814, 124 + 438 + 14 + 152 + 42});
     CHECK(w.rectOf("orngrid") == gemui::Rect{154, 264, OrnGrid::kWidth, OrnGrid::kHeight});

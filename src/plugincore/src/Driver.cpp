@@ -18,15 +18,15 @@ namespace {
 enum QType : uint8_t {
     qNoteOn, qNoteOff, qBend, qWheel, qAllOff, qManOff, qClock, qStart, qContinue, qStop, qSongPos,
     qSeqPlay, qSeqStop, qSeqSelect, qSeqPreview, qSeqSongJump, qDrumPreview,
-    qDmaPreview,   // preview of a DMA slot (D-153); value 1: stop it (D-449)
-    qDigiPreview,  // preview of a Digidrum slot (D-154); value 1: stop it (D-449)
-    qProgram,      // Program Change (D-156)
+    qDmaPreview,   // preview of a DMA slot; value 1: stop it
+    qDigiPreview,  // preview of a Digidrum slot; value 1: stop it
+    qProgram,      // Program Change
     qYmPlay,       // start of the YM Player (ymplay): manual play and sequencer released
-    qPressure, qNotePressure, qMpeBend, qMpePressure, qMpeSlide  // MIDI expression (D-432)
+    qPressure, qNotePressure, qMpeBend, qMpePressure, qMpeSlide  // MIDI expression
 };
 
-// Key on 29 bits: clock, chain and resampling on 2 bits each, then the frequency of the Custom clock on 23 bits
-// (D-237); bit 29 of the request word says whether a new engine is wanted.
+// Key on 29 bits: clock, chain and resampling on 2 bits each, then the frequency of the Custom clock on 23 bits;
+// bit 29 of the request word says whether a new engine is wanted.
 static_assert(kCustomClockMaxHz < (1 << 23));
 constexpr int kActiveBit = 29;
 uint32_t packKey(const ConfigKey& k) noexcept {
@@ -71,7 +71,7 @@ bool isEngineGlobal(int g) noexcept {
     case Global::Resampling:
     case Global::SteBass:
     case Global::SteTreble:
-    case Global::Mpe:           // MPE: read by the driver (D-432)
+    case Global::Mpe:           // MPE: read by the driver
     case Global::MpeBendRange:
     case Global::Gate:  // global gate: carried by the tracks (trackGate)
     case Global::GateAll: return false;
@@ -79,7 +79,7 @@ bool isEngineGlobal(int g) noexcept {
     }
 }
 
-// MPE (D-432): in 16 ch only, where every note has its own channel of the chip.
+// MPE: in 16 ch only, where every note has its own channel of the chip.
 bool mpeOn(const ParamValues& v) noexcept {
     return value(v, Global::Mpe) >= 0.5f && voiceMode(v) == VoiceMode::Studio16;
 }
@@ -114,7 +114,7 @@ Driver::~Driver() {
 }
 
 uint32_t Driver::fadeSamples() const noexcept {
-    // Panic fade of the engine: 64 steps at 48 kHz (D-051), then the resampling delay, so that the end of the fade
+    // Panic fade of the engine: 64 steps at 48 kHz, then the resampling delay, so that the end of the fade
     // is output before the switch.
     // ceil(64 × rate / 48000) in integers.
     const uint32_t fade = uint32_t((uint64_t(64) * setup_.sampleRate + 47999) / 48000);
@@ -147,7 +147,7 @@ std::unique_ptr<Driver::EngineSlot> Driver::build(const ConfigKey& key, const Pa
     return s;
 }
 
-// Global settings of the engine; outside real time (bounce, export), no metronome (D-112).
+// Global settings of the engine; outside real time (bounce, export), no metronome.
 GlobalParams Driver::globalFor(const ParamValues& values) const noexcept {
     GlobalParams g = toGlobal(values, snapshot_->state.global);
     if (fixedSeqClock_) g.seqClock = *fixedSeqClock_;
@@ -342,7 +342,7 @@ void Driver::takeSnapshot() noexcept {
 
 void Driver::applySnapshotData() noexcept {
     // Kit and samples: only what changed. setKit recomputes the kit on this thread (a few hundred microseconds,
-    // known limit of M3).
+    // a known limit).
     EngineSlot& s = *slot_;
     if (s.kitVersion != snapshot_->kitVersion) {
         s.engine.setKit(snapshot_->state.kit);
@@ -461,7 +461,7 @@ void Driver::sync(const ParamValues& values) noexcept {
     if (changed(paramIndex(Global::SteBass)) || changed(paramIndex(Global::SteTreble)))
         e.setBoardTone(intValue(values, Global::SteBass), intValue(values, Global::SteTreble));
 
-    // Global gate switched on, off or changed while it plays: all tracks take it up (D-134).
+    // Global gate switched on, off or changed while it plays: all tracks take it up.
     const bool gate = changed(paramIndex(Global::GateAll)) ||
                       (value(values, Global::GateAll) >= 0.5f && changed(paramIndex(Global::Gate)));
     bool release = false;
@@ -497,7 +497,7 @@ void Driver::startAction(Action a) noexcept {
 void Driver::carrySequencer(const Engine::SeqStatus& seq) noexcept {
     slot_->patternSerial = snapshot_->patternSerial;
     applySnapshotData();
-    if (seq.pattern >= 0) slot_->engine.seqSelectPattern(0, seq.pattern);  // -1: Rest entry of the Song (D-158)
+    if (seq.pattern >= 0) slot_->engine.seqSelectPattern(0, seq.pattern);  // -1: Rest entry of the Song
     if (seq.playing) slot_->engine.seqPlay(0);
 }
 
@@ -560,7 +560,7 @@ void Driver::renderTo(const Outputs& out, uint32_t to) noexcept {
         const Queued& q = queue_[qHead_++];
         const uint32_t rel = q.at - pos_;
         switch (q.type) {
-        case qNoteOn: e.noteOn(rel, q.a, q.b, q.track, int(q.value)); break;  // value: MPE channel (D-432)
+        case qNoteOn: e.noteOn(rel, q.a, q.b, q.track, int(q.value)); break;  // value: MPE channel
         case qNoteOff: e.noteOff(rel, q.a, q.track, int(q.value)); break;
         case qBend: e.pitchBend(rel, q.value, q.track); break;
         case qWheel: e.modWheel(rel, q.value, q.track); break;
@@ -621,14 +621,14 @@ void Driver::setParam(ParamValues& values, int index, float v, ParamListener* li
     if (listener) listener->parameterChangedByMidi(index, v);
 }
 
-// A host CC (D-061): controllers that act on the engine are queued; those of the prototype change a parameter at
+// A host CC: controllers that act on the engine are queued; those of the prototype change a parameter at
 // sample `at` (render cut there). True when a parameter changed.
 bool Driver::controlChange(ParamValues& values, int cc, int v, int channel, uint32_t at, const Outputs& out,
                            ParamListener* listener) noexcept {
     const bool perChannel = midiRouting(values) == MidiRouting::PerChannel && !mpeOn(values);
     const int track = perChannel ? channel : -1;
     switch (cc) {
-    case 1: {  // mod wheel: vibrato (D-061) or the Wheel target (D-432)
+    case 1: {  // mod wheel: vibrato or the Wheel target
         const double amount = double(v) / 127.0;
         queue(at, qWheel, track, 0, 0, amount);
         for (int t = 0; t < kTracks; ++t)
@@ -727,7 +727,7 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     const int ch = st & 0x0f;
     const int d1 = e.size > 1 ? e.data[1] & 0x7f : 0;
     const int d2 = e.size > 2 ? e.data[2] & 0x7f : 0;
-    // MPE (D-432): channels 2 to 16 (members) play a note each, with its own bend, pressure and CC74; channel 1 (the
+    // MPE: channels 2 to 16 (members) play a note each, with its own bend, pressure and CC74; channel 1 (the
     // master) and the other messages act on all the notes. The notes go where the keyboard plays (focused track or
     // Layer), per channel routing aside.
     const bool mpe = !e.screen && mpeOn(values);
@@ -781,7 +781,7 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
         controlChange(values, d1, d2, ch, at, out, listener);
         return;
     case 0xd0: {
-        // Channel pressure (D-432): that of the tracks, kept for a new engine; that of an MPE member, of its notes.
+        // Channel pressure: that of the tracks, kept for a new engine; that of an MPE member, of its notes.
         if (e.size < 2) return;
         const double amount = double(d1) / 127.0;
         if (member) {
@@ -793,12 +793,12 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
             if (track < 0 || t == track) press_[size_t(t)] = amount;
         return;
     }
-    case 0xa0:  // polyphonic pressure (D-432): of one note (an MPE member has its channel pressure)
+    case 0xa0:  // polyphonic pressure: of one note (an MPE member has its channel pressure)
         if (e.size < 3 || member) return;
         queue(at, qNotePressure, track, d1, 0, double(d2) / 127.0);
         return;
     case 0xc0: {
-        // Program Change n (D-156): instrument n (1 to 32) on the channel's track (per-channel routing), the focused
+        // Program Change n: instrument n (1 to 32) on the channel's track (per-channel routing), the focused
         // track (Omni) or all tracks (Layer, which plays them together); 0 gives the track its own sound back; above
         // 32, ignored. The on-screen keyboard does not send any.
         if (e.size < 2 || d1 > kInstruments) return;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# STYM2149 — fetches the reference tunes of the tests (DECISIONS.md D-032).
+# STYM2149 — fetches the reference tunes of the tests.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #
@@ -49,7 +49,7 @@ files=(
   "website/player/ym/Misc.Composers/Huelsbeck.Chris/Jim Power/jimpowr5.ym"
 )
 
-# SNDH (M7, D-159): played by AtariAudio's machine, compared with its SndhRenderer.
+# SNDH: played by AtariAudio's machine, compared with its SndhRenderer.
 sndh_files=(
   "examples/sndh/Mad_Max/Bomber_(ST).sndh"
   "examples/sndh/Mad_Max/Bomber_(STe).sndh"

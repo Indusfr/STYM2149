@@ -1,4 +1,4 @@
-// STYM2149 — standard MIDI files (M7, A3, D-170): bounded reading (the prototype's parseMidiFile) and SMF 1 writing
+// STYM2149 — standard MIDI files: bounded reading (the prototype's parseMidiFile) and SMF 1 writing
 // (the prototype's midiVar, midiTrack, midiBlob)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

@@ -43,7 +43,7 @@ TEST_CASE("ymseq: scales, figures, bars and names", "[ymseq]") {
     CHECK(figureSteps(11, 2) == 3);  // quarter-note triplet in 1/16: round(2.67)
     CHECK(figureSteps(6, 0) == 1);   // thirty-second note in 1/4: round(0.125) → 1
     CHECK(figureSteps(10, 2) == 2);  // dotted sixteenth in 1/16: round(1.5) = 2 (JavaScript rounding)
-    // 1/64 (D-422): the figure after 1/32, the resolution after the triplets (index 7, 16 steps per quarter note).
+    // 1/64: the figure after 1/32, the resolution after the triplets (index 7, 16 steps per quarter note).
     CHECK(kFigures[7].name == "1/64");
     CHECK(kFigures[8].name == "1/4.");
     CHECK(kResolutions[7].label == "1/64");
@@ -54,7 +54,7 @@ TEST_CASE("ymseq: scales, figures, bars and names", "[ymseq]") {
     CHECK(beatSteps(2, 7) == 16);
     CHECK(barSteps(2, 7) == 64);   // 4/4 in 1/64
     CHECK(barSteps(7, 7) == 48);   // 6/8 in 1/64: 6 × 8
-    // 1/32T (D-433): the last figure and the last resolution (index 8, 12 steps per quarter note).
+    // 1/32T: the last figure and the last resolution (index 8, 12 steps per quarter note).
     CHECK(kFigures[14].name == "1/32T");
     CHECK(kResolutions[8].label == "1/32T");
     CHECK(figureSteps(14, 8) == 1);   // thirty-second-note triplet in 1/32T
@@ -89,7 +89,7 @@ TEST_CASE("ymseq: scales, figures, bars and names", "[ymseq]") {
     CHECK(euclidName(4, 16).empty());
 }
 
-TEST_CASE("ymseq: figures that fit a resolution, a whole number of steps (D-425)", "[ymseq]") {
+TEST_CASE("ymseq: figures that fit a resolution, a whole number of steps", "[ymseq]") {
     // One row per resolution (saved index), one column per figure: Step, 1/1 to 1/64, 1/4. 1/8. 1/16., 1/4T 1/8T 1/16T
     // 1/32T.
     const std::array<std::string_view, kResolutionCount> fits = {
@@ -101,7 +101,7 @@ TEST_CASE("ymseq: figures that fit a resolution, a whole number of steps (D-425)
         "111100000001100",  // 1/8T
         "111110001001110",  // 1/16T
         "111111111110000",  // 1/64
-        "111111001101111",  // 1/32T (D-433): a thirty-second note lasts a step and a half
+        "111111001101111",  // 1/32T: a thirty-second note lasts a step and a half
     };
     for (int r = 0; r < kResolutionCount; ++r)
         for (int f = 0; f < kFigureCount; ++f) {
@@ -156,7 +156,7 @@ TEST_CASE("ymseq: shared tracks copied on write", "[ymseq]") {
     CHECK(q.sameContent(p));
 }
 
-TEST_CASE("ymseq: INS row (M6), empty at 0, follows the note like GEN (D-147)", "[ymseq]") {
+TEST_CASE("ymseq: INS row, empty at 0, follows the note like GEN", "[ymseq]") {
     Lane l;
     CHECK(Lane::emptyValue(Row::Ins) == 0);
     l.set(Row::Ins, 3, 32);
@@ -205,7 +205,7 @@ TEST_CASE("ymseq: INS row (M6), empty at 0, follows the note like GEN (D-147)", 
     CHECK(l.pat[13] < 0);
 }
 
-TEST_CASE("ymseq: Snap keeps every note written in the scale, chord voices included (D-280)", "[ymseq]") {
+TEST_CASE("ymseq: Snap keeps every note written in the scale, chord voices included", "[ymseq]") {
     Lane l;
     EditContext ctx;
     ctx.length = 16;
@@ -249,7 +249,7 @@ TEST_CASE("ymseq: Snap keeps every note written in the scale, chord voices inclu
     eh.writeNoteAt(6, 3);
     CHECK(eh.writeChord(6, 3) == 1);
     CHECK(rows(6) == std::vector<int>{3, 8});
-    // Without Snap, the row clicked is kept (the scale only greys it); drums are never snapped (D-090).
+    // Without Snap, the row clicked is kept (the scale only greys it); drums are never snapped.
     ctx.snap = false;
     LaneEditor ef(l, ctx);
     REQUIRE(ef.addVoiceAt(0, 8) == 3);
@@ -259,7 +259,7 @@ TEST_CASE("ymseq: Snap keeps every note written in the scale, chord voices inclu
     CHECK(LaneEditor(l, ctx).snapRow(1) == 1);
 }
 
-TEST_CASE("ymseq: CMD row (M6), attached to the line and not to the note (D-150)", "[ymseq][commands]") {
+TEST_CASE("ymseq: CMD row, attached to the line and not to the note", "[ymseq][commands]") {
     using stym::ymengine::SeqCmd;
     using stym::ymengine::seqCmd;
     Lane l;
@@ -277,7 +277,7 @@ TEST_CASE("ymseq: CMD row (M6), attached to the line and not to the note (D-150)
     e.setNoteLen(0, 4);
     l.setCmd(0, seqCmd(SeqCmd::VolSlide, 0x37));
     l.setCmd(2, seqCmd(SeqCmd::Retrig, 0x02));
-    l.setCmd(2, seqCmd(SeqCmd::Delay, 0x03));  // a second command on the same line (D-330)
+    l.setCmd(2, seqCmd(SeqCmd::Delay, 0x03));  // a second command on the same line
     // Split, new start, note copy: the commands stay on their line.
     REQUIRE(e.splitNote(0, 2));
     CHECK(l.cmdAt(SeqCmd::Retrig, 2) == seqCmd(SeqCmd::Retrig, 0x02));
@@ -295,7 +295,7 @@ TEST_CASE("ymseq: CMD row (M6), attached to the line and not to the note (D-150)
     CHECK(l.cmdAt(SeqCmd::Retrig, 3) == seqCmd(SeqCmd::Retrig, 0x02));
     CHECK(l.cmdAt(SeqCmd::Delay, 3) == seqCmd(SeqCmd::Delay, 0x03));
     CHECK_FALSE(l.hasCmd(0));
-    // Block: CMD alone, all the kinds of its box together; Dxx has a row of its own (DLY, item 139, D-348), Rxx goes
+    // Block: CMD alone, all the kinds of its box together; Dxx has a row of its own (DLY, item 139), Rxx goes
     // with the ENV row (twelfth DAW test, item 146).
     const BlockClip cmd = e.blockCopy(1, 3, Row::CmdVolSlide);
     e.blockPaste(10, cmd);
@@ -317,7 +317,7 @@ TEST_CASE("ymseq: CMD row (M6), attached to the line and not to the note (D-150)
     CHECK_FALSE(l.hasCmd(12));
 }
 
-TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW test, item 122, D-330)",
+TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW test, item 122)",
           "[ymseq][commands]") {
     using stym::ymengine::SeqCmd;
     using stym::ymengine::seqCmd;
@@ -397,7 +397,7 @@ TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW 
     CHECK(cmdKind(Row::Ins) == SeqCmd::None);
 }
 
-TEST_CASE("ymseq: Xyz and Pxy are retired, a value written for them is dropped (items 131 and 135, D-340, D-344)",
+TEST_CASE("ymseq: Xyz and Pxy are retired, a value written for them is dropped (items 131 and 135)",
           "[ymseq][commands]") {
     using stym::ymengine::SeqCmd;
     using stym::ymengine::seqCmd;
@@ -629,7 +629,7 @@ TEST_CASE("ymseq: Euclidean generator", "[ymseq][euclid]") {
     dc.drum = true;
     LaneEditor de(d, dc);
     euclidApply(de, d, euclidFigure(4, 2, 0, 0), EuclidTarget::Digidrum, 3, false);
-    CHECK(d.pat[0] == 2);  // D-103: Slot 3 = row 2
+    CHECK(d.pat[0] == 2);  // Slot 3 = row 2
     CHECK(d.slt[0] == 3);
     CHECK(d.vol[0] == 15);  // without an accent, VOL is not written
     euclidApply(de, d, euclidFigure(4, 1, 1, 0), EuclidTarget::Chipdrum, 6, true);  // Merge: kept
@@ -713,9 +713,9 @@ TEST_CASE("ymseq: table of the named Euclidean rhythms (item 157)", "[ymseq][euc
     }
 }
 
-// ---------------------------------------------------------------- piano roll editing (D-282)
+// ---------------------------------------------------------------- piano roll editing
 
-TEST_CASE("ymseq edit: the held length of a note stops at the next note (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: the held length of a note stops at the next note", "[ymseq][pianoroll]") {
     Lane l;
     EditContext c;
     c.figure = 4;  // 1/8: two steps at 1/16
@@ -732,7 +732,7 @@ TEST_CASE("ymseq edit: the held length of a note stops at the next note (D-282)"
     CHECK(e.noteLenAt(2) == 2);
 }
 
-TEST_CASE("ymseq edit: under Snap, splitting or resizing a note does not change its pitch (D-282)",
+TEST_CASE("ymseq edit: under Snap, splitting or resizing a note does not change its pitch",
           "[ymseq][pianoroll]") {
     EditContext c;
     c.scale = 1;  // C major
@@ -750,7 +750,7 @@ TEST_CASE("ymseq edit: under Snap, splitting or resizing a note does not change 
     CHECK(e2.relNote(1) == 1);
 }
 
-TEST_CASE("ymseq edit: under Snap, a promoted voice keeps its octave (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: under Snap, a promoted voice keeps its octave", "[ymseq][pianoroll]") {
     EditContext c;
     c.mono = true;
     c.scale = 16;  // Pentatonic major on C: no B
@@ -765,7 +765,7 @@ TEST_CASE("ymseq edit: under Snap, a promoted voice keeps its octave (D-282)", "
     CHECK(e.voiceAt(0, 0) == 2);  // the old root became the greyed voice
 }
 
-TEST_CASE("ymseq edit: under Snap, +1 semitone moves the notes up (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: under Snap, +1 semitone moves the notes up", "[ymseq][pianoroll]") {
     EditContext c;
     c.scale = 1;  // C major
     c.snap = true;
@@ -798,7 +798,7 @@ TEST_CASE("ymseq edit: under Snap, +1 semitone moves the notes up (D-282)", "[ym
     }
 }
 
-TEST_CASE("ymseq edit: a track with a note above C8 can still be transposed down (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: a track with a note above C8 can still be transposed down", "[ymseq][pianoroll]") {
     Lane l;
     EditContext c;
     LaneEditor e(l, c);
@@ -808,7 +808,7 @@ TEST_CASE("ymseq edit: a track with a note above C8 can still be transposed down
     CHECK(absoluteNote(l, 1, 0, 3) == 109);
 }
 
-TEST_CASE("ymseq edit: a selection box is not moved below B0 (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: a selection box is not moved below B0", "[ymseq][pianoroll]") {
     Lane l;
     EditContext c;
     LaneEditor e(l, c);
@@ -820,7 +820,7 @@ TEST_CASE("ymseq edit: a selection box is not moved below B0 (D-282)", "[ymseq][
     CHECK(absoluteNote(l, 1, 1, 3) == 36);
 }
 
-TEST_CASE("ymseq edit: shifting a note selection keeps the notes it lands on (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: shifting a note selection keeps the notes it lands on", "[ymseq][pianoroll]") {
     SECTION("root over another root") {
         Lane l;
         EditContext c;
@@ -850,7 +850,7 @@ TEST_CASE("ymseq edit: shifting a note selection keeps the notes it lands on (D-
     }
 }
 
-TEST_CASE("ymseq edit: a chord voice held more than 64 steps is found over all its steps (D-282)",
+TEST_CASE("ymseq edit: a chord voice held more than 64 steps is found over all its steps",
           "[ymseq][pianoroll]") {
     Lane l;
     EditContext c;
@@ -863,7 +863,7 @@ TEST_CASE("ymseq edit: a chord voice held more than 64 steps is found over all i
     CHECK(e.stepBusy(80));
 }
 
-TEST_CASE("ymseq edit: a moved note takes its step rows along and gives back what it covered (D-282)",
+TEST_CASE("ymseq edit: a moved note takes its step rows along and gives back what it covered",
           "[ymseq][pianoroll]") {
     SECTION("melodic note: VOL, SLD, CRV, SRC, GEN, INS") {
         Lane l;
@@ -909,7 +909,7 @@ TEST_CASE("ymseq edit: a moved note takes its step rows along and gives back wha
     }
 }
 
-TEST_CASE("ymseq edit: a pasted box does not erase the notes its held notes cover (D-282)", "[ymseq][pianoroll]") {
+TEST_CASE("ymseq edit: a pasted box does not erase the notes its held notes cover", "[ymseq][pianoroll]") {
     Lane l;
     EditContext c;
     LaneEditor e(l, c);
@@ -962,7 +962,7 @@ TEST_CASE("ymseq: ARP flags become Jxx switches and back, Txx of the tracks the 
     CHECK(f.cmdAt(SeqCmd::Arpeggiator, 0) == on);
     CHECK(f.cmdAt(SeqCmd::Arpeggiator, 1) == off);
     // A flagged note tied over steps 4 to 7: the flags let its arpeggio run to its end, so J00 waits for step 8, where
-    // J00 would stop it (D-379); a slid note holds its root at an unlit flag, so J00 stays on the step after the run.
+    // J00 would stop it; a slid note holds its root at an unlit flag, so J00 stays on the step after the run.
     for (const bool slid : {false, true}) {
         CAPTURE(slid);
         Lane t;
@@ -1005,7 +1005,7 @@ TEST_CASE("ymseq: ARP flags become Jxx switches and back, Txx of the tracks the 
     CHECK_FALSE(p.migrateTempo());
 }
 
-TEST_CASE("ymseq: a resolution change fits the notes to the new grid, keeping their time (Indus, 26/10/2026, D-448)",
+TEST_CASE("ymseq: a resolution change fits the notes to the new grid, keeping their time (Indus, 26/10/2026)",
           "[ymseq]") {
     CHECK(fitStep(4, 1, 2) == 2);   // 1/16 to 1/8
     CHECK(fitStep(3, 1, 2) == 2);   // half up

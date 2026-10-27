@@ -45,7 +45,7 @@ public:
     std::map<std::string, std::string, std::less<>> prefs;
     std::string patches, digidrums, dmaBanks;
     std::string systemLang = "en";       // systemLanguage
-    std::vector<TextFile> languages;     // .po files, the user's and the installed ones (D-283)
+    std::vector<TextFile> languages;     // .po files, the user's and the installed ones
     std::vector<TextFile> folderFiles;   // files written when the folder was last opened
     int foldersOpened = 0;
     Recorder rec;                     // recorder state and kept take
@@ -191,7 +191,7 @@ inline void alertButton(pluginui::MainWindow& w, size_t index) {
     press(w, centre(a->button(index).bounds()));
 }
 
-// A setting of the Settings window (Options > Settings..., D-430) as the Options submenu that held it: its label,
+// A setting of the Settings window (Options > Settings...) as the Options submenu that held it: its label,
 // greyed out with its button's tooltip as the reason, the entries of its menu and the checked one. Opens the window.
 inline gemui::MenuItem setting(pluginui::MainWindow& w, std::string_view id) {
     pluginui::SettingsWindow& s = w.settingsWindow();

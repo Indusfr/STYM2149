@@ -4,7 +4,7 @@
 //
 // One window per track, several open at the same time (openScope, closeScope): 360 × 140 canvas inside a 2 px line,
 // 2 px green (#0A0) trace of the last 128 points of the track's oscilloscope, y = 70 - v × 126 (drawBigScope).
-// Title "SCOPE - " followed by the track name (D-212; scopeName, refreshScopeTitle: "TRACK 3" without a name, A, B, C,
+// Title "SCOPE - " followed by the track name (scopeName, refreshScopeTitle: "TRACK 3" without a name, A, B, C,
 // Digi in 3-channel mode). An opened window goes to (240 + 24 n, 200 + 24 n), n being the number of oscilloscope
 // windows already open; once closed, it is forgotten (the prototype removed it from the page).
 #pragma once
@@ -40,7 +40,7 @@ public:
 
     explicit ScopeWindow(int track);
     int track() const noexcept { return track_; }
-    // Title: "SCOPE - " and the track name (D-212; the prototype showed "SCOPE-" with the name right after it, the
+    // Title: "SCOPE - " and the track name (the prototype showed "SCOPE-" with the name right after it, the
     // text of .tt being a flex container that drops the space).
     void setName(const std::string& name);
     void setPoints(std::span<const float> points) { scope_.setPoints(points); }

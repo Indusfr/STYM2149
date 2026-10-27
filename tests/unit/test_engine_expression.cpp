@@ -1,4 +1,4 @@
-// STYM2149 — voice engine: MIDI expression (D-432). Targets of the bend, the wheel and the aftertouch (channel and
+// STYM2149 — voice engine: MIDI expression. Targets of the bend, the wheel and the aftertouch (channel and
 // polyphonic pressure), MPE notes with their own bend, pressure and slide (CC74).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

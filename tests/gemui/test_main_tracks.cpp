@@ -1,5 +1,5 @@
-// STYM2149 — gemui tests: main window keyboard Latch (P147), a held key let go when the sequencer cuts its note
-// (D-431), the track tabs' context menu, Copy settings and Paste settings (P230, P231), and tracks switched off from
+// STYM2149 — gemui tests: main window keyboard Latch, a held key let go when the sequencer cuts its note,
+// the track tabs' context menu, Copy settings and Paste settings, and tracks switched off from
 // their tabs during playback, heard through the driver.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -52,8 +52,7 @@ void tabMenuPick(pluginui::MainWindow& w, int track, int item) {
     pickItem(w, item);
 }
 
-// The Send of the delay goes with the pan: a setting of the Mixer (D-299), like the right side of a stereo DMA sample
-// (D-459).
+// The Send of the delay goes with the pan: a setting of the Mixer, like the right side of a stereo DMA sample.
 constexpr bool notCopied(Track t) {
     return t == Track::On || t == Track::Pan || t == Track::Mute || t == Track::Solo || t == Track::Send ||
            t == Track::LevelR || t == Track::MuteR || t == Track::SoloR || t == Track::Link;
@@ -114,7 +113,7 @@ struct Playback {
 
 }  // namespace
 
-TEST_CASE("Latch: keys stay held until pressed again, one mouse note at a time, released when Latch goes off (P147)",
+TEST_CASE("Latch: keys stay held until pressed again, one mouse note at a time, released when Latch goes off",
           "[ui][kbd][latch]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -176,7 +175,7 @@ TEST_CASE("Latch: keys stay held until pressed again, one mouse note at a time, 
     CHECK(h.take() == std::vector<Midi>{{kNoteOn, 40, 127}, {kNoteOff, 40, 0}});
 }
 
-TEST_CASE("Latch: a held key lets go when the sequencer cuts its note, and plays again (D-431)", "[ui][kbd][latch]") {
+TEST_CASE("Latch: a held key lets go when the sequencer cuts its note, and plays again", "[ui][kbd][latch]") {
     // Indus, 25/10/2026 19:41: a latched key stayed lit once the sequencer, started with Space, took its voice.
     UiHost h;
     pluginui::MainWindow w(h);
@@ -216,7 +215,7 @@ TEST_CASE("Latch: a held key lets go when the sequencer cuts its note, and plays
     CHECK(h.take().empty());
 }
 
-TEST_CASE("SYSTEM Note line: the newest note's period, back to \"-\" once no voice sounds (D-440)", "[ui][note]") {
+TEST_CASE("SYSTEM Note line: the newest note's period, back to \"-\" once no voice sounds", "[ui][note]") {
     // Indus, 26/10/2026 04:00-04:02: the period stayed shown with no note playing; the line stays, as at launch.
     UiHost h;
     pluginui::MainWindow w(h);
@@ -247,7 +246,7 @@ TEST_CASE("SYSTEM Note line: the newest note's period, back to \"-\" once no voi
     CHECK(w.noteReadout() == "TP=142 -> 880.28 Hz");
 }
 
-TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; disabled in 3ch (P230)", "[ui][tracks]") {
+TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; disabled in 3ch", "[ui][tracks]") {
     UiHost h;
     pluginui::MainWindow w(h);
     const auto tab = w.rectOf("tab2");
@@ -285,7 +284,7 @@ TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; dis
     CHECK(h3.state.trackNames[1].empty());
 }
 
-TEST_CASE("Copy settings and Paste settings: patch, arpeggio, level and gate, not on/pan/mute/solo/send (P231)",
+TEST_CASE("Copy settings and Paste settings: patch, arpeggio, level and gate, not on/pan/mute/solo/send",
           "[ui][tracks]") {
     UiHost h;
     // Track 1: every setting away from its default.
@@ -348,7 +347,7 @@ TEST_CASE("Demo pattern in Authentic 3ch: tracks switched off during a tied note
         CAPTURE(k.keep, k.at);
         UiHost h;
         pluginui::MainWindow w(h);
-        w.demoPattern();  // File > Demo pattern (D-301); empty tracks: no confirmation
+        w.demoPattern();  // File > Demo pattern; empty tracks: no confirmation
         REQUIRE(h.state.seq.cur().lane(1).pat[2] == 12);
         Playback g(h);
         g.block(true);

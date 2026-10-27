@@ -1,5 +1,5 @@
-// STYM2149 — buzzer (M6, B7, D-152): envelope tuned to the note (N / D ratio, fine tune), YM Pad, envelope period
-// driven by the pitch written in 3-channel mode too. The tuning and YM Pad are Sync Buzzer settings (D-231).
+// STYM2149 — buzzer: envelope tuned to the note (N / D ratio, fine tune), YM Pad, envelope period
+// driven by the pitch written in 3-channel mode too. The tuning and YM Pad are Sync Buzzer settings.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -104,7 +104,7 @@ double rms(const std::vector<float>& x) {
 }  // namespace
 
 TEST_CASE("Buzzer: tuned envelope period, sawtooths and triangles", "[engine][buzzer]") {
-    // 2 MHz: a sawtooth cycle lasts 256 · EP clock periods (D-010), a triangle twice as long.
+    // 2 MHz: a sawtooth cycle lasts 256 · EP clock periods, a triangle twice as long.
     CHECK(ymengine::envelopeRamps(8) == 1);
     CHECK(ymengine::envelopeRamps(12) == 1);
     CHECK(ymengine::envelopeRamps(10) == 2);
@@ -133,7 +133,7 @@ TEST_CASE("Buzzer: the tuned envelope follows the note, its ratio and its fine t
         CHECK(r.e.voice(0).envPeriod == tuned(57, k.ratio, k.shape));
     }
 
-    // The sound (Sync Buzzer, D-231): the timer restarts the sawtooth of 1.5 times A3 (330 Hz) at the note, so the
+    // The sound (Sync Buzzer): the timer restarts the sawtooth of 1.5 times A3 (330 Hz) at the note, so the
     // sound repeats at A3: harmonics of 220 Hz only, the third (660 Hz, the second of the sawtooth) strong where a
     // sawtooth at the note (1 / 1) gives about a third of the fundamental.
     auto spectrum = [](int n, int d) {
@@ -194,7 +194,7 @@ TEST_CASE("Buzzer: in 3-channel mode, R11-R12 get the tuned period and that of t
     r.run(480);
     CHECK(r.lastEnvPeriod() == tuned(57, 0.5));
 
-    // Matrix, table to the envelope (D-148): the period halved at the octave is written (16-channel and 3-channel).
+    // Matrix, table to the envelope: the period halved at the octave is written (16-channel and 3-channel).
     Rig m(ymengine::VoiceMode::Authentic3);
     ymengine::TrackParams t;
     t.mix.enabled = true;
@@ -256,7 +256,7 @@ TEST_CASE("Buzzer: YM Pad, tone at period 0 under the envelope, about -6 dB", "[
 }
 
 TEST_CASE("Buzzer: tuning and YM Pad belong to the Sync Buzzer, Chip Voice keeps the track's period (fourth DAW test, "
-          "item 33, D-231)",
+          "item 33)",
           "[engine][buzzer]") {
     // Chip Voice with the Sync Buzzer settings left in the patch: the envelope period and the tone of the track.
     Rig r(ymengine::VoiceMode::Authentic3);
@@ -295,7 +295,7 @@ TEST_CASE("Buzzer: tuning and YM Pad belong to the Sync Buzzer, Chip Voice keeps
 }
 
 TEST_CASE("Env source: neither square nor noise, the envelope's own waveform at its frequency, in 16 ch and "
-          "Authentic 3ch (fifth DAW test, item 48, D-246)",
+          "Authentic 3ch (fifth DAW test, item 48)",
           "[engine][buzzer][3ch]") {
     for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {
         CAPTURE(int(mode));

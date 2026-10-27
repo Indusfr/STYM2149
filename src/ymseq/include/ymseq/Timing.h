@@ -2,7 +2,7 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Ticks timing (M6, Q3, D-149): a line lasts Speed replay ticks, plus the groove's ticks for that line (values taken
+// Ticks timing (Q3): a line lasts Speed replay ticks, plus the groove's ticks for that line (values taken
 // in a loop). Keyboard input of the speed and the groove, and the tempo that follows from them.
 #pragma once
 #include <array>

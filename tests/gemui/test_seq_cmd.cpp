@@ -1,9 +1,9 @@
-// STYM2149 — CMD row of the Step Sequencer (M6, B4, D-150): "CMD row" preference of the Resolution menu, box of the
+// STYM2149 — CMD row of the Step Sequencer: "CMD row" preference of the Resolution menu, box of the
 // commands of a step (one row each with its value and On/Off, Cancel by default: tenth DAW test, items 121 and 122; the
-// effects of item 130, D-338), right-click eraser, row kept as long as a command is written; the rows of their own of
+// effects of item 130), right-click eraser, row kept as long as a command is written; the rows of their own of
 // the eleventh DAW test (VIB, BPM, ENV, DLY, CUT: items 132, 133 and 138 to 140) and of the twelfth (LFO, MOD, ARP,
 // the restart of ENV, the BPM row of the pattern, SMP, TUN, crossed cells: items 142 to 146, 150, 152, 153); Env
-// entries of the SRC row (D-277).
+// entries of the SRC row.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -170,7 +170,7 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
     // By default (ninth DAW test, item 117): the row is shown, after the rows of the timing and before PAN
-    // (thirteenth DAW test, item 166, D-375).
+    // (thirteenth DAW test, item 166).
     REQUIRE(g.laneRect(0, SeqLane::Cmd).w > 0);
     const gemui::Rect src = g.laneRect(0, SeqLane::Cmd);
     CHECK(g.laneRect(0, SeqLane::Gat).y < src.y);
@@ -212,7 +212,7 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
     CHECK(g.laneRect(0, SeqLane::Pnr).y > cell.y);
     CHECK(g.laneText(3, SeqLane::Cmd) == "-");
 
-    // The box of the step's commands (tenth DAW test, items 121 and 122, D-329, D-330): a row for each, in this order,
+    // The box of the step's commands (tenth DAW test, items 121 and 122): a row for each, in this order,
     // Cancel the default button.
     press(w, centre(cell));
     {
@@ -227,7 +227,7 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
             CHECK(b.onOff(k).text() == "Off");
             CHECK(ymengine::seqCmdInBox(k));
         }
-        // Arpeggio and Pitch Slide retired (items 131 and 135, D-340, D-344); Vibrato, BPM, Envelope Shape, Note Delay
+        // Arpeggio and Pitch Slide retired (items 131 and 135); Vibrato, BPM, Envelope Shape, Note Delay
         // and Note Cut in rows of their own (items 132, 133 and 138 to 140); Envelope Restart, Sample Offset and Fine
         // Tune too (twelfth DAW test, items 146, 152 and 153).
         CHECK(names ==
@@ -249,7 +249,7 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
         CHECK(b.onOff(SeqCmd::VolSlide).text() == "On");
         CHECK(b.field(SeqCmd::VolSlide).text() == "4");
         CHECK(b.direction(SeqCmd::VolSlide).text() == "Down");
-        b.direction(SeqCmd::VolSlide).click();  // up 4 (D-391)
+        b.direction(SeqCmd::VolSlide).click();  // up 4
         CHECK(b.direction(SeqCmd::VolSlide).text() == "Up");
         CHECK(b.entry(SeqCmd::VolSlide).value == 0x40);
         CHECK(b.field(SeqCmd::Speed).onCommit("40"));  // brought down to 31
@@ -366,11 +366,11 @@ TEST_CASE("CMD row: the commands of the rows of their own stay out of it (eleven
     CHECK(g.laneText(3, SeqLane::Vib) == "Off");
 }
 
-TEST_CASE("CMD box: slides (tenth DAW test, item 130, D-338)", "[ui][seq][commands]") {
+TEST_CASE("CMD box: slides (tenth DAW test, item 130)", "[ui][seq][commands]") {
     TestHost h;
     h.editExtras([](plugin::NonParamState& st) {
         st.seq.cur().edit(0).mix[6] = 7;  // Tone+Noise+Env: all three
-        // The Volume Slide of an older project (the box shows it only where it is written, D-393): down a quarter step.
+        // The Volume Slide of an older project (the box shows it only where it is written): down a quarter step.
         st.seq.cur().edit(0).setCmd(4, seqCmd(SeqCmd::VolSlide, 0x01));
     });
     MainWindow w(h);
@@ -391,7 +391,7 @@ TEST_CASE("CMD box: slides (tenth DAW test, item 130, D-338)", "[ui][seq][comman
             CHECK(b.entry(k).on == (k == SeqCmd::VolSlide));
             CHECK(b.shown(k));
         }
-        // A slide: a speed from 0 (stop) to 15 and its direction, x0 up or 0y down (D-391).
+        // A slide: a speed from 0 (stop) to 15 and its direction, x0 up or 0y down.
         for (const SeqCmd k : {SeqCmd::VolSlide, SeqCmd::EnvSlide, SeqCmd::NoiseSlide}) {
             CHECK(b.slider(k).min() == 0);
             CHECK(b.slider(k).max() == 15);
@@ -403,7 +403,7 @@ TEST_CASE("CMD box: slides (tenth DAW test, item 130, D-338)", "[ui][seq][comman
         CHECK(b.field(SeqCmd::EnvSlide).onCommit("40"));  // brought down to 15
         CHECK(b.slider(SeqCmd::EnvSlide).value() == 15);
         CHECK(b.entry(SeqCmd::EnvSlide).value == 0xF0);
-        // 16 channels: the Buzzer Slide's button opens its Curve menu (D-394), Down picked there.
+        // 16 channels: the Buzzer Slide's button opens its Curve menu, Down picked there.
         b.direction(SeqCmd::EnvSlide).click();
         REQUIRE(labels(w) == std::vector<std::string>{"Up", "Down", "---", "Curve"});
         press(w, centre(menu(w).itemRect(1)));
@@ -420,7 +420,7 @@ TEST_CASE("CMD box: slides (tenth DAW test, item 130, D-338)", "[ui][seq][comman
     CHECK_FALSE(l.cmdAt(SeqCmd::NoiseSlide, 4));
     CHECK(g.laneText(4, SeqLane::Cmd) == "MUL");
 
-    // An xy written with both digits (D-385, or an imported Axy): its speed is their difference, kept until touched.
+    // An xy written with both digits (or an imported Axy): its speed is their difference, kept until touched.
     h.editExtras([](plugin::NonParamState& st) { st.seq.cur().edit(0).setCmd(5, seqCmd(SeqCmd::EnvSlide, 0x41)); });
     w.tick(5);
     press(w, centre(g.laneRect(5, SeqLane::Cmd)));
@@ -444,13 +444,13 @@ TEST_CASE("CMD box: slides (tenth DAW test, item 130, D-338)", "[ui][seq][comman
     }
 }
 
-TEST_CASE("VIB row: shown with the vibrato of the track On, a step starts or stops it (item 132, D-341)",
+TEST_CASE("VIB row: shown with the vibrato of the track On, a step starts or stops it (item 132)",
           "[ui][seq][commands]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
-    // Vibrato On by default (D-279): the row is shown, between GEN and SLD.
+    // Vibrato On by default: the row is shown, between GEN and SLD.
     REQUIRE(h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] != 0.0F);
     const gemui::Rect cell = g.laneRect(2, SeqLane::Vib);
     REQUIRE(cell.w > 0);
@@ -479,7 +479,7 @@ TEST_CASE("VIB row: shown with the vibrato of the track On, a step starts or sto
     CHECK(ctrl(w, U'z'));
     CHECK(lane0(h).cmdAt(SeqCmd::Vibrato, 2) == seqCmd(SeqCmd::Vibrato, 1));
 
-    // Vibrato Off on the track: the row goes with the V01 written, which it keeps (bug of 24/10/2026, D-380).
+    // Vibrato Off on the track: the row goes with the V01 written, which it keeps (bug of 24/10/2026).
     h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 0;
     w.tick(10);
     CHECK(g.laneRect(2, SeqLane::Vib).w == 0);
@@ -492,7 +492,7 @@ TEST_CASE("VIB row: shown with the vibrato of the track On, a step starts or sto
 }
 
 TEST_CASE("BPM row: the pattern's, under VOL behind a separator, in the standalone application only (items 133, "
-          "150, D-342, D-359)",
+          "150)",
           "[ui][seq][commands]") {
     TestHost h;
     h.alone = false;
@@ -509,7 +509,7 @@ TEST_CASE("BPM row: the pattern's, under VOL behind a separator, in the standalo
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
     REQUIRE(g.laneRect(2, SeqLane::Bpm).w > 0);
-    // Under VOL, a separator between them (4 px of black between two 2 px lines, D-458).
+    // Under VOL, a separator between them (4 px of black between two 2 px lines).
     const gemui::Rect vol = g.laneRect(2, SeqLane::Vol);
     CHECK(g.laneRect(2, SeqLane::Bpm).y == vol.bottom() + 2 + 4 + 2);
     CHECK(g.laneText(2, SeqLane::Bpm) == "140");
@@ -563,7 +563,7 @@ TEST_CASE("BPM row: the pattern's, under VOL behind a separator, in the standalo
     CHECK_FALSE(g.laneCrossed(6, SeqLane::Bpm));
 }
 
-TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138, D-347)", "[ui][seq][commands]") {
+TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138)", "[ui][seq][commands]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Chip);
     h.values[size_t(plugin::paramIndex(0, plugin::Track::VolMode))] = 0;
@@ -597,7 +597,7 @@ TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138, 
     CHECK(cell.y > g.laneRect(1, SeqLane::Fx).y);
     CHECK(cell.y < g.laneRect(1, SeqLane::Vib).y);
 
-    // The menu: No change, then the shapes with their pictures, then Restart (twelfth DAW test, item 146, D-355).
+    // The menu: No change, then the shapes with their pictures, then Restart (twelfth DAW test, item 146).
     press(w, centre(cell));
     const std::vector<std::string> want = {"No change", "---", "8", "9", "A", "B", "C", "D", "E", "F", "---",
                                            "Restart"};
@@ -648,7 +648,7 @@ TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138, 
     menu(w).items()[11].sub[0].pick();
     w.desktop().closePopups();
     CHECK_FALSE(lane0(h).hasCmd(1));
-    // A right click opens the ENVELOPE settings and keeps the shape and the restart (D-392; before: the eraser).
+    // A right click opens the ENVELOPE settings and keeps the shape and the restart (before: the eraser).
     h.editExtras([](plugin::NonParamState& st) {
         st.seq.cur().edit(0).setCmd(1, seqCmd(SeqCmd::Shape, 10));
         st.seq.cur().edit(0).setCmd(1, seqCmd(SeqCmd::Retrig, 0));
@@ -668,7 +668,7 @@ TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138, 
     CHECK(g.laneCrossed(1, SeqLane::Env));
 }
 
-TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 and 140, D-348, D-349)",
+TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 and 140)",
           "[ui][seq][commands]") {
     TestHost h;
     h.state.global.timing = ymengine::SeqTiming::Ticks;
@@ -679,7 +679,7 @@ TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 an
     const gemui::Rect dly = g.laneRect(4, SeqLane::Dly), cut = g.laneRect(4, SeqLane::NoteCut);
     REQUIRE(dly.w > 0);
     REQUIRE(cut.w > 0);
-    // DLY between CND and RTG, CUT after GAT (thirteenth DAW test, item 166, D-375).
+    // DLY between CND and RTG, CUT after GAT (thirteenth DAW test, item 166).
     CHECK(dly.y > g.laneRect(4, SeqLane::Cnd).y);
     CHECK(dly.y < g.laneRect(4, SeqLane::Rtg).y);
     CHECK(cut.y > g.laneRect(4, SeqLane::Gat).y);
@@ -733,7 +733,7 @@ TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 an
 }
 
 TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has none on (twelfth DAW test, items 142 "
-          "to 145, D-351 to D-354, D-380)",
+          "to 145)",
           "[ui][seq][commands]") {
     TestHost h;
     h.state.tracks[0].patch.lfo.on = true;
@@ -743,7 +743,7 @@ TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has no
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
     // TUN with the pitch, above GEN; after SRC (ENV hidden here), ARP, VIB, LFO, MOD, then SLD (thirteenth DAW test,
-    // item 166, D-375).
+    // item 166).
     for (const SeqLane r : {SeqLane::Afl, SeqLane::Vib, SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun})
         REQUIRE(g.laneRect(2, r).w > 0);
     CHECK(g.laneRect(2, SeqLane::Tun).y < g.laneRect(2, SeqLane::Fx).y);
@@ -784,7 +784,7 @@ TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has no
           "LFO: switch the LFO of the track on or off from this step\nOn: The LFO of this track is off (Modulation "
           "window)");
     // The LFO, the modulation table and the arpeggiator of the track off: their rows go with the values written,
-    // which they keep (bug of 24/10/2026, D-380).
+    // which they keep (bug of 24/10/2026).
     h.editExtras([](plugin::NonParamState& st) {
         st.tracks[0].patch.lfo.on = false;
         st.tracks[0].patch.ornamentOn = false;
@@ -822,7 +822,7 @@ TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has no
 }
 
 TEST_CASE("SMP and TUN rows: the sample offset of DMA tracks, the fine tune in cents; DLY crossed without a note "
-          "(twelfth DAW test, items 145, 152, 153, D-354, D-361, D-362)",
+          "(twelfth DAW test, items 145, 152, 153)",
           "[ui][seq][commands]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(plugin::Global::Computer))] = 1;  // STE
@@ -833,7 +833,7 @@ TEST_CASE("SMP and TUN rows: the sample offset of DMA tracks, the fine tune in c
     const gemui::Rect smp = g.laneRect(3, SeqLane::Smp), tun = g.laneRect(3, SeqLane::Tun);
     REQUIRE(smp.w > 0);
     REQUIRE(tun.w > 0);
-    // SMP with the rows of the sound, after SRC, before SLD (thirteenth DAW test, item 166, D-375).
+    // SMP with the rows of the sound, after SRC, before SLD (thirteenth DAW test, item 166).
     CHECK(smp.y > g.laneRect(3, SeqLane::Mix).y);
     CHECK(smp.y < g.laneRect(3, SeqLane::Slide).y);
 
@@ -908,7 +908,7 @@ TEST_CASE("SMP and TUN rows: the sample offset of DMA tracks, the fine tune in c
     CHECK_FALSE(g.laneCrossed(3, SeqLane::Dly));
 }
 
-TEST_CASE("Control rows in the order of what they do to the note (thirteenth DAW test, item 166, D-375)",
+TEST_CASE("Control rows in the order of what they do to the note (thirteenth DAW test, item 166)",
           "[ui][seq][commands]") {
     TestHost h;
     h.state.instruments[0].used = true;  // INS
@@ -939,7 +939,7 @@ TEST_CASE("Control rows in the order of what they do to the note (thirteenth DAW
                                         SeqLane::Bpm});
 }
 
-TEST_CASE("Impossible cells crossed from the sound of the step, empty ones too (thirteenth DAW test, item 165, D-374)",
+TEST_CASE("Impossible cells crossed from the sound of the step, empty ones too (thirteenth DAW test, item 165)",
           "[ui][seq][commands]") {
     TestHost h;
     h.state.instruments[0].used = true;  // the INS row
@@ -1008,7 +1008,7 @@ TEST_CASE("Impossible cells crossed from the sound of the step, empty ones too (
     }
 }
 
-TEST_CASE("SRC row: the Env entries after a separator, shown as E, TE, NE and TNE (sixth DAW test, item 79, D-277)",
+TEST_CASE("SRC row: the Env entries after a separator, shown as E, TE, NE and TNE (sixth DAW test, item 79)",
           "[ui][seq]") {
     TestHost h;
     MainWindow w(h);
@@ -1033,7 +1033,7 @@ TEST_CASE("SRC row: the Env entries after a separator, shown as E, TE, NE and TN
     CHECK(ctrl(w, U'z'));  // the menu's pick is one undo step
 }
 
-TEST_CASE("CMD box: the Curve of the Buzzer and Noise slides in 16 channels, Up/Down in 3 channels (D-394)",
+TEST_CASE("CMD box: the Curve of the Buzzer and Noise slides in 16 channels, Up/Down in 3 channels",
           "[ui][seq][commands]") {
     TestHost h;
     h.editExtras([](plugin::NonParamState& st) {
@@ -1217,7 +1217,7 @@ TEST_CASE("CMD box and cell menus: a track or pattern changed under them is not 
     CHECK(h.state.seq.patterns[0].lane(1) == t2);
 }
 
-TEST_CASE("PAN box: the centre shows its 0 (D-384)", "[ui][seq][commands]") {
+TEST_CASE("PAN box: the centre shows its 0", "[ui][seq][commands]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();
@@ -1245,8 +1245,8 @@ TEST_CASE("PAN box: the centre shows its 0 (D-384)", "[ui][seq][commands]") {
     CHECK(ValueBox(w).field().text() == "0");
 }
 
-TEST_CASE("CMD box: a slide shows where it can move a note, from the GEN and SRC cells too (D-386); Axy only "
-          "where written (D-393)",
+TEST_CASE("CMD box: a slide shows where it can move a note, from the GEN and SRC cells too; Axy only "
+          "where written",
           "[ui][seq][commands]") {
     TestHost h;  // Chip Voice, Tone at a fixed volume
     MainWindow w(h);
@@ -1303,7 +1303,7 @@ TEST_CASE("CMD box: a slide shows where it can move a note, from the GEN and SRC
     CHECK(shown(2) == Shown{true, false, false});  // an Axy of an older project, to be switched off
 }
 
-TEST_CASE("CRV row: shown while an SLD cell is lit, or a curve is written (D-387)", "[ui][seq][commands]") {
+TEST_CASE("CRV row: shown while an SLD cell is lit, or a curve is written", "[ui][seq][commands]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();
@@ -1331,7 +1331,7 @@ TEST_CASE("CRV row: shown while an SLD cell is lit, or a curve is written (D-387
     CHECK(g.laneRect(0, SeqLane::Gat).y == gatY);
 }
 
-TEST_CASE("VOL box: Slide glides the step to the next step's volume, drawn as a ramp (D-393)", "[ui][seq][commands]") {
+TEST_CASE("VOL box: Slide glides the step to the next step's volume, drawn as a ramp", "[ui][seq][commands]") {
     TestHost h;
     MainWindow w(h);
     w.sequencer().show();

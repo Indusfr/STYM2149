@@ -74,7 +74,7 @@ TEST_CASE("Chipdrum kit: identical to the prototype, 13 banks", "[kit]") {
     for (size_t b = 0; b < golden.size(); ++b) {
         const Golden& g = golden[b];
         INFO("bank " << g.bank);
-        // TR-606 and TR-808 of the prototype renamed TR-606-ish and TR-808-ish, like TR-909-ish (D-245).
+        // TR-606 and TR-808 of the prototype renamed TR-606-ish and TR-808-ish, like TR-909-ish.
         const std::string name = g.bank == "TR-606" || g.bank == "TR-808" ? g.bank + "-ish" : g.bank;
         CHECK(name == kKitBanks[b].name);
         for (int v = 0; v < 3; ++v) {

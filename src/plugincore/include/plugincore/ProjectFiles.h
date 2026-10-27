@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: JSON files of the File menu (preset, pattern, Song, kit) (M7, A1, D-165, D-168)
+// STYM2149 — plugincore: JSON files of the File menu (preset, pattern, Song, kit)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -13,18 +13,18 @@
 // A motif: {steps, chans: [16 × {pat, tie, ... ton, pat2-pat6, oct2-oct6, dur2-dur6}]}, each row of 256 steps.
 // The preset, the pattern and the Song are written on one line (JSON.stringify(d)), the kit indented by one space.
 //
-// Additions of STYM2149, under keys that the prototype ignores (D-165, D-168):
+// Additions of STYM2149, under keys that the prototype ignores:
 // - preset: "stym" = {v: 1, state: complete plugin state in base64}, the state that the host saves (State.h)
 //   without the recorder take; it carries everything that the fields of the prototype do not say (instruments,
 //   sequences, INS and CMD rows, extended Song, machine, DMA, Digidrums and their samples, track and sequencer
 //   settings). When reading, it wins over the fields of the prototype; a file without it (the prototype's) or from a
 //   more recent version is read field by field, on top of the current project as loadPresetObj does;
-// - motifs: "ins" and the CMD rows ("cmd" for Xyz, "cmdS", "cmdR", "cmdZ", "cmdT", "cmdV": D-330; "cmdA", "cmdP",
-//   "cmdD", "cmdC", "cmdB", "cmdN", "cmdE", "cmdO", "cmdF": D-338) of the tracks that have them; a file written
-//   before D-330 kept every command under "cmd", each goes to the row of its kind; Xyz and Pxy, retired (D-340,
-//   D-344), are dropped;
-// - Song: "kind" ("rest", "noteoff", "loop"), "arg" and "restart" of the entries that have them (D-158).
-// Version of the additions (B6, D-174): the "stym" key of the preset carries "v"; a pattern, a Song or a Patches
+// - motifs: "ins" and the CMD rows ("cmd" for Xyz, "cmdS", "cmdR", "cmdZ", "cmdT", "cmdV"; "cmdA", "cmdP",
+//   "cmdD", "cmdC", "cmdB", "cmdN", "cmdE", "cmdO", "cmdF") of the tracks that have them; an older file
+//   kept every command under "cmd", each goes to the row of its kind; Xyz and Pxy, retired,
+//   are dropped;
+// - Song: "kind" ("rest", "noteoff", "loop"), "arg" and "restart" of the entries that have them.
+// Version of the additions: the "stym" key of the preset carries "v"; a pattern, a Song or a Patches
 // library that carries additions ends with "stym" = {v: 1} (without additions, the file stays the prototype's). A
 // more recent version is reported when reading, which takes what it knows.
 // Reading clamps everything (sanitize) and completes the short rows (padLane: old 64-step format).
@@ -48,18 +48,18 @@ namespace stym::plugin {
 enum class FileKind : uint8_t { Preset, Pattern, Song, Kit, Patches };
 inline constexpr int kFileKinds = 5;
 
-// Version of the STYM2149 additions in the JSON files ("stym" key, B6, D-174).
+// Version of the STYM2149 additions in the JSON files ("stym" key).
 inline constexpr int kStymFileVersion = 1;
 // "stym" key = {v: kStymFileVersion} appended at the end of the document.
 void markStymFile(json::Value& doc);
 // Document whose "stym" key comes from a more recent version of STYM2149.
 bool newerStymFile(const json::Value& doc) noexcept;
 
-// Name offered when saving: fileNames of the prototype and name of its Patches export, without PRISM (D-060).
+// Name offered when saving: fileNames of the prototype and name of its Patches export, without PRISM.
 std::string_view defaultFileName(FileKind k) noexcept;
 // ensureJson: edge spaces removed, ".json" appended if missing (case ignored); empty if the name is empty.
 std::string ensureJson(std::string_view name);
-// Same rule for the exports (M7): the first extension (in lower case) appended if the name ends with none of them.
+// Same rule for the exports: the first extension (in lower case) appended if the name ends with none of them.
 std::string ensureExtension(std::string_view name, std::initializer_list<std::string_view> extensions);
 
 // Preset: the whole project.

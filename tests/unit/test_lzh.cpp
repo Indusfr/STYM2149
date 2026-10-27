@@ -1,4 +1,4 @@
-// STYM2149 — LZH decompression (port of pylzh, D-043)
+// STYM2149 — LZH decompression (port of pylzh)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

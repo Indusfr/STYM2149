@@ -14,7 +14,7 @@
 // The host can create and destroy the plugin outside the JUCE message thread (LV2 on Linux: the host's thread, a
 // message thread of the plugin's own): the timer is a separate object, detached on destruction (ServiceTimer).
 // clap_properties (clap-juce-extensions) says whether the instance is a CLAP: after a state is read back, only the
-// CLAP must ask the host to read the parameter values again (D-066).
+// CLAP must ask the host to read the parameter values again.
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <clap-juce-extensions/clap-juce-extensions.h>
@@ -40,7 +40,7 @@ class StymProcessor final : public juce::AudioProcessor,
                             public clap_juce_extensions::clap_properties,
                             private ParamListener {
 public:
-    // Output buses: main stereo, then one mono output per track and per chip, disabled by default (D-062). Bus
+    // Output buses: main stereo, then one mono output per track and per chip, disabled by default. Bus
     // indices: 0 main, 1-16 tracks, 17-18 chips.
     static constexpr int kTrackBusFirst = 1;
     static constexpr int kChipBusFirst = kTrackBusFirst + kTracks;
@@ -95,7 +95,7 @@ public:
     // empties it when it opens.
     bool popHostNote(std::array<uint8_t, 3>& message) noexcept;
     void dropHostNotes() noexcept;
-    // MIDI learn (D-146): map from the preferences (JSON text of midiMap), read when the plugin is created so that
+    // MIDI learn: map from the preferences (JSON text of midiMap), read when the plugin is created so that
     // the learned CCs and notes are caught even with the editor closed; keys and armed control given by the editor;
     // caught messages, for the editor (a single reader, full queue: the following ones are lost, the editor empties it
     // when it opens).
@@ -104,7 +104,7 @@ public:
     void disarmMidiLearn() noexcept { capture_.disarm(); }
     bool popLearnMidi(std::array<uint8_t, 3>& message) noexcept;
     void dropLearnMidi() noexcept;
-    // Register recorder (D-157), editor: arming on a chip, stop (Driver), take kept with the project (header and
+    // Register recorder, editor: arming on a chip, stop (Driver), take kept with the project (header and
     // number of frames), clearing. A take finished by the audio thread is collected by the message thread's timer; a
     // take without frames does not replace the previous one.
     bool armRecorder(int chip);
@@ -115,19 +115,19 @@ public:
         int chip = 0;
     };
     TakeInfo takeInfo() const;
-    RegisterTake recordedTake() const;  // copy of the kept take (export, B3)
+    RegisterTake recordedTake() const;  // copy of the kept take (export)
     void clearTake();
-    // YM Player (M7, A2, D-169), message thread: file read then loaded, stopped (alert of the refusal, empty if it is
+    // YM Player, message thread: file read then loaded, stopped (alert of the refusal, empty if it is
     // loaded), playback, back to the start, subsong, closing.
     std::string loadYm(std::span<const uint8_t> bytes, std::string fileName);
     void ymPlay(bool on);
     void ymRewind();
     void ymSubsong(int subsong);
     void ymClose();
-    // Whole project replaced from the editor (File > Load > Preset, M7): parameters changed by gestures,
+    // Whole project replaced from the editor (File > Load > Preset): parameters changed by gestures,
     // non-automatable state taken like a state read back; the recorder's take is kept.
     void loadProject(const ParamValues& values, const NonParamState& extras);
-    // Default sequencer clock: Host sync in a host, Free run in Standalone (D-114).
+    // Default sequencer clock: Host sync in a host, Free run in Standalone.
     ymengine::SeqClock defaultSeqClock() const noexcept;
     // Engine status: true if a new one arrived since the previous call (read in engineStatus()). One reader.
     bool updateEngineStatus() noexcept { return engineStatus_.update(); }
@@ -154,7 +154,7 @@ private:
     ParamValues values_{};      // plain values of the block, read from the host parameters at its start
     std::vector<MidiEvent> midi_;  // events of the block: 4096 reserved by the constructor, never grown
     uint16_t preparedOutputs_ = 0;  // track outputs enabled at prepareToPlay (bit t = track t); the others stay silent
-    std::vector<float> click_;  // metronome of the block (D-226), as long as the longest block announced
+    std::vector<float> click_;  // metronome of the block, as long as the longest block announced
 
     // On-screen playing, from the editor to the audio thread.
     juce::AbstractFifo screenFifo_{256};
@@ -182,7 +182,7 @@ private:
     std::array<uint64_t, ymengine::kDigidrumSlots> sampleVersion_{};
     std::array<uint64_t, ymengine::kDmaSlots> dmaVersion_{};
     std::atomic<uint64_t> extrasVersion_{1};
-    RegisterTake take_;  // last take of the recorder (D-157), under controlLock_
+    RegisterTake take_;  // last take of the recorder, under controlLock_
 
     pluginui::EditorSession session_;  // message thread
 

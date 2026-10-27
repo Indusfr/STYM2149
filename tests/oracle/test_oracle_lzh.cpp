@@ -1,4 +1,4 @@
-// STYM2149 — LZH decompression: port of pylzh (ymio, D-043) against the AtariAudio 1.26 decompressor
+// STYM2149 — LZH decompression: port of pylzh (ymio) against the AtariAudio 1.26 decompressor
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: Patches library, named track sounds (D-141)
+// STYM2149 — plugincore: Patches library, named track sounds
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -7,7 +7,7 @@
 // The library is shared by all projects: a JSON file next to the preferences file, in the export format of the
 // prototype ({"kind": "patchlib", "patches": [...]}, which its Import button reads back).
 //
-// Units and keys of the prototype in the file: EP = chip period / 32 (D-021; a decimal number keeps the exact
+// Units and keys of the prototype in the file: EP = chip period / 32 (a decimal number keeps the exact
 // period), level and gate from 0 to 1, flags as 0 / 1. The keys that STYM2149 does not know stay in the entry and
 // go back out unchanged.
 #pragma once
@@ -46,7 +46,7 @@ PatchChange patchChange(const PatchEntry& e, const NonParamState& state, int tra
 
 // Library file. Reading also accepts a bare array (the localStorage key of the prototype) and ignores entries
 // without a name or without a patch; nullopt if the text is not a library. `newer`: "stym" key of a more recent
-// version (B6, D-174). Writing adds the "stym" key when a patch carries a STYM2149 key.
+// version. Writing adds the "stym" key when a patch carries a STYM2149 key.
 std::optional<std::vector<PatchEntry>> parsePatchLibrary(std::string_view text, std::string* error = nullptr,
                                                          bool* newer = nullptr);
 std::string dumpPatchLibrary(const std::vector<PatchEntry>& patches);

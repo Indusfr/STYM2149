@@ -1,4 +1,4 @@
-// STYM2149 — plugin with JUCE: stress test (M8, A3) and cost of an editor frame (M8, A2).
+// STYM2149 — plugin with JUCE: stress test and cost of an editor frame.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -64,7 +64,7 @@ struct Rng {
 };
 
 // Test audio thread: blocks of 1 to `maxBlock` samples and random notes, until stopped. Counts the non-finite
-// samples (all outputs) and those of the main output outside [−1, 1] (tanh, D-049).
+// samples (all outputs) and those of the main output outside [−1, 1] (tanh).
 class AudioThread {
 public:
     AudioThread(StymProcessor& p, int maxBlock, uint32_t seed) : p_(p), maxBlock_(maxBlock), rng_{seed} {
@@ -112,7 +112,7 @@ private:
 
 }  // namespace
 
-TEST_CASE("Plugin: stress test, settings changed and editor opened during playback (M8, A3)", "[processor][editor][stress]") {
+TEST_CASE("Plugin: stress test, settings changed and editor opened during playback", "[processor][editor][stress]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
     StymProcessor p;
@@ -175,7 +175,7 @@ TEST_CASE("Plugin: stress test, settings changed and editor opened during playba
 }
 
 // The message thread services the driver without pause while the audio thread swaps engines one after the other:
-// service() must not read what the audio thread owns, such as its engine slot (ThreadSanitizer in the CI, D-184).
+// service() must not read what the audio thread owns, such as its engine slot (ThreadSanitizer in the CI).
 TEST_CASE("Driver: message thread servicing during engine swaps on the audio thread", "[processor][stress]") {
     Driver d;
     ParamValues values = defaultValues();
@@ -231,7 +231,7 @@ TEST_CASE("Editor: painting by zones identical to a full paint, animated windows
         p.serviceMessageThread();
         editor.frame();
         zones = std::max(zones, w.desktop().painted().size());
-        REQUIRE(sameAsFullRepaint(editor, 1.25f));  // anti-aliased glyphs (D-201)
+        REQUIRE(sameAsFullRepaint(editor, 1.25f));  // anti-aliased glyphs
     }
     CHECK(zones > 1);  // several animated zones at once
 }
@@ -240,7 +240,7 @@ TEST_CASE("Editor: painting by zones identical to a full paint, animated windows
 // of the changed areas into the JUCE image) while the sequencer plays, common windows opened one after the other; then
 // JUCE paint of the whole editor at the zoom (upper bound: the host repaints only the changed area), on a display at
 // 100 and 125 %.
-TEST_CASE("Editor: cost of a frame (M8, A2)", "[.][bench][editor]") {
+TEST_CASE("Editor: cost of a frame", "[.][bench][editor]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
     StymProcessor p;

@@ -1,4 +1,4 @@
-// STYM2149 — plugin: GEM drawing with juce::Graphics at the screen's resolution (D-201)
+// STYM2149 — plugin: GEM drawing with juce::Graphics at the screen's resolution
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "JucePainter.h"
@@ -20,8 +20,8 @@ namespace {
 juce::Colour colour(Color c) noexcept { return juce::Colour(juce::uint32(c | 0xFF000000u)); }
 
 // Mask of the contours of pixel squares (one rectangle per run of lit pixels), filled with anti-aliasing: the
-// squares fall on whole pixels at a whole scale, so the mask is then fully opaque or empty. With `snap` (sharp pixels,
-// D-331) each edge is rounded to a whole pixel, at least one pixel apart: the mask is opaque or empty at any scale.
+// squares fall on whole pixels at a whole scale, so the mask is then fully opaque or empty. With `snap` (sharp pixels)
+// each edge is rounded to a whole pixel, at least one pixel apart: the mask is opaque or empty at any scale.
 struct Squares {
     juce::Path path;
     bool snap = false;
@@ -105,7 +105,7 @@ void JucePainter::line(gemui::Point a, gemui::Point b, Color c, int thickness) n
     }
     const juce::Rectangle<int> clip = screenClip();
     if (clip.isEmpty()) return;
-    // From the centre of the first end pixel to the centre of the last, `thickness` desktop pixels wide (D-214).
+    // From the centre of the first end pixel to the centre of the last, `thickness` desktop pixels wide.
     const float k = float(d_), w = float(std::max(1.0, std::max(1, thickness) * d_));
     juce::Path path;
     path.startNewSubPath((float(a.x) + 0.5f) * k, (float(a.y) + 0.5f) * k);
@@ -252,7 +252,7 @@ void JucePainter::glyph(int index, int x, int baseline, int px, Color c, int qua
 
 namespace {
 
-// Mask of a bitmap's outline at d screen pixels per pixel (D-404): the polygons filled with anti-aliasing, or with
+// Mask of a bitmap's outline at d screen pixels per pixel: the polygons filled with anti-aliasing, or with
 // `sharp` the screen pixels whose centre lies inside, opaque.
 JucePainter::Cache::Mask outlineMask(const gemui::Bitmap& b, double d, bool sharp) {
     const gemui::Outline& o = *b.outline;
@@ -287,7 +287,7 @@ JucePainter::Cache::Mask outlineMask(const gemui::Bitmap& b, double d, bool shar
 
 void JucePainter::bitmap(const gemui::Bitmap& b, int x, int y, Color c) noexcept {
     // Cached by the address of its bits: the icons are static data. One rectangle per run of lit pixels of a row; a
-    // bitmap with an outline (the Atari logo, D-404) is its outline filled at any d but 1, whole or not, where the
+    // bitmap with an outline (the Atari logo) is its outline filled at any d but 1, whole or not, where the
     // squares would show steps; without anti-aliasing in sharp pixels at any d.
     auto [it, fresh] = cache_.bitmaps_.try_emplace(b.bits);
     if (fresh && b.outline && d_ != 1) {

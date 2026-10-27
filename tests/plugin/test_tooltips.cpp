@@ -1,11 +1,11 @@
-// STYM2149 — plugin with JUCE: every tooltip line has its translations (M8, E1, D-185, D-283).
+// STYM2149 — plugin with JUCE: every tooltip line has its translations.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // The editor's windows are opened in several states (voice modes, machines, generators of track 1); the tooltip of
 // every widget is read (tip(), and tipAt() over the widget, every 2 pixels), with the reasons of the disabled menu
 // entries. Each line must be in the catalogue and translated by the five PO files installed with STYM2149 (languages/
-// in the sources, D-283), written only with characters of the GEM font. With STYM_TIPS_DUMP=<file>, the English lines
+// in the sources), written only with characters of the GEM font. With STYM_TIPS_DUMP=<file>, the English lines
 // are also written to that file, one per line.
 #include <catch2/catch_test_macros.hpp>
 
@@ -89,12 +89,12 @@ void collect(std::set<std::string>& lines, StymEditor& editor) {
         }
         w.desktop().closePopups();
     }
-    // The menus of the Settings window (D-430): their greyed-out values give a reason.
+    // The menus of the Settings window: their greyed-out values give a reason.
     for (const std::string_view id : pluginui::SettingsWindow::menuIds()) {
         int checked = -1;
         collectMenu(lines, w.settingsWindow().items(id, checked));
     }
-    // The Note length menu of the Step Sequencer: the values that do not fit the resolution give a reason (D-425).
+    // The Note length menu of the Step Sequencer: the values that do not fit the resolution give a reason.
     if (const auto* fig = dynamic_cast<const gemui::Button*>(w.sequencer().widgetOf("seqFig")); fig && fig->onClick) {
         fig->onClick();
         if (const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().firstPopup()))
@@ -105,7 +105,7 @@ void collect(std::set<std::string>& lines, StymEditor& editor) {
 
 }  // namespace
 
-TEST_CASE("Tooltips: every line is translated, with characters of the GEM font (D-185)", "[editor][tooltips]") {
+TEST_CASE("Tooltips: every line is translated, with characters of the GEM font", "[editor][tooltips]") {
     juce::ScopedJuceInitialiser_GUI juce;
     juce::TemporaryFile prefs(".settings");
     StymProcessor p;
@@ -119,8 +119,7 @@ TEST_CASE("Tooltips: every line is translated, with characters of the GEM font (
              &w.echoWindow(), &w.settingsWindow()})
         static_cast<gemui::FloatWindow*>(win)->open();
     w.openScope(0);
-    // Modulation table on for track 1: the sequence rows show below it (D-240). Echo and delay on: their rows show
-    // (D-299).
+    // Modulation table on for track 1: the sequence rows show below it. Echo and delay on: their rows show.
     p.editExtras([](plugin::NonParamState& s) {
         s.tracks[0].patch.ornamentOn = true;
         s.tracks[0].patch.echo.on = true;
@@ -182,7 +181,7 @@ TEST_CASE("Tooltips: every line is translated, with characters of the GEM font (
     CHECK(swallowed == 0);
 }
 
-TEST_CASE("Tooltips: lookup in an installed language, placeholders and language codes (D-185, D-283)",
+TEST_CASE("Tooltips: lookup in an installed language, placeholders and language codes",
           "[tooltips]") {
     const pluginui::TipBook french(language("fr")), german(language("de"));
     CHECK(pluginui::tipLanguageCode("fr_FR") == "fr-fr");

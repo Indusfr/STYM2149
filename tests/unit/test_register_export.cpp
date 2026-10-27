@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: register exports (M7, A5, D-160, D-163): capture by a second instance of the engine.
+// STYM2149 — plugincore: register exports: capture by a second instance of the engine.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_approx.hpp>
@@ -67,7 +67,7 @@ TEST_CASE("Register capture: one frame per replay tick, from the start to the se
     CHECK((t.frames[0].reg[8] & 15) != 0);
     CHECK((t.frames[0].reg[7] & 1) == 0);  // tone of channel A open
 
-    // Replay tick of 200 Hz (D-149): four times as many frames.
+    // Replay tick of 200 Hz: four times as many frames.
     param(pr.v, Global::VblRate) = 4;
     const auto fast = captureRegisters(OfflineRender::Source::Pattern, pr.v, pr.x);
     REQUIRE(fast);
@@ -82,7 +82,7 @@ TEST_CASE("Register capture: one frame per replay tick, from the start to the se
     CHECK(song->take.frames.size() == 200);
     CHECK(period(song->take.frames[100], 0) == c4);
 
-    // Cancel requested; nothing outside Authentic 3ch mode (D-160).
+    // Cancel requested; nothing outside Authentic 3ch mode.
     std::atomic<bool> cancel{true};
     CHECK_FALSE(captureRegisters(OfflineRender::Source::Song, pr.v, pr.x, &cancel));
     for (const float mode : {0.0f, 2.0f}) {
@@ -116,7 +116,7 @@ TEST_CASE("Register capture: timer effects and their restart at each attack", "[
     CHECK((at == 50 || at == 51));
 }
 
-// STE machine (D-153, D-162): the DMA sound of each frame is taken with the registers, for the SNDH.
+// STE machine: the DMA sound of each frame is taken with the registers, for the SNDH.
 TEST_CASE("Register capture: DMA sound of the STE machine, frame by frame", "[regexport][dma]") {
     Project pr;
     param(pr.v, Global::Computer) = 1;  // STE: track 5 = DMA 1, slot 0
@@ -151,7 +151,7 @@ TEST_CASE("Register capture: DMA sound of the STE machine, frame by frame", "[re
     CHECK(st->take.frames.size() == 100);
 }
 
-// Files of the exports (D-172): formats, subsongs of the SNDH, what the alert reports.
+// Files of the exports: formats, subsongs of the SNDH, what the alert reports.
 TEST_CASE("Register exports: files and alert notes", "[regexport]") {
     Project pr;
     param(pr.v, 1, Track::On) = 1;
@@ -214,8 +214,8 @@ TEST_CASE("Register exports: files and alert notes", "[regexport]") {
     CHECK_FALSE(none->error.empty());
 }
 
-// A Digidrum plays from Start to End (D-443): the YM6 carries that part, which its player plays from the beginning.
-TEST_CASE("Register exports: a Digidrum carries the part from Start to End (D-443)", "[regexport][digidrum]") {
+// A Digidrum plays from Start to End: the YM6 carries that part, which its player plays from the beginning.
+TEST_CASE("Register exports: a Digidrum carries the part from Start to End", "[regexport][digidrum]") {
     Project pr;
     param(pr.v, 3, Track::On) = 1;  // Digidrum track of the chip
     note(pr.x.seq.cur().edit(3), 0, 60);

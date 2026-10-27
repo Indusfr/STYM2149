@@ -5,9 +5,9 @@
 // The editor is the host of the main window (pluginui::Host): host parameters with gestures, the processor's
 // non-automatable state and on-screen playing, engine status, user preferences (a file shared by every instance),
 // a window size from 50 to 200 %, set by resizing the window (STYM2149_SPEC.md §6.6 without its Zoom menu, tenth DAW
-// test, item 127, D-335; 100 % shows the desktop at 5/8 of its logical size, D-202 and D-216). The GEM desktop is
-// laid out in logical pixels (1344 × 984: D-067, D-461) and drawn into an image at the screen's resolution
-// (JucePainter, D-201). A 30 Hz timer advances the window and redraws only the changed areas.
+// test, item 127; 100 % shows the desktop at 5/8 of its logical size). The GEM desktop is
+// laid out in logical pixels (1344 × 984) and drawn into an image at the screen's resolution
+// (JucePainter). A 30 Hz timer advances the window and redraws only the changed areas.
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -39,7 +39,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
-    void parentHierarchyChanged() override;  // the window's renderer once the editor is on screen (D-420)
+    void parentHierarchyChanged() override;  // the window's renderer once the editor is on screen
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
@@ -53,7 +53,7 @@ public:
     void focusLost(FocusChangeType cause) override;
 
     pluginui::MainWindow& window() noexcept { return *window_; }
-    // The close box of the standalone application's window (D-439): the GEM Quit box, as File > Quit; false in a host,
+    // The close box of the standalone application's window: the GEM Quit box, as File > Quit; false in a host,
     // where the editor does not quit.
     bool askQuit();
     // One editor frame (window tick, desktop drawing, copy): 30 Hz timer; also called by the tests, which have no
@@ -68,10 +68,10 @@ private:
     void render(int w, int h);
     // Draws area r of the desktop into the image; returns the changed area of the component.
     juce::Rectangle<int> draw(const gemui::Rect& r);
-    // Asynchronous file dialog (M7): suggested file, folder remembered in the preferences ("lastFolder").
+    // Asynchronous file dialog: suggested file, folder remembered in the preferences ("lastFolder").
     void launchChooser(const FileDialog& dialog, bool save, std::function<void(const std::string& path)> done);
     gemui::Point logical(const juce::MouseEvent& e) const noexcept;  // mouse → desktop pixel, clamped to the desktop
-    // Rendering engine of the window that shows the editor, from the "renderer" preference (Windows, D-420).
+    // Rendering engine of the window that shows the editor, from the "renderer" preference (Windows).
     void applyRenderer();
     void applyZoom(int percent);  // editor size for this zoom (clamped); the caller stores the preference if needed
     // Releases the held keys that the system no longer reports as pressed (all of them if `all`).
@@ -124,7 +124,7 @@ private:
     bool openLanguagesFolder(const std::vector<TextFile>& files) override;
     std::string keyboardLayout() const override;
     bool rendererChoice() const override;
-    // Files (M7): whole project replaced (File > Load > Preset), state of a new project (File > New), dialogs and
+    // Files: whole project replaced (File > Load > Preset), state of a new project (File > New), dialogs and
     // whole-file access with absolute UTF-8 paths, streamed exports (createFile).
     void loadProject(const ParamValues& values, const NonParamState& extras) override;
     NonParamState newExtras() const override;
@@ -149,7 +149,7 @@ private:
     // Held keys (JUCE code → press passed on): JUCE reports neither auto-repeat nor the release of a given key
     // (keyStateChanged only says that the keyboard state changed).
     std::map<int, gemui::KeyEvent> keysDown_;
-    mutable std::string layout_;  // system keyboard layout (D-215), asked again after a second
+    mutable std::string layout_;  // system keyboard layout, asked again after a second
     mutable juce::uint32 layoutAt_ = 0;  // when it was last asked (juce::Time::getMillisecondCounter)
     std::unique_ptr<pluginui::MainWindow> window_;  // last: destroyed first
 

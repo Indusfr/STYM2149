@@ -77,7 +77,7 @@ TEST_CASE("S1 internal state step by step against AtariAudio (AtariAudio noise)"
            std::to_string(bad) + " deviation(s)", "0", bad == 0);
 }
 
-TEST_CASE("S1 internal state step by step against AtariAudio corrected for D-012 (maximal noise)", "[S1][oracle]") {
+TEST_CASE("S1 internal state step by step against AtariAudio with the maximal noise LFSR", "[S1][oracle]") {
     uint64_t total = 0, bad = 0;
     for (const Scenario& sc : tickScenarios(true)) {
         // All the state except the LFSR; the output only when no channel listens to the noise.

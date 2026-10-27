@@ -1,4 +1,4 @@
-// STYM2149 — Mixer window (M5): opening (button, Ctrl+M), faders, panning, mute and solo linked to the track
+// STYM2149 — Mixer window: opening (button, Ctrl+M), faders, panning, mute and solo linked to the track
 // parameters, one undo step per gesture, strips of the 3 ch mode, VU meters (vuPct, peak hold, clipping).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -142,7 +142,7 @@ std::vector<std::string> sliderMenu(MainWindow& w, const std::string& id, int it
     return labels;
 }
 
-// Clicks a value under its slider, types `text` and ends with `end` (Enter or Escape) (D-415).
+// Clicks a value under its slider, types `text` and ends with `end` (Enter or Escape).
 void typeUnder(MainWindow& w, const std::string& id, std::string_view text, gemui::Key end = gemui::Key::Enter) {
     click(w, id);
     const gemui::ValueField* f = w.mixer().field(id);
@@ -178,7 +178,7 @@ TEST_CASE("Mixer: Mixer button and Ctrl+M open the window, Escape closes it", "[
     click(w, "openMixBtn");
     CHECK(w.mixer().isOpen());
     CHECK_FALSE(w.desktop().hasModal());  // no more "not available yet" alert
-    // + the Master faders (D-276, D-284), the values (D-300), the Send (D-299).
+    // + the Master faders, the values, the Send.
     CHECK(w.rectOf("mixWin") == gemui::Rect{110, 110, 1048 + 78, 325 + 24 + 32});
     CHECK(w.rectOf("mixFad15"));
     CHECK(w.rectOf("vuhR"));
@@ -226,8 +226,7 @@ TEST_CASE("Mixer: fader and panning linked to the track's level and pan, one ste
     CHECK(h.track(2, Track::Level) == 100.0f);
 }
 
-TEST_CASE("Mixer: values under the faders and the pans, the pans named (D-310); right click: Value... and Reset "
-          "(D-300)",
+TEST_CASE("Mixer: values under the faders and the pans, the pans named; right click: Value... and Reset ",
           "[ui][mixer]") {
     TestHost h;
     MainWindow w(h);
@@ -240,9 +239,9 @@ TEST_CASE("Mixer: values under the faders and the pans, the pans named (D-310); 
     CHECK(fv.h == 8);
     CHECK(pan.y == fv.bottom() + 4);
     CHECK(pv.y == pan.bottom() + 4);
-    CHECK(w.rectOf("mixSend2")->y == pv.bottom() + 4);  // the Send under the pan (D-299)
+    CHECK(w.rectOf("mixSend2")->y == pv.bottom() + 4);  // the Send under the pan
     CHECK(mix.valueText("mixFadVal2") == "75");
-    CHECK(mix.valueText("mixPanVal2") == "Pan 0");  // named like the send (ninth DAW test, item 109, D-310)
+    CHECK(mix.valueText("mixPanVal2") == "Pan 0");  // named like the send (ninth DAW test, item 109)
     // The Masters' values on the row of the faders' values, the balance's under it.
     CHECK(w.rectOf("mixMasterVal")->y == fv.y);
     CHECK(w.rectOf("mixMaster2Val")->y == fv.y);
@@ -314,8 +313,7 @@ TEST_CASE("Mixer: values under the faders and the pans, the pans named (D-310); 
     CHECK(h.track(1, Track::Level) == 75.0f);
 }
 
-TEST_CASE("Mixer: a click on a value under its slider types it in place, Enter confirms, Escape cancels (24/10/2026, "
-          "D-415)",
+TEST_CASE("Mixer: a click on a value under its slider types it in place, Enter confirms, Escape cancels (24/10/2026)",
           "[ui][mixer]") {
     TestHost h;
     MainWindow w(h);
@@ -397,7 +395,7 @@ TEST_CASE("Mixer: a click on a value under its slider types it in place, Enter c
     CHECK_FALSE(mix.field("mixFadVal1")->editing());
 }
 
-TEST_CASE("Mixer: Send of each track to the delay, under the pan, 16 channels only (D-299)", "[ui][mixer]") {
+TEST_CASE("Mixer: Send of each track to the delay, under the pan, 16 channels only", "[ui][mixer]") {
     TestHost h;
     MainWindow w(h);
     w.mixer().show();
@@ -531,13 +529,13 @@ TEST_CASE("Mixer: 3 ch, strips A B C Digi without panning, faders on the 4-bit v
     h.values[size_t(paramIndex(Global::VoiceMode))] = 1;
     MainWindow w(h);
     w.mixer().show();
-    // + the Master fader (D-276), the values (D-300).
+    // + the Master fader, the values.
     CHECK(w.rectOf("mixWin") == gemui::Rect{110, 110, 230 + 20, 283 + 12});
     CHECK(w.rectOf("mixFad3"));
     CHECK_FALSE(w.rectOf("mixFad4"));
     CHECK_FALSE(w.rectOf("mixPan0"));
     CHECK_FALSE(w.rectOf("vuhR"));
-    // The fader of a chip channel is its 4-bit Volume, the one of the SOURCE frame (sixth DAW test, item 62, D-260):
+    // The fader of a chip channel is its 4-bit Volume, the one of the SOURCE frame (sixth DAW test, item 62):
     // one undo step per drag, the level untouched.
     const float vol = h.track(1, Track::Volume);
     const gemui::Rect fad = *w.rectOf("mixFad1");
@@ -553,7 +551,7 @@ TEST_CASE("Mixer: 3 ch, strips A B C Digi without panning, faders on the 4-bit v
     CHECK(h.track(1, Track::Volume) == vol);
     h.values[size_t(paramIndex(1, Track::Volume))] = 8;
     w.tick(0);
-    // A Sync Buzzer has no fixed volume: the fader is greyed out with the SOURCE frame's Volume (D-261).
+    // A Sync Buzzer has no fixed volume: the fader is greyed out with the SOURCE frame's Volume.
     h.values[size_t(paramIndex(1, Track::Generator))] = float(int(ymengine::Generator::SyncBuzzer));
     w.tick(0);
     drag(w, {fad.x + 8, fad.y + 2}, {{fad.x + 8, fad.bottom() - 1}});
@@ -570,11 +568,11 @@ TEST_CASE("Mixer: 3 ch, strips A B C Digi without panning, faders on the 4-bit v
     h.values[size_t(paramIndex(Global::VoiceMode))] = 0;
     w.tick(0);
     CHECK(w.rectOf("mixPan15"));
-    // + the Master faders (D-276, D-284), the values (D-300), the Send (D-299).
+    // + the Master faders, the values, the Send.
     CHECK(w.rectOf("mixWin") == gemui::Rect{110, 110, 1048 + 78, 325 + 24 + 32});
 }
 
-TEST_CASE("Mixer: Master fader after a rule, the main level of the SYSTEM frame (D-276)", "[ui][mixer]") {
+TEST_CASE("Mixer: Master fader after a rule, the main level of the SYSTEM frame", "[ui][mixer]") {
     for (const int mode : {0, 1}) {
         CAPTURE(mode);
         TestHost h;
@@ -606,7 +604,7 @@ TEST_CASE("Mixer: Master fader after a rule, the main level of the SYSTEM frame 
 }
 
 TEST_CASE("Mixer: two Masters with Link, left and right with a balance for stereo outputs, chips 1 and 2 in 2x3 "
-          "channels, one Master in 3-channel mono (D-284)",
+          "channels, one Master in 3-channel mono",
           "[ui][mixer]") {
     // 16 channels and 3 channels with the STE (DMA tracks): stereo, left and right; two chips (ST or STE): a Master per
     // chip, no balance; 3 channels with the ST: mono, one Master.
@@ -745,7 +743,7 @@ TEST_CASE("Mixer: place and state kept when the plugin window reopens", "[ui][mi
     }
     MainWindow w(h);
     CHECK(w.mixer().isOpen());
-    // + the values (D-300), the Send (D-299)
+    // + the values, the Send
     CHECK(w.rectOf("mixWin") == gemui::Rect{130, 140, 1048 + 78, 325 + 24 + 32});
     CHECK(w.rectOf("scWin1") == gemui::Rect{240, 200, 392, 201});
     CHECK(w.rectOf("scWin4") == gemui::Rect{364, 234, 392, 201});
@@ -753,7 +751,7 @@ TEST_CASE("Mixer: place and state kept when the plugin window reopens", "[ui][mi
     CHECK(gemui::FloatWindow::topmost(w) == &w.mixer());
 }
 
-TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and two meters (Indus, 26/10/2026, D-457)",
+TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and two meters (Indus, 26/10/2026)",
           "[ui][mixer][dma]") {
     using pluginui::MixerWindow;
     TestHost h;
@@ -766,7 +764,7 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
     MainWindow w(h);
     w.mixer().show();
     // Stereo: the left and right oscilloscopes side by side, sharing their frame's line, centred on the strip; each
-    // side its fader and its meter (D-459), the right side's 4 px after the left meter.
+    // side its fader and its meter, the right side's 4 px after the left meter.
     const auto l = w.rectOf("mixScope3"), r = w.rectOf("mixScopeR3"), vl = w.rectOf("mixVu3"),
                vr = w.rectOf("mixVuR3"), fad = w.rectOf("mixFad3"), pan = w.rectOf("mixPan3");
     REQUIRE(l);
@@ -836,7 +834,7 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
     CHECK(tipAt({w.rectOf("mixScope3")->x + 12, w.rectOf("mixScope3")->y + 8}).empty());
 }
 
-TEST_CASE("Mixer: a stereo sample's right side has its fader, M and S, and Link (Indus, 26/10/2026, D-459)",
+TEST_CASE("Mixer: a stereo sample's right side has its fader, M and S, and Link (Indus, 26/10/2026)",
           "[ui][mixer][dma]") {
     TestHost h;
     // 16 channels on the STE: track 3 plays slot 2, stereo; track 4 slot 3, mono.
@@ -884,7 +882,7 @@ TEST_CASE("Mixer: a stereo sample's right side has its fader, M and S, and Link 
     CHECK(h.track(3, Track::Level) == 50.0f);
     CHECK(h.track(3, Track::LevelR) < 50.0f);
     CHECK(h.editor.undo.undoSize() == 3);
-    CHECK(mix.field("mixFadRVal3"));  // typed in place like the others (D-415)
+    CHECK(mix.field("mixFadRVal3"));  // typed in place like the others
     // M and S of each side.
     click(w, "mixMuteR3");
     CHECK(h.track(3, Track::MuteR) == 1.0f);

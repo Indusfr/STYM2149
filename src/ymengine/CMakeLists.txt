@@ -1,5 +1,5 @@
-# ymengine: MFP timers, timer effects, voices, 3-channel / dual-chip / 16-channel modes (M2), playback of the sequencer
-# tracks (M5).
+# ymengine: MFP timers, timer effects, voices, 3-channel / dual-chip / 16-channel modes, playback of the sequencer
+# tracks.
 add_library(ymengine STATIC
   src/Mfp68901.cpp
   src/VirtualChannel.cpp

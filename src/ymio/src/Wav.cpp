@@ -1,4 +1,4 @@
-// STYM2149 — ymio: stereo WAV files of the exports (M7, A4, D-164)
+// STYM2149 — ymio: stereo WAV files of the exports
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "ymio/Wav.h"

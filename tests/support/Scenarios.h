@@ -21,7 +21,7 @@ struct Scenario {
     bool usesNoise;
 };
 
-// The six scenarios of the M0 trial (writes at time 0).
+// The six scenarios of the initial trial (writes at time 0).
 std::vector<Scenario> m0Scenarios();
 
 // Deterministic pseudo-random script: writes to all registers over [0, length), about writesPerUnit writes per

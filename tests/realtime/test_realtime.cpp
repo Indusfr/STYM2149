@@ -191,8 +191,8 @@ int main() {
         total += g_allocs;
         if (g_allocs != 0 || p.timerInterrupts() == 0) ok = false;
     }
-    // Voice engine (M2): three voice modes, MFP and continuous timer effects, arpeggio, live mixer, settings changed
-    // from the audio thread, event queue overflow. M3: separate outputs of the tracks and chips, notes, bend and mod
+    // Voice engine: three voice modes, MFP and continuous timer effects, arpeggio, live mixer, settings changed
+    // from the audio thread, event queue overflow. Plugin: separate outputs of the tracks and chips, notes, bend and mod
     // wheel per track, velocity effect, bass and treble of the STE chain.
     {
         long engineAllocs = 0;
@@ -261,7 +261,7 @@ int main() {
                         g.irqJitterCpuCycles = tm == ymengine::TimerMode::Mfp ? 16 : 0;
                         g.arpClock = pass % 4 == 3 ? ymengine::ArpClock::MidiClock : ymengine::ArpClock::Hz;
                         g.velocity = ymengine::VelocityMode(pass % 3);
-                        g.bendTarget = ymengine::BendTarget(pass % 3);  // MIDI expression (D-432)
+                        g.bendTarget = ymengine::BendTarget(pass % 3);  // MIDI expression
                         g.wheelTarget = ymengine::ExpressTarget(pass % 5);
                         g.aftertouch = ymengine::ExpressTarget((pass + 2) % 5);
                         g.mpeSlide = ymengine::SlideTarget(pass % 3);
@@ -310,7 +310,7 @@ int main() {
         total += engineAllocs;
     }
     {
-        // Plugin driver (M3): MIDI, prototype controllers, automation, mode changes, new engine preparations
+        // Plugin driver: MIDI, prototype controllers, automation, mode changes, new engine preparations
         // (prepared outside the section, like the message thread), published settings.
         using namespace stym::plugin;
         struct Sink : ParamListener {
@@ -325,7 +325,7 @@ int main() {
             return rng;
         };
         long driverAllocs = 0;
-        // YM Player (M7): YM3 dump loaded, played, rewound, stopped then closed by the message thread, while the
+        // YM Player: YM3 dump loaded, played, rewound, stopped then closed by the message thread, while the
         // automation changes the chain and the resampling (playback resumed on a new chip).
         std::vector<uint8_t> ym3 = {'Y', 'M', '3', '!'};
         ym3.resize(4 + 14 * 400);
@@ -424,7 +424,7 @@ int main() {
     test::metric("S11", "RealtimeSanitizer: locks, system calls, allocations (3 modes × 3 rates, Raw/ST/STE chains, + YM player, effects included, + voice engine and plugin driver, YM Player included)",
                  "no violation", "0", ok);
 #else
-    test::metric("S11", "allocations during reset/write/render (3 modes × 3 rates, Raw/ST/STE chains, + YM player, effects included, + M2 voice engine and M3 additions, + plugin driver and YM Player)", std::to_string(total), "0", ok);
+    test::metric("S11", "allocations during reset/write/render (3 modes × 3 rates, Raw/ST/STE chains, + YM player, effects included, + voice engine and plugin additions, + plugin driver and YM Player)", std::to_string(total), "0", ok);
 #endif
     return ok ? 0 : 1;
 }

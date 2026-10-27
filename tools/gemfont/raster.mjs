@@ -8,14 +8,14 @@ import { readFileSync } from 'node:fs';
 export const SIZES = [8, 9, 10, 11, 12, 13, 14, 15, 16];
 // Printable ASCII, then the GEM glyphs of the TOS (private area E001-E008 of the prototype's font), then the
 // characters that the prototype takes from its fallback font and that gemui draws with the glyph of the Atari ST
-// encoding (FALLBACK, D-127).
+// encoding (FALLBACK).
 export const CODES = [];
 for (let c = 0x20; c <= 0x7e; c++) CODES.push(c);
 for (let c = 0xe001; c <= 0xe008; c++) CODES.push(c);
 // Code point → character of the Atari ST encoding: musical note (0x0B), bullet (0xFA, middle dot), then the
-// engravings of the AZERTY and QWERTZ layouts of the keyboard drawing (D-131): ù (0x97), ² (0xFD), Ö (0x99),
+// engravings of the AZERTY and QWERTZ layouts of the keyboard drawing: ù (0x97), ² (0xFD), Ö (0x99),
 // Ä (0x8E), Ü (0x9A), ß (0x9E), ´ (0xBA); then the accented letters and signs of the Atari ST encoding used by the
-// tooltips in French, German, Spanish, Portuguese and Italian (D-185). The accented capitals missing from the
+// tooltips in French, German, Spanish, Portuguese and Italian. The accented capitals missing from the
 // encoding (È, Ê, Á, Í, Ó, Ú, Ô...) are not there: the translations write them without an accent.
 export const FALLBACK = new Map([[0x266a, 0x0b], [0x2022, 0xfa], [0xf9, 0x97], [0xb2, 0xfd], [0xd6, 0x99],
   [0xc4, 0x8e], [0xdc, 0x9a], [0xdf, 0x9e], [0xb4, 0xba],
@@ -63,7 +63,7 @@ export const QUARTERS = 4;
 // Rows from `top` (negative, above the baseline) down to the descent rounded up to the next pixel.
 // `glyph`: glyph index in the TrueType, or contours already read (emutos8x16). `dx`: horizontal shift of the contour
 // before rasterisation (sub-pixel position, Skia: quarter pixels). `bearing`: the contour keeps its place in the cell
-// (EmuTOS's left side bearing, D-266) instead of starting at the origin as in the prototype's TrueType. Returns, for
+// (EmuTOS's left side bearing) instead of starting at the origin as in the prototype's TrueType. Returns, for
 // each row, an integer whose bit (15 - x) is column x (0 to 15).
 export function rasterizeAt(font, glyph, size, dx, bearing = false) {
   const k = size / font.upem;

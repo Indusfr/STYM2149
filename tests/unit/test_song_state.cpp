@@ -1,4 +1,4 @@
-// STYM2149 — extended Song (M6, B12, D-158): ymseq model (Rest, Note-off and Loop entries, restart point), SNGX chunk
+// STYM2149 — extended Song: ymseq model (Rest, Note-off and Loop entries, restart point), SNGX chunk
 // of the state, bounds on reading back, engine snapshot.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

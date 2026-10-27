@@ -1,6 +1,6 @@
-// STYM2149 — Patches window (M6, A3): opening (button, Ctrl+P, Edit menu), Save current, loading into the focused
+// STYM2149 — Patches window: opening (button, Ctrl+P, Edit menu), Save current, loading into the focused
 // track (one undo step), menu of a patch (Load, Rename, Overwrite, Delete), shared library, unreadable file never
-// overwritten, Import and Export without a host dialogue (M7: test_file_menu.cpp).
+// overwritten, Import and Export without a host dialogue (test_file_menu.cpp).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -118,7 +118,7 @@ void menuPick(MainWindow& w, int patch, int index) {
     click(w, id, gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
     const gemui::Rect r = *w.rectOf(id);
-    const int top = r.bottom() - 2;  // the menu's frame on the button's bottom rule (D-396)
+    const int top = r.bottom() - 2;  // the menu's frame on the button's bottom rule
     const int sep = index >= 3 ? 8 - 20 : 0;  // 8 px rule in place of an entry
     press(w, {r.x + 20, top + 2 + 20 * index + sep + 10});
     CHECK_FALSE(w.desktop().hasPopups());
@@ -144,12 +144,12 @@ TEST_CASE("Patches: button, Ctrl+P and Edit menu open the window; empty library"
     CHECK(letter(w, U'p', true));
     CHECK(w.patches().isOpen());
     key(w, gemui::Key::Escape);
-    w.openMenu(2);  // Edit > Patches (seventh entry since Effects, D-312, below the bar)
+    w.openMenu(2);  // Edit > Patches (seventh entry since Effects, below the bar)
     const gemui::Rect edit = *w.rectOf("mEdit");
     press(w, {edit.x + 20, edit.bottom() + 2 + 6 * 20 + 10});
     CHECK(w.patches().isOpen());
 
-    // Import and Export (M7): host dialogues, which it has none of here (test_file_menu.cpp tries them).
+    // Import and Export: host dialogues, which it has none of here (test_file_menu.cpp tries them).
     click(w, "libImport");
     CHECK_FALSE(w.desktop().hasModal());
     click(w, "libExport");

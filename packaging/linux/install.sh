@@ -1,11 +1,11 @@
 #!/bin/sh
-# STYM2149 — per-user install on Linux (M8, D-182): VST3, LV2, CLAP, the standalone application and the tooltip
-# languages (D-283).
+# STYM2149 — per-user install on Linux: VST3, LV2, CLAP, the standalone application and the tooltip
+# languages.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #
 # Usage: ./install.sh              copy the plugins to ~/.vst3, ~/.lv2 and ~/.clap, the application to ~/.local/bin,
-#                                  with its menu entry and its icon (D-218) in ~/.local/share, the tooltip languages
+#                                  with its menu entry and its icon in ~/.local/share, the tooltip languages
 #                                  to ~/.local/share/STYM2149/Languages, where the plugins read them
 #        ./install.sh --uninstall  remove what install.sh copied (the settings file of the user stays)
 # No root access is needed and nothing outside the home folder is touched.
@@ -50,11 +50,11 @@ cp -R "$here/STYM2149.lv2" "$lv2/"
 cp "$here/STYM2149.clap" "$clap/"
 cp "$here/STYM2149" "$bin/"
 chmod 755 "$bin/STYM2149"
-# Tooltip languages (D-283), replaced as a whole like the bundles; the user's own files stay in ~/.config/STYM2149.
+# Tooltip languages, replaced as a whole like the bundles; the user's own files stay in ~/.config/STYM2149.
 rm -rf "$share/STYM2149/Languages"
 mkdir -p "$share/STYM2149"
 cp -R "$here/Languages" "$share/STYM2149/"
-# Menu entry of the application, with its icon at the sizes drawn (D-218).
+# Menu entry of the application, with its icon at the sizes drawn.
 for size in 16 32 48 256; do
     if [ -e "$here/icons/STYM2149-$size.png" ]; then
         mkdir -p "$share/icons/hicolor/${size}x$size/apps"

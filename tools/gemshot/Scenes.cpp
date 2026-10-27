@@ -35,7 +35,7 @@ using plugin::paramIndex;
 using plugin::Track;
 
 // A menu under a control lies kMenuLift px higher than the prototype's: no 6 px gap, its frame on the control's bottom
-// rule (D-396).
+// rule.
 constexpr int kMenuLift = 6 + 2;
 
 // Test host: parameters and state in memory, standalone application without MIDI (like the capture machine).
@@ -123,8 +123,8 @@ public:
 
     std::string patches;
     std::deque<std::array<uint8_t, 3>> learned;  // messages taken for the interface (MIDI learn)
-    Recorder rec;  // register recorder (D-157): state given by the scene
-    YmPlayer ym;   // YM Player (D-169)
+    Recorder rec;  // register recorder: state given by the scene
+    YmPlayer ym;   // YM Player
 };
 
 void set(FakeHost& h, Global g, float v) { h.values[size_t(paramIndex(g))] = v; }
@@ -173,7 +173,7 @@ struct Scene {
     std::function<void(FakeHost&)> before;               // starting settings
     std::function<void(FakeHost&, pluginui::MainWindow&)> act;  // action on the window
     std::vector<const char*> masked = {};                 // controls ignored by the comparison (rectOf)
-    const char* decision = "";                            // decision that justifies them
+    const char* decision = "";                            // intended deviation that justifies them
     int budget = 1;                                       // allowed deviation in % (Shot::budget)
     const char* alt = "";                                 // same window without the menu or the alert (Shot::alt)
 };
@@ -181,18 +181,18 @@ struct Scene {
 const std::vector<Scene>& scenes() {
     static const std::vector<Scene> list = {
         {"default", {}, {}},
-        // The SID wave under the SID settings (D-251): its dense controls ignored, the texts compared (with the frame's
-        // white of the capture, where they are not). With Base, the bars and Steps are hidden (D-417): their zones go.
+        // The SID wave under the SID settings: its dense controls ignored, the texts compared (with the frame's
+        // white of the capture, where they are not). With Base, the bars and Steps are hidden: their zones go.
         {"sid", {}, [](FakeHost&, pluginui::MainWindow& w) { w.pickGenerator(1); },
-         {"waveGrid", "waveSteps", "waveForm"}, "D-251"},
-        // Mode button of the ADSR greyed out on a drum track (D-205).
-        {"chipdrum", {}, [](FakeHost&, pluginui::MainWindow& w) { w.pickGenerator(4); }, {"adsrMode"}, "D-205"},
-        // Waveform and note of the frame: rewritten texts (D-078), in the 6×6 font (D-071); with the small texts of
+         {"waveGrid", "waveSteps", "waveForm"}, "sid-wave-frame"},
+        // Mode button of the ADSR greyed out on a drum track.
+        {"chipdrum", {}, [](FakeHost&, pluginui::MainWindow& w) { w.pickGenerator(4); }, {"adsrMode"}, "no-adsr-drums"},
+        // Waveform and note of the frame: rewritten texts, in the 6×6 font; with the small texts of
         // the rest of the window, the scene would exceed 1 % for these intended deviations alone. Mode button of the
-        // ADSR greyed out on a drum track (D-205). Digidrum samples button where the prototype drew the waveform, the
-        // waveform below it (D-213).
+        // ADSR greyed out on a drum track. Digidrum samples button where the prototype drew the waveform, the
+        // waveform below it.
         {"digidrum", {}, [](FakeHost&, pluginui::MainWindow& w) { w.pickGenerator(2); },
-         {"drumwave", "digiHint", "digiEdit", "adsrMode"}, "D-078, D-205, D-213"},
+         {"drumwave", "digiHint", "digiEdit", "adsrMode"}, "digidrum-text, no-adsr-drums, digidrum-button"},
         {"envelope",
          [](FakeHost& h) {
              set(h, 0, Track::VolMode, 1);
@@ -228,13 +228,13 @@ const std::vector<Scene>& scenes() {
              w.lightKey(63, true);
          }},
         {"menu_generator", {}, [](FakeHost&, pluginui::MainWindow& w) { click(w, "fxSel"); }},
-        // The frames moved by the sixth DAW test (D-268), whose former place the menu or the alert covers in the
+        // The frames moved by the sixth DAW test, whose former place the menu or the alert covers in the
         // capture, compared with the default scene's (the envelope mode changes none of them).
         {"menu_shape", [](FakeHost& h) { set(h, 0, Track::VolMode, 1); },
          [](FakeHost&, pluginui::MainWindow& w) { click(w, "shapeSel"); }, {}, "", 1, "default"},
         {"alert_chip", {}, [](FakeHost&, pluginui::MainWindow& w) { w.showChipAlert(); }, {}, "", 1, "default"},
-        // Floating windows (M5), at the prototype's places: 2 % (D-121). The Step Sequencer's scenes seq and
-        // seq_demo are STYM2149 scenes since its grid's 2 px gaps (D-458).
+        // Floating windows, at the prototype's places: 2 %. The Step Sequencer's scenes seq and
+        // seq_demo are STYM2149 scenes since its grid's 2 px gaps.
         {"song", {}, [](FakeHost&, pluginui::MainWindow& w) { w.songWindow().show(); }, {}, "", 2},
         // Written Song: repeats, own tempo, selection (Shift) and keyboard cursor on two different blocks.
         {"song_demo", {},
@@ -246,11 +246,11 @@ const std::vector<Scene>& scenes() {
              w.songWindow().setSelection({1}, 2);
          },
          {}, "", 2},
-        // Arpeggiator: stopped, running (Up); the Sync button after the mode, not in the prototype, ignored (D-256). On
-        // the MIDI clock and in Table mode: STYM2149 scenes (arp_midi, D-290; arp_table, D-322).
+        // Arpeggiator: stopped, running (Up); the Sync button after the mode, not in the prototype, ignored. On
+        // the MIDI clock and in Table mode: STYM2149 scenes (arp_midi; arp_table).
         {"arp", {}, [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }},
         {"arp_on", [](FakeHost& h) { set(h, 0, Track::ArpOn, 1); },
-         [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }, {"arpSync"}, "D-256"},
+         [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }, {"arpSync"}, "arp-sync"},
         // Slide Curve: straight line by default, then a drawn curve that stops at 80 % (warning).
         {"curve", {}, [](FakeHost&, pluginui::MainWindow& w) { w.slideCurve().show(); }},
         {"curve_custom",
@@ -282,16 +282,16 @@ const std::vector<Scene>& scenes() {
              w.setBaseOctave(8);
              w.keyboardWindow().show();
          }},
-        // Drum Kit (M6): on a track that is not a Chipdrum (note, inert content), on a Chipdrum (Kick, Classic
+        // Drum Kit: on a track that is not a Chipdrum (note, inert content), on a Chipdrum (Kick, Classic
         // kit), then the TR-808-ish bank with the Clap tail at 55 (Custom kit, settings on two columns). On a
-        // Chipdrum, the Mode button of the ADSR is greyed out (D-205).
+        // Chipdrum, the Mode button of the ADSR is greyed out.
         {"kit_off", {}, [](FakeHost&, pluginui::MainWindow& w) { w.drumKit().show(); }},
         {"kit", {},
          [](FakeHost&, pluginui::MainWindow& w) {
              w.pickGenerator(4);
              w.drumKit().show();
          },
-         {"adsrMode"}, "D-205"},
+         {"adsrMode"}, "no-adsr-drums"},
         {"kit_clap",
          [](FakeHost& h) {
              for (const auto& b : ymengine::kKitBanks)
@@ -303,8 +303,8 @@ const std::vector<Scene>& scenes() {
              w.pickGenerator(4);
              w.drumKit().show();
          },
-         {"adsrMode"}, "D-205"},
-        // Patches (M6): empty library (note), then eight patches on three lines.
+         {"adsrMode"}, "no-adsr-drums"},
+        // Patches: empty library (note), then eight patches on three lines.
         {"lib", {}, [](FakeHost&, pluginui::MainWindow& w) { w.patches().show(); }},
         {"lib_list",
          [](FakeHost& h) {
@@ -314,9 +314,9 @@ const std::vector<Scene>& scenes() {
              h.patches = plugin::dumpPatchLibrary(lib);
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.patches().show(); }},
-        // MIDI learn (M6): banner of the learn mode, then after a CC learnt for the Noise period slider.
+        // MIDI learn: banner of the learn mode, then after a CC learnt for the Noise period slider.
         {"learn", {}, [](FakeHost&, pluginui::MainWindow& w) { w.setMidiLearn(true); }},
-        // Noise in the source, so that the noise period slider can be learnt (greyed out without noise, D-253); the
+        // Noise in the source, so that the noise period slider can be learnt (greyed out without noise); the
         // Source button then reads Tone+Noise.
         {"learn_bound", [](FakeHost& h) { set(h, 0, Track::Noise, 1); },
          [](FakeHost& h, pluginui::MainWindow& w) {
@@ -325,16 +325,16 @@ const std::vector<Scene>& scenes() {
              h.learned.push_back({0xB0, 21, 0});
              w.tick(0);
          },
-         {"srcSel"}, "D-253"},
-        // YM Player (M7): YM3 dump of 250 frames loaded, stopped.
+         {"srcSel"}, "noise-greyed"},
+        // YM Player: YM3 dump of 250 frames loaded, stopped.
         {"ym", {},
          [](FakeHost&, pluginui::MainWindow& w) {
              std::string ym3 = "YM3!";
              ym3.resize(4 + 14 * 250, '\0');
              w.loadYmBytes(ym3, "tune.ym");
          }},
-        // SHORTCUTS window (M8, D-189): opened as by ^? (openHelp), scroll bar at the top; in the visible part, the
-        // text of the M key changes and ^D moves from File to Generator (D-301); the rows added by STYM2149 are
+        // SHORTCUTS window: opened as by ^? (openHelp), scroll bar at the top; in the visible part, the
+        // text of the M key changes and ^D moves from File to Generator; the rows added by STYM2149 are
         // further down.
         {"help", {}, [](FakeHost&, pluginui::MainWindow& w) { w.help().show(); }},
     };
@@ -367,7 +367,7 @@ void demoWithIns(FakeHost& h, pluginui::MainWindow& w) {
     w.sequencer().show();
 }
 
-// Demo pattern with instruments, plus the CMD row (D-150), the rows of their own of the eleventh DAW test (ENV, VIB,
+// Demo pattern with instruments, plus the CMD row, the rows of their own of the eleventh DAW test (ENV, VIB,
 // DLY, CUT: items 132 and 138 to 140) and of the twelfth (LFO, MOD, TUN, the restart of ENV, the BPM row of the
 // pattern under VOL, an SMP crossed on a chip track: items 142, 143, 145, 146, 150, 152, 153).
 void demoWithCmd(FakeHost& h, pluginui::MainWindow& w) {
@@ -385,7 +385,7 @@ void demoWithCmd(FakeHost& h, pluginui::MainWindow& w) {
         l.setCmd(4, seqCmd(SeqCmd::Speed, 0x03));
         l.setCmd(8, seqCmd(SeqCmd::Retrig, 0x02));
         l.setCmd(12, seqCmd(SeqCmd::Sync, 0x1a));
-        l.setCmd(12, seqCmd(SeqCmd::VolSlide, 0x02));  // several commands: MUL (D-330)
+        l.setCmd(12, seqCmd(SeqCmd::VolSlide, 0x02));  // several commands: MUL
         l.setCmd(12, seqCmd(SeqCmd::Fine, 0x5a));
         l.setCmd(12, seqCmd(SeqCmd::Vibrato, 0));
         l.setCmd(14, seqCmd(SeqCmd::Offset, 0x0c));
@@ -413,7 +413,7 @@ void cmdBox(FakeHost& h, pluginui::MainWindow& w) {
 }
 
 // The Commands box of step 13 in 16 channels, with a Buzzer Slide up in S-Curve: its Curve menu open over the box,
-// the shapes of the CRV row shown (D-394).
+// the shapes of the CRV row shown.
 void cmdCurve(FakeHost& h, pluginui::MainWindow& w) {
     using ymengine::SeqCmd;
     using ymengine::seqCmd;
@@ -437,7 +437,7 @@ void cmdCurve(FakeHost& h, pluginui::MainWindow& w) {
     if (const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup())) press(m->itemRect(3));
 }
 
-// Right click on a GEN, SRC or ENV cell of the demo pattern (D-392): SID Voice at step 3, Sync Buzzer at step 5
+// Right click on a GEN, SRC or ENV cell of the demo pattern: SID Voice at step 3, Sync Buzzer at step 5
 // (the settings of someSidWave and someBuzzer, the track staying a Chip Voice), Noise at step 7, the ENV cell of
 // step 9.
 void stepSound(FakeHost& h, pluginui::MainWindow& w, pluginui::SeqLane row, int step) {
@@ -470,7 +470,7 @@ void stepSound(FakeHost& h, pluginui::MainWindow& w, pluginui::SeqLane row, int 
     w.tick(0);
 }
 
-// A fade drawn on VOL and slid (D-393): steps 1 to 4 glide from 15 down to 3, then the VOL box of step 2, its Slide on.
+// A fade drawn on VOL and slid: steps 1 to 4 glide from 15 down to 3, then the VOL box of step 2, its Slide on.
 void volSlide(FakeHost& h, pluginui::MainWindow& w) {
     using ymengine::SeqCmd;
     demoWithCmd(h, w);
@@ -492,7 +492,7 @@ void volSlide(FakeHost& h, pluginui::MainWindow& w) {
     w.tick(0);
 }
 
-// Instrument sequences of track 1 (D-148): looped table of 16 steps, vibrato in PER, noise, voice modes,
+// Instrument sequences of track 1: looped table of 16 steps, vibrato in PER, noise, voice modes,
 // generators, fixed notes, pitch settings and chained instrument.
 void someSequences(FakeHost& h) {
     someInstruments(h);
@@ -515,7 +515,7 @@ void someSequences(FakeHost& h) {
     });
 }
 
-// Track 1 in SID Voice: SID wave of 12 steps drawn, the Custom form (D-151, D-411), in the GENERATOR frame (D-251).
+// Track 1 in SID Voice: SID wave of 12 steps drawn, the Custom form, in the GENERATOR frame.
 void someSidWave(FakeHost& h) {
     set(h, 0, Track::Generator, float(ymengine::Generator::Sid));
     h.editExtras([](plugin::NonParamState& s) {
@@ -526,7 +526,7 @@ void someSidWave(FakeHost& h) {
     });
 }
 
-// Track 1 in SID Voice, the Square of 8 Steps and Width 5 drawn in the bars over SID min vol 3 (D-407, D-408, D-411):
+// Track 1 in SID Voice, the Square of 8 Steps and Width 5 drawn in the bars over SID min vol 3:
 // Width alone under Steps.
 void someSidSquare(FakeHost& h) {
     set(h, 0, Track::Generator, float(ymengine::Generator::Sid));
@@ -537,7 +537,7 @@ void someSidSquare(FakeHost& h) {
     });
 }
 
-// Track 1 in SID Voice, the Sine form, two cycles of 8 bars (D-401, D-406, D-411): Period alone under Steps.
+// Track 1 in SID Voice, the Sine form, two cycles of 8 bars: Period alone under Steps.
 void someSidSine(FakeHost& h) {
     set(h, 0, Track::Generator, float(ymengine::Generator::Sid));
     h.editExtras([](plugin::NonParamState& s) {
@@ -548,7 +548,7 @@ void someSidSine(FakeHost& h) {
     });
 }
 
-// Track 1 in SID Voice, the Bounce form, two cycles of 8 bars on the chip's levels (D-414).
+// Track 1 in SID Voice, the Bounce form, two cycles of 8 bars on the chip's levels.
 void someSidBounce(FakeHost& h) {
     set(h, 0, Track::Generator, float(ymengine::Generator::Sid));
     h.editExtras([](plugin::NonParamState& s) {
@@ -559,8 +559,8 @@ void someSidBounce(FakeHost& h) {
     });
 }
 
-// Track 1 as a tuned Sync Buzzer (fifth 3/2, fine tuning -7 cents, YM Pad): D-152, settings in the GENERATOR frame
-// since the Buzzer window left (D-238); five steps, one of them at the track's shape (D-151, D-252).
+// Track 1 as a tuned Sync Buzzer (fifth 3/2, fine tuning -7 cents, YM Pad), settings in the GENERATOR frame
+// since the Buzzer window left; five steps, one of them at the track's shape.
 void someBuzzer(FakeHost& h) {
     set(h, 0, Track::Generator, float(ymengine::Generator::SyncBuzzer));
     set(h, 0, Track::EnvShape, 8);
@@ -576,8 +576,8 @@ void someBuzzer(FakeHost& h) {
     });
 }
 
-// STE DMA bank (D-153): STE machine, 3 channels; slot 3 "Pad loop" (stereo, looped, A3, frames 1500 to 8999 played,
-// D-444, D-445), slots 1 and 2 mono. Shapes computed in integers (decaying triangle and square). DMA track 2 (track 6)
+// STE DMA bank: STE machine, 3 channels; slot 3 "Pad loop" (stereo, looped, A3, frames 1500 to 8999 played),
+// slots 1 and 2 mono. Shapes computed in integers (decaying triangle and square). DMA track 2 (track 6)
 // plays slot 3.
 void someDma(FakeHost& h) {
     set(h, Global::Computer, 1);
@@ -585,7 +585,7 @@ void someDma(FakeHost& h) {
     set(h, 5, Track::Level, 60);
     set(h, 5, Track::Pan, -20);
     h.editExtras([](plugin::NonParamState& s) {
-        s.dma.slots[2] = {2, true, 57, true, 1500, 9000};  // part played: frames 1500 to 8999 (D-444)
+        s.dma.slots[2] = {2, true, 57, true, 1500, 9000};  // part played: frames 1500 to 8999
         s.dma.slots[0].rate = 1;
         s.tracks[5].patch.dmaSlot = 2;
         auto tri = [](int i, int period) { const int k = i % period; return k < period / 2 ? 4 * k - period : 3 * period - 4 * k; };
@@ -603,7 +603,7 @@ void someDma(FakeHost& h) {
 }
 
 // Digidrum editor: slot 4 selected (11,025 Hz, C3, -12 cents, YM levels, sustain loop), other slots filled (one
-// of them from before M6, without a source or a name).
+// of them older, without a source or a name).
 void someDigi(FakeHost& h) {
     h.session().digiSlot = 3;
     h.editExtras([](plugin::NonParamState& s) {
@@ -640,7 +640,7 @@ void publishDma(FakeHost& h, pluginui::MainWindow& w) {
     t.serial = 1;
     t.peak[0] = 0.5f;
     t.peak[5] = 0.35f;
-    t.peakR[5] = 0.2f;  // track 6 plays a stereo sample: its left and right meters (D-457)
+    t.peakR[5] = 0.2f;  // track 6 plays a stereo sample: its left and right meters
     t.outPeak = {0.42f, 0.3f};
     for (size_t i = 0; i < t.trackScope[5].size(); ++i) {
         t.trackScope[5][i] = float(int(i % 16) - 8) / 24.0f;
@@ -653,10 +653,10 @@ void publishDma(FakeHost& h, pluginui::MainWindow& w) {
 // Windows and rows specific to STYM2149 (no capture of the prototype).
 const std::vector<Scene>& stymScenes() {
     static const std::vector<Scene> list = {
-        // The GEM desktop (ninth DAW test, items 101 and 102, D-302, D-303): the menu bar across its top, the icons
+        // The GEM desktop (ninth DAW test, items 101 and 102): the menu bar across its top, the icons
         // of the floppy disks side by side at its top left and the trash at its bottom right (tenth DAW test, item
-        // 124, D-332), the trash being dragged: its outline on the cell of the invisible grid where it would land
-        // (thirteenth DAW test, item 167, D-376).
+        // 124), the trash being dragged: its outline on the cell of the invisible grid where it would land
+        // (thirteenth DAW test, item 167).
         {"desk", {},
          [](FakeHost&, pluginui::MainWindow& w) {
              const gemui::Rect t = w.deskIcons()[2].bounds();
@@ -664,10 +664,10 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().mouseDrag({t.x + 26, t.y - 64}, {});
          }},
         // The menus of the menu bar, compared with the prototype's captures up to the ninth DAW test: the bar moved
-        // to the top of the desktop (D-302). The File menu with the submenu of Load open; STYM2149's entries: New
-        // (D-225), Recorder (D-157), Instruments and Samples (D-147, D-154), one Audio/MIDI settings entry (D-217),
+        // to the top of the desktop. The File menu with the submenu of Load open; STYM2149's entries: New,
+        // Recorder, Instruments and Samples, one Audio/MIDI settings entry,
         // Settings... at the end of Options, its window holding the Sound engine, the interface and the tooltips
-        // (D-430, scenes settings and settings_language).
+        // (scenes settings and settings_language).
         {"menu_file", {},
          [](FakeHost&, pluginui::MainWindow& w) {
              w.openMenu(1);
@@ -678,13 +678,13 @@ const std::vector<Scene>& stymScenes() {
         {"menu_options", {}, [](FakeHost&, pluginui::MainWindow& w) { w.openMenu(3); }},
         {"menu_fuji", {}, [](FakeHost&, pluginui::MainWindow& w) { w.openMenu(0); }},
         {"ins_window", someInstruments, [](FakeHost&, pluginui::MainWindow& w) { w.instruments().show(); }},
-        // Source menu: the prototype's three entries and the four with the envelope (fifth DAW test, item 48, D-246),
+        // Source menu: the prototype's three entries and the four with the envelope (fifth DAW test, item 48),
         // compared with the prototype's capture up to then.
         {"menu_source", {}, [](FakeHost&, pluginui::MainWindow& w) { click(w, "srcSel"); }},
         // The Step Sequencer, empty then with the demo pattern, compared with the prototype's captures until the gaps
-        // between the grid's columns and rows became 2 px (D-458), which make the window 64 px wider.
+        // between the grid's columns and rows became 2 px, which make the window 64 px wider.
         // Without the CMD row, shown by default since the ninth DAW test (item 117): the prototype's grid.
-        // One SLD cell lit (step 16): the CRV row shows only where a note slides (D-387), as on the prototype's grid.
+        // One SLD cell lit (step 16): the CRV row shows only where a note slides, as on the prototype's grid.
         {"seq",
          [](FakeHost& h) {
              noCmdRow(h);
@@ -722,15 +722,14 @@ const std::vector<Scene>& stymScenes() {
         {"seq_step_env", someInstruments,
          [](FakeHost& h, pluginui::MainWindow& w) { stepSound(h, w, pluginui::SeqLane::Env, 8); }},
         {"seq_vol_slide", someInstruments, volSlide},
-        // In a plugin there is no BPM row: the DAW sets the tempo (item 133, D-342).
+        // In a plugin there is no BPM row: the DAW sets the tempo (item 133).
         {"seq_cmd_plugin",
          [](FakeHost& h) {
              someInstruments(h);
              h.alone = false;
          },
          demoWithCmd},
-        // Menu of the ENV cell of step 9: No change, the shapes 8 to F with their pictures, A checked (D-347), Restart
-        // (D-355).
+        // Menu of the ENV cell of step 9: No change, the shapes 8 to F with their pictures, A checked, Restart.
         {"seq_env_menu", someInstruments,
          [](FakeHost& h, pluginui::MainWindow& w) {
              demoWithCmd(h, w);
@@ -742,7 +741,7 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().mouseMove({2, pluginui::MainWindow::kHeight - 2}, {});
          }},
         // Arpeggiator on the MIDI clock: compared with the prototype's capture up to the sixth DAW test; the divisions
-        // in a menu button (seventh DAW test, item 89, D-290) make the window narrower than the capture's.
+        // in a menu button (seventh DAW test, item 89) make the window narrower than the capture's.
         {"arp_midi",
          [](FakeHost& h) {
              set(h, 0, Track::ArpOn, 1);
@@ -750,9 +749,9 @@ const std::vector<Scene>& stymScenes() {
              h.pending = plugin::EngineStatus{};  // one publication: MIDI clock stopped (STOP), like the capture
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }},
-        // Modulation (M6): stopped, then running with a drawn table (pitch, NSE, VOL), length 12, Hold,
+        // Modulation: stopped, then running with a drawn table (pitch, NSE, VOL), length 12, Hold,
         // 2 frames per step, keyboard cursor on step 4. Compared with the prototype's #ornWin up to the fifth DAW
-        // test; the sequences below the table (D-240) make it a window of STYM2149.
+        // test; the sequences below the table make it a window of STYM2149.
         {"orn", {}, [](FakeHost&, pluginui::MainWindow& w) { w.modulation().show(); }},
         {"orn_on",
          [](FakeHost& h) {
@@ -772,7 +771,7 @@ const std::vector<Scene>& stymScenes() {
              h.editor.ornRow = 9;
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.modulation().show(); }},
-        // Sequences in the Modulation table, between its pitch and NSE rows (D-148, D-240, D-270).
+        // Sequences in the Modulation table, between its pitch and NSE rows.
         {"seqx_window", someSequences, [](FakeHost&, pluginui::MainWindow& w) { w.modulation().show(); }},
         // Menu of the MIX cell of step 9: the track's mixing table and the eight voice modes (6 Noise+Env checked).
         {"seqx_menu", someSequences,
@@ -786,7 +785,7 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().mouseMove({2, pluginui::MainWindow::kHeight - 2}, {});
          }},
         // Slider of the PER cell of step 3, opened by a right click; its value can be typed (sixth DAW test, items 74
-        // to 76, D-272 to D-274).
+        // to 76).
         {"seqx_slider", someSequences,
          [](FakeHost&, pluginui::MainWindow& w) {
              w.modulation().show();
@@ -797,7 +796,7 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().mouseUp(p, {});
              w.desktop().mouseMove({2, pluginui::MainWindow::kHeight - 2}, {});
          }},
-        // LFO of the track below the settings of the sequences (sixth DAW test, item 59, D-257): on, Sine on the pitch,
+        // LFO of the track below the settings of the sequences (sixth DAW test, item 59): on, Sine on the pitch,
         // synchronised to the tempo by 1/8 triplets, 350 cents.
         {"lfo_on",
          [](FakeHost& h) {
@@ -810,7 +809,7 @@ const std::vector<Scene>& stymScenes() {
              l.depth = 350;
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.modulation().show(); }},
-        // The same, the menu of the shapes open: their drawings (seventh DAW test, item 90, D-291).
+        // The same, the menu of the shapes open: their drawings (seventh DAW test, item 90).
         {"lfo_shapes",
          [](FakeHost& h) {
              ymengine::TrackLfo& l = h.state.tracks[0].patch.lfo;
@@ -825,18 +824,18 @@ const std::vector<Scene>& stymScenes() {
         {"sid_square", someSidSquare, {}},
         {"sid_sine", someSidSine, {}},
         {"sid_bounce", someSidBounce, {}},
-        // The menu of the SID wave's forms, open (D-411, Bounce since D-414).
+        // The menu of the SID wave's forms, open (with Bounce).
         {"sid_form_menu", someSidSquare, [](FakeHost&, pluginui::MainWindow& w) { click(w, "waveForm"); }},
         {"sync_buzzer", someBuzzer, {}},
         // Sync Buzzer generator: compared with the prototype's capture up to the eighth DAW test (the settings of the
-        // former Buzzer window ignored, D-227, D-252); with the arrows of the horizontal sliders (item 96, D-297), its
+        // former Buzzer window ignored); with the arrows of the horizontal sliders (item 96), its
         // ignored areas would exceed the 2 % of the masks.
         {"sync", {}, [](FakeHost&, pluginui::MainWindow& w) { w.pickGenerator(3); }},
         {"dma_window", someDma, [](FakeHost&, pluginui::MainWindow& w) { w.dmaWindow().showSlot(2); }},
         {"digi_window", someDigi, [](FakeHost&, pluginui::MainWindow& w) { w.digidrums().show(); }},
         // Mixer in 3 channels with the STE machine: the four YM strips, then the eight DMA tracks (panning); track 6
-        // plays a stereo sample: two oscilloscopes and two meters, left and right (D-457), two faders, two M, two S
-        // and Link, unlinked, the right side at 40 and muted (D-459).
+        // plays a stereo sample: two oscilloscopes and two meters, left and right, two faders, two M, two S
+        // and Link, unlinked, the right side at 40 and muted.
         {"dma_mixer",
          [](FakeHost& h) {
              someDma(h);
@@ -849,7 +848,7 @@ const std::vector<Scene>& stymScenes() {
              publishDma(h, w);
          }},
         // Mixer: compared with the prototype's captures up to the eighth DAW test; the values under the faders and the
-        // pans (item 99, D-300) and the Send of the delay (item 98, D-299) make it taller. 3 channels: channels A, B, C and Digidrum, faders on their 4-bit
+        // pans (item 99) and the Send of the delay (item 98) make it taller. 3 channels: channels A, B, C and Digidrum, faders on their 4-bit
         // volumes, no panning, mono output. Oscilloscope of track 3, opened from its Mixer strip.
         {"mixer", {}, [](FakeHost&, pluginui::MainWindow& w) { w.mixer().show(); }},
         {"mixer_3ch", [](FakeHost& h) { set(h, Global::VoiceMode, 1); },
@@ -859,7 +858,7 @@ const std::vector<Scene>& stymScenes() {
              w.mixer().show();
              click(w, "mixScope2");
          }},
-        // A value typed in place (24/10/2026, D-415): track 3's level being typed ("4"), the pointer on track 4's pan
+        // A value typed in place (24/10/2026): track 3's level being typed ("4"), the pointer on track 4's pan
         // value (reverse video).
         {"mixer_type", {},
          [](FakeHost&, pluginui::MainWindow& w) {
@@ -871,7 +870,7 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().keyDown(e);
              if (const auto r = w.rectOf("mixPanVal3")) w.desktop().mouseMove({r->x + r->w / 2, r->y + r->h / 2}, {});
          }},
-        // Effects window (eighth DAW test, item 98, D-299; named by the ninth, D-311): echo of track 1 on, repeated
+        // Effects window (eighth DAW test, item 98; named by the ninth): echo of track 1 on, repeated
         // by track 3, four repeats losing two steps each; delay on, synchronised to the tempo. 3 channels: the echo,
         // the delay's row greyed out.
         {"echo_delay",
@@ -892,14 +891,14 @@ const std::vector<Scene>& stymScenes() {
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.echoWindow().show(); }},
         // Arpeggiator in Table mode (grid, keyboard cursor), compared with the prototype's capture up to the grid of
-        // +0 to +24 (D-322), whose 9 added rows make the window taller than the capture's.
+        // +0 to +24, whose 9 added rows make the window taller than the capture's.
         {"arp_table",
          [](FakeHost& h) {
              set(h, 0, Track::ArpOn, 1);
              h.state.tracks[0].arp.mode = ymengine::ArpMode::Table;
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }},
-        // Arpeggio table of a chord that reaches two octaves (D-322): the offsets +0 to +24, the keyboard cursor on +0.
+        // Arpeggio table of a chord that reaches two octaves: the offsets +0 to +24, the keyboard cursor on +0.
         {"arp_chord",
          [](FakeHost& h) {
              set(h, 0, Track::ArpOn, 1);
@@ -909,8 +908,8 @@ const std::vector<Scene>& stymScenes() {
              a.length = 7;
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.arpeggiator().show(); }},
-        // Effects of a Sync Buzzer in 3 channels (ninth DAW test, item 115, D-316): the echo greyed out, its setting
-        // kept; the delay off, without its Ping-pong (D-315).
+        // Effects of a Sync Buzzer in 3 channels (ninth DAW test, item 115): the echo greyed out, its setting
+        // kept; the delay off, without its Ping-pong.
         {"echo_buzzer3",
          [](FakeHost& h) {
              h.state.tracks[0].patch.echo.on = true;
@@ -918,7 +917,7 @@ const std::vector<Scene>& stymScenes() {
              set(h, 0, Track::Generator, float(ymengine::Generator::SyncBuzzer));
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.echoWindow().show(); }},
-        // Mixer in 2x3 channels with the ST (D-284): eight YM strips, a Master per chip (1 and 2) and Link, no balance.
+        // Mixer in 2x3 channels with the ST: eight YM strips, a Master per chip (1 and 2) and Link, no balance.
         {"mixer_dual", [](FakeHost& h) { set(h, Global::VoiceMode, 2); },
          [](FakeHost&, pluginui::MainWindow& w) { w.mixer().show(); }},
         // DMA track 2 selected: GENERATOR frame of the DMA type, tabs DMA1 to DMA8, Computer row on STE.
@@ -928,7 +927,7 @@ const std::vector<Scene>& stymScenes() {
              set(h, Global::FocusTrack, 6);
          },
          {}},
-        // Digi track of Authentic 3ch on slot 4 (D-213): Digidrum samples under slots 5 to 8, ST channel row, drawing.
+        // Digi track of Authentic 3ch on slot 4: Digidrum samples under slots 5 to 8, ST channel row, drawing.
         {"digi_track",
          [](FakeHost& h) {
              someDigi(h);
@@ -937,7 +936,7 @@ const std::vector<Scene>& stymScenes() {
              h.editExtras([](plugin::NonParamState& s) { s.tracks[3].patch.digidrumSlot = 3; });
          },
          {}},
-        // Recorder (D-157) in dual chip: take in progress on chip 2, kept take of chip 1.
+        // Recorder in dual chip: take in progress on chip 2, kept take of chip 1.
         {"rec_window",
          [](FakeHost& h) {
              set(h, Global::VoiceMode, 2);
@@ -948,7 +947,7 @@ const std::vector<Scene>& stymScenes() {
              h.rec.takeHz = 50;
          },
          [](FakeHost&, pluginui::MainWindow& w) { w.recorderWindow().show(); }},
-        // Extended Song (D-158): rest, note-off, backward jump, restart point; menu of the jump open.
+        // Extended Song: rest, note-off, backward jump, restart point; menu of the jump open.
         {"song_special", {},
          [](FakeHost& h, pluginui::MainWindow& w) {
              w.doDemo();
@@ -969,23 +968,23 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().mouseMove({2, pluginui::MainWindow::kHeight - 2}, {});
          },
          {}, "", 2},
-        // Translated tooltips (D-185): accented Atari ST glyphs (EmuTOS), French non-breaking space before ":".
+        // Translated tooltips: accented Atari ST glyphs (EmuTOS), French non-breaking space before ":".
         {"tip_fr", [](FakeHost& h) { h.prefs["tipLanguage"] = "fr"; },
          [](FakeHost&, pluginui::MainWindow& w) { hover(w, "srcSel"); }},
         {"tip_de", [](FakeHost& h) { h.prefs["tipLanguage"] = "de"; },
          [](FakeHost&, pluginui::MainWindow& w) { hover(w, "modeSel"); }},
-        // Settings window (Indus, 25/10/2026 19:33, D-430): SOUND ENGINE, MIDI with the expression (D-432) and
+        // Settings window (Indus, 25/10/2026 19:33): SOUND ENGINE, MIDI with the expression and
         // INTERFACE side by side; Computer ST, so the STE bass and treble greyed out; MPE off, so its bend range and
         // slide greyed out; the Renderer greyed out off Windows.
         {"settings", {}, [](FakeHost&, pluginui::MainWindow& w) { w.settingsWindow().show(); }},
-        // Its Language menu, French chosen: English, built in, then the installed languages by name (D-283).
+        // Its Language menu, French chosen: English, built in, then the installed languages by name.
         {"settings_language", [](FakeHost& h) { h.prefs["tipLanguage"] = "fr"; },
          [](FakeHost&, pluginui::MainWindow& w) {
              w.settingsWindow().show();
              click(w, "setLanguage");
          }},
         // Cancel with a setting changed in the window: the GEM box before the changes are lost (Indus, 26/10/2026
-        // 03:51, D-437).
+        // 03:51).
         {"settings_discard", {},
          [](FakeHost&, pluginui::MainWindow& w) {
              w.settingsWindow().show();
@@ -993,12 +992,12 @@ const std::vector<Scene>& stymScenes() {
              w.settingsWindow().items("setNoteNames", checked)[1].pick();
              click(w, "setCancel");
          }},
-        // Options > Register monitor Off (Indus, 25/10/2026 21:53, D-436): the keyboard and its buttons 50 px higher,
+        // Options > Register monitor Off (Indus, 25/10/2026 21:53): the keyboard and its buttons 50 px higher,
         // the window as much shorter.
         {"regs_off", [](FakeHost& h) { h.prefs["mainRegs"] = "0"; }, {}},
-        // Options > Note monitor Off (Indus, 26/10/2026 04:05, D-442): the SYSTEM frame without its Note line.
+        // Options > Note monitor Off (Indus, 26/10/2026 04:05): the SYSTEM frame without its Note line.
         {"note_off", [](FakeHost& h) { h.prefs["mainNote"] = "0"; }, {}},
-        // Resolution 1/8 chosen with notes in the patterns (Indus, 26/10/2026 14:12, D-448): the alert asks whether
+        // Resolution 1/8 chosen with notes in the patterns (Indus, 26/10/2026 14:12): the alert asks whether
         // they fit the new grid.
         {"seq_fit", noCmdRow,
          [](FakeHost&, pluginui::MainWindow& w) {
@@ -1011,7 +1010,7 @@ const std::vector<Scene>& stymScenes() {
              w.desktop().closePopups();
              if (pick) pick();
          }},
-        // Modulation of a DMA track (Indus, 26/10/2026 20:42, D-463): NSE, NP, MIX, GEN, Hard sync and the Sq and Bz
+        // Modulation of a DMA track (Indus, 26/10/2026 20:42): NSE, NP, MIX, GEN, Hard sync and the Sq and Bz
         // columns of the matrix greyed; the pitch, PER, FIX, VOL and the Tm column act.
         {"orn_dma",
          [](FakeHost& h) {
@@ -1035,10 +1034,10 @@ const std::vector<Scene>& stymScenes() {
         // 16 voices, STE machine: the DMA type in the generator menu.
         {"dma_menu", [](FakeHost& h) { set(h, Global::Computer, 1); },
          [](FakeHost&, pluginui::MainWindow& w) { click(w, "fxSel"); }},
-        // WAV export dialog (D-164, D-171): Format and Rate rows, 24-bit kept in the preferences.
+        // WAV export dialog: Format and Rate rows, 24-bit kept in the preferences.
         {"wav_dialog", [](FakeHost& h) { h.prefs["wavFormat"] = "24"; },
          [](FakeHost&, pluginui::MainWindow& w) { menuPick(w, 1, "Export pattern", "WAV"); }},
-        // Computer Keyboard on a Chipdrum track (D-229): pads 1 to 8 from A to K, Kick (A) and Hat (F) held.
+        // Computer Keyboard on a Chipdrum track: pads 1 to 8 from A to K, Kick (A) and Hat (F) held.
         {"kbd_drums", [](FakeHost& h) { set(h, 0, Track::Generator, float(ymengine::Generator::Chipdrum)); },
          [](FakeHost&, pluginui::MainWindow& w) {
              w.keyboardWindow().show();
@@ -1050,7 +1049,7 @@ const std::vector<Scene>& stymScenes() {
                  w.desktop().keyDown(e);
              }
          }},
-        // Information window: credits reviewed in M8 (D-186), EmuTOS é in "Carré".
+        // Information window: credits, EmuTOS é in "Carré".
         {"info", {}, [](FakeHost&, pluginui::MainWindow& w) { menuPick(w, 0, "Information"); }},
     };
     return list;
@@ -1112,7 +1111,7 @@ Shot renderScene(const std::string& name) {
     if (!it) return {};
     const bool proto = std::any_of(scenes().begin(), scenes().end(), [&](const Scene& sc) { return sc.name == name; });
     // Scenes of the prototype: its TrueType's glyphs, which start at the origin, where gemui keeps EmuTOS's place in
-    // the cell (D-266); the STYM2149 scenes check gemui's.
+    // the cell; the STYM2149 scenes check gemui's.
     struct PrototypeGlyphs {
         explicit PrototypeGlyphs(bool on) { gemui::Font::useSizes(on ? gemui::fontdata::prototype::kSizes : nullptr); }
         ~PrototypeGlyphs() { gemui::Font::useSizes(nullptr); }
@@ -1121,7 +1120,7 @@ Shot renderScene(const std::string& name) {
     } glyphs(proto);
     FakeHost host;
     // Ghost notes off, as in the prototype's captures (ghostOn = 0) and the reference renderings; STYM2149 starts
-    // with them on (D-209).
+    // with them on.
     host.editor.ghost = false;
     if (it->before) it->before(host);
     pluginui::MainWindow win(host);
@@ -1136,23 +1135,23 @@ Shot renderScene(const std::string& name) {
     shot.image.pixels = s.pixels();
     for (const char* id : it->masked)
         if (const auto r = win.rectOf(id)) shot.masks.push_back({r->x, r->y, r->w, r->h, it->decision});
-    // Step Sequencer: the notes scrolled by a bar at the edge of the window (D-294), no longer by the prototype's
+    // Step Sequencer: the notes scrolled by a bar at the edge of the window, no longer by the prototype's
     // slider beside the grid; neither place compared.
     if (proto)
         for (const char* id : {"seqTr", "seqTrProto"})
-            if (const auto r = win.rectOf(id)) shot.masks.push_back({r->x, r->y, r->w, r->h, "D-294"});
-    // Scenes of the prototype: STYM2149's Computer row inserted in the SYSTEM frame (D-155), the following rows
+            if (const auto r = win.rectOf(id)) shot.masks.push_back({r->x, r->y, r->w, r->h, "seq-scroll-bar"});
+    // Scenes of the prototype: STYM2149's Computer row inserted in the SYSTEM frame, the following rows
     // compared with their place in the capture.
     const auto row = win.rectOf("computerRow"), below = win.rectOf("systemBelow");
     if (proto && row && below)
-        shot.shifts.push_back({below->x, below->y, below->w, below->h, row->h, "D-155"});
-    // Menu bar at the top of the desktop (ninth DAW test, item 101, D-302): the band from the top of the desktop down
+        shot.shifts.push_back({below->x, below->y, below->w, below->h, row->h, "computer-row"});
+    // Menu bar at the top of the desktop (ninth DAW test, item 101): the band from the top of the desktop down
     // to the main window's title bar is not compared (the STYM2149 scene desk checks it); the window's content keeps
-    // the prototype's places. The desktop icons (item 102, D-303), absent from the prototype: their visible parts not
+    // the prototype's places. The desktop icons (item 102), absent from the prototype: their visible parts not
     // compared either.
     if (proto) {
         constexpr int kBand = pluginui::MainWindow::kWinY + 6 + gemui::TitleBar::kHeight;
-        shot.masks.push_back({0, 0, s.width(), kBand, "D-302"});
+        shot.masks.push_back({0, 0, s.width(), kBand, "menu-bar-top"});
         std::vector<gemui::Rect> front;  // what covers the icons: the windows, then the menus and the alerts
         bool above = false;
         for (const gemui::Widget* c : win.children()) {
@@ -1169,28 +1168,28 @@ Shot renderScene(const std::string& name) {
                     for (const gemui::Rect& m : minus(r, f)) left.push_back(m);
                 parts = std::move(left);
             }
-            for (const gemui::Rect& r : parts) shot.masks.push_back({r.x, r.y, r.w, r.h, "D-303"});
+            for (const gemui::Rect& r : parts) shot.masks.push_back({r.x, r.y, r.w, r.h, "desk-icons"});
         }
     }
-    // Menu of a control, its frame on the control's rule (D-396): compared with the capture's, kMenuLift px lower (6 px
-    // gap, its frame under the rule); the strip it left, under it, ignored. Shape R13 menu without the shapes 0 to 7
-    // (D-221): its eight rows compared with the last eight of the capture, eight rows lower still; the place of those,
+    // Menu of a control, its frame on the control's rule: compared with the capture's, kMenuLift px lower (6 px
+    // gap, its frame under the rule); the strip it left, under it, ignored. Shape R13 menu without the shapes 0 to 7:
+    // its eight rows compared with the last eight of the capture, eight rows lower still; the place of those,
     // under the menu, ignored.
     const auto menu = win.rectOf("anchoredMenu");
     const auto shapes = win.rectOf("shapeMenu"), gone = win.rectOf("shapeMenuGone");
     if (proto && shapes && gone) {
-        shot.shifts.push_back({shapes->x, shapes->y, shapes->w, shapes->h, -gone->h - kMenuLift, "D-221", 0});
-        shot.masks.push_back({gone->x, gone->y, gone->w, gone->h + kMenuLift, "D-221"});
+        shot.shifts.push_back({shapes->x, shapes->y, shapes->w, shapes->h, -gone->h - kMenuLift, "shape-menu", 0});
+        shot.masks.push_back({gone->x, gone->y, gone->w, gone->h + kMenuLift, "shape-menu"});
     } else if (proto && menu) {
-        shot.shifts.push_back({menu->x, menu->y, menu->w, menu->h, -kMenuLift, "D-396", 0});
-        shot.masks.push_back({menu->x, menu->bottom(), menu->w, kMenuLift, "D-396"});
+        shot.shifts.push_back({menu->x, menu->y, menu->w, menu->h, -kMenuLift, "menu-on-rule", 0});
+        shot.masks.push_back({menu->x, menu->bottom(), menu->w, kMenuLift, "menu-on-rule"});
     }
     // Rows of the main window changed by the ninth DAW test, not compared (the STYM2149 scenes check them to the
-    // pixel): Vibrato's Depth and Rate (item 103, D-304), Source's Volume and Level (item 104, D-305), the info cell of
-    // the register monitor (item 105, D-306), the ADSR rows (item 106, D-307), and the row of the window buttons with
-    // Effects (item 110, D-311), across the width of the oscilloscope: it replaces the comparison of the centred row
-    // with the prototype's (D-247). The same for the rows that the twelfth DAW test aligned on the sliders of Volume
-    // and Level: Source, Voicing and Mode (item 159, D-368), the Noise period slider (item 160, D-369). What a window,
+    // pixel): Vibrato's Depth and Rate (item 103), Source's Volume and Level (item 104), the info cell of
+    // the register monitor (item 105), the ADSR rows (item 106), and the row of the window buttons with
+    // Effects (item 110), across the width of the oscilloscope: it replaces the comparison of the centred row
+    // with the prototype's. The same for the rows that the twelfth DAW test aligned on the sliders of Volume
+    // and Level: Source, Voicing and Mode (item 159), the Noise period slider (item 160). What a window,
     // a menu or an alert covers there stays compared.
     if (proto) {
         std::vector<gemui::Rect> front;
@@ -1211,18 +1210,18 @@ Shot renderScene(const std::string& name) {
             }
             for (const gemui::Rect& p : parts) shot.masks.push_back({p.x, p.y, p.w, p.h, decision});
         };
-        for (const auto& [id, decision] : {std::pair{"vibRows", "D-304"}, std::pair{"volRow", "D-305"},
-                                           std::pair{"levelRow", "D-305"}, std::pair{"regInfo", "D-306"},
-                                           std::pair{"adsrRows", "D-307"}, std::pair{"srcRow", "D-368"},
-                                           std::pair{"polyRow", "D-368"}, std::pair{"vmRow", "D-368"},
-                                           std::pair{"npRow", "D-369"}})
+        for (const auto& [id, decision] : {std::pair{"vibRows", "vibrato-widths"}, std::pair{"volRow", "source-widths"},
+                                           std::pair{"levelRow", "source-widths"}, std::pair{"regInfo", "register-monitor"},
+                                           std::pair{"adsrRows", "adsr-sliders"}, std::pair{"srcRow", "source-sliders-first"},
+                                           std::pair{"polyRow", "source-sliders-first"}, std::pair{"vmRow", "source-sliders-first"},
+                                           std::pair{"npRow", "noise-slider-last"}})
             if (const auto r = win.rectOf(id)) uncovered(*r, decision);
         const auto btns = win.rectOf("winButtons"), scope = win.rectOf("scope");
-        if (btns && scope) uncovered({scope->x, btns->y, scope->w, btns->h}, "D-311");
+        if (btns && scope) uncovered({scope->x, btns->y, scope->w, btns->h}, "effects-button");
     }
-    // Control rows of the Step Sequencer in the order of the thirteenth DAW test (item 166, D-375): each compared with
+    // Control rows of the Step Sequencer in the order of the thirteenth DAW test (item 166): each compared with
     // its place in the capture, where the rows came in the order of the prototype's DOM, that of SeqLane. The cells
-    // crossed from the sound of their step (item 165, D-374), which the prototype left as they are, not compared.
+    // crossed from the sound of their step (item 165), which the prototype left as they are, not compared.
     if (proto && win.sequencer().isOpen()) {
         const pluginui::SeqGrid& g = win.sequencer().grid();
         std::vector<std::pair<pluginui::SeqLane, gemui::Rect>> shown;  // in the order of SeqLane
@@ -1237,28 +1236,28 @@ Shot renderScene(const std::string& name) {
             int y = byY[0].y;
             const gemui::Rect gb = g.bounds();
             for (const auto& [lane, r] : shown) {
-                if (r.y != y) shot.shifts.push_back({gb.x, r.y, gb.w, r.h, r.y - y, "D-375", 0});
+                if (r.y != y) shot.shifts.push_back({gb.x, r.y, gb.w, r.h, r.y - y, "row-order", 0});
                 y += r.h + gap;
                 for (int c = 0; c < pluginui::SeqGrid::kCols; ++c)
                     if (g.laneCrossed(c, lane)) {
                         const gemui::Rect cell = g.laneRect(c, lane);
-                        shot.masks.push_back({cell.x, cell.y, cell.w, cell.h, "D-374"});
+                        shot.masks.push_back({cell.x, cell.y, cell.w, cell.h, "crossed-cells"});
                     }
             }
         }
     }
-    // Main window without the prototype's help line (D-267): its bottom margin and border kHelpLine px higher, the
+    // Main window without the prototype's help line: its bottom margin and border kHelpLine px higher, the
     // desktop where the line was.
     const auto bottom = win.rectOf("mainBottom"), helpLine = win.rectOf("mainGone");
     if (proto && bottom && helpLine) {
-        shot.shifts.push_back({bottom->x, bottom->y, bottom->w, bottom->h, -helpLine->h, "D-267"});
-        Dim desk{helpLine->x, helpLine->y, helpLine->w, helpLine->h, 0, 0, "D-267"};
+        shot.shifts.push_back({bottom->x, bottom->y, bottom->w, bottom->h, -helpLine->h, "no-shortcut-line"});
+        Dim desk{helpLine->x, helpLine->y, helpLine->w, helpLine->h, 0, 0, "no-shortcut-line"};
         desk.desktopRow = helpLine->bottom();  // the capture's window ends there
         shot.dims.push_back(desk);
     }
-    // Frames moved by the sixth DAW test (D-268), compared with their place in the capture: VIBRATO under SOURCE
+    // Frames moved by the sixth DAW test, compared with their place in the capture: VIBRATO under SOURCE
     // (its new On/Off row not compared, the STYM2149 scenes check it), ADSR and ADSR ENVELOPE under ENVELOPE, whose
-    // Shape R13 row moved up by the 16 px space it lost (D-255); SOURCE and GENERATOR end at the new bottoms of their
+    // Shape R13 row moved up by the 16 px space it lost; SOURCE and GENERATOR end at the new bottoms of their
     // columns.
     const auto src = win.rectOf("srcFrame"), env = win.rectOf("envFrame"), vib = win.rectOf("vibFrame"),
                adsr = win.rectOf("adsrFrame"), curve = win.rectOf("curveFrame"), gen = win.rectOf("genFrame"),
@@ -1273,7 +1272,7 @@ Shot renderScene(const std::string& name) {
     if (proto && src && env && vib && adsr && curve && gen && shape && vibOn) {
         const int c1 = src->x, c2 = env->x, c3 = gen->x, w = env->w;
         auto move = [&](int x, int y, int h, int dx, int dy, int band = 0) {
-            Shift m{x, y, w, h, dy, "D-268", band};
+            Shift m{x, y, w, h, dy, "main-columns", band};
             m.dx = dx;
             shot.shifts.push_back(m);
         };
@@ -1290,10 +1289,10 @@ Shot renderScene(const std::string& name) {
         move(c1, src->bottom(), vibOn->y - src->bottom(), c1 - c2, src->bottom() - (kProtoVib - 10));
         const int rows = vibOn->bottom() + 6;                                      // Depth and Rate, under On/Off
         move(c1, rows, vib->bottom() - rows, c1 - c2, rows - kProtoVibRows, rows - vibOn->y);
-        // VIBRATO of a percussion track dimmed like ADSR (D-254), the prototype left it as it is.
+        // VIBRATO of a percussion track dimmed like ADSR, the prototype left it as it is.
         if (win.rectOf("vibInert")) {
             const auto veil = [&](int y, int h, int dy) {
-                Dim d{c1, y, w, h, gemui::kOpacityInert, gemui::colors::kWhite, "D-254, D-268"};
+                Dim d{c1, y, w, h, gemui::kOpacityInert, gemui::colors::kWhite, "vibrato-on-off, main-columns"};
                 d.dx = c1 - c2;
                 d.dy = dy;
                 shot.dims.push_back(d);
@@ -1306,7 +1305,7 @@ Shot renderScene(const std::string& name) {
         const int extra = gen->bottom() - 4 - (kProtoGenEnd - 4);
         move(c3, kProtoGenEnd - 4, extra, 0, extra);
         const uint32_t inside = s.pixels()[size_t(gen->bottom() - 6) * size_t(s.width()) + size_t(c3 + 6)];
-        shot.dims.push_back({c3 + 3, kProtoGenEnd - 4, w - 6, extra, 0, inside, "D-268"});
+        shot.dims.push_back({c3 + 3, kProtoGenEnd - 4, w - 6, extra, 0, inside, "main-columns"});
         // A menu or an alert covers the same place in both images: where it covers the former place of a moved zone
         // in the capture but not its new place, that part is compared with the capture of the same window without it
         // (Scene::alt), or not compared.
@@ -1316,14 +1315,14 @@ Shot renderScene(const std::string& name) {
         const size_t moved = shot.shifts.size();
         for (size_t k = 0; k < moved; ++k) {
             const Shift m = shot.shifts[k];  // a copy: the loop adds to shot.shifts
-            if (m.decision != "D-268") continue;
+            if (m.decision != "main-columns") continue;
             for (const gemui::Rect& c : covers)
                 for (const gemui::Rect& r : minus(c.translated(m.dx, m.dy).intersect({m.x, m.y, m.w, m.h}), c)) {
                     if (!*it->alt) {
-                        shot.masks.push_back({r.x, r.y, r.w, r.h, "D-268"});
+                        shot.masks.push_back({r.x, r.y, r.w, r.h, "main-columns"});
                         continue;
                     }
-                    Shift seen{r.x, r.y, r.w, r.h, m.dy, "D-268", 0};
+                    Shift seen{r.x, r.y, r.w, r.h, m.dy, "main-columns", 0};
                     seen.dx = m.dx;
                     seen.alt = true;
                     shot.shifts.push_back(seen);
@@ -1331,11 +1330,11 @@ Shot renderScene(const std::string& name) {
         }
     }
     // Frames dimmed where the prototype left them as they are: ADSR and ADSR ENVELOPE of a drum track, ADSR ENVELOPE
-    // of a Sync Buzzer in Chip mode (D-220); at their new places (D-268).
+    // of a Sync Buzzer in Chip mode; at their new places.
     if (proto)
         for (const char* id : {"adsrInert", "curveInert"})
             if (const auto r = win.rectOf(id)) {
-                Dim d{r->x, r->y, r->w, r->h, gemui::kOpacityInert, gemui::colors::kWhite, "D-220"};
+                Dim d{r->x, r->y, r->w, r->h, gemui::kOpacityInert, gemui::colors::kWhite, "adsr-greyed"};
                 d.dy = adsrDy;
                 if (id[0] == 'c') {
                     d.dx = curveDx;
@@ -1351,13 +1350,12 @@ Shot renderScene(const std::string& name) {
                 }
                 shot.dims.push_back(d);
             }
-    // ENVELOPE of a drum or DMA track dimmed (D-378), the prototype left it as it is: its Shape R13 row 16 px higher
-    // (D-255).
+    // ENVELOPE of a drum or DMA track dimmed, the prototype left it as it is: its Shape R13 row 16 px higher.
     if (proto && shape)
         if (const auto r = win.rectOf("envInert")) {
             const int cut = shape->y - 4;
-            shot.dims.push_back({r->x, r->y, r->w, cut - r->y, gemui::kOpacityInert, gemui::colors::kWhite, "D-378"});
-            Dim low{r->x, cut, r->w, r->bottom() - cut, gemui::kOpacityInert, gemui::colors::kWhite, "D-378"};
+            shot.dims.push_back({r->x, r->y, r->w, cut - r->y, gemui::kOpacityInert, gemui::colors::kWhite, "greyed-dma-drums"});
+            Dim low{r->x, cut, r->w, r->bottom() - cut, gemui::kOpacityInert, gemui::colors::kWhite, "greyed-dma-drums"};
             low.dy = -kProtoShapeDrop;
             shot.dims.push_back(low);
         }
@@ -1377,7 +1375,7 @@ Shot renderScene(const std::string& name) {
                     break;
                 }
         }
-    // SOURCE controls greyed out where the sound does not use them (D-253, D-261, D-262), black in the prototype: under
+    // SOURCE controls greyed out where the sound does not use them, black in the prototype: under
     // the veil of the frame's background (white, or veiled under an alert); a greyed label also turns grey, which on
     // the capture's black text amounts to a lighter veil.
     const auto srcFrame = win.rectOf("srcFrame");
@@ -1389,10 +1387,10 @@ Shot renderScene(const std::string& name) {
             double alpha = g->opacity();
             if (dynamic_cast<const gemui::Label*>(g))
                 alpha *= 1 - double(gemui::colors::kGreyDisabled >> 16 & 0xFF) / 255;
-            shot.dims.push_back({r.x, r.y, r.w, r.h, alpha, under, "D-253, D-261, D-262"});
+            shot.dims.push_back({r.x, r.y, r.w, r.h, alpha, under, "noise-greyed, sync-buzzer-greyed, sid-voice-greyed"});
         }
     }
-    // Horizontal sliders: an arrow at each end (D-297); its 8 × 10 glyph not compared, the rest of the cell and the
+    // Horizontal sliders: an arrow at each end; its 8 × 10 glyph not compared, the rest of the cell and the
     // thumb's shortened run are. Not for a glyph already ignored, or hidden under a window, a menu or an alert.
     if (proto) {
         const gemui::Desktop& desk = win.desktop();
@@ -1409,7 +1407,7 @@ Shot renderScene(const std::string& name) {
                 for (const bool right : {false, true}) {
                     const gemui::Rect r = sl->arrowRect(right);
                     const gemui::Rect g{r.x + (r.w - 8) / 2, r.y + (r.h - 10) / 2, 8, 10};
-                    if (!hidden(g)) shot.masks.push_back({g.x, g.y, g.w, g.h, "D-297"});
+                    if (!hidden(g)) shot.masks.push_back({g.x, g.y, g.w, g.h, "slider-arrows"});
                 }
             for (const gemui::Widget* c : w.children()) walk(*c);
         };

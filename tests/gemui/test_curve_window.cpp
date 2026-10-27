@@ -1,5 +1,5 @@
-// STYM2149 — Slide Curve window (M5): opened by the Custom entry of the CRV row, drawing with the mouse, Linear,
-// Smooth, Invert, warning for a curve that misses the target note, neither Escape nor undo (D-130), place kept.
+// STYM2149 — Slide Curve window: opened by the Custom entry of the CRV row, drawing with the mouse, Linear,
+// Smooth, Invert, warning for a curve that misses the target note, neither Escape nor undo, place kept.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_approx.hpp>
@@ -77,7 +77,7 @@ void click(MainWindow& w, const std::string& id) {
 }
 
 // Entry `index` of the curve menu opened below cell `cell`: 13 entries of 20 px and 4 separators of 8 px (before
-// entries 4, 7, 9 and 12) inside a 2 px border on the cell's bottom rule, or above it if it does not fit (D-396).
+// entries 4, 7, 9 and 12) inside a 2 px border on the cell's bottom rule, or above it if it does not fit.
 void pickCurve(MainWindow& w, const gemui::Rect& cell, int index) {
     REQUIRE(w.desktop().hasPopups());
     constexpr std::array<int, 4> seps = {4, 7, 9, 12};
@@ -119,7 +119,7 @@ TEST_CASE("Slide Curve: the Custom entry of the CRV row opens the window; Escape
     CHECK_FALSE(w.slideCurve().isOpen());
     CHECK_FALSE(w.rectOf("curveWin"));
 
-    h.editExtras([](plugin::NonParamState& s) { s.seq.cur().edit(0).slide[0] = 1; });  // the CRV row (D-387)
+    h.editExtras([](plugin::NonParamState& s) { s.seq.cur().edit(0).slide[0] = 1; });  // the CRV row
     w.tick(0);
     w.sequencer().show();
     const gemui::Rect cell = w.sequencer().grid().laneRect(0, SeqLane::Slc);
@@ -162,7 +162,7 @@ TEST_CASE("Slide Curve: drawing with the mouse, without an undo step", "[ui][cur
     w.desktop().mouseMove(at(w, 3, 0.5), {});
     w.desktop().mouseDown(at(w, 3, 0.5), gemui::MouseButton::Left, {});
     CHECK(h.table()[3] == Approx(0.5));
-    w.desktop().mouseDrag(at(w, 3, 0.25), {});  // in the same column, downwards too (D-130)
+    w.desktop().mouseDrag(at(w, 3, 0.25), {});  // in the same column, downwards too
     CHECK(h.table()[3] == Approx(0.25));
     w.desktop().mouseDrag(at(w, 5, 0.75), {});
     CHECK(h.table()[5] == Approx(0.75));
@@ -188,7 +188,7 @@ TEST_CASE("Slide Curve: drawing with the mouse, without an undo step", "[ui][cur
 
     CHECK(g.pointerAt(at(w, 4, 0.5)) == gemui::Pointer::Crosshair);
     CHECK(g.pointerAt({300, 243}) == gemui::Pointer::Arrow);
-    // Neither the prototype nor gemui make it an undo step (D-130).
+    // Neither the prototype nor gemui make it an undo step.
     CHECK(h.editor.undo.undoSize() == 0);
 }
 
@@ -206,7 +206,7 @@ TEST_CASE("Slide Curve: Linear, Smooth, Invert and warning", "[ui][curve]") {
     CHECK(h.table()[16] == Approx(0.75));
     CHECK(h.table()[31] == 1.0f);
 
-    // Invert: the whole curve upside down, straight parts included (sixth DAW test, item 65, D-263).
+    // Invert: the whole curve upside down, straight parts included (sixth DAW test, item 65).
     setTable(h, w, [](int i) { return i < 8 ? float(std::pow(i / 7.0, 2)) * 0.25f : float(i / 31.0); });
     const auto drawn = h.table();
     click(w, "curveInvert");

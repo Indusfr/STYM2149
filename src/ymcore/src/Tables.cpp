@@ -3,7 +3,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Tables of AtariAudio 1.26 (ym2149_tables.h, © 2026 Arnaud Carré, MIT licence): envelope shapes
-// and mixing table measured by Paulo Simoes on an Atari ST, interpolated to 32×32×32 by A. Carré (D-013).
+// and mixing table measured by Paulo Simoes on an Atari ST, interpolated to 32×32×32 by A. Carré.
 // The original file is included as is from third_party/AtariAudio/src.
 #include <cstdint>
 #include "ymcore/Ym2149.h"

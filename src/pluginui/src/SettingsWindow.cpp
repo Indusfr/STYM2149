@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: Settings window (sound engine, MIDI and interface settings, D-430)
+// STYM2149 — pluginui: Settings window (sound engine, MIDI and interface settings)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/SettingsWindow.h"
@@ -31,7 +31,7 @@ constexpr double kTop = 26;       // from a frame's top to its first row (the le
 constexpr double kBottom = 10;    // from the last row to the frame's bottom rule
 constexpr double kColGap = 12;    // between the two columns
 constexpr double kFrameGap = 8;   // between two frames of a column
-constexpr double kButtonsTop = 12;  // from the frames' bottom to Cancel and OK (D-435)
+constexpr double kButtonsTop = 12;  // from the frames' bottom to Cancel and OK
 constexpr double kButtonsGap = 14;  // between Cancel and OK, as in the alert boxes
 
 constexpr std::array<const char*, 4> kLayoutNames = {"Auto (detect)", "QWERTY", "AZERTY", "QWERTZ"};
@@ -97,7 +97,7 @@ constexpr const char* kSteWhy = "STE only: set Computer to STE";
 constexpr const char* kRendererWhy = "Renderer: Windows only";
 constexpr const char* kMpeModeWhy = "MPE: 16 ch only";
 constexpr const char* kMpeOffWhy = "MPE: set MPE to On";
-// Bend ranges of the MPE notes offered (D-432): small ones, then the octaves up to the 96 semitones of the
+// Bend ranges of the MPE notes offered: small ones, then the octaves up to the 96 semitones of the
 // parameter; 48 is the MPE default.
 constexpr std::array kMpeBends = {1, 2, 3, 4, 5, 7, 12, 24, 36, 48, 60, 72, 84, 96};
 constexpr const char* kFolderTip = "Open the folder of the language files, to add a translation or change one";
@@ -132,7 +132,7 @@ void SettingsWindow::build() {
         add(btns_[size_t(r)]);
     }
     // Tuning A4 in Hz with two decimals ("440.00 Hz"), its input mask one 9 per digit, its unit shown while it is
-    // typed too (Indus, 25/10/2026 21:50, D-434).
+    // typed too (Indus, 25/10/2026 21:50).
     a4v_.setMinChars(9);
     a4v_.setMask("999.99 Hz");
     a4v_.setTip(kSpecs[kA4].tip);
@@ -146,7 +146,7 @@ void SettingsWindow::build() {
 }
 
 void SettingsWindow::wire() {
-    // Closed by Cancel, the close box or Escape: the settings changed in the window put back (D-435).
+    // Closed by Cancel, the close box or Escape: the settings changed in the window put back.
     onClose = [this] {
         if (!keep_) putBack();
         keep_ = false;
@@ -156,7 +156,7 @@ void SettingsWindow::wire() {
     for (int r = 0; r < kRows; ++r) {
         if (r == kA4) continue;
         btns_[size_t(r)].onClick = [this, r] {
-            // The languages of the files read again at each opening, as the Options menu did (D-283).
+            // The languages of the files read again at each opening, as the Options menu did.
             if (r == kLanguage) {
                 m_.scanTipLanguages();
                 m_.applyTipLanguage();
@@ -191,7 +191,7 @@ void SettingsWindow::cancel() {
         close();
         return;
     }
-    // Changes to lose: asked first, as File > New and Quit do (Indus, 26/10/2026 03:51, D-437); Cancel, the default
+    // Changes to lose: asked first, as File > New and Quit do (Indus, 26/10/2026 03:51); Cancel, the default
     // button of the box, keeps the window open with the changes.
     gemui::Alert::Spec spec;
     spec.lines = {{"Discard the changes?"}, {"The settings changed in this window will be lost."}};
@@ -347,8 +347,8 @@ std::optional<double> SettingsWindow::parseA4(const std::string& text) {
     return std::clamp(std::round(raw * 100) / 100, ymengine::kA4MinHz, ymengine::kA4MaxHz);
 }
 
-// The entries of each row's menu. Authentic 3ch (D-207): the entries an Atari ST or STE cannot play are greyed out,
-// the ones the CHIP list names; STE hardware with Computer ST (D-206): the STE output chain greyed out (its bass and
+// The entries of each row's menu. Authentic 3ch: the entries an Atari ST or STE cannot play are greyed out,
+// the ones the CHIP list names; STE hardware with Computer ST: the STE output chain greyed out (its bass and
 // treble buttons are). A value chosen before is kept and still plays, checked, until another entry is picked.
 std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
     checked = -1;
@@ -385,8 +385,8 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         std::vector<MenuItem> out = m.paramItems(Global::ChipClock, 1, checked);
         for (size_t i = MainWindow::kFirstAyClock; i < out.size(); ++i)
             notOnAtari(out[i], "Authentic 3ch: an Atari ST or STE clocks its YM at 2 MHz");
-        // Custom clock in place of 2 MHz (fourth DAW test, D-237): its frequency, typed in a prompt box, in 16
-        // channels only; greyed out in the other modes, where it plays 2 MHz (checked if chosen before, D-207).
+        // Custom clock in place of 2 MHz (fourth DAW test): its frequency, typed in a prompt box, in 16
+        // channels only; greyed out in the other modes, where it plays 2 MHz (checked if chosen before).
         MenuItem& custom = out[0];
         const uint32_t hz = m.mode3() ? uint32_t(plugin::kCustomClockDefaultHz) : plugin::customClockHz(m.values_);
         custom.label = "Custom " + MainWindow::clockMHz(hz) + " MHz...";
@@ -414,9 +414,9 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         notOnAtari(out[MainWindow::kTimerFree], "Authentic 3ch: an Atari ST or STE times its effects with the MFP");
         return out;
     }
-    // The replay tick, from the Options menu (Indus, 26/10/2026 04:03, D-441).
+    // The replay tick, from the Options menu (Indus, 26/10/2026 04:03).
     case kVbl: return m.paramItems(Global::VblRate, 1, checked);
-    case kQuantize: {  // a setting of the state, without a host parameter (spec §11, D-111)
+    case kQuantize: {  // a setting of the state, without a host parameter (spec §11)
         std::vector<MenuItem> out;
         for (int i = 0; i < 2; ++i) {
             MenuItem e = entry(i ? "On" : "Off");
@@ -453,11 +453,11 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         return out;
     }
     case kMpeSlide: return m.paramItems(Global::MpeSlide, 1, checked);
-    // Pixels of the plugin's window at a size that is not a whole multiple of the desktop (tenth DAW test, item 123,
-    // D-331): Sharp puts each pixel on whole screen pixels, Smooth (default again, eleventh DAW test, item 130,
-    // D-339) draws the letters and icons with anti-aliasing, as a browser shows the prototype.
+    // Pixels of the plugin's window at a size that is not a whole multiple of the desktop (tenth DAW test, item 123):
+    // Sharp puts each pixel on whole screen pixels, Smooth (default again, eleventh DAW test, item 130)
+    // draws the letters and icons with anti-aliasing, as a browser shows the prototype.
     case kPixels: return preference("pixels", "smooth", {{"Sharp", "sharp"}, {"Smooth", "smooth"}});
-    // How the window reaches the screen on Windows (D-420): JUCE's software renderer by default, or Direct2D. The
+    // How the window reaches the screen on Windows: JUCE's software renderer by default, or Direct2D. The
     // desktop is drawn into an image by the CPU either way; with Direct2D, a copy of the window flickered at the top
     // right of the Windows desktop for a few seconds (Indus, 24/10/2026 22:27). Greyed out elsewhere (its button).
     case kRenderer: return preference("renderer", "software", {{"Software", "software"}, {"Direct2D", "direct2d"}});
@@ -480,7 +480,7 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         checked = m.desk_.tooltips() ? 0 : 1;
         return out;
     }
-    // Tooltip language (D-185): English, built in, then the languages of the files, installed or the user's (D-283).
+    // Tooltip language: English, built in, then the languages of the files, installed or the user's.
     case kLanguage: {
         std::vector<MenuItem> out;
         for (size_t i = 0; i < m.tipChoices_.size(); ++i) {
@@ -527,7 +527,7 @@ double SettingsWindow::buttonWidth(int row) {
 }
 
 void SettingsWindow::show() {
-    if (!isOpen()) {  // a new opening: nothing changed yet (D-435)
+    if (!isOpen()) {  // a new opening: nothing changed yet
         saved_ = {};
         keep_ = false;
     }
@@ -540,14 +540,14 @@ void SettingsWindow::refresh() {
     if (!isOpen()) return;
     for (int r = 0; r < kRows; ++r)
         if (r != kA4) btns_[size_t(r)].setText(valueText(r));
-    // STE bass and treble with Computer ST (D-206): greyed out, the value chosen before kept and shown.
+    // STE bass and treble with Computer ST: greyed out, the value chosen before kept and shown.
     const bool ste = m_.ste();
     for (int r : {kBass, kTreble}) {
         btns_[size_t(r)].setEnabled(ste);
         btns_[size_t(r)].setTip(ste ? kSpecs[size_t(r)].tip : kSteWhy);
         labs_[size_t(r)].setDim(!ste);
     }
-    // MPE (D-432): 16 ch only; its bend range and slide with MPE on.
+    // MPE: 16 ch only; its bend range and slide with MPE on.
     const bool studio = !m_.mode3();
     const bool mpe = studio && m_.pv(Global::Mpe) >= 0.5f;
     btns_[kMpe].setEnabled(studio);
@@ -612,7 +612,7 @@ void SettingsWindow::layout() {
         }
         return std::pair<double, double>{w, y - kFrameGap};
     };
-    // Three columns, one frame each (the MIDI expression made the MIDI frame as tall as SOUND ENGINE, D-432).
+    // Three columns, one frame each (the MIDI expression made the MIDI frame as tall as SOUND ENGINE).
     const auto [leftW, leftBottom] = column(x0, y0, {{&engineFs_,
                                                        {kComputer, kClock, kA4, kChain, kResampling, kBass, kTreble,
                                                         kSoftClip, kTimer, kVbl, kQuantize}}});
@@ -630,7 +630,7 @@ void SettingsWindow::layout() {
         f->setBox({b.x, b.y, b.w, bottom - b.y});
     }
 
-    // Cancel and OK under the frames, centred, Cancel first (D-435).
+    // Cancel and OK under the frames, centred, Cancel first.
     const double contentW = leftW + kColGap + midW + kColGap + rightW;
     const double cw = std::ceil(cancel_.naturalWidth()), okw = std::ceil(ok_.naturalWidth());
     const double by = bottom + kButtonsTop, bh = cancel_.naturalHeight();

@@ -1,5 +1,5 @@
 #!/bin/sh
-# STYM2149 — Linux archive (M8, D-182): the plugins, the standalone application, the tooltip languages (D-283),
+# STYM2149 — Linux archive: the plugins, the standalone application, the tooltip languages,
 # install.sh and the licences.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

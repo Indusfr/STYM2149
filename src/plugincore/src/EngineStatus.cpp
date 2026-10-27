@@ -39,7 +39,7 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
     EngineStatus& t = buffer_.back();
     t.serial = ++serial_;
 
-    // The right side of a stereo DMA sample has its own fader, mute and solo (D-459).
+    // The right side of a stereo DMA sample has its own fader, mute and solo.
     auto on = [&](int k, Track f) { return value(values, k, f) >= 0.5f; };
     bool solo = false;
     for (int k = 0; k < kTracks; ++k)
@@ -68,7 +68,7 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
             newest = i;
             newestAge = v.age;
         }
-        // The curve follows each note of the track (D-403), not their echo repeats, which restart an envelope at
+        // The curve follows each note of the track, not their echo repeats, which restart an envelope at
         // each repeat (ninth DAW test, item 113).
         const bool own = v.tag != ymengine::VoiceTag::Echo;
         if (v.track == focus && own && !v.fading) drawn[size_t(drawnCount++)] = {v.age, i};

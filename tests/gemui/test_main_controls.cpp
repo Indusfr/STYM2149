@@ -1,7 +1,7 @@
-// STYM2149 — gemui tests: main window controls: track tabs (P229), All on / All off (P232), ADSR values typed in
-// (P261), envelope frequency and period typed in (P465, P466) and the frequency beside EP (D-296), keyboard destination
-// menu (P428), drum pads (P430), mouse glissando (P433), the Layer button (P434) and the ADSR frame inert on Sync
-// Buzzer (P263) and on the drums (D-205), and the Source menu with the envelope entries (D-246).
+// STYM2149 — gemui tests: main window controls: track tabs, All on / All off, ADSR values typed in,
+// envelope frequency and period typed in and the frequency beside EP, keyboard destination
+// menu, drum pads, mouse glissando, the Layer button and the ADSR frame inert on Sync
+// Buzzer and on the drums, and the Source menu with the envelope entries.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -100,7 +100,7 @@ int darkest(pluginui::MainWindow& w, const gemui::Rect& r) {
 
 }  // namespace
 
-TEST_CASE("Track tabs: a click focuses the track, a click on the focused tab turns it on or off (P229)",
+TEST_CASE("Track tabs: a click focuses the track, a click on the focused tab turns it on or off",
           "[ui][tracks]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -127,7 +127,7 @@ TEST_CASE("Track tabs: a click focuses the track, a click on the focused tab tur
     for (int t = 1; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == 0.0f);
 }
 
-TEST_CASE("All on / All off: every track of the mode, 4 in 3ch, 8 with two chips (P232, D-083)", "[ui][tracks]") {
+TEST_CASE("All on / All off: every track of the mode, 4 in 3ch, 8 with two chips", "[ui][tracks]") {
     {
         UiHost h;
         pluginui::MainWindow w(h);
@@ -136,8 +136,8 @@ TEST_CASE("All on / All off: every track of the mode, 4 in 3ch, 8 with two chips
         click(w, "allOff");
         for (int t = 0; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == 0.0f);
     }
-    // 3ch: the four tracks of the chip; two chips: eight (the prototype stopped at four, D-083); 3ch on the STE: the
-    // eight DMA tracks too (D-153). The tracks past the mode keep their state.
+    // 3ch: the four tracks of the chip; two chips: eight (the prototype stopped at four); 3ch on the STE: the
+    // eight DMA tracks too. The tracks past the mode keep their state.
     struct Case {
         int voiceMode, computer, tracks;
     };
@@ -155,11 +155,11 @@ TEST_CASE("All on / All off: every track of the mode, 4 in 3ch, 8 with two chips
     }
 }
 
-TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P261)", "[ui][adsr]") {
+TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode", "[ui][adsr]") {
     UiHost h;
     pluginui::MainWindow w(h);
 
-    // Smooth: Attack, Decay and Release 0 to 2000 ms (D-428), Sustain 0 to 100 %.
+    // Smooth: Attack, Decay and Release 0 to 2000 ms, Sustain 0 to 100 %.
     enter(w, "atkv", "2500");
     CHECK(h.p(0, Track::Attack) == 2000.0f);
     CHECK(field(w, "atkv").text() == "2000");
@@ -201,8 +201,8 @@ TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P2
     enter(w, "relv", "64");
     CHECK(h.p(0, Track::Release) == 1280.0f);
     CHECK(field(w, "relv").text() == "64");
-    // A, D and R go to the end of their sliders, 100 ticks at 50 Hz: the 2000 ms of Smooth (Indus, 18:30, D-428; A
-    // and D stopped at 50 ticks, D-085, then 64, D-427; R at 64 ticks like the prototype's).
+    // A, D and R go to the end of their sliders, 100 ticks at 50 Hz: the 2000 ms of Smooth (Indus, 18:30; A
+    // and D stopped at 50 ticks, then 64; R at 64 ticks like the prototype's).
     const auto* atk = dynamic_cast<const gemui::Slider*>(w.widgetOf("atk"));
     const auto* dcy = dynamic_cast<const gemui::Slider*>(w.widgetOf("dcy"));
     REQUIRE(atk);
@@ -225,12 +225,12 @@ TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P2
     CHECK(field(w, "atkv").text() == "2000");
 }
 
-TEST_CASE("Envelope: EP typed in decimal or $hex, frequency typed in Hz, clamped to 1..65535 (P465, P466)",
+TEST_CASE("Envelope: EP typed in decimal or $hex, frequency typed in Hz, clamped to 1..65535",
           "[ui][env]") {
     UiHost h;
     pluginui::MainWindow w(h);
     const double clk = plugin::chipClock(h.values).hz();
-    REQUIRE(field(w, "epv").text() == epText(12800));  // D-073
+    REQUIRE(field(w, "epv").text() == epText(12800));
 
     // EP: decimal or $hex, clamped; the frequency follows.
     enter(w, "epv", "$1A2B");
@@ -254,7 +254,7 @@ TEST_CASE("Envelope: EP typed in decimal or $hex, frequency typed in Hz, clamped
         CHECK(field(w, "epv").text() == epText(300));
     }
 
-    // Frequency: EP = round(clock / (256 × f)) (D-010), clamped; zero refused.
+    // Frequency: EP = round(clock / (256 × f)), clamped; zero refused.
     enter(w, "efv", "100");
     CHECK(h.p(0, Track::EnvPeriod) == float(std::round(clk / (256.0 * 100))));
     enter(w, "efv", "12.5");
@@ -268,7 +268,7 @@ TEST_CASE("Envelope: EP typed in decimal or $hex, frequency typed in Hz, clamped
     CHECK(h.p(0, Track::EnvPeriod) == 65535.0f);
 }
 
-TEST_CASE("Envelope: the frequency value on the row of EP =, the slider over the whole row (D-296)", "[ui][env]") {
+TEST_CASE("Envelope: the frequency value on the row of EP =, the slider over the whole row", "[ui][env]") {
     UiHost h;
     pluginui::MainWindow w(h);
     auto check = [&w] {
@@ -294,7 +294,7 @@ TEST_CASE("Envelope: the frequency value on the row of EP =, the slider over the
     check();
 }
 
-TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right-clicked (P428)", "[ui][kbd][tracks]") {
+TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right-clicked", "[ui][kbd][tracks]") {
     UiHost h;
     h.p(2, Track::On) = 1;
     h.p(2, Track::Generator) = float(int(Generator::Sid));
@@ -351,7 +351,7 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
           std::vector<std::string>{"Voice A [Chip Voice]", "Voice B [Chip Voice]", "Voice C [Chip Voice]",
                                    "Digi [Digidrum]"});
     key(w3, gemui::Key::Escape);
-    // On the STE, the DMA tracks follow, named as their tabs (D-153).
+    // On the STE, the DMA tracks follow, named as their tabs.
     h3.p(Global::Computer) = 1;
     w3.tick(0);
     press(w3, whiteKey(w3, 2), gemui::MouseButton::Right);
@@ -380,7 +380,7 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     CHECK(hp.take().empty());
 }
 
-TEST_CASE("Drum pads: Chipdrum names, note 48 + pad at velocity 118, released on leaving; Digidrum slots (P430)",
+TEST_CASE("Drum pads: Chipdrum names, note 48 + pad at velocity 118, released on leaving; Digidrum slots",
           "[ui][pads]") {
     UiHost h;
     h.p(0, Track::Generator) = float(int(Generator::Chipdrum));
@@ -462,7 +462,7 @@ TEST_CASE("Drum pads during playback: only the hits the engine plays light up (3
     CHECK(lit(2, 0) == std::pair{true, false});  // Dual chip 2x3ch
 }
 
-TEST_CASE("Mouse glissando: with the button held the note follows the pointer, released at the end (P433)",
+TEST_CASE("Mouse glissando: with the button held the note follows the pointer, released at the end",
           "[ui][kbd]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -486,7 +486,7 @@ TEST_CASE("Mouse glissando: with the button held the note follows the pointer, r
     CHECK(h.take() == std::vector<Midi>{{kNoteOff, 39, 0}});
 }
 
-TEST_CASE("Layer: the button switches MIDI routing between Omni and Layer and silences the notes (P434, P148, D-061)",
+TEST_CASE("Layer: the button switches MIDI routing between Omni and Layer and silences the notes",
           "[ui][kbd][layer]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -528,7 +528,7 @@ TEST_CASE("Layer: the button switches MIDI routing between Omni and Layer and si
     CHECK(layer->on());
 }
 
-TEST_CASE("ADSR on Sync Buzzer in Chip mode: the frame is inert and the mouse goes through it (P263)", "[ui][adsr]") {
+TEST_CASE("ADSR on Sync Buzzer in Chip mode: the frame is inert and the mouse goes through it", "[ui][adsr]") {
     UiHost h;
     h.p(0, Track::Generator) = float(Generator::SyncBuzzer);
     h.p(0, Track::AdsrMode) = 1;
@@ -565,7 +565,7 @@ TEST_CASE("ADSR on Sync Buzzer in Chip mode: the frame is inert and the mouse go
     CHECK(field(w, "atkv").editing());
 }
 
-TEST_CASE("ADSR on a drum track: the frame is inert in every voice mode (D-205)", "[ui][adsr]") {
+TEST_CASE("ADSR on a drum track: the frame is inert in every voice mode", "[ui][adsr]") {
     // In 3 channels the Digidrum is the fourth track (its fixed role); the other cases use the first track.
     struct Case {
         int mode;
@@ -608,7 +608,7 @@ TEST_CASE("ADSR on a drum track: the frame is inert in every voice mode (D-205)"
 }
 
 TEST_CASE("ADSR not applicable: the ADSR and ADSR ENVELOPE frames greyed out with their titles (third DAW test, "
-          "item 21, D-220)",
+          "item 21)",
           "[ui][adsr]") {
     UiHost h;
     h.p(0, Track::Generator) = float(Generator::Chipdrum);
@@ -643,7 +643,7 @@ TEST_CASE("ADSR not applicable: the ADSR and ADSR ENVELOPE frames greyed out wit
     CHECK(w.rectOf("curveInert") == curve);
 }
 
-TEST_CASE("Shape R13 menu: shapes 8 to F, a value below 8 marks the shape it plays as (third DAW test, item 22, D-221)",
+TEST_CASE("Shape R13 menu: shapes 8 to F, a value below 8 marks the shape it plays as (third DAW test, item 22)",
           "[ui][envelope]") {
     UiHost h;
     h.p(0, Track::VolMode) = 1;  // envelope
@@ -668,7 +668,7 @@ TEST_CASE("Shape R13 menu: shapes 8 to F, a value below 8 marks the shape it pla
 }
 
 TEST_CASE("Source menu: the envelope entries set Mode too, one undo step per entry; Mode follows (fifth DAW test, "
-          "item 48, D-246)",
+          "item 48)",
           "[ui][source]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -744,8 +744,7 @@ TEST_CASE("Source menu: the envelope entries set Mode too, one undo step per ent
     w.desktop().closePopups();
 }
 
-TEST_CASE("SOURCE: what the sound does not use is greyed out with its reason (sixth DAW test, items 55, 63 and 64, "
-          "D-253, D-261, D-262)",
+TEST_CASE("SOURCE: what the sound does not use is greyed out with its reason (sixth DAW test, items 55, 63 and 64)",
           "[ui][source]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -806,8 +805,7 @@ TEST_CASE("SOURCE: what the sound does not use is greyed out with its reason (si
     w.desktop().closePopups();
 }
 
-TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteenth DAW test, items 169 and 170, "
-          "D-378)",
+TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteenth DAW test, items 169 and 170)",
           "[ui][source][env]") {
     UiHost h;
     h.p(Global::Computer) = 1;  // the STE, for the DMA type in 16 ch
@@ -857,8 +855,7 @@ TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteen
     CHECK_FALSE(w.rectOf("envInert"));
 }
 
-TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the session (third DAW test, item 25, "
-          "D-224)",
+TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the session (third DAW test, item 25)",
           "[ui][windows]") {
     using pluginui::MainWindow;
     UiHost h;
@@ -887,7 +884,7 @@ TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the s
         click(w, "fxSel");
         CHECK(topMenu(w));
         w.desktop().closePopups();
-        // Kept on the desktop: its right and bottom edges on those of the desktop (Indus, 26/10/2026, D-460).
+        // Kept on the desktop: its right and bottom edges on those of the desktop (Indus, 26/10/2026).
         w.moveMainTo(5000, 5000);
         const gemui::Rect f = w.mainFrame().bounds();
         CHECK(f.right() == MainWindow::kWidth);
@@ -902,7 +899,7 @@ TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the s
     CHECK(w.rectOf("fxSel"));
 }
 
-TEST_CASE("Ctrl+D: the DMA generator on the STE, the demo pattern left to the File menu (D-301)", "[ui][kbd]") {
+TEST_CASE("Ctrl+D: the DMA generator on the STE, the demo pattern left to the File menu", "[ui][kbd]") {
     // ST: no DMA; the key does nothing else (no demo pattern, no box).
     UiHost h;
     h.state.seq.cur().edit(0).pat[0] = 5;
@@ -952,7 +949,7 @@ TEST_CASE("Typed and shown decimals do not depend on the C locale of the host", 
     CHECK(h.p(0, Track::EnvPeriod) == ep);
 }
 
-TEST_CASE("ADSR curve: one point per note sounding (Indus, 24/10/2026 11:45, D-403)", "[ui][adsr]") {
+TEST_CASE("ADSR curve: one point per note sounding (Indus, 24/10/2026 11:45)", "[ui][adsr]") {
     using pluginui::AdsrCurve;
     AdsrCurve c;
     c.setBox({0, 0, 300, 74});
@@ -1029,8 +1026,7 @@ TEST_CASE("ADSR curve: with S = 0 %, a released note ends at the end of the deca
     CHECK(AdsrCurve::liveTime(s, 4, 0) < 2000 + AdsrCurve::kHoldMs);
 }
 
-TEST_CASE("Sample drawings: every column drawn and joined to the next one where the wave jumps (Indus, 26/10/2026, "
-          "D-447)",
+TEST_CASE("Sample drawings: every column drawn and joined to the next one where the wave jumps (Indus, 26/10/2026)",
           "[ui][digidrum][dma]") {
     // A square wave: 37 samples high, 37 low. Each column of the inside of the box, below the line of text, must
     // hold black pixels touching those of the column before (the canvas of 360 columns stretched into the box left
@@ -1078,7 +1074,7 @@ TEST_CASE("Sample drawings: every column drawn and joined to the next one where 
     CHECK(joined(digi, {10, 10, 360, 72}, pluginui::DigiWave::kH) == 0);
 }
 
-TEST_CASE("The units of the typed values stay in normal video under the pointer (Indus, 26/10/2026, D-464)",
+TEST_CASE("The units of the typed values stay in normal video under the pointer (Indus, 26/10/2026)",
           "[ui][units]") {
     UiHost h;
     h.p(Global::DelayOn) = 1;

@@ -1,4 +1,4 @@
-// STYM2149 — ymengine: virtual YM channel of the 16-channel mode (D-018)
+// STYM2149 — ymengine: virtual YM channel of the 16-channel mode
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -101,7 +101,7 @@ private:
 };
 
 // Mixer rule of the chip: the channel sounds when (tone high or tone off) and (noise high or noise off); its level is
-// then that of the envelope or 2 × volume + 1 (D-011), otherwise 0.
+// then that of the envelope or 2 × volume + 1, otherwise 0.
 inline uint8_t VirtualChannel::output() const noexcept {
     if (!((edge_ || toneMasked_) && (noiseOut_ || noiseMasked_))) return 0;
     return (volume_ & 0x10u) ? ymcore::tables::kEnvData[envBase_ + uint32_t(envPos_ + 64)] : uint8_t((volume_ << 1) | 1u);

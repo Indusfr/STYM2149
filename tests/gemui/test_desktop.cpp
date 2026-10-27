@@ -1,6 +1,6 @@
 // STYM2149 — GEM desktop: the menu bar across its top and the decorative icons of the floppy disks and of the trash
-// (ninth DAW test, items 101 and 102, D-302, D-303), their pictures (those of EmuTOS: D-409, D-419, D-423); the Atari
-// logo of the menu bar (D-404).
+// (ninth DAW test, items 101 and 102), their pictures (those of EmuTOS); the Atari
+// logo of the menu bar.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -217,7 +217,7 @@ TEST_CASE("Desktop: a dragged icon leaves no trace (tenth DAW test, item 129)", 
     CHECK(diff == 0);
 }
 
-TEST_CASE("Desktop: the Atari logo of the menu bar, the outline of the real logo and its raster (24/10/2026, D-404)",
+TEST_CASE("Desktop: the Atari logo of the menu bar, the outline of the real logo and its raster (24/10/2026)",
           "[ui][desktop]") {
     const gemui::Bitmap& f = pluginui::icons::kFuji;
     REQUIRE(f.outline);
@@ -267,7 +267,7 @@ TEST_CASE("Desktop: the Atari logo of the menu bar, the outline of the real logo
     CHECK(same == f.w * f.h);
 }
 
-TEST_CASE("Desktop: the floppy disk and the trash of the EmuTOS desktop (D-409, D-419, D-423)", "[ui][desktop]") {
+TEST_CASE("Desktop: the floppy disk and the trash of the EmuTOS desktop", "[ui][desktop]") {
     namespace icons = pluginui::icons;
     // Every black pixel lies on the white of its mask, which hides the desktop pattern under the whole picture.
     using Picture = std::pair<const gemui::Bitmap*, const gemui::Bitmap*>;

@@ -6,7 +6,7 @@
 // armArpSlide, reshapeSlide, laneArpTick, cndPass, the pattern queue and the MIDI clock messages) and of the Song
 // walk of the page (songArm, songOnWrap, songOnPa), which moves to the audio thread. The countdowns (gate, CUT, RTG,
 // track arpeggios) are in host samples, as in the prototype; what they trigger is dated at the cycle of the sample
-// (at()). Deliberate deviations: D-097 to D-105 (DECISIONS.md).
+// (at()). Deliberate deviations.
 #include <cmath>
 #include <limits>
 
@@ -24,7 +24,7 @@ int64_t modPos(int64_t a, int64_t b) noexcept {
     const int64_t r = a % b;
     return r < 0 ? r + b : r;
 }
-// 32-bit mix (lowbias32) of the draws tied to the playback position (D-104).
+// 32-bit mix (lowbias32) of the draws tied to the playback position.
 uint32_t mix32(uint32_t x) noexcept {
     x ^= x >> 16;
     x *= 0x7feb352du;
@@ -39,18 +39,17 @@ double xorshiftUnit(uint32_t& s) noexcept {
     s ^= s << 5;
     return double(s) / 4294967296.0;
 }
-// Track put back at rest (stop, track switched off); full: also the chord voices and the slides of the arpeggio
-// (D-102).
+// Track put back at rest (stop, track switched off); full: also the chord voices and the slides of the arpeggio.
 void clearLane(LaneState& L, bool full) noexcept {
     L.offIn = L.cutIn = 0;
     L.arpNote = -1;
     L.tiedHold = L.slidePend = false;
     L.rtLeft = 0;
-    L.vibOff = false;  // the track's vibrato again (D-254)
+    L.vibOff = false;  // the track's vibrato again
     L.lfoOff = L.modOff = L.arp = false;  // its LFO and table, no arpeggiator (items 142 to 144)
     L.switchLane = nullptr;
     L.envIn = 0;
-    // Effects of D-338: no slide, fine tune nor shape any more; no step delayed nor cut to come.
+    // Step effects: no slide, fine tune nor shape any more; no step delayed nor cut to come.
     L.volSpeed = L.envSpeed = L.noiseSpeed = 0;
     L.fine = 0;
     L.shape = 0;
@@ -84,7 +83,7 @@ void Impl::seqLogPush(char op, int voice, int a, int b, double x, double y, doub
 
 // ---------------------------------------------------------------------------------------------------- Data
 const SeqLane& Impl::seqLane(int track) const noexcept {
-    if (!seqData || seq.pattern >= kSeqRestPattern) return emptySeqLane();  // Rest or NoteOff entry (D-158)
+    if (!seqData || seq.pattern >= kSeqRestPattern) return emptySeqLane();  // Rest or NoteOff entry
     const auto& l = seqData->patterns[size_t(std::clamp(seq.pattern, 0, kSeqPatterns - 1))].lanes[size_t(track)];
     return l ? *l : emptySeqLane();
 }
@@ -102,7 +101,7 @@ int Impl::trackLen(int track) const noexcept {
 }
 
 // Absolute note of the voice (0 = root, 1-5 = chord voices) at step s, -1 if nothing (chanPayload, polyAbs).
-// Drums: (octave of the track + 1) × 12 + row, OCT and TON transposing the hit (D-098).
+// Drums: (octave of the track + 1) × 12 + row, OCT and TON transposing the hit.
 double Impl::seqNote(const SeqLane& l, int track, int voice, int s) const noexcept {
     const int rel = voice == 0 ? l.pat[size_t(s)] : l.vpat[size_t(voice - 1)][size_t(s)];
     if (rel < 0) return -1;
@@ -114,7 +113,7 @@ double Impl::seqNote(const SeqLane& l, int track, int voice, int s) const noexce
 
 double Impl::seqBpm() const noexcept {
     if (global.seqClock == SeqClock::Host) return std::max(1.0, host.bpm);  // tempo of the host, Song blocks included
-    if (seq.cmdBpm > 0) return seq.cmdBpm;  // Txx (D-243)
+    if (seq.cmdBpm > 0) return seq.cmdBpm;  // Txx
     if (songActive()) {
         const auto& e = seqData->song[size_t(std::clamp<int>(seq.songPos, 0, int(seqData->song.size()) - 1))];
         if (e.bpm > 0) return e.bpm;
@@ -158,7 +157,7 @@ int64_t Impl::stepAt(double ppq) const noexcept {
     return 2 * pair + (u - 2.0 * double(pair) >= swingAmount() ? 1 : 0);
 }
 
-// Draw tied to the playback position (D-104): the absolute step, a track or voice index and a salt that keeps the
+// Draw tied to the playback position: the absolute step, a track or voice index and a salt that keeps the
 // uses apart (1: CND, 2: Random track arpeggio, 3: seed of the slide armed by SLD, 4: seed of a slide reshaped by
 // SLC), with the seed of the engine.
 uint32_t Impl::seqHash(int64_t stepAbs, int a, uint32_t salt) const noexcept {
@@ -166,7 +165,7 @@ uint32_t Impl::seqHash(int64_t stepAbs, int a, uint32_t salt) const noexcept {
                  uint32_t(config.seed));
 }
 
-// CND: the step only plays if its condition passes (current cycle of the track, or draw tied to the step: D-104).
+// CND: the step only plays if its condition passes (current cycle of the track, or draw tied to the step).
 bool Impl::cndPass(int cv, int64_t cycle, int track) const noexcept {
     const double r = double(seqHash(seq.stepAbs, track, 1)) / 4294967296.0;
     switch (cv) {
@@ -185,7 +184,7 @@ bool Impl::cndPass(int cv, int64_t cycle, int track) const noexcept {
 // prototype (the 4-bit volume depends on it in 3-channel mode); in 16-channel mode, the level of the track applies
 // live (mixer) and the voice only receives the accent.
 double Impl::seqLevel(int track, double vol) const noexcept {
-    // A DMA track in 3-channel mode takes its level from the mixer, as in 16-channel mode (D-153).
+    // A DMA track in 3-channel mode takes its level from the mixer, as in 16-channel mode.
     return (studio() || dmaTrack(track) ? 1.0 : std::clamp(tracks[size_t(track)].mix.level, 0.0, 1.0)) * vol / 15.0;
 }
 
@@ -208,7 +207,7 @@ void Impl::resetSeq() noexcept {
     clickCount = 0;
 }
 
-// Tracks put back at rest (stop); full: also the chord voices and the slides of the arpeggio (D-102).
+// Tracks put back at rest (stop); full: also the chord voices and the slides of the arpeggio.
 void Impl::clearLanes(bool full) noexcept {
     lanesCatchUp();
     for (LaneState& L : lanes) clearLane(L, full);
@@ -234,7 +233,7 @@ void Impl::laneOff(int i, uint64_t c) noexcept {
 
 void Impl::seqStart(uint64_t c) noexcept {
     if (seq.on) return;
-    restartLfoRuns(c);  // free LFOs from the start of the playback (D-279)
+    restartLfoRuns(c);  // free LFOs from the start of the playback
     const bool song = songActive();
     if (song) {
         songLoopReset();
@@ -242,7 +241,7 @@ void Impl::seqStart(uint64_t c) noexcept {
         seq.pattern = songEntryPattern(songFirst);
         seq.queued = -1;
     } else if (seq.pattern >= kSeqRestPattern) {
-        seq.pattern = restFallback();  // Song left on a Rest or NoteOff entry (D-158)
+        seq.pattern = restFallback();  // Song left on a Rest or NoteOff entry
     }
     seq.len = patternSteps(seq.pattern);
     seq.on = true;
@@ -251,11 +250,11 @@ void Impl::seqStart(uint64_t c) noexcept {
     seq.phase = 1;
     seq.dur = 1;
     seq.speed = std::clamp<int>(global.speed, 1, kSpeedMax);
-    seq.cmdBpm = 0;  // Play starts again from the tempo of the song (D-243)
+    seq.cmdBpm = 0;  // Play starts again from the tempo of the song
     seq.clockCount = lineHalves(seq.step) - clockWeight();
     for (LaneState& L : lanes) {
         L.polyDone = -1;  // start afresh on the chords
-        L.vibOff = false;  // Play starts with the vibrato of the tracks (D-254)
+        L.vibOff = false;  // Play starts with the vibrato of the tracks
         L.lfoOff = L.modOff = L.arp = false;  // their LFO and table, no arpeggiator (items 142 to 144)
         L.switchLane = nullptr;
     }
@@ -268,7 +267,7 @@ void Impl::seqHalt(uint64_t c) noexcept {
     seq.on = false;
     if (seq.queued >= 0) applyQueue();
     killTag(VoiceTag::Sequencer, false, c);
-    killTag(VoiceTag::Chord, false, c);  // D-102: the chord voices are released too
+    killTag(VoiceTag::Chord, false, c);  // the chord voices are released too
     clearLanes(true);
     for (int i = 0; i < kTracks; ++i) setStepPan(i, kNoPan, c);
     seqLogPush('!', -1);
@@ -286,7 +285,7 @@ void Impl::selectPattern(int pattern) noexcept {
     seq.queued = pattern == seq.pattern ? -1 : pattern;
 }
 
-// Pattern switch at step 0 (applyPatQ): the whole pattern, all rows included (D-100).
+// Pattern switch at step 0 (applyPatQ): the whole pattern, all rows included.
 void Impl::applyQueue() noexcept {
     seq.pattern = seq.queued;
     seq.queued = -1;
@@ -300,7 +299,7 @@ void Impl::applyQueue() noexcept {
 void Impl::songArm() noexcept {
     const auto& song = seqData->song;
     seq.songPos = std::clamp<int>(seq.songPos, 0, int(song.size()) - 1);
-    if (song[size_t(seq.songPos)].bpm > 0) seq.cmdBpm = 0;  // an entry with its own tempo starts at it (D-243)
+    if (song[size_t(seq.songPos)].bpm > 0) seq.cmdBpm = 0;  // an entry with its own tempo starts at it
     seq.songRep = 0;
     seq.songQueued = -1;
     seq.songWraps = false;
@@ -322,7 +321,7 @@ void Impl::songOnWrap() noexcept {
         songQueueNext(seq.songPos + 1);
 }
 
-// --------------------------------------------------------------------------------- Extended Song (D-158)
+// --------------------------------------------------------------------------------- Extended Song
 // A playable Song has an entry that is not a jump.
 bool Impl::songActive() const noexcept { return global.songMode && seqData && songFirst >= 0; }
 
@@ -418,13 +417,12 @@ void Impl::songNoteOff(uint64_t c) noexcept {
 // songStep: the chosen entry becomes the entry played. Its pattern replaces the pattern played at once
 // (loadPattern of the prototype), the current step kept as on a change of length (seq message); during playback,
 // the entry restarts at its first repeat (songArm). The pattern that the old entry had queued is dropped: the
-// prototype left it to the worklet when the new entry repeated, and the Song replayed the old sequence
-// (D-126).
+// prototype left it to the worklet when the new entry repeated, and the Song replayed the old sequence.
 void Impl::songJump(int entry) noexcept {
     if (!seqData || songFirst < 0) return;
-    if (seq.on && global.seqClock == SeqClock::Host) return;  // the host places the Song (D-110)
+    if (seq.on && global.seqClock == SeqClock::Host) return;  // the host places the Song
     const auto& song = seqData->song;
-    // A jump is not played: the playable entry that follows it, jump passed (D-158); the jumps restart from zero.
+    // A jump is not played: the playable entry that follows it, jump passed; the jumps restart from zero.
     entry = std::clamp(entry, 0, int(song.size()) - 1);
     songLoopReset();
     bool wrapped = false;
@@ -500,16 +498,16 @@ void Impl::seqTick(uint64_t c) noexcept {
             }
         }
     }
-    // Real duration of the step (swing included): gate, slides, retriggers (D-099: according to the resolution).
+    // Real duration of the step (swing included): gate, slides, retriggers (according to the resolution).
     // Host sync: the parity of the swing follows the position of the host (absolute step).
-    // Ticks (D-149): the row lasts its replay ticks (Free run) or its pulses (MIDI clock), without swing.
-    if (ticksTiming()) seqSpeedCmd();  // Sxx of the row (D-150): its duration follows the new speed
-    else if (global.seqClock == SeqClock::Internal) seqTempoCmd();  // Txx of the row (D-243): likewise
+    // Ticks: the row lasts its replay ticks (Free run) or its pulses (MIDI clock), without swing.
+    if (ticksTiming()) seqSpeedCmd();  // Sxx of the row: its duration follows the new speed
+    else if (global.seqClock == SeqClock::Internal) seqTempoCmd();  // Txx of the row: likewise
     const int swingStep = global.seqClock == SeqClock::Host ? int(modPos(seq.stepAbs, 2)) : seq.step;
     const double stepSamp = global.seqClock == SeqClock::Midi ? lineHalves(seq.step) * seq.spt / 2
                             : ticksTiming() ? double(hostRate()) * lineTicks(seq.step) / std::max<uint32_t>(1, global.vblHz)
                                             : double(hostRate()) * 60 / (seqBpm() * stepsPerBeat()) * swingFactor(swingStep);
-    if (seqLog) {  // nominal tempo of the step (MIDI exports, D-170)
+    if (seqLog) {  // nominal tempo of the step (MIDI exports)
         const double bpm = ticksTiming() ? 60.0 * std::max<uint32_t>(1, global.vblHz) /
                                                (std::clamp(seq.speed, 1, kSpeedMax) * stepsPerBeat())
                                          : seqBpm();
@@ -522,7 +520,7 @@ void Impl::seqTick(uint64_t c) noexcept {
         LaneState& L = lanes[size_t(i)];
         laneSwitches(i);
         laneLineCmds(i, stepSamp, c);
-        // Dxx (D-338): the step of the row starts at tick xx, the rest of the row being its length; a tick beyond
+        // Dxx: the step of the row starts at tick xx, the rest of the row being its length; a tick beyond
         // the row is ignored.
         const uint16_t delayCmd = lineCmd(i, SeqCmd::Delay);
         const double late = double(seqCmdParam(delayCmd)) * double(hostRate()) / std::max<uint32_t>(1, global.vblHz);
@@ -607,14 +605,14 @@ void Impl::hostClock(uint32_t dt) noexcept {
     }
     const double pps = std::max(1.0, host.bpm) / 60 / double(hostRate());  // quarter notes per sample
     const double ppq = host.ppq + (double(rI) + 0.5) * pps;  // a boundary falls on the nearest sample
-    // Half pulses (48 per quarter note, D-289) of the arpeggios set to the clock. Start or jump: the keyboard
+    // Half pulses (48 per quarter note) of the arpeggios set to the clock. Start or jump: the keyboard
     // arpeggio restarts on the grid of the host (half pulse played only if the position falls on it); the tracks,
     // relocated just after by hostLocate, do not receive any.
     const int64_t q = int64_t(std::floor(ppq * 48));
     if (q != hostPulse) {
         const bool fresh = hostPulse == kNoPulse;
         if (!fresh && q > hostPulse && q - hostPulse <= int64_t(double(dt) * pps * 48) + 1) {
-            // Tracks: every half pulse for an odd division, the whole pulses otherwise (D-289).
+            // Tracks: every half pulse for an odd division, the whole pulses otherwise.
             for (int64_t j = hostPulse + 1; j <= q; ++j)
                 if (arpHalves() || j % 2 == 0) arpPulse(at(), j, true, arpHalves() ? 1 : 2);
         } else {
@@ -667,7 +665,7 @@ void Impl::hostLocate(int64_t k, double ppq, double pps) noexcept {
 
 // State of the sequencer after absolute step last (-1: before the start): step of the pattern, or entry, repeat and
 // step of the Song, with the next entry queued as the walk of the Song would have done. False: beyond the end of a
-// Song without loop. Extended Song (D-158): the jumps unrolled in order, then the looped restart.
+// Song without loop. Extended Song: the jumps unrolled in order, then the looped restart.
 bool Impl::locateTo(int64_t last) noexcept {
     seq.stepAbs = std::max<int64_t>(last, -1);
     const bool song = songActive();
@@ -772,7 +770,7 @@ void Impl::metroTick() noexcept {
 void Impl::renderClicks(const Outputs& out, uint32_t n) noexcept {
     int next = 0;
     const double sr = double(hostRate());
-    const double level = std::min<int>(global.metronomeLevel, 100) / 100.0;  // D-288
+    const double level = std::min<int>(global.metronomeLevel, 100) / 100.0;
     for (uint32_t i = 0; i < n; ++i) {
         while (next < clickCount && clickAt[size_t(next)].first <= i) {
             const bool first = clickAt[size_t(next++)].second;
@@ -801,7 +799,7 @@ void Impl::renderClicks(const Outputs& out, uint32_t n) noexcept {
 }
 
 // ----------------------------------------------------------------------------------------------- Voices
-// ins: instrument of the step (INS row, D-147), 0 for the sound of the track.
+// ins: instrument of the step (INS row), 0 for the sound of the track.
 void Impl::laneTrigger(int i, double note, double level, int gen, double drumTr, int ins, uint64_t c) noexcept {
     const int vi = laneVoice(i);
     Voice& v = voices[size_t(vi)];
@@ -827,7 +825,7 @@ void Impl::killLane(int vi, bool hard, uint64_t c) noexcept {
 }
 
 // MIX of the step (SRC row): 1 Tone, 2 Noise, 3 Tone+Noise with the volume mode of the note; 4 Env, 5 Tone+Env,
-// 6 Noise+Env, 7 Tone+Noise+Env with the volume on the envelope (sixth DAW test, item 79, D-277). Not applicable to
+// 6 Noise+Env, 7 Tone+Noise+Env with the volume on the envelope (sixth DAW test, item 79). Not applicable to
 // the drums, the Sync Buzzer and DMA.
 void Impl::applyMix(int vi, int m, uint64_t c) noexcept {
     Voice& v = voices[size_t(vi)];
@@ -877,7 +875,7 @@ void Impl::liveFx(int vi, int track, int ins, int fxv, uint64_t c) noexcept {
     v.wavePos = 0;
     v.shape = v.trackShape;
     primeBuzz(v);
-    v.baseGen = v.gen;  // the GEN row of the sequences comes back to it (D-148)
+    v.baseGen = v.gen;  // the GEN row of the sequences comes back to it
     v.genOv = false;
     tuneEnv(v, applyPitch(v));
     startTimer(v, c);
@@ -892,7 +890,7 @@ bool Impl::polyAny(const SeqLane& l, int st) const noexcept {
     return false;
 }
 
-// D-102: each chord voice lasts its steps (rows dur2-dur6), counted at the start of each step of the track.
+// each chord voice lasts its steps (rows dur2-dur6), counted at the start of each step of the track.
 void Impl::polyAge(int i, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
     for (int k = 0; k < kSeqChordVoices; ++k) {
@@ -907,7 +905,7 @@ void Impl::polyAge(int i, uint64_t c) noexcept {
 }
 
 // Voices 2 to 6 of the step (16-channel, polyphonic tracks): five voices per track, one per rank, lent to another
-// rank while their own note is still held (D-281) or in its release (D-421).
+// rank while their own note is still held or in its release.
 void Impl::polyTrigger(int i, const SeqLane& l, int st, double level, int mix, int64_t gateHold, double drumTr,
                        int ins, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
@@ -918,7 +916,7 @@ void Impl::polyTrigger(int i, const SeqLane& l, int st, double level, int mix, i
     const TrackPatch& p = x ? x->patch : tracks[size_t(i)].patch;
     if (p.mono) return;
     const bool drum = isDrum(tracks[size_t(i)].patch.generator);
-    // Deviation (D-281, D-421): the note of rank k takes the voice of rank k while it is silent; when an earlier note
+    // Deviation: the note of rank k takes the voice of rank k while it is silent; when an earlier note
     // of the track still holds it (its steps are not over) or is in its release there, it takes a silent rank,
     // otherwise the oldest of the ranks in their release, which gives way, so that overlapping notes all sound to the
     // end of their release. The prototype gave each rank one voice, and the new note cut the one there. When every
@@ -969,7 +967,7 @@ void Impl::polyTrigger(int i, const SeqLane& l, int st, double level, int mix, i
     }
 }
 
-// Polyphonic track in 16 channels (24/10/2026, D-421): before a new note, the note of the track's voice moves, as it
+// Polyphonic track in 16 channels (24/10/2026): before a new note, the note of the track's voice moves, as it
 // sounds (its envelope, its channel and its share of the buses), to a chord voice of the track, where it goes on to
 // its release, or carries on with it; the track's voice is then free for the new note. A chord voice that no chord
 // note holds: a silent one, otherwise the oldest of those in their release, which gives way. False (the note is cut,
@@ -1091,7 +1089,7 @@ void Impl::reshapeSlide(int vi, int cv) noexcept {
     seqLogPush('H', vi, int(left), cv);
 }
 
-// End of the slide in progress. snap: the note has arrived, it settles on its target (D-105).
+// End of the slide in progress. snap: the note has arrived, it settles on its target.
 void Impl::holdGlide(int vi, bool snap, uint64_t c) noexcept {
     Voice& v = voices[size_t(vi)];
     stopGlide(v, c);
@@ -1132,13 +1130,13 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     const int st = int(modPos(seq.stepAbs, len));
     const size_t s = size_t(st);
     const bool drumTrack = isDrum(tp.patch.generator);
-    // INS of the step (D-147), not applicable to the drums; 00: the instrument chosen by Program Change (D-156).
+    // INS of the step, not applicable to the drums; 00: the instrument chosen by Program Change.
     const int insStep = drumTrack ? 0 : l.ins[s] ? l.ins[s] : program[size_t(i)];
     L.rand = seqHash(seq.stepAbs, i, 2) | 1u;  // state of the Random track arpeggio (xorshift: never 0)
     if (!drumTrack) polyAge(i, c);
     double n = seqNote(l, i, 0, st);
     const double lvl = seqLevel(i, l.vol[s]);
-    // Gxx (D-393): the level of the step glides to that of the next step over the step, frame after frame (the notes
+    // Gxx: the level of the step glides to that of the next step over the step, frame after frame (the notes
     // attacked here wake their VBL frames for it, laneSliding; those that sound already wake now).
     if (!drumTrack && l.cmdAt(SeqCmd::VolGlide, st)) {
         L.vg = true;
@@ -1150,12 +1148,12 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
             if (!isDrum(w.gen)) wakeVbl(w, c);
         });
     }
-    const double drumTr = drumTrack ? std::pow(2.0, (l.oct[s] * 12 + l.ton[s]) / 12.0) : 1.0;  // D-098
+    const double drumTr = drumTrack ? std::pow(2.0, (l.oct[s] * 12 + l.ton[s]) / 12.0) : 1.0;
     if (n < 0 && polyAny(l, st))  // chord without a root
         polyTrigger(i, l, st, lvl, l.mix[s], std::max<int64_t>(1, int64_t(std::floor(stepSamp))), drumTr, insStep, c);
     Voice* v = &voices[size_t(vi)];
     if (n >= 0 && l.cnd[s] && !cndPass(l.cnd[s], floorDiv(seq.stepAbs, len), i)) n = -1;
-    // RTG: retriggers of the step (D-101: the sound of the step, level × 0.92).
+    // RTG: retriggers of the step (the sound of the step, level × 0.92).
     L.rtLeft = 0;
     if (n >= 0 && l.rtg[s] > 0) {
         const int hits = l.rtg[s] + 1;
@@ -1172,8 +1170,8 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     // PAN row: v × 10 + 101 for v from −10 to +10, so −1 to 1; 0 leaves the panning of the mixer.
     setStepPan(i, l.pnr[s] ? (l.pnr[s] - 101) / 100.0 : kNoPan, c);
     // 3-channel: a Digidrum occupies the channel of the track (stolen channel); the melodic track gives up its step.
-    // (In 16-channel mode, the voice of the track is its own: a Digidrum there comes from an instrument of the track,
-    // D-147.)
+    // (In 16-channel mode, the voice of the track is its own: a Digidrum there comes from an instrument of the
+    // track.)
     if (!studio() && v->on && v->gen == Generator::Digidrum && tp.patch.generator != Generator::Digidrum) {
         L.offIn = 0;
         return;
@@ -1198,7 +1196,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     }
     // ---- Melodic track ----
     const bool sounding = v->on && v->tag == VoiceTag::Sequencer && !v->fading() && v->stage != 4;
-    // Instrument (D-147): that of the step for an attacked note; ties, slides and a note reached by a slide
+    // Instrument: that of the step for an attacked note; ties, slides and a note reached by a slide
     // keep that of the sounding note.
     if (n >= 0 && !(L.slidePend && sounding)) L.ins = insStep;
     if (n >= 0) L.heldNote = n;
@@ -1221,7 +1219,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
             }
             applyMixDef(vi, i, L.ins, mix, c);
             liveFx(vi, i, L.ins, l.fx[s], c);
-            forLaneVoices(i, [&](int k, Voice&) { relevel(k, i, L.ins, lvl, c); });  // VOL (D-345)
+            forLaneVoices(i, [&](int k, Voice&) { relevel(k, i, L.ins, lvl, c); });  // VOL
             L.arpLvl = lvl;
             return;
         }
@@ -1260,7 +1258,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
         // Hold of the target note: the duration consumed by the slide does not shorten it.
         L.offIn = std::max(L.offIn, L.arp && arpOn ? std::max<int64_t>(1, int64_t(std::floor(stepSamp))) : gateHold);
         v->accent = studio() ? lvl : 1;
-        if (v->hardSync) syncRestart(*v, c);  // Hard sync (D-148): the target note restarts square and timer
+        if (v->hardSync) syncRestart(*v, c);  // Hard sync: the target note restarts square and timer
         seqLogPush('L', vi, 0, 0, v->accent);
         touch(vi, c);
         applyMixDef(vi, i, L.ins, mix, c);
@@ -1286,7 +1284,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
             L.arpHold = false;
         }
     } else {
-        if (!laneTail(i, c)) killLane(vi, false, c);  // a polyphonic track lets the note before go on (D-421)
+        if (!laneTail(i, c)) killLane(vi, false, c);  // a polyphonic track lets the note before go on
         L.arpNote = -1;
         const int fxv = std::min<int>(l.fx[s], 4);
         const int effOv = fxv ? kSeqFxGen[size_t(fxv)] : -1;
@@ -1329,10 +1327,10 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     }
 }
 
-// A step that a held note crosses (TIE, eleventh DAW test, items 134 and 136, D-343, D-345): its rows act on the
+// A step that a held note crosses (TIE, eleventh DAW test, items 134 and 136): its rows act on the
 // note as on an attacked one. VOL sets the level of the sounding note, RTG strikes it again 2, 3 or 4 times in the
 // step (from its start), ARP On starts the arpeggio of the track on it, or resumes it, ARP Off on the step stops it
-// there and the note goes on at its own pitch (D-379; a step without ARP leaves a running arpeggio as it is, even at
+// there and the note goes on at its own pitch (a step without ARP leaves a running arpeggio as it is, even at
 // the start of a pattern), GAT on the last step of the note releases it at that share of the step. PAN, SRC, GEN and CRV were already read at each step; during a slide
 // (SLD) only VOL acts.
 void Impl::heldStep(int i, const SeqLane& l, size_t s, double level, double stepSamp, bool arpOn, uint64_t c) noexcept {
@@ -1391,7 +1389,7 @@ void Impl::heldStep(int i, const SeqLane& l, size_t s, double level, double step
     }
 }
 
-// VOL of a held step (D-345): the level of a sounding voice of track i, as setupVoice gives it at the attack (the
+// VOL of a held step: the level of a sounding voice of track i, as setupVoice gives it at the attack (the
 // 4-bit volume of the sound lowered in 3-channel mode, the audio gain in 16-channel mode and for DMA).
 void Impl::relevel(int vi, int track, int ins, double level, uint64_t c) noexcept {
     Voice& v = voices[size_t(vi)];
@@ -1401,7 +1399,7 @@ void Impl::relevel(int vi, int track, int ins, double level, uint64_t c) noexcep
     touch(vi, c);
 }
 
-// The level itself, also set frame after frame by a Gxx glide (D-393; the caller writes the registers).
+// The level itself, also set frame after frame by a Gxx glide (the caller writes the registers).
 void Impl::setLevel(Voice& v, int track, int ins, double level) noexcept {
     if (!v.on || v.fading() || v.stage == 4) return;
     if (studio() || v.gen == Generator::Dma) {
@@ -1414,14 +1412,14 @@ void Impl::setLevel(Voice& v, int track, int ins, double level) noexcept {
     }
 }
 
-// -------------------------------------------------------------------------------- Commands (CMD row, D-150)
+// -------------------------------------------------------------------------------- Commands (CMD row)
 // Command of kind k on the current row of an active track (0: none).
 uint16_t Impl::lineCmd(int i, SeqCmd k) const noexcept {
     if (!tracks[size_t(i)].mix.enabled) return 0;
     return seqLane(i).cmdAt(k, int(modPos(seq.stepAbs, trackLen(i))));
 }
 
-// Switches of the row: Vxx, Lxx, Mxx and Jxx hold from their step until the next one of their kind (D-254; twelfth
+// Switches of the row: Vxx, Lxx, Mxx and Jxx hold from their step until the next one of their kind (twelfth
 // DAW test, items 142 to 144). Each pattern starts as Play does (vibrato, LFO and table of the track, no arpeggiator):
 // a track that enters another pattern takes the state of the last switch of each kind before its step in it (the
 // step counter of the prototype runs on from one pattern to the next). ARP flags turned into Jxx play as the flags did.
@@ -1459,7 +1457,7 @@ void Impl::seqSpeedCmd() noexcept {
     }
 }
 
-// BPM row of the pattern (Txx of the tracks until the twelfth DAW test, item 150; D-243): tempo in BPM from this step
+// BPM row of the pattern (Txx of the tracks until the twelfth DAW test, item 150): tempo in BPM from this step
 // on (BPM cadence, internal clock), until the next one, a Song entry with its own tempo or a change of the song's
 // tempo; below 32, no effect.
 void Impl::seqTempoCmd() noexcept {
@@ -1482,18 +1480,18 @@ void Impl::forLaneVoices(int i, F&& f) noexcept {
 
 // After the notes of the row: Rxx arms the envelope retrigger at tick xx (R00: at once; a tick beyond the row is
 // ignored). Zxx plays nothing: its value goes to the next frame of the register recorder (the render is run up
-// to the row: the frames before are already taken), for the SNDH export (D-150); several tracks on the same row:
+// to the row: the frames before are already taken), for the SNDH export; several tracks on the same row:
 // the last one wins.
 void Impl::laneCmd(int i, double stepSamp, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
     L.envIn = 0;
     L.cutCmdIn = 0;
-    // Slides (D-338): the notes that sound slide from the next frame on.
+    // Slides: the notes that sound slide from the next frame on.
     if (L.volSpeed || L.envSpeed || L.noiseSpeed)
         forLaneVoices(i, [&](int, Voice& v) {
             if (!isDrum(v.gen)) wakeVbl(v, c);
         });
-    // Cxx (D-338): the notes of the row stop at tick xx (C00: at once); a tick beyond the row is ignored.
+    // Cxx: the notes of the row stop at tick xx (C00: at once); a tick beyond the row is ignored.
     if (const uint16_t cut = lineCmd(i, SeqCmd::Cut)) {
         const int xx = seqCmdParam(cut);
         const double when = double(xx) * double(hostRate()) / std::max<uint32_t>(1, global.vblHz);
@@ -1529,7 +1527,7 @@ void Impl::wakeVbl(Voice& v, uint64_t c) const noexcept {
     v.nextVbl = c;
 }
 
-// Effects of D-338 read at the start of the row, before its notes: the speeds of the slides, the fine tune and the
+// Step effects read at the start of the row, before its notes: the speeds of the slides, the fine tune and the
 // envelope shape (kept until the next command of their kind) and the DMA offset of the row's attacks. A new fine
 // tune or shape reaches the notes that sound: the shape is written to R13, which restarts the envelope.
 void Impl::laneLineCmds(int i, double stepSamp, uint64_t c) noexcept {
@@ -1571,7 +1569,7 @@ void Impl::laneLineCmds(int i, double stepSamp, uint64_t c) noexcept {
     }
 }
 
-// Kxx and Qxx with a Bxy or Nxy (D-394, 16-channel mode; the 3-channel modes keep the straight slides of the replay):
+// Kxx and Qxx with a Bxy or Nxy (16-channel mode; the 3-channel modes keep the straight slides of the replay):
 // the slide follows its curve from this row to the next command of its kind (the rest of the track if there is none),
 // covering there what the speed (perFrame per frame) covers in a straight line. Linear: the speed per frame.
 void Impl::armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, uint64_t c) noexcept {
@@ -1592,7 +1590,7 @@ void Impl::armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, u
     r.seed = seqHash(seq.stepAbs, i, 7);
 }
 
-// Cxx (D-338): the notes of the track stop at once (a drum hit too) and the row plays nothing more: no retrigger,
+// Cxx: the notes of the track stop at once (a drum hit too) and the row plays nothing more: no retrigger,
 // no arpeggio, the next note attacks.
 void Impl::cutLine(int i, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
@@ -1606,7 +1604,7 @@ void Impl::cutLine(int i, uint64_t c) noexcept {
 
 // ----------------------------------------------------------------------------------------- One sample
 // Track i after dt samples: its countdowns and its arpeggio (laneCount), then the cut and the delayed step of the CMD
-// row (D-338), after them so that the countdowns of a step started here are not shortened by this run.
+// row, after them so that the countdowns of a step started here are not shortened by this run.
 void Impl::laneSample(int i, uint32_t dt) noexcept {
     laneCount(i, dt);
     LaneState& L = lanes[size_t(i)];
@@ -1636,7 +1634,7 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
         while (L.rtLeft > 0 && L.rtClk <= 0)  // Quantize to VBL: the hits of the same frame make only one
             if (--L.rtLeft > 0) L.rtClk += L.rtPeriod;
     }
-    if (L.envIn > 0 && (L.envIn -= dt) <= 0) {  // Rxx (D-150)
+    if (L.envIn > 0 && (L.envIn -= dt) <= 0) {  // Rxx
         L.envIn = 0;
         retrigEnv(i, at());
     }
@@ -1644,10 +1642,10 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
         L.offIn = 0;
         const int vi = laneVoice(i);
         if (!isDrum(voices[size_t(vi)].gen)) killLane(vi, false, at());  // a drum plays to the end
-        else voices[size_t(vi)].looping = false;                          // sustain loop of a Digidrum (D-154)
+        else voices[size_t(vi)].looping = false;                          // sustain loop of a Digidrum
         L.arpNote = -1;
     }
-    for (int k = 0; k < kSeqChordVoices; ++k) {  // gate of the chord voices of a step (D-102)
+    for (int k = 0; k < kSeqChordVoices; ++k) {  // gate of the chord voices of a step
         if (L.polyOff[size_t(k)] <= 0 || (L.polyOff[size_t(k)] -= dt) > 0) continue;
         L.polyOff[size_t(k)] = 0;
         const int vi = kLaneVoices + i * kSeqChordVoices + k;
@@ -1665,7 +1663,7 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
     const bool laneRel = releasing() && (lv.nextEvent() > pendingCycle() || (at(), releasing()));
     const bool arpRun = (L.arpNote >= 0 && (L.offIn > 0 || L.tiedHold)) || laneRel;
     if (!arpRun && !(L.arpGl && L.arpGlLeft > 0)) return;
-    if (L.arpGl && L.arpGlLeft > 0) {  // moving base under the arpeggio (D-097: also with the MIDI clock)
+    if (L.arpGl && L.arpGlLeft > 0) {  // moving base under the arpeggio (also with the MIDI clock)
         L.arpGlP += L.arpGlHz / double(hostRate()) * dt;
         while (L.arpGlP >= 1 && L.arpGlLeft > 0) {
             L.arpGlP -= 1;
@@ -1697,10 +1695,10 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
             L.arpGlNow = d;
         }
     }
-    // D-097: the prototype left the whole audio block here (return) when the arpeggio was suspended.
+    // the prototype left the whole audio block here (return) when the arpeggio was suspended.
     if (!arpRun || arpOnPulses()) return;
     const TrackArp& a = laneArp(i, L.arpIns);
-    const double cadence = arpRate(a.rateHz);  // Rate, or the tempo (D-256)
+    const double cadence = arpRate(a.rateHz);  // Rate, or the tempo
     double rate = cadence;
     if (a.track && L.arpGl) {  // Track: the cadence rises with the pitch
         // In proportion to the slide, by the frequency ratio of its interval at most, and not past 200 Hz.
@@ -1720,7 +1718,7 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
 // One step of the track arpeggio (ARP flag): offsets of the table of the track on the note of the step.
 void Impl::laneArpTick(int i, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
-    const TrackArp& a = laneArp(i, L.arpIns);  // arpeggio of the track, or of the instrument of the step (D-147)
+    const TrackArp& a = laneArp(i, L.arpIns);  // arpeggio of the track, or of the instrument of the step
     const int vi = laneVoice(i);
     const bool relL = L.arpNote < 0 && voices[size_t(vi)].on && voices[size_t(vi)].stage == 4 &&
                       !voices[size_t(vi)].fading();
@@ -1812,8 +1810,8 @@ void Impl::laneArpTick(int i, uint64_t c) noexcept {
 }
 
 // ------------------------------------------------------------------------------------------ MIDI clock
-// One half pulse (48 per quarter note, D-289), from the MIDI clock (at each clock and halfway to the next) or the
-// transport of the host, for the arpeggios set to the clock or synced to the tempo of the host (D-256): that of the
+// One half pulse (48 per quarter note), from the MIDI clock (at each clock and halfway to the next) or the
+// transport of the host, for the arpeggios set to the clock or synced to the tempo of the host: that of the
 // keyboard, then those of the tracks (lanes). The keyboard arpeggio plays every `division` half pulses: since MIDI
 // Start with the MIDI clock (count of the prototype), on the multiples of the division since the start of the host in
 // Host sync (pulse: half pulse of the host). weight: half pulses it stands for (2 for a whole pulse).
@@ -1837,8 +1835,7 @@ void Impl::arpPulse(uint64_t c, int64_t pulse, bool lanesToo, int weight) noexce
     }
 }
 
-// The half pulse between two MIDI clocks: for an arpeggio of odd division (D-289), and for the sequencer at 1/64
-// (D-422).
+// The half pulse between two MIDI clocks: for an arpeggio of odd division, and for the sequencer at 1/64.
 void Impl::halfPulse(uint64_t c) noexcept {
     halfPulseIn = 0;
     if (arpHalves()) arpPulse(c);
@@ -1855,7 +1852,7 @@ void Impl::seqMidiClock(uint64_t c) noexcept {
     seqMidiPulse(c, clockWeight());
 }
 
-// A clock or the half pulse after it (weight: half pulses it stands for, D-422): the sequencer moves on when it
+// A clock or the half pulse after it (weight: half pulses it stands for): the sequencer moves on when it
 // follows the MIDI clock and the row has received all its half pulses.
 void Impl::seqMidiPulse(uint64_t c, int weight) noexcept {
     if (global.seqClock != SeqClock::Midi || !seq.on || !seq.run) return;
@@ -1915,7 +1912,7 @@ void Impl::seqSongPosition(int sixteenths) noexcept {
         seq.clockCount = 2 * int(left - start);
         return;
     }
-    // In half pulses (D-422): the last one counted before the position is the clock before it, or the half pulse
+    // In half pulses: the last one counted before the position is the clock before it, or the half pulse
     // after that clock at 1/64.
     const int hps = halfPulsesPerStep();
     const int64_t h = 2 * p - clockWeight();

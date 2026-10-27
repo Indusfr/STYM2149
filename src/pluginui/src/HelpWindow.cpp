@@ -18,8 +18,8 @@ namespace {
 using Row = HelpWindow::Row;
 
 // HELP of the prototype, verbatim, except for M (the prototype's key handler, like STYM2149's, toggles the
-// metronome: its hint line says M=Metro) and ^D, which leaves File (the demo pattern) for the DMA generator (D-301).
-// Rows STYM2149 adds come last in their section, below what the window shows when it opens (D-189).
+// metronome: its hint line says M=Metro) and ^D, which leaves File (the demo pattern) for the DMA generator.
+// Rows STYM2149 adds come last in their section, below what the window shows when it opens.
 constexpr Row kWindows[] = {
     {"^E", "Step Sequencer"}, {"^B", "Arpeggiator"}, {"^M", "Mixer"},
     {"^G", "Song"},           {"^R", "Modulation"},  {"^P", "Patches"},
@@ -27,7 +27,7 @@ constexpr Row kWindows[] = {
 };
 constexpr Row kGenerator[] = {
     {"^V", "Chip Voice"}, {"^S", "SID Voice"}, {"^U", "Sync Buzzer"}, {"^C", "Chipdrum"}, {"^I", "Digidrum"},
-    {"^D", "DMA (STE)"},  // D-301: ^D no longer loads the demo pattern
+    {"^D", "DMA (STE)"},  // ^D no longer loads the demo pattern
 };
 constexpr Row kFile[] = {{"^Q", "quit"}, {"^?", "this window"}};
 constexpr Row kTransport[] = {
@@ -90,12 +90,12 @@ constexpr Row kMouse[] = {
     {"Click a mixer scope", "open the large oscilloscope"},
 };
 // Keys of MainWindow::keyDown and of the windows that the prototype's list lacks: Instruments window of STYM2149
-// (D-147; the ^L Sequences window went into the Modulation window, D-241), keys of the prototype's handler it did
+// (the ^L Sequences window went into the Modulation window), keys of the prototype's handler it did
 // not list (redo, banks, channel, numeric keypad, note and block editing in the grid, Arpeggiator and Modulation
-// tables), File > New (D-225).
+// tables), File > New.
 constexpr Row kMore[] = {
     {"^T", "Instruments"},
-    {"^F", "Effects"},  // ninth DAW test, item 112 (D-313)
+    {"^F", "Effects"},  // ninth DAW test, item 112
     {"Shift + ^Z", "redo"},
     {"Shift + 1 - 4", "select a pattern bank"},
     {"Left / Right", "previous / next channel (grid closed)"},
@@ -111,7 +111,7 @@ constexpr Row kMore[] = {
     {"Enter", "write the step at the table cursor"},
     {"Delete", "clear the step at the Modulation cursor"},
     {"N", "toggle NSE at the Modulation cursor"},
-    {"Tab / Shift + Tab", "next / previous open window to the front"},  // D-389
+    {"Tab / Shift + Tab", "next / previous open window to the front"},
     {"^N", "new project (File > New)"},
 };
 
@@ -228,7 +228,7 @@ void HelpWindow::build() {
     const gemui::Point o = pane_.contentOrigin();
     text_.setBox({double(o.x), double(o.y), l.width, l.height});
     text_.setLayout(std::move(l));
-    // Last: place() may move the window and its content to keep it on the desktop (D-460).
+    // Last: place() may move the window and its content to keep it on the desktop.
     place({double(kX), double(kY), double(kW), kInset + gemui::TitleBar::kHeight + paneH + kInset});
 }
 

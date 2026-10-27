@@ -18,7 +18,7 @@ using json::Value;
 namespace {
 
 // Default values of a new track of the prototype (mkCh), for the keys missing from an entry.
-constexpr double kDefEp = 400;  // EP of the prototype (× 32 for the chip, D-021)
+constexpr double kDefEp = 400;  // EP of the prototype (× 32 for the chip)
 
 double num(const Value& o, std::string_view key, double fallback) {
     const Value* v = o.find(key);
@@ -50,7 +50,7 @@ void readList(const Value& o, std::string_view key, Array& out, int fill) {
     }
 }
 
-// Instrument sequences (D-148), keys specific to STYM2149: written only when not default, so that a patch without
+// Instrument sequences, keys specific to STYM2149: written only when not default, so that a patch without
 // sequences stays the prototype's.
 template <class Array>
 bool allZero(const Array& a) {
@@ -70,23 +70,23 @@ void putSequences(Value& p, const ymengine::TrackPatch& t) {
     if (t.hardSync) p.set("hardSync", Value(1));
     if (t.link) p.set("link", Value(int(t.link)));
     if (t.pitchMatrix != def.pitchMatrix) p.set("pitchMatrix", Value(int(t.pitchMatrix)));
-    if (!allZero(t.sidWave)) p.set("sidWave", list(t.sidWave));  // timer waves (B6, D-151)
+    if (!allZero(t.sidWave)) p.set("sidWave", list(t.sidWave));  // timer waves
     if (t.sidWaveLen != def.sidWaveLen) p.set("sidWaveLen", Value(int(t.sidWaveLen)));
-    if (t.sidWavePhase != def.sidWavePhase) p.set("sidWavePhase", Value(int(t.sidWavePhase)));     // D-405
-    if (t.sidWavePeriod != def.sidWavePeriod) p.set("sidWavePeriod", Value(int(t.sidWavePeriod)));  // D-406
-    if (t.sidWidth != def.sidWidth) p.set("sidWidth", Value(int(t.sidWidth)));  // width of the Square (D-408)
-    // The form of the SID wave (D-411), always beside the keys of the wave: without it, those keys are read as the
+    if (t.sidWavePhase != def.sidWavePhase) p.set("sidWavePhase", Value(int(t.sidWavePhase)));
+    if (t.sidWavePeriod != def.sidWavePeriod) p.set("sidWavePeriod", Value(int(t.sidWavePeriod)));
+    if (t.sidWidth != def.sidWidth) p.set("sidWidth", Value(int(t.sidWidth)));  // width of the Square
+    // The form of the SID wave, always beside the keys of the wave: without it, those keys are read as the
     // patches written before it (getSequences).
     if (t.sidForm != def.sidForm || p.find("sidWave") || p.find("sidWaveLen") || p.find("sidWidth"))
         p.set("sidForm", Value(int(t.sidForm)));
     if (!allZero(t.buzzShapes)) p.set("buzzSteps", list(t.buzzShapes));
     if (t.buzzLen) p.set("buzzLen", Value(int(t.buzzLen)));
-    if (t.envTuned) p.set("envTuned", Value(1));  // buzzer (B7, D-152)
+    if (t.envTuned) p.set("envTuned", Value(1));  // buzzer
     if (t.envRatioN != def.envRatioN) p.set("envN", Value(int(t.envRatioN)));
     if (t.envRatioD != def.envRatioD) p.set("envD", Value(int(t.envRatioD)));
     if (t.envFineCents != 0) p.set("envFine", Value(t.envFineCents));
     if (t.ymPad) p.set("ymPad", Value(1));
-    if (t.lfo != def.lfo) {  // LFO (D-257)
+    if (t.lfo != def.lfo) {  // LFO
         Value l = Value::object();
         l.set("on", Value(flag(t.lfo.on)));
         l.set("shape", Value(int(t.lfo.shape)));
@@ -95,10 +95,10 @@ void putSequences(Value& p, const ymengine::TrackPatch& t) {
         l.set("hz", Value(t.lfo.hz));
         l.set("div", Value(int(t.lfo.division)));
         l.set("depth", Value(t.lfo.depth));
-        l.set("retrig", Value(flag(t.lfo.retrig)));  // D-279
+        l.set("retrig", Value(flag(t.lfo.retrig)));
         p.set("lfo", std::move(l));
     }
-    if (t.echo != def.echo) {  // echo of the notes (D-299)
+    if (t.echo != def.echo) {  // echo of the notes
         Value x = Value::object();
         x.set("on", Value(flag(t.echo.on)));
         x.set("div", Value(int(t.echo.division)));
@@ -130,10 +130,10 @@ void getSequences(const Value& p, ymengine::TrackPatch& t) {
     auto count = [&](std::string_view key, double fallback = 0) {
         return uint8_t(std::clamp(finite(std::round(num(p, key, fallback)), fallback), 0.0, 255.0));
     };
-    // The form of the SID wave (D-411). A patch without it was written before: Steps 0 or 1 (or none) was the plain
-    // square, whose width counted sixteenths of its period (D-408), 8 being half and half; Steps 2 or more played the
-    // bars, a Sine when sidWaveSine was lit (D-402), one cycle over the 16 bars without its period (D-406), drawn on
-    // the chip's levels: the Bounce now (D-414). As in a project (State.cpp), another width becomes the Square of 16
+    // The form of the SID wave. A patch without it was written before: Steps 0 or 1 (or none) was the plain
+    // square, whose width counted sixteenths of its period, 8 being half and half; Steps 2 or more played the
+    // bars, a Sine when sidWaveSine was lit, one cycle over the 16 bars without its period, drawn on
+    // the chip's levels: the Bounce now. As in a project (State.cpp), another width becomes the Square of 16
     // Steps, the same sound.
     using ymengine::SidForm;
     const bool form = p.find("sidForm");
@@ -164,7 +164,7 @@ void getSequences(const Value& p, ymengine::TrackPatch& t) {
     t.envRatioD = uint8_t(std::clamp(finite(std::round(num(p, "envD", 1)), 1), 1.0, 255.0));
     t.envFineCents = finite(num(p, "envFine", 0), 0);
     t.ymPad = num(p, "ymPad", 0) != 0;
-    t.lfo = def.lfo;  // LFO (D-257); clamped with the state (sanitize)
+    t.lfo = def.lfo;  // LFO; clamped with the state (sanitize)
     if (const Value* l = p.find("lfo"); l && l->isObject()) {
         auto index = [&](std::string_view key, double fallback, int n) {
             return std::clamp(finite(std::round(num(*l, key, fallback)), fallback), 0.0, double(n - 1));
@@ -178,7 +178,7 @@ void getSequences(const Value& p, ymengine::TrackPatch& t) {
         t.lfo.depth = finite(num(*l, "depth", def.lfo.depth), def.lfo.depth);
         t.lfo.retrig = num(*l, "retrig", 1) != 0;
     }
-    t.echo = def.echo;  // echo of the notes (D-299); clamped with the state (sanitize)
+    t.echo = def.echo;  // echo of the notes; clamped with the state (sanitize)
     if (const Value* x = p.find("echo"); x && x->isObject()) {
         auto whole = [&](std::string_view key, double fallback, double lo, double hi) {
             return std::clamp(finite(std::round(num(*x, key, fallback)), fallback), lo, hi);
@@ -229,10 +229,10 @@ PatchEntry snapPatch(const std::string& name, const ParamValues& v, const NonPar
     p.set("sidRatio", fv(Track::SidRatio));
     p.set("sidVmin", iv(Track::SidVmin));
     p.set("slot", Value(int(x.patch.digidrumSlot)));
-    if (x.patch.dmaSlot >= 0) p.set("dmaSlot", Value(int(x.patch.dmaSlot)));  // M6: DMA sample (D-153)
+    if (x.patch.dmaSlot >= 0) p.set("dmaSlot", Value(int(x.patch.dmaSlot)));  // DMA sample
     p.set("vibDepth", iv(Track::VibDepth));
     p.set("vibRate", fv(Track::VibRate));
-    // Vibrato Off (D-254); On: the patch of the prototype.
+    // Vibrato Off; On: the patch of the prototype.
     if (intValue(v, track, Track::VibOn) == 0) p.set("vibOn", Value(0));
     p.set("ornOn", Value(flag(x.patch.ornamentOn)));
     p.set("ornLen", Value(int(x.patch.ornamentLength)));
@@ -291,14 +291,14 @@ PatchChange patchChange(const PatchEntry& e, const NonParamState& state, int tra
     set(Track::NoisePeriod, num(p, "NP", 8));
     set(Track::VolMode, num(p, "volMode", 0));
     set(Track::Volume, num(p, "vol4", 13));
-    set(Track::EnvPeriod, std::round(num(p, "EP", kDefEp) * 32));  // D-021: capped at 65535 by its range
+    set(Track::EnvPeriod, std::round(num(p, "EP", kDefEp) * 32));  // capped at 65535 by its range
     set(Track::EnvShape, num(p, "shape", 8));
     set(Track::Generator, num(p, "effect", 0));
     set(Track::SidRatio, num(p, "sidRatio", 1));
     set(Track::SidVmin, num(p, "sidVmin", 0));
     set(Track::VibDepth, num(p, "vibDepth", 0));
     set(Track::VibRate, num(p, "vibRate", 6));
-    set(Track::VibOn, num(p, "vibOn", 1));  // vibrato On before D-254
+    set(Track::VibOn, num(p, "vibOn", 1));  // vibrato On in older patches
     set(Track::Attack, num(p, "atk", 0));
     set(Track::Decay, num(p, "dcy", 0));
     set(Track::Sustain, num(p, "sus", 100));
@@ -369,7 +369,7 @@ std::string dumpPatchLibrary(const std::vector<PatchEntry>& patches) {
     Value doc = Value::object();
     doc.set("kind", Value("patchlib"));
     doc.set("patches", std::move(list));
-    // Keys that STYM2149 adds to the patch of the prototype (M6: sequences, timer waves, buzzer, DMA; vibrato Off;
+    // Keys that STYM2149 adds to the patch of the prototype (sequences, timer waves, buzzer, DMA; vibrato Off;
     // LFO; echo).
     static constexpr std::array<std::string_view, 29> kStymKeys = {
         "seqPer", "seqNP", "seqMix", "seqGen", "seqFix", "fixNote", "detune", "analog", "hardSync", "link",

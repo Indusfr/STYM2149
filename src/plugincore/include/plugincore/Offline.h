@@ -1,14 +1,14 @@
-// STYM2149 — plugincore: offline render of the exports (M7, STYM2149_SPEC.md §8, D-160, D-163, D-170)
+// STYM2149 — plugincore: offline render of the exports (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // A second instance of the driver (Driver), never the audio thread's, plays the project copied at the time of the
-// export: the current pattern once, or the Song from its first entry to its end (D-163: tempo of each block, swing,
+// export: the current pattern once, or the Song from its first entry to its end (tempo of each block, swing,
 // groove, Ticks mode, Loop jumps unrolled, stop at the last entry). Settings forced for this: internal clock (Free
 // run, at the free tempo of the project), loop off, Song mode according to the source; the driver mutes the
-// metronome outside real time (D-112). With the arpeggio on the MIDI clock, pulses are produced at the tempo played
+// metronome outside real time. With the arpeggio on the MIDI clock, pulses are produced at the tempo played
 // (24 per quarter note), for lack of an external clock.
-// The render stops dead at the sample where the sequencer stops (D-164); the audio exports add the resampling delay
+// The render stops dead at the sample where the sequencer stops; the audio exports add the resampling delay
 // to it (renderRaw), so that the file starts and ends with the music. The sequencer log (Engine::SeqLogRecord) of
 // each rendered chunk is kept for the exports that read it (MIDI).
 // To be used from a single thread, the export job's (allocations at construction, and in the first advance()).
@@ -59,7 +59,7 @@ public:
     uint64_t position() const noexcept { return position_; }  // samples rendered since the start
     uint32_t sampleRate() const noexcept { return rate_; }
     uint32_t latencySamples() const noexcept;
-    // Capture of the registers of the chip in 3-channel mode (register exports, D-160): one frame per replay tick
+    // Capture of the registers of the chip in 3-channel mode (register exports): one frame per replay tick
     // from the start (Engine::startCapture), written into `frames` which the caller keeps alive, with the DMA sound
     // of the STE machine in `dma` if it is not empty. To be called before the first render; false in 16 channels.
     bool startCapture(std::span<ymengine::RegisterFrame> frames, std::span<ymengine::DmaFrame> dma = {}) noexcept;

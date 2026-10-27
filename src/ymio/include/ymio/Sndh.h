@@ -1,4 +1,4 @@
-// STYM2149 — ymio: reading SNDH files by emulating the Atari (M7, A2, D-159)
+// STYM2149 — ymio: reading SNDH files by emulating the Atari
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

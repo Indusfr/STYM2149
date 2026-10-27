@@ -15,13 +15,13 @@ constexpr double kPi = 3.141592653589793;
 double jsRound(double x) noexcept { return std::floor(x + 0.5); }  // JavaScript Math.round (half-way towards +∞)
 
 // Sine at bar k of the SID wave for a cycle of n bars, sampled half a step after the middle so that no bar falls on a
-// trough (24/10/2026, D-395, D-406).
+// trough (24/10/2026).
 double sidSine(int k, int n) noexcept { return std::sin(2 * kPi * (k + 0.5) / n); }
 
-// Output level of volume v on channel A alone (5-bit level 2v + 1, D-011; B and C at volume 0).
+// Output level of volume v on channel A alone (5-bit level 2v + 1; B and C at volume 0).
 double sidLevel(int v) noexcept { return double(ymcore::tables::kMixTable[(2 * v + 1) | (1 << 5) | (1 << 10)]); }
 
-// The volume whose level is nearest `want` (the lower one on a tie): the Bounce (D-414).
+// The volume whose level is nearest `want` (the lower one on a tie): the Bounce.
 uint8_t nearestVolume(double want) noexcept {
     int best = 0;
     for (int v = 1; v < 16; ++v)
@@ -41,11 +41,11 @@ std::array<uint8_t, kSidWaveSteps> sineSidWave(int low, int high, int phase, int
     std::array<uint8_t, kSidWaveSteps> out{};
     for (int k = 0; k < kSidWaveSteps; ++k) {
         const double u = std::clamp((sidSine(k - shift, n) - bottom) / (top - bottom), 0.0, 1.0);
-        if (bounce) {  // on the scale of the chip's levels (D-414)
+        if (bounce) {  // on the scale of the chip's levels
             out[size_t(k)] = nearestVolume(sidLevel(lo) + (sidLevel(hi) - sidLevel(lo)) * u);
             continue;
         }
-        // On the scale of the volumes, as the bars draw it (D-410); a hair up, so that a sample on the middle of an odd
+        // On the scale of the volumes, as the bars draw it; a hair up, so that a sample on the middle of an odd
         // period rounds the same way with every sine of the libraries.
         out[size_t(k)] = uint8_t(jsRound(lo + (hi - lo) * u + 1e-9));
     }

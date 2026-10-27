@@ -23,8 +23,7 @@ public:
     void prepare(const RenderConfig& config);
     void reset() noexcept;
     // Starts at the position of `other` (prepared with the same configuration) as if it had been fed silence until
-    // then, without allocation: the stream of a bus that begins to sound in the middle of a render (send of the delay,
-    // D-299).
+    // then, without allocation: the stream of a bus that begins to sound in the middle of a render (send of the delay).
     void joinSilent(const TickStreamOutput& other) noexcept;
     // Bass and treble of the STE chain, without allocation (like ChipRenderer::setBoardTone).
     void setBoardTone(int bassDb, int trebleDb) noexcept;

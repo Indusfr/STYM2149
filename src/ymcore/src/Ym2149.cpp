@@ -31,7 +31,7 @@ void Ym2149::reset() noexcept {
         tonePeriod_[v] = 0;
     }
     // The internal edges of the chip are unpredictable at power-on (AtariAudio);
-    // they are drawn from a fixed seed to stay deterministic (D-019).
+    // they are drawn from a fixed seed to stay deterministic.
     // Bits 0, 5 and 10 of one draw give the edges of voices A, B and C, each spread to its 5-bit field.
     uint32_t seed = config_.edgeSeed;
     toneEdges_ = (msvcRand(seed) & ((1u << 10) | (1u << 5) | 1u)) * 0x1fu;

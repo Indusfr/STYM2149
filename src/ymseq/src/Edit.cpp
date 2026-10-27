@@ -3,7 +3,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Port of the prototype's editing functions, in the same order of operations. The intended deviations are marked
-// with "Deviation" and listed in DECISIONS.md. Reads outside the array of 256 steps (undefined in JavaScript) are
+// with "Deviation". Reads outside the array of 256 steps (undefined in JavaScript) are
 // bounded: a cell beyond it is neither a note nor a tie.
 #include "ymseq/Edit.h"
 
@@ -86,7 +86,7 @@ int LaneEditor::figLenAt(int c) const noexcept {
     if (!inLane(c) || !l_.tie[u(c)]) return 1;
     const int N = length();
     int n = 1;
-    // Deviation (D-282): the hold stops at the next note; the prototype also counted the hold of a note that follows
+    // Deviation: the hold stops at the next note; the prototype also counted the hold of a note that follows
     // at once, and a click then shortened that note instead of taking this one away.
     while (c + n < N && l_.pat[u(c + n)] < 0 && l_.tie[u(c + n)]) ++n;
     return n;
@@ -96,7 +96,7 @@ void LaneEditor::clearFigure(int c) noexcept {
     if (!inLane(c)) return;
     const int N = length();
     for (int k = c; k < N && l_.tie[u(k)]; ++k) {
-        // Deviation (D-282): another note takes over and keeps its hold (the prototype removed its first tie).
+        // Deviation: another note takes over and keeps its hold (the prototype removed its first tie).
         if (k > c && l_.pat[u(k)] >= 0) break;
         l_.tie[u(k)] = 0;
     }
@@ -169,7 +169,7 @@ int LaneEditor::noteLenAt(int s) const noexcept {
 void LaneEditor::setNoteLen(int s, int n) noexcept {
     if (!inLane(s)) return;
     const int N = length();
-    // Deviation (D-282): not in the 3-channel modes either, which play no chord voice (D-204): the note met would
+    // Deviation: not in the 3-channel modes either, which play no chord voice: the note met would
     // fall silent (the prototype demoted it there too).
     const bool poly = !c_.mono && !c_.threeVoice && !c_.drum;
     n = std::max(1, std::min(n, N - s));
@@ -197,7 +197,7 @@ int LaneEditor::setNoteStart(int s, int ns) noexcept {
     const int end = s + noteLenAt(s) - 1;  // last step, kept
     ns = std::max(0, std::min(ns, end));
     // Limit: previous note. Deviation: the search starts from the current start backwards (the nearest note); the
-    // prototype started from the new start and could jump over a note when dragging fast. Deviation (D-282): the
+    // prototype started from the new start and could jump over a note when dragging fast. Deviation: the
     // held part of the previous note stops it too (the prototype cut that note short).
     for (int k = s - 1; k >= ns; --k)
         if (l_.pat[u(k)] >= 0 || (!c_.drum && l_.tie[u(k)] && noteStart(k) >= 0)) {
@@ -205,7 +205,7 @@ int LaneEditor::setNoteStart(int s, int ns) noexcept {
             break;
         }
     if (ns == s) return -1;
-    // Deviation (D-282): the pitch is kept as it is (writeNoteAt brought a note written before Snap to a degree).
+    // Deviation: the pitch is kept as it is (writeNoteAt brought a note written before Snap to a degree).
     const auto pat = l_.pat[u(s)];
     const auto oct = l_.oct[u(s)];
     const auto vol = l_.vol[u(s)], mx = l_.mix[u(s)], fx = l_.fx[u(s)], ins = l_.ins[u(s)];
@@ -231,7 +231,7 @@ bool LaneEditor::splitNote(int s, int at) noexcept {
     if (!inLane(s)) return false;
     const int n = noteLenAt(s);
     if (at <= s || at >= s + n) return false;
-    // Deviation (D-282): the second half keeps the pitch as it is (writeNoteAt brought a note written before Snap to
+    // Deviation: the second half keeps the pitch as it is (writeNoteAt brought a note written before Snap to
     // a degree).
     const auto pat = l_.pat[u(s)];
     const auto oct = l_.oct[u(s)];
@@ -343,7 +343,7 @@ int LaneEditor::voiceCount(int s) const noexcept {
 
 std::optional<VoiceHit> LaneEditor::voiceStartCovering(int s, int row) const noexcept {
     if (!inLane(s)) return std::nullopt;
-    // Deviation (D-282): every earlier step is searched; the prototype looked 64 steps back only, while a voice
+    // Deviation: every earlier step is searched; the prototype looked 64 steps back only, while a voice
     // can be held up to 256 steps (and is played that long).
     for (int k = s; k >= 0; --k)
         for (int v = 2; v <= kPolyMax; ++v) {
@@ -362,7 +362,7 @@ bool LaneEditor::stepBusy(int s) const noexcept {
         return false;
     }
     if (noteStart(s) >= 0) return true;
-    for (int v = 2; v <= kPolyMax; ++v)  // chord voice that extends (all the way back, D-282)
+    for (int v = 2; v <= kPolyMax; ++v)  // chord voice that extends (all the way back)
         for (int k = 0; k <= s; ++k)
             if (voiceRow(k, v) && k + voiceDur(k, v) > s) return true;
     return false;
@@ -378,7 +378,7 @@ int LaneEditor::freeVoice(int s) const noexcept {
 int LaneEditor::addVoiceAt(int s, int row) noexcept {
     const int v = freeVoice(s);
     if (!v) return 0;
-    // Deviation (D-280): Snap brings the added voice to a degree, like the root; the prototype wrote it on the row
+    // Deviation: Snap brings the added voice to a degree, like the root; the prototype wrote it on the row
     // that was clicked, greyed or not.
     writeVoiceAt(s, snapRow(row), v);
     // same duration as the chosen figure
@@ -399,7 +399,7 @@ int LaneEditor::writeChord(int s, int row) noexcept {
     if (c_.drum || c_.threeVoice || c_.mono) return 0;
     for (int v = 2; v <= kPolyMax; ++v) delVoiceAt(s, v);  // start clean
     const ymengine::Chord& ch = ymengine::kChords[u(c_.chord)];
-    // Deviation (D-280): under Snap, the chord stands on the root brought into the scale and each voice goes to the
+    // Deviation: under Snap, the chord stands on the root brought into the scale and each voice goes to the
     // nearest degree (a major triad on D in C major gives D, F, A); a voice that lands on a pitch already written at
     // this step is left out. The prototype stacked the intervals on the clicked row, outside the scale.
     const bool snaps = c_.snap && c_.scale > 0 && c_.scale < kScaleCount;
@@ -451,7 +451,7 @@ bool LaneEditor::promoteVoice(int c, const VoiceHit& hit) noexcept {
         l_.tie[u(mainAt + k)] = 0;
     }
     delVoiceAt(s0, v);
-    // The chosen voice becomes the root. Deviation (D-282): its pitch is copied as it is; the prototype rewrote it
+    // The chosen voice becomes the root. Deviation: its pitch is copied as it is; the prototype rewrote it
     // with writeNoteAt and then put back the voice's octave, which under Snap could move it by an octave.
     l_.pat[u(s0)] = newPat;
     l_.oct[u(s0)] = newOct;
@@ -541,7 +541,7 @@ void LaneEditor::moveNoteTo(Moving& m, int c2, int row2) noexcept {
     const int N = length(), n = m.len;
     c2 = std::max(0, std::min(c2, N - n));  // the note stays whole inside the pattern
     if (c2 == m.from && row2 == m.row) return;
-    // Deviation (D-280): Snap brings the target row to a degree before the tests, for a chord voice too (the prototype
+    // Deviation: Snap brings the target row to a degree before the tests, for a chord voice too (the prototype
     // tested the clicked row, then brought back the root alone).
     row2 = snapRow(row2);
     if (c2 == m.from && row2 == m.row) return;
@@ -572,7 +572,7 @@ void LaneEditor::moveNoteTo(Moving& m, int c2, int row2) noexcept {
     for (int k = 0; k < n && c2 + k < N; ++k) {  // is the space free? (test before any change)
         const int t = c2 + k;
         if (l_.pat[u(t)] >= 0 && t != m.from) return;
-        // Deviation (D-282): the moved note's own start is not in the way (the prototype took it for a voice that
+        // Deviation: the moved note's own start is not in the way (the prototype took it for a voice that
         // holds the pitch, so a long note could not go back by less than its length), but the held part of another
         // note is (the prototype wrote over it and cut that note short).
         for (int v = 2; v <= kPolyMax; ++v)
@@ -582,9 +582,9 @@ void LaneEditor::moveNoteTo(Moving& m, int c2, int row2) noexcept {
             if (ns >= 0 && ns != m.from) return;
         }
     }
-    // Deviation (D-282): a Digidrum hit held over several steps keeps its length, like a note.
+    // Deviation: a Digidrum hit held over several steps keeps its length, like a note.
     const bool ties = !m.drum || n > 1;
-    // Deviation (D-282): the rows of the note's start (kNoteRows) go with it; the step it leaves gets back what it
+    // Deviation: the rows of the note's start (kNoteRows) go with it; the step it leaves gets back what it
     // held before the note came. The prototype left them behind (accent, slide, curve, source, generator).
     const size_t rows = c_.drum ? size_t(kDrumNoteRows) : size_t(kMelodicNoteRows);
     std::array<int, kNoteRows.size()> carried{};
@@ -625,7 +625,7 @@ std::vector<RectNote> LaneEditor::rectNotes(const RectBounds& r) const {
                 out.push_back({s, row, l_.tie[u(s)] ? d : 1, l_.vol[u(s)], l_.slide[u(s)], l_.slc[u(s)], 1});
             }
         }
-        // Deviation (D-282): the chord voices that start in the box are part of it, as the grid shows them (the
+        // Deviation: the chord voices that start in the box are part of it, as the grid shows them (the
         // prototype took the roots only: Delete, Cut, Copy and the moves left the voices behind).
         for (int v = 2; v <= kPolyMax; ++v) {
             const auto row = voiceRow(s, v);
@@ -659,7 +659,7 @@ void LaneEditor::clearNotes(const std::vector<RectNote>& notes) noexcept {
 
 namespace {
 // Writes a note of a rectangular selection (rectMove, paste) at step s: pitch, VOL, SLD, CRV and tie for a root; a
-// chord voice takes a free voice of the step. The hold of a root stops before the next root (deviation, D-282:
+// chord voice takes a free voice of the step. The hold of a root stops before the next root (deviation:
 // the prototype erased the notes it covered). False if a chord voice finds no room (pitch already there, step full).
 bool placeRectNote(LaneEditor& e, Lane& l, int s, const RectNote& n) {
     if (n.v >= 2) {
@@ -713,7 +713,7 @@ bool LaneEditor::rectMove(RectBounds& r, int ds, int dr) {
 
 bool LaneEditor::moveNotes(const std::vector<RectNote>& src, int ds, int dr, std::vector<RectNote>& dst) {
     const int N = length();
-    // Deviations (D-282): under Snap, a note moved up or down never stays on its pitch (snapTransposed); all or
+    // Deviations: under Snap, a note moved up or down never stays on its pitch (snapTransposed); all or
     // nothing, the notes do not leave the playable range (the prototype crushed them under B0) and do not land on a
     // note outside the box or on its held part (the prototype erased it).
     const int base = (c_.trackOctave + 1) * 12;
@@ -767,7 +767,7 @@ bool LaneEditor::transposeSel(const std::vector<SelKey>& keys, int semis) {
     const std::vector<SelNote> items = resolve(keys);
     if (items.empty()) return false;
     const int base = (c_.trackOctave + 1) * 12;
-    // Deviation (D-280): Snap applies to the chord voices as to the roots. Deviation (D-282): a note never stays on
+    // Deviation: Snap applies to the chord voices as to the roots. Deviation: a note never stays on
     // its pitch (snapTransposed: the nearest degree brought +1 back onto most notes), range checked after Snap.
     std::vector<int> rows;
     rows.reserve(items.size());
@@ -811,7 +811,7 @@ bool LaneEditor::shiftSel(std::vector<SelKey>& keys, int dir) {
         } else
             delVoiceAt(it.s, it.v);
     }
-    // Deviation (D-282): all or nothing, a shifted note does not land on a note outside the selection (or on its held
+    // Deviation: all or nothing, a shifted note does not land on a note outside the selection (or on its held
     // part, or on a voice of the same pitch), and a chord voice does not get lost on a full step; the prototype wrote
     // over the roots and dropped the voice.
     std::vector<SelKey> next;
@@ -901,7 +901,7 @@ bool LaneEditor::transpose(int semis) noexcept {
             out = -1;
             if (l_.vp(v, st) < 0) continue;
             const int from = (octaveOf(l_.vo(v, st), T) + 1) * 12 + l_.vp(v, st);
-            // Stay in the scale. Deviations (D-282): a note never stays on its pitch (snapTransposed: the nearest
+            // Stay in the scale. Deviations: a note never stays on its pitch (snapTransposed: the nearest
             // degree brought +1 back onto most notes), and the range is the grid's and transposeSel's, B0 to C9 (the
             // prototype stopped at C1 and C8, so a track holding a note above C8 could not be transposed at all).
             const int abs = snapTransposed(from, semis, c_.scale, c_.scaleRoot, c_.snap);
@@ -927,8 +927,8 @@ void LaneEditor::clear() noexcept {
 bool LaneEditor::hasNotes() const noexcept { return l_.hasNotes(length()); }
 
 namespace {
-// A single row: the CMD row stands for every kind of the Commands box, shown as one row in the grid (D-330); the
-// rows of Vxx, Txx, Exx, Dxx and Cxx are rows of their own (D-341, D-342, D-347 to D-349), Exx with Rxx (ENV row,
+// A single row: the CMD row stands for every kind of the Commands box, shown as one row in the grid; the
+// rows of Vxx, Txx, Exx, Dxx and Cxx are rows of their own, Exx with Rxx (ENV row,
 // twelfth DAW test, item 146).
 void copyStep(Lane& dst, int ds, const Lane& src, int ss, std::optional<Row> row) noexcept {
     if (row && isCmdBoxRow(*row)) {
@@ -964,7 +964,7 @@ void LaneEditor::blockClear(int a, int b, std::optional<Row> row) noexcept {
     b = std::clamp(b, a, kSteps - 1);
     for (int s = a; s <= b; ++s) {
         if (row && isCmdBoxRow(*row))
-            l_.clearBoxCmds(s);  // every kind of the CMD row (D-330)
+            l_.clearBoxCmds(s);  // every kind of the CMD row
         else if (row) {
             l_.set(*row, s, Lane::emptyValue(*row));
             l_.set(rowPartner(*row), s, Lane::emptyValue(rowPartner(*row)));
@@ -996,7 +996,7 @@ void LaneEditor::recordAt(int s, int note, int velocity) noexcept {
     l_.vol[u(s)] = uint8_t(std::max(1, int(std::floor(double(velocity) / 127.0 * 15.0 + 0.5))));  // velocity → accent
 }
 
-// ---------------------------------------------------------------- resolution change (D-448)
+// ---------------------------------------------------------------- resolution change
 
 Lane fitLane(const Lane& src, int num, int den) {
     Lane out;

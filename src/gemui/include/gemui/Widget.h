@@ -121,7 +121,7 @@ public:
     Widget* parent() const noexcept { return parent_; }
     const std::vector<Widget*>& children() const noexcept { return children_; }
     // Box covered by the widget and its visible children, which can overflow it (a hint text past its frame, as in
-    // CSS); its own box if it clips them. The area of its opacity group (D-220).
+    // CSS); its own box if it clips them. The area of its opacity group.
     Rect extent() const noexcept;
 
     // Desktop of the tree's root; nullptr while the widget is not in a desktop's tree.

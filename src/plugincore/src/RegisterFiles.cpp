@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: files of the register exports (M7, A5, B1 to B3, STYM2149_SPEC.md §8, D-160 to D-162)
+// STYM2149 — plugincore: files of the register exports (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/RegisterFiles.h"
@@ -39,7 +39,7 @@ bool sameClock(const ymcore::MasterClock& a, const ymcore::MasterClock& b) {
 }
 
 // Voice frames that use a timer effect (SID, Sync Buzzer, Digidrum): VBL and YM3 cannot carry them, so they are
-// frozen there (D-172).
+// frozen there.
 uint32_t timerFrames(std::span<const RegisterFrame> frames) {
     uint32_t n = 0;
     for (const RegisterFrame& f : frames)
@@ -54,7 +54,7 @@ uint32_t dmaFrames(std::span<const DmaFrame> dma) {
     return n;
 }
 
-// The part of each Digidrum that the engine plays, Start to End (D-443): a player plays its sample from the beginning.
+// The part of each Digidrum that the engine plays, Start to End: a player plays its sample from the beginning.
 std::array<std::span<const uint8_t>, 8> digidrums(const NonParamState& x) {
     std::array<std::span<const uint8_t>, 8> out{};
     for (size_t k = 0; k < out.size() && k < x.digidrums.size(); ++k) {
@@ -78,7 +78,7 @@ struct Source {
     bool take = false;
 };
 
-// Writes one format, and lists for the alert what the file does not render like the engine (D-172).
+// Writes one format, and lists for the alert what the file does not render like the engine.
 RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& values, const NonParamState& x,
                    const RegisterFileOptions& o) {
     RegisterFile out;
@@ -123,7 +123,7 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         ymio::Ym6Info info;
         info.frameHz = s.frameHz;
         info.clock = s.clock;
-        info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob (D-060)
+        info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob
         info.comment = "Made with STYM2149";
         info.digidrums = digidrums(x);
         ymio::Ym6Report rep;
@@ -142,10 +142,10 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         info.frameHz = s.frameHz;
         info.clock = s.clock;
         info.ste = s.ste && !s.take;  // a take has no DMA sound to play
-        info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob (D-060)
+        info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob
         info.digidrums = digidrums(x);
         for (size_t k = 0; k < info.dma.size() && k < x.dmaSamples.size(); ++k) {
-            // The bytes up to End (D-444): the capture gives the first frame read, Start included.
+            // The bytes up to End: the capture gives the first frame read, Start included.
             const ymengine::DmaSlot& d = x.dma.slots[k];
             const std::span<const int8_t> all = x.dmaSamples[k];
             const size_t ch = d.stereo ? 2 : 1;
@@ -189,7 +189,7 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
 }  // namespace
 
 std::string registerFileName(RegisterFormat format, bool take) {
-    // prism-ym2149-song.s, .ym, .sndh of the prototype (D-060).
+    // prism-ym2149-song.s, .ym, .sndh of the prototype.
     std::string name = take ? "stym2149-take" : "stym2149-song";
     switch (format) {
     case RegisterFormat::Vbl: return name + ".s";

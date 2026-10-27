@@ -1,4 +1,4 @@
-// STYM2149 — ymengine: stereo delay of the audio output (eighth DAW test, item 98, D-299)
+// STYM2149 — ymengine: stereo delay of the audio output (eighth DAW test, item 98)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

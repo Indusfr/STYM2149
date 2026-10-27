@@ -23,10 +23,10 @@ namespace {
 constexpr std::string_view kApp = "STYM2149";
 
 // Rows of a track: LANEKEYS of the prototype (rows 0 to 15 of the state, then the chord voices in the order of
-// POLYKEYS: pat2-pat6, oct2-oct6, dur2-dur6), then INS and the CMD rows of STYM2149: "cmd" holds the Xyz (and, in a
-// file written before D-330, every kind of command, each going to the row of its kind), then one key per kind
-// ("cmd" followed by its letter; D-330, D-338; "cmdL", "cmdM" and "cmdJ" since the twelfth DAW test, "cmdG", "cmdK"
-// and "cmdQ" since D-393 and D-394). Xyz and Pxy are retired (D-340, D-344): "cmd" and "cmdP" are no longer written,
+// POLYKEYS: pat2-pat6, oct2-oct6, dur2-dur6), then INS and the CMD rows of STYM2149: "cmd" holds the Xyz (and, in an
+// older file, every kind of command, each going to the row of its kind), then one key per kind
+// ("cmd" followed by its letter; "cmdL", "cmdM" and "cmdJ" since the twelfth DAW test, "cmdG", "cmdK"
+// and "cmdQ" later). Xyz and Pxy are retired: "cmd" and "cmdP" are no longer written,
 // an Xyz or a Pxy read is dropped. The "afl" flags and the Txx of a file written before the twelfth DAW test become Jxx
 // and the "bpm" row of the pattern (items 144, 150).
 struct LaneKey {

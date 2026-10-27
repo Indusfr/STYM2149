@@ -1,4 +1,4 @@
-# pluginui: the plugin's main window drawn with gemui, without JUCE (M4, STYM2149_SPEC.md §6). The JUCE editor
+# pluginui: the plugin's main window drawn with gemui, without JUCE (STYM2149_SPEC.md §6). The JUCE editor
 # (src/plugin) and the capture tool (tools/gemshot) both use it.
 add_library(stym_pluginui STATIC
   src/AppIcon.cpp

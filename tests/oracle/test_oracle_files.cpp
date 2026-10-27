@@ -180,7 +180,7 @@ TEST_CASE("S9 HQ chain against the AtariAudio YM player", "[S9][oracle][refdata]
         const size_t nc = std::min<size_t>(size_t(1) << 20, refCut.size());
         const auto [corr, lag] = bestFractionalCorrelation(std::vector<double>(hqAaCut.begin(), hqAaCut.begin() + long(nc)),
                                                            std::vector<double>(refCut.begin(), refCut.begin() + long(nc)), 4);
-        // Log-spectral distance over 20 Hz-15 kHz (D-046): above that, the AtariAudio box average sags (-1.4 dB at
+        // Log-spectral distance over 20 Hz-15 kHz: above that, the AtariAudio box average sags (-1.4 dB at
         // 15 kHz, -2.5 dB at 20 kHz at 48 kHz) and lets what exceeds half the output rate fold back, which the fast
         // writes of the timer effects make audible. The 15-20 kHz band and the full band are published as
         // diagnostics, without a threshold.
@@ -192,8 +192,8 @@ TEST_CASE("S9 HQ chain against the AtariAudio YM player", "[S9][oracle][refdata]
              fmt(logSpectralDistanceDb(psdHq, psdRef, rate, 15000, 20000), 3) + " dB, " +
                  fmt(logSpectralDistanceDb(psdHq, psdRef, rate, 20, 20000), 3) + " dB");
 
-        // S9b (D-042, option A): effect of the noise alone. The default HQ mode (maximal LFSR) is compared with the HQ
-        // mode with the AtariAudio LFSR: same decimation on both sides, only the noise sequence (D-012) differs.
+        // S9b (option A): effect of the noise alone. The default HQ mode (maximal LFSR) is compared with the HQ
+        // mode with the AtariAudio LFSR: same decimation on both sides, only the noise sequence differs.
         const std::vector<double> hqMax = renderHq(ymcore::NoiseLfsr::Maximal, ymio::YmFxModel::AtariAudio);
         const std::vector<double> hqMaxCut(hqMax.begin() + long(skip), hqMax.end());
         const auto bandsMax = thirdOctaveDb(welchPsd(hqMaxCut, 16384), rate);
@@ -210,7 +210,7 @@ TEST_CASE("S9 HQ chain against the AtariAudio YM player", "[S9][oracle][refdata]
                 worstFc = bandsHqAa[i].first;
             }
             // Diagnostic (no threshold): deviation due to the decimation, HQ against the AtariAudio player at equal
-            // LFSR (D-014).
+            // LFSR.
             const double d1 = std::fabs(bandsHqAa[i].second - bandsRef[i].second);
             if (d1 > decim) {
                 decim = d1;
@@ -220,7 +220,7 @@ TEST_CASE("S9 HQ chain against the AtariAudio YM player", "[S9][oracle][refdata]
         metric("S9", std::string(t.file) + ": max deviation per third octave, maximal LFSR against AtariAudio LFSR, band " +
                          fmt(worstFc, 4) + " Hz",
                fmt(worst, 3) + " dB", "≤ 1 dB", worst <= 1.0);
-        note("S9", std::string(t.file) + ": third octave, HQ against the AtariAudio player at equal LFSR (decimation, D-014), band " +
+        note("S9", std::string(t.file) + ": third octave, HQ against the AtariAudio player at equal LFSR (decimation), band " +
                        fmt(decimFc, 4) + " Hz",
              fmt(decim, 3) + " dB");
         if (t.effects) {

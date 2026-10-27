@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: YM Player tune and its playback (M7, A2, D-159, D-169)
+// STYM2149 — plugincore: YM Player tune and its playback
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/YmTune.h"
@@ -93,7 +93,7 @@ YmPlayback::YmPlayback(std::shared_ptr<const YmTune> tune, int subsong, const ym
     : tune_(std::move(tune)), subsong_(std::clamp(subsong, 1, tune_->subsongs())) {
     ymcore::RenderConfig rc = render;
     rc.chip.clock = tune_->clock();
-    // AtariAudio averaging and Retro: at least one internal step per sample; beyond that, sinc (D-058).
+    // AtariAudio averaging and Retro: at least one internal step per sample; beyond that, sinc.
     if (rc.mode != ymcore::OutputMode::Raw && double(rc.hostRate) > rc.chip.clock.hz() / 8.0)
         rc.mode = ymcore::OutputMode::Raw;
     renderer_.prepare(rc);

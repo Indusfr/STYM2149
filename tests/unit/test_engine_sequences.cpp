@@ -1,4 +1,4 @@
-// STYM2149 — instrument sequences of the engine (M6, B2, D-148): PER, NP, MIX, GEN and FIX rows of the Modulation
+// STYM2149 — instrument sequences of the engine: PER, NP, MIX, GEN and FIX rows of the Modulation
 // table, detune, "analog" randomness, pitch matrix, hard sync, instrument chained at the end of the table, table
 // under the arpeggio.
 // Programming: Pascal "Indus" Nowak (with Claude's help).

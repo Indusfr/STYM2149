@@ -1,4 +1,4 @@
-// STYM2149 — timer waves (M6, B6, D-151): programmable SID wave of 2 to 16 steps, Sine-SID, Sync Buzzer steps,
+// STYM2149 — timer waves: programmable SID wave of 2 to 16 steps, Sine-SID, Sync Buzzer steps,
 // three simultaneous timers on a chip in 3-channel mode.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -54,7 +54,7 @@ struct Rig {
     }
 };
 
-// A SID Voice track: Base below 2 steps (the prototype's square), the Custom form of len steps otherwise (D-411).
+// A SID Voice track: Base below 2 steps (the prototype's square), the Custom form of len steps otherwise.
 ymengine::TrackParams sid(int len = 0, std::initializer_list<uint8_t> wave = {}) {
     ymengine::TrackParams t;
     t.mix.enabled = true;
@@ -90,7 +90,7 @@ TEST_CASE("SID wave: one volume per interrupt, scaled by the volume of the note,
     for (const auto mode : {ymengine::TimerMode::Free, ymengine::TimerMode::Mfp}) {
         CAPTURE(int(mode));
         // Square wave of the prototype: volume of the note (13), low volume, one toggle per interrupt, two in a period
-        // of the note (D-426).
+        // of the note.
         Rig sq(ymengine::VoiceMode::Authentic3, mode);
         sq.e.setTrack(0, sid());
         sq.e.noteOn(0, 57, 127);
@@ -135,8 +135,8 @@ TEST_CASE("SID wave: one volume per interrupt, scaled by the volume of the note,
 
 TEST_CASE("SID wave: Sine-SID volumes, harmonic 3 weaker than that of the square wave",
           "[engine][timer][timerwave]") {
-    // At period 16, one cycle over the 16 bars (D-401), half a step after the middle, up to the top (15) then down
-    // near the trough: no step at 0 (D-395). A sine on the scale of the volumes, as the bars draw it (D-410): the bars
+    // At period 16, one cycle over the 16 bars, half a step after the middle, up to the top (15) then down
+    // near the trough: no step at 0. A sine on the scale of the volumes, as the bars draw it: the bars
     // of each half mirror those of the other about volume 9.
     const auto sine = ymengine::sineSidWave(3, 15, 8, 16);
     CHECK(sine == std::array<uint8_t, 16>{10, 12, 14, 15, 15, 14, 12, 10, 8, 6, 4, 3, 3, 4, 6, 8});
@@ -164,12 +164,12 @@ TEST_CASE("SID wave: Sine-SID volumes, harmonic 3 weaker than that of the square
     const double sinus = ratio(16, sine, 0);
     CAPTURE(square, sinus);
     CHECK(square > 0.3);  // 1/3 for a perfect square wave (-9.5 dB)
-    // 0.20 measured: the volumes follow the sine (D-410), and the chip's level, logarithmic in the volume, peaks at the
-    // top (0.013 while the volumes followed a sine of the levels; 0.08 before D-395, with a step on the trough).
+    // 0.20 measured: the volumes follow the sine, and the chip's level, logarithmic in the volume, peaks at the
+    // top (0.013 while the volumes followed a sine of the levels; 0.08 formerly, with a step on the trough).
     CHECK(sinus < 0.25);
 }
 
-TEST_CASE("Sine-SID between two volumes (Indus, 24/10/2026 11:29, D-402)",
+TEST_CASE("Sine-SID between two volumes (Indus, 24/10/2026 11:29)",
           "[engine][timer][timerwave]") {
     using Wave = std::array<uint8_t, ymengine::kSidWaveSteps>;
     // Its highest bars (the 4th and 5th) at the highest volume, its lowest (the 12th and 13th) at the lowest; the
@@ -189,10 +189,10 @@ TEST_CASE("Sine-SID between two volumes (Indus, 24/10/2026 11:29, D-402)",
     }
 }
 
-TEST_CASE("Sine-SID at a phase, a bar moved shifts it (Indus, 24/10/2026 14:07-14:08, D-405)",
+TEST_CASE("Sine-SID at a phase, a bar moved shifts it (Indus, 24/10/2026 14:07-14:08)",
           "[engine][timer][timerwave]") {
     using Wave = std::array<uint8_t, ymengine::kSidWaveSteps>;
-    // At period 16 (one cycle over the 16 bars), phase 8, the default, is the sine of D-401; each phase moves its bars
+    // At period 16 (one cycle over the 16 bars), phase 8, the default, is the former sine; each phase moves its bars
     // one place to the right, all around.
     const Wave sine = ymengine::sineSidWave(3, 15, 8, 16);
     CHECK(ymengine::kSidWavePhase == 8);
@@ -216,7 +216,7 @@ TEST_CASE("Sine-SID at a phase, a bar moved shifts it (Indus, 24/10/2026 14:07-1
         CAPTURE(k);
         CHECK(ymengine::sineSidWavePhase(sine, 8, 16, k, sine[size_t(k)]) == 8);  // put back: nothing moves
     }
-    // The bars of phase 8: 10 12 14 15 15 14 12 10 8 6 4 3 3 4 6 8 (D-410). The 10th bar, falling, raised to the
+    // The bars of phase 8: 10 12 14 15 15 14 12 10 8 6 4 3 3 4 6 8. The 10th bar, falling, raised to the
     // volume of the 9th: the sine one bar to the right; lowered to the volume of the 11th: one bar to the left.
     CHECK(sine == Wave{10, 12, 14, 15, 15, 14, 12, 10, 8, 6, 4, 3, 3, 4, 6, 8});
     CHECK(ymengine::sineSidWavePhase(sine, 8, 16, 9, sine[8]) == 9);
@@ -234,13 +234,13 @@ TEST_CASE("Sine-SID at a phase, a bar moved shifts it (Indus, 24/10/2026 14:07-1
     CHECK(ymengine::sineSidWavePhase(sine, 0, 16, 0, ymengine::sineSidWave(3, 15, 15, 16)[0]) == 15);
 }
 
-TEST_CASE("Sine-SID period, 8 bars by default (Indus, 24/10/2026 15:41, D-406)", "[engine][timer][timerwave]") {
+TEST_CASE("Sine-SID period, 8 bars by default (Indus, 24/10/2026 15:41)", "[engine][timer][timerwave]") {
     using Wave = std::array<uint8_t, ymengine::kSidWaveSteps>;
     // By default, two cycles of 8 bars from volume 3 to 15, peaks on the 2nd and 3rd bars, no step at 0.
     CHECK(ymengine::kSidWavePeriod == 8);
     const Wave sine = ymengine::sineSidWave();
     CHECK(sine == ymengine::sineSidWave(3, 15, 8, 8));
-    CHECK(sine == Wave{11, 15, 15, 11, 7, 3, 3, 7, 11, 15, 15, 11, 7, 3, 3, 7});  // D-410
+    CHECK(sine == Wave{11, 15, 15, 11, 7, 3, 3, 7, 11, 15, 15, 11, 7, 3, 3, 7});
     for (int period = ymengine::kSidWavePeriodMin; period <= ymengine::kSidWaveSteps; ++period)
         for (const auto& [low, high] : {std::pair{3, 15}, std::pair{0, 15}, std::pair{6, 9}}) {
             CAPTURE(period, low, high);
@@ -266,7 +266,7 @@ TEST_CASE("Sine-SID period, 8 bars by default (Indus, 24/10/2026 15:41, D-406)",
     CHECK(ymengine::sineSidWavePhase(sine, 8, 8, 1, sine[0]) == 9);
 
     // Played: with Steps 8, one cycle per period of the note, at its pitch; with Steps 16, two cycles, the octave
-    // above (the n steps of a SID wave last one period of the note, D-151).
+    // above (the n steps of a SID wave last one period of the note).
     auto play = [](int len, const Wave& wave) {
         Rig r(ymengine::VoiceMode::Studio16);
         ymengine::TrackParams t = sid(len);
@@ -285,15 +285,15 @@ TEST_CASE("Sine-SID period, 8 bars by default (Indus, 24/10/2026 15:41, D-406)",
     const auto [one1, one2] = play(8, sine);
     const auto [two1, two2] = play(16, sine);
     CAPTURE(one1, one2, two1, two2);
-    CHECK(one2 < 0.6 * one1);  // 0.51 measured, the level peaking at the top (D-410)
+    CHECK(one2 < 0.6 * one1);  // 0.51 measured, the level peaking at the top
     CHECK(two1 < 0.05 * two2);
 }
 
-TEST_CASE("Bounce-SID: the Sine-SID on the chip's levels (Indus, 24/10/2026 18:41, D-414)",
+TEST_CASE("Bounce-SID: the Sine-SID on the chip's levels (Indus, 24/10/2026 18:41)",
           "[engine][timer][timerwave]") {
     using Wave = std::array<uint8_t, ymengine::kSidWaveSteps>;
-    // The Sine-SID before D-410: the volumes whose levels best follow the sine, packed at the top by the logarithmic
-    // level, which the bars draw as a bounce; no step at 0 (D-395).
+    // The former Sine-SID: the volumes whose levels best follow the sine, packed at the top by the logarithmic
+    // level, which the bars draw as a bounce; no step at 0.
     const Wave one = ymengine::sineSidWave(3, 15, 8, 16, true);
     CHECK(one == Wave{14, 14, 15, 15, 15, 15, 14, 14, 13, 11, 8, 3, 3, 8, 11, 13});
     const Wave bounce = ymengine::sineSidWave(3, 15, ymengine::kSidWavePhase, ymengine::kSidWavePeriod, true);
@@ -317,8 +317,8 @@ TEST_CASE("Bounce-SID: the Sine-SID on the chip's levels (Indus, 24/10/2026 18:4
     CHECK(ymengine::sineSidWavePhase(one, 8, 16, 9, one[8], true) == 9);
     CHECK(ymengine::sineSidWaveAt(one, 9, 16, true) == ymengine::sineSidWave(3, 15, 9, 16, true));
 
-    // Played as its bars, like Sine and Custom: the timer Steps times the note (D-426). Heard, a sine: harmonic 3 at
-    // 0.013 of the fundamental over 16 Steps (0.20 for the Sine of D-410), harmonic 2 under 5 % over 8 (0.51).
+    // Played as its bars, like Sine and Custom: the timer Steps times the note. Heard, a sine: harmonic 3 at
+    // 0.013 of the fundamental over 16 Steps (0.20 for the former Sine), harmonic 2 under 5 % over 8 (0.51).
     auto play = [](int len, const Wave& wave, int harmonic) {
         Rig r(ymengine::VoiceMode::Studio16);
         ymengine::TrackParams t = sid(len);
@@ -342,7 +342,7 @@ TEST_CASE("Bounce-SID: the Sine-SID on the chip's levels (Indus, 24/10/2026 18:4
     CHECK(second < 0.05);
 }
 
-TEST_CASE("SID Square: the note's volume over Width of its Steps (Indus, 24/10/2026 16:00 and 17:47, D-408, D-411)",
+TEST_CASE("SID Square: the note's volume over Width of its Steps (Indus, 24/10/2026 16:00 and 17:47)",
           "[engine][3ch][timer][timerwave]") {
     const ymengine::TrackPatch def;
     CHECK(def.sidForm == ymengine::SidForm::Base);
@@ -350,7 +350,7 @@ TEST_CASE("SID Square: the note's volume over Width of its Steps (Indus, 24/10/2
     CHECK(def.sidWidth == 4);
     for (const auto mode : {ymengine::TimerMode::Free, ymengine::TimerMode::Mfp}) {
         CAPTURE(int(mode));
-        // Base: the prototype's square, one toggle per interrupt, two in a period of the note (D-426), whatever its
+        // Base: the prototype's square, one toggle per interrupt, two in a period of the note, whatever its
         // Steps and Width.
         Rig sq(ymengine::VoiceMode::Authentic3, mode);
         ymengine::TrackParams base = sid();
@@ -408,7 +408,7 @@ TEST_CASE("SID Square: the note's volume over Width of its Steps (Indus, 24/10/2
     for (size_t i = 0; i < 8; ++i) CHECK(v8[i].value == std::array<uint8_t, 4>{13, 0, 8, 3}[i % 4]);
 }
 
-TEST_CASE("Recorder: every form of the SID wave keeps the timer of its square (D-408, D-411)",
+TEST_CASE("Recorder: every form of the SID wave keeps the timer of its square",
           "[engine][3ch][timer][timerwave][recorder]") {
     using ymengine::SidForm;
     for (const auto mode : {ymengine::TimerMode::Free, ymengine::TimerMode::Mfp}) {
@@ -431,7 +431,7 @@ TEST_CASE("Recorder: every form of the SID wave keeps the timer of its square (D
             return e.timer;
         };
         const ymengine::MfpSetting square = taken(SidForm::Base, 8, 4);
-        CHECK(std::fabs(square.hz() - 2 * ymengine::noteHz(57)) / ymengine::noteHz(57) < 0.02);  // D-426
+        CHECK(std::fabs(square.hz() - 2 * ymengine::noteHz(57)) / ymengine::noteHz(57) < 0.02);
         struct Case {
             SidForm form;
             int len, width;
@@ -455,7 +455,7 @@ TEST_CASE("Sync Buzzer: the steps write their R13 shapes in turn, 0: the shape o
     t.patch.buzzShapes = {0x8, 0xA, 0, 0xE, 0x8, 0x8, 0x8, 0x8};
     t.patch.buzzLen = 4;
     r.e.setTrack(0, t);
-    r.e.noteOn(0, 45, 127);  // 110 Hz: four restarts every 9 ms (D-388)
+    r.e.noteOn(0, 45, 127);  // 110 Hz: four restarts every 9 ms
     r.run(24000);
     const Log w = r.writes(13);
     REQUIRE(w.size() >= 40);
@@ -483,7 +483,7 @@ TEST_CASE("Sync Buzzer: the steps write their R13 shapes in turn, 0: the shape o
     for (const auto& x : q) REQUIRE(x.value == 0xC);
 }
 
-TEST_CASE("Sync Buzzer: the steps fit in one period of the note, which keeps its pitch (D-388)",
+TEST_CASE("Sync Buzzer: the steps fit in one period of the note, which keeps its pitch",
           "[engine][timer][timerwave]") {
     for (const auto vm : {ymengine::VoiceMode::Authentic3, ymengine::VoiceMode::Studio16}) {
         for (const auto mode : {ymengine::TimerMode::Free, ymengine::TimerMode::Mfp}) {
@@ -534,7 +534,7 @@ TEST_CASE("Sync Buzzer: the steps fit in one period of the note, which keeps its
     }
 }
 
-TEST_CASE("Timers: three SID voices on one 3-channel chip, one timer each (D-138)", "[engine][3ch][timer][timerwave]") {
+TEST_CASE("Timers: three SID voices on one 3-channel chip, one timer each", "[engine][3ch][timer][timerwave]") {
     Rig r(ymengine::VoiceMode::Authentic3, ymengine::TimerMode::Mfp);
     r.e.setTrack(0, sid());
     r.e.setTrack(1, sid(4, {15, 0, 9, 4}));

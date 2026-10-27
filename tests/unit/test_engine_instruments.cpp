@@ -1,4 +1,4 @@
-// STYM2149 — instruments of the engine (M6, B1, D-147): INS row of the melodic tracks, sound and arpeggio of the
+// STYM2149 — instruments of the engine: INS row of the melodic tracks, sound and arpeggio of the
 // instrument, ties, chords, RTG, GEN row first, drums and roles of the tracks in 3-channel mode.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

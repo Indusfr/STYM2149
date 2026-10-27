@@ -1,7 +1,7 @@
-// STYM2149 — STE DMA sound in the interface (M6, B8, D-153, D-155): Computer row below Voices (ST or STE) and Options
-// (no longer the modes menu, D-397); DMA type of the generator and its slot; tabs DMA1 to DMA8 in 3 ch mode; DMA window
+// STYM2149 — STE DMA sound in the interface: Computer row below Voices (ST or STE) and Options
+// (no longer the modes menu); DMA type of the generator and its slot; tabs DMA1 to DMA8 in 3 ch mode; DMA window
 // (bank: slots, name, loading and listening, rate, mono or stereo, loop, root note, Sign and Gain tools, undo steps);
-// Mixer of the DMA tracks (panning, Out L and Out R in 3 ch mode); session; named banks (D-462).
+// Mixer of the DMA tracks (panning, Out L and Out R in 3 ch mode); session; named banks.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -74,7 +74,7 @@ public:
     void setPreference(std::string_view key, std::string_view value) override { prefs[std::string(key)] = value; }
     std::string patchLibrary() const override { return {}; }
     void setPatchLibrary(const std::string&) override {}
-    std::string library;  // the DMA bank file (D-462)
+    std::string library;  // the DMA bank file
     std::string dmaLibrary() const override { return library; }
     void setDmaLibrary(const std::string& json) override { library = json; }
 
@@ -154,7 +154,7 @@ void dragSlider(MainWindow& w, const char* id, bool toMax) {
     drag(w, {centre(t), {r.x + r.w / 2, t.y + 8}, {toMax ? r.right() + 20 : r.x - 20, t.y + 8}});
 }
 
-// Computer menu button (thirteenth DAW test, item 164, D-373): 0 = ST, 1 = STE.
+// Computer menu button (thirteenth DAW test, item 164): 0 = ST, 1 = STE.
 void setComputer(MainWindow& w, int machine) {
     click(w, "compSel");
     pick(w, machine);
@@ -208,16 +208,16 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
     const gemui::Rect clock = *w.rectOf("clkSel");
     CHECK(comp.y > voices.bottom());
     CHECK(clock.y > comp.bottom());
-    // The three buttons start together (thirteenth DAW test, item 161, D-370).
+    // The three buttons start together (thirteenth DAW test, item 161).
     CHECK(comp.x == voices.x);
     CHECK(clock.x == voices.x);
-    // Band of the row and rows moved down (comparison with the screenshots, D-155).
+    // Band of the row and rows moved down (comparison with the screenshots).
     const gemui::Rect row = *w.rectOf("computerRow"), below = *w.rectOf("systemBelow");
     CHECK(row.y == comp.y);
     CHECK(row.bottom() == clock.y);
     CHECK(below.y == clock.y);
 
-    // A menu button (item 164, D-373): ST or STE, the current one marked.
+    // A menu button (item 164): ST or STE, the current one marked.
     click(w, "compSel");
     CHECK(labels(w) == std::vector<std::string>{"ST", "STE"});
     CHECK(menu(w).checked() == 0);
@@ -231,7 +231,7 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
     pick(w, 0);
     CHECK(h.global(Global::Computer) == 0);
 
-    // Modes menu: the three modes alone, the machine left to the Computer row (24/10/2026, D-397).
+    // Modes menu: the three modes alone, the machine left to the Computer row (24/10/2026).
     click(w, "modeSel");
     CHECK(labels(w).size() == 3);
     pick(w, 0);
@@ -239,7 +239,7 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
     pick(w, 1);
     CHECK(h.global(Global::Computer) == 1);
 
-    // Options > Settings..., then Computer in its window (D-430).
+    // Options > Settings..., then Computer in its window.
     w.openMenu(3);
     const std::vector<std::string> opts = labels(w);
     const size_t at = size_t(std::find(opts.begin(), opts.end(), "Settings...") - opts.begin());
@@ -276,13 +276,13 @@ TEST_CASE("DMA: DMA type of the generator with the STE, slot of the track", "[ui
     CHECK(h.state.tracks[0].patch.dmaSlot == 4);
     CHECK(h.editor.undo.undoSize() == undo);
     w.tick(0);
-    // "DMA samples", under samples 5 to 8 and as wide as them (D-213): the DMA window, on the track's slot.
+    // "DMA samples", under samples 5 to 8 and as wide as them: the DMA window, on the track's slot.
     const gemui::Rect s5 = *w.rectOf("genDma4"), s8 = *w.rectOf("genDma7"), edit = *w.rectOf("dmaEdit");
     CHECK(edit.x == s5.x);
     CHECK(edit.right() == s8.right());
     CHECK(edit.y > s5.bottom());
     CHECK(edit.y - s5.bottom() <= 6);
-    // The drawing of the sample, between the button and the text (D-213); it loads nothing.
+    // The drawing of the sample, between the button and the text; it loads nothing.
     const gemui::Rect wave = *w.rectOf("genDmaWave");
     CHECK(wave.y > edit.bottom());
     CHECK(w.rectOf("dmaHint")->y > wave.bottom());
@@ -360,7 +360,7 @@ TEST_CASE("DMA: DMA tracks in 3 ch mode with the STE (tabs, enforced role, Mixer
     CHECK(h.global(Global::FocusTrack) == 1);
 }
 
-TEST_CASE("DMA: Edit > Samples menu, greyed out on an ST (fourth DAW test, item 36, D-234); STE machine offered",
+TEST_CASE("DMA: Edit > Samples menu, greyed out on an ST (fourth DAW test, item 36); STE machine offered",
           "[ui][dma]") {
     TestHost h;
     MainWindow w(h);
@@ -370,7 +370,7 @@ TEST_CASE("DMA: Edit > Samples menu, greyed out on an ST (fourth DAW test, item 
         const std::vector<std::string> edit = labels(w);
         const size_t at = size_t(std::find(edit.begin(), edit.end(), "Samples") - edit.begin());
         REQUIRE(at < edit.size());
-        CHECK(edit[at - 1] == "Instruments");  // Timer wave, Buzzer (D-238) and Sequences (D-241) left the menu
+        CHECK(edit[at - 1] == "Instruments");  // Timer wave, Buzzer and Sequences left the menu
         pick(w, int(at));                     // the submenu opens
         CHECK(labels(w) == std::vector<std::string>{"Digidrums", "DMA (STE)"});
     };
@@ -452,7 +452,7 @@ TEST_CASE("DMA: slot, rate, format, loop, root note, one undo step each", "[ui][
     CHECK(h.dma() == ymengine::DmaParams{});
 }
 
-TEST_CASE("DMA: Start and End of the part played, with or without Loop (D-444)", "[ui][dma][undo]") {
+TEST_CASE("DMA: Start and End of the part played, with or without Loop", "[ui][dma][undo]") {
     TestHost h;
     MainWindow w(h);
     w.dmaWindow().show();
@@ -497,7 +497,7 @@ TEST_CASE("DMA: Start and End of the part played, with or without Loop (D-444)",
     CHECK(h.dma().slots[1].start == 999);
 }
 
-TEST_CASE("DMA: name of the sample in the window, the drawings and the tips; renamed, undone, cleared (D-445)",
+TEST_CASE("DMA: name of the sample in the window, the drawings and the tips; renamed, undone, cleared",
           "[ui][dma][undo]") {
     TestHost h;
     h.values[size_t(paramIndex(Global::Computer))] = 1;
@@ -604,7 +604,7 @@ TEST_CASE("DMA: loading, listening, tools and mono-stereo switch; bytes in the u
 }
 
 TEST_CASE("DMA: Normalize, Reverse and Fade out of the Digidrums; L and R choose the channels of a stereo sample "
-          "(Indus, 26/10/2026, D-450)",
+          "(Indus, 26/10/2026)",
           "[ui][dma][undo]") {
     TestHost h;
     MainWindow w(h);
@@ -669,7 +669,7 @@ TEST_CASE("DMA: Normalize, Reverse and Fade out of the Digidrums; L and R choose
     CHECK(h.state.dmaSamples[3][1] == -3);
 }
 
-TEST_CASE("DMA: -3 dB after a clipped +3 dB gives the peaks back; each step undone alone (Indus, 26/10/2026, D-453)",
+TEST_CASE("DMA: -3 dB after a clipped +3 dB gives the peaks back; each step undone alone (Indus, 26/10/2026)",
           "[ui][dma][undo]") {
     TestHost h;
     MainWindow w(h);
@@ -694,7 +694,7 @@ TEST_CASE("DMA: -3 dB after a clipped +3 dB gives the peaks back; each step undo
     CHECK(h.state.dmaSamples[0] == want);
 }
 
-TEST_CASE("DMA: with Resample on, a new rate resamples the sample; Start and End follow (Indus, 26/10/2026, D-454)",
+TEST_CASE("DMA: with Resample on, a new rate resamples the sample; Start and End follow (Indus, 26/10/2026)",
           "[ui][dma][undo]") {
     TestHost h;
     MainWindow w(h);
@@ -734,8 +734,7 @@ TEST_CASE("DMA: with Resample on, a new rate resamples the sample; Start and End
     CHECK(h.state.dmaSamples[1] == ramp(1000));
 }
 
-TEST_CASE("DMA: Fine tunes the slot from -100 to +100 cents, one undo step per gesture, typed too (Indus, 26/10/2026, "
-          "D-452)",
+TEST_CASE("DMA: Fine tunes the slot from -100 to +100 cents, one undo step per gesture, typed too (Indus, 26/10/2026)",
           "[ui][dma][undo]") {
     TestHost h;
     MainWindow w(h);
@@ -766,7 +765,7 @@ TEST_CASE("DMA: Fine tunes the slot from -100 to +100 cents, one undo step per g
     CHECK(h.dma().slots[4].cents == 0);
 }
 
-TEST_CASE("DMA: with Loop on, Play loops the sample; Play again, Loop or closing stops it (Indus, 26/10/2026, D-449)",
+TEST_CASE("DMA: with Loop on, Play loops the sample; Play again, Loop or closing stops it (Indus, 26/10/2026)",
           "[ui][dma]") {
     TestHost h;
     MainWindow w(h);
@@ -819,7 +818,7 @@ TEST_CASE("DMA: with Loop on, Play loops the sample; Play again, Loop or closing
     CHECK(h.stops == std::vector<int>{2, 2});
 }
 
-TEST_CASE("DMA: named banks in a shared library, as in the Digidrums window (Indus, 26/10/2026, D-462)",
+TEST_CASE("DMA: named banks in a shared library, as in the Digidrums window (Indus, 26/10/2026)",
           "[ui][dma]") {
     TestHost h;
     MainWindow w(h);

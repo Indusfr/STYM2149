@@ -1,4 +1,4 @@
-// STYM2149 — reference tunes (D-032, tools/fetch_refdata.sh)
+// STYM2149 — reference tunes (tools/fetch_refdata.sh)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #pragma once
@@ -10,7 +10,7 @@ namespace stym::test {
 
 struct RefTune {
     const char* file;
-    bool effects;     // YM5/YM6 effects or YM2 digidrums: played in M2, excluded from bit-exact comparisons
+    bool effects;     // YM5/YM6 effects or YM2 digidrums: played, excluded from bit-exact comparisons
     const char* role; // what the tune exercises
 };
 
@@ -42,7 +42,7 @@ inline const std::vector<RefTune>& refTunes() {
     return tunes;
 }
 
-// Reference SNDH files (M7, D-159), in refdata/sndh.
+// Reference SNDH files, in refdata/sndh.
 struct RefSndh {
     const char* file;
     bool ste;          // STE DMA sound

@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: MIDI import and export of the File menu (M7, A3, D-170)
+// STYM2149 — plugincore: MIDI import and export of the File menu
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -12,7 +12,7 @@
 //   replaces it (no chord voices, like the prototype).
 // - Patterns 1 to n are replaced, the Song becomes one entry per pattern; the other patterns stay. The filled
 //   tracks are switched on, the others off.
-// - Deviations (D-170): the octave is written as octCode (the prototype wrote 0 for octave 0, which then played at
+// - Deviations: the octave is written as octCode (the prototype wrote 0 for octave 0, which then played at
 //   the octave of the track); a held note also carries TIE on its first step, like a note stretched in the grid
 //   (the prototype wrote it only on the following steps, and the note did not hold); in dual chip, the channels go
 //   to the channels of both chips (tracks 1-3 and 5-7; the prototype took tracks 1 to 6, including the Digidrum
@@ -20,7 +20,7 @@
 //   (the prototype played a tempo that its slider did not show).
 //
 // Export (exportMidi, exportSongMidi of the prototype): SMF 1, 96 ticks per quarter note, like the prototype; the
-// content is what the sequencer plays (D-163), rendered offline (OfflineRender) and read from its log:
+// content is what the sequencer plays, rendered offline (OfflineRender) and read from its log:
 // - each attack of a sequencer voice is a note (root, chord voices, RTG repeated hits, notes of the track
 //   arpeggios), which ends at the release of its voice (gate, CUT, Note-off, stop), at the next attack of the same
 //   voice, or when the voice changes note (arrival of a slide, held arpeggio);
@@ -29,7 +29,7 @@
 // - track 0: tempo of each step where it changes (Song blocks; in Ticks mode, 60 × VBL / (speed × steps per
 //   quarter note)) and time signature of the project; the steps follow the time played (swing, groove);
 // - one MIDI track per track played, in track order, channels like the prototype (1 to 9 then 11 to 16), named
-//   after the track name, otherwise "STYM2149 chN" (the prototype wrote "PRISM chN", D-060).
+//   after the track name, otherwise "STYM2149 chN" (the prototype wrote "PRISM chN").
 #pragma once
 #include <array>
 #include <atomic>

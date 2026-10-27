@@ -1,4 +1,4 @@
-﻿; STYM2149 — Windows installer for all users (M8, C1, D-181, D-199, D-210, D-211, D-218, D-269, D-283)
+﻿; STYM2149 — Windows installer for all users
 ; Programming: Pascal "Indus" Nowak (with Claude's help).
 ; Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 ;
@@ -6,11 +6,11 @@
 ;   ISCC.exe /DAppVersion=0.9.0 [/DBuild=<CI run number>] /DArtefacts=<build-plugin\src\plugin\STYM2149_artefacts\Release>
 ;            /DRepo=<repository>
 ;            /O<output folder> packaging\windows\STYM2149.iss
-; Needs administrator rights (D-199). VST3 and CLAP go to the system-wide folders that hosts scan by default
+; Needs administrator rights. VST3 and CLAP go to the system-wide folders that hosts scan by default
 ; (C:\Program Files\Common Files\VST3 and ...\CLAP), the application to C:\Program Files\PRISM\STYM2149 by default,
 ; the tooltip languages (PO files: French, German, Spanish, Portuguese, Italian) to C:\ProgramData\STYM2149\Languages,
-; where the plugins and the application read them (D-283).
-; No AAX (D-175). Not signed (D-176): Windows SmartScreen warns on the first run, as the manual explains.
+; where the plugins and the application read them.
+; No AAX. Not signed: Windows SmartScreen warns on the first run, as the manual explains.
 
 #ifndef AppVersion
   #error Pass the version: /DAppVersion=x.y.z
@@ -21,7 +21,7 @@
 #ifndef Repo
   #define Repo "..\.."
 #endif
-; The build number (D-211), shown by Fuji > Information, goes into the file name and the name of the installed version.
+; The build number, shown by Fuji > Information, goes into the file name and the name of the installed version.
 #ifdef Build
   #define BuildSuffix "-build" + Build
   #define BuildLabel " build " + Build
@@ -41,7 +41,7 @@ AppSupportURL=https://github.com/Indusfr/STYM2149/issues
 AppCopyright=Copyright © 2026 Indus / PRISM
 VersionInfoVersion={#AppVersion}
 PrivilegesRequired=admin
-; Application folder (sixth DAW test, item 71, D-269), for an update too: the folder of the former versions
+; Application folder (sixth DAW test, item 71), for an update too: the folder of the former versions
 ; (C:\Program Files\Indus) is not offered again, its files are removed below.
 DefaultDirName={commonpf64}\PRISM\STYM2149
 UsePreviousAppDir=no
@@ -58,7 +58,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 WizardStyle=modern
-; Application icon (D-218): the installer's own icon; the application carries it too (ICON_BIG and ICON_SMALL).
+; Application icon: the installer's own icon; the application carries it too (ICON_BIG and ICON_SMALL).
 SetupIconFile={#Repo}\packaging\icon\STYM2149.ico
 UninstallDisplayName=STYM2149
 UninstallDisplayIcon={app}\STYM2149.exe
@@ -121,11 +121,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; A previous version of the bundle is replaced as a whole, so that none of its files stays; so are the languages.
 Type: files; Name: "{commonappdata}\STYM2149\Languages\*.po"
 Type: filesandordirs; Name: "{commoncf64}\VST3\STYM2149.vst3"; Components: vst3
-; Copies left by the per-user installer of D-181 are removed, so that hosts do not list STYM2149 twice.
+; Copies left by the former per-user installer are removed, so that hosts do not list STYM2149 twice.
 Type: filesandordirs; Name: "{localappdata}\Programs\Common\VST3\STYM2149.vst3"; Components: vst3
 Type: files; Name: "{localappdata}\Programs\Common\CLAP\STYM2149.clap"; Components: clap
-; The files that the former versions put in C:\Program Files\Indus (D-199), then the folder if nothing else is left in
-; it (D-269); unless the application is installed there again.
+; The files that the former versions put in C:\Program Files\Indus, then the folder if nothing else is left in
+; it; unless the application is installed there again.
 Type: files; Name: "{commonpf64}\Indus\STYM2149.exe"; Check: FormerDirLeft
 Type: files; Name: "{commonpf64}\Indus\LICENSE.txt"; Check: FormerDirLeft
 Type: files; Name: "{commonpf64}\Indus\README.md"; Check: FormerDirLeft
@@ -158,10 +158,10 @@ Name: "{autodesktop}\STYM2149"; Filename: "{app}\STYM2149.exe"; Tasks: desktopic
 Filename: "{app}\STYM2149.exe"; Description: "{cm:LaunchProgram,STYM2149}"; Components: app; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
-// The per-user installation of D-181 has the same AppId but its own uninstall entry (HKCU), its application in
+// The former per-user installation has the same AppId but its own uninstall entry (HKCU), its application in
 // %LOCALAPPDATA%\Programs\STYM2149 and its Start menu group and desktop icon for the user: left in place, its
 // shortcuts still started the old application. Its uninstaller runs before the files are installed; what it leaves
-// (no uninstaller, or a file in use) is removed after it (D-210).
+// (no uninstaller, or a file in use) is removed after it.
 const
   PerUserKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{50AB0BA1-66D4-4A91-AB65-1FBDB8849998}_is1';
 
@@ -182,7 +182,7 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, PerUserKey);
 end;
 
-// Former application folder (D-199), left for C:\Program Files\PRISM\STYM2149 (D-269): true unless the user
+// Former application folder, left for C:\Program Files\PRISM\STYM2149: true unless the user
 // installs into it again.
 function FormerDirLeft(): Boolean;
 begin

@@ -1,4 +1,4 @@
-// STYM2149 — ymio: standard MIDI files (SMF), reading formats 0 and 1 and writing format 1 (M7, A3, D-170)
+// STYM2149 — ymio: standard MIDI files (SMF), reading formats 0 and 1 and writing format 1
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "ymio/Smf.h"

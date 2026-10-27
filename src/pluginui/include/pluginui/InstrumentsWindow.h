@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: Instruments window (M6, B1, D-147), the project's 32 instruments
+// STYM2149 — pluginui: Instruments window, the project's 32 instruments
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

@@ -1,4 +1,4 @@
-# gemui: GEM widgets drawn pixel by pixel into a framebuffer, without JUCE (M4, STYM2149_SPEC.md §6).
+# gemui: GEM widgets drawn pixel by pixel into a framebuffer, without JUCE (STYM2149_SPEC.md §6).
 add_library(gemui STATIC
   src/Alert.cpp
   src/Color.cpp

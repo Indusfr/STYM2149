@@ -1,5 +1,4 @@
-# STYM2149 plugin (M3): formats per system (D-059), identity and codes (D-060; author and copyright, D-248; vendor PRISM,
-# D-334).
+# STYM2149 plugin: formats per system, identity and codes (author and copyright; vendor PRISM).
 if(APPLE)
   set(STYM_FORMATS AU VST3 AAX Standalone)
 elseif(WIN32)
@@ -28,14 +27,14 @@ juce_add_plugin(STYM2149
   AU_MAIN_TYPE kAudioUnitType_MusicDevice
   AAX_CATEGORY AAX_ePlugInCategory_SWGenerators
   LV2URI https://github.com/Indusfr/STYM2149
-  # Application icon (D-218): JUCE builds the standalone application's .ico and .icns from the drawn 16 px icon and the
+  # Application icon: JUCE builds the standalone application's .ico and .icns from the drawn 16 px icon and the
   # 256 px one (the 32 px drawing enlarged); packaging/icon/STYM2149.ico, for the installer, holds the four sizes as
   # drawn (tools/icon/make_ico.py).
   ICON_SMALL "${PROJECT_SOURCE_DIR}/packaging/icon/STYM2149-16.png"
   ICON_BIG "${PROJECT_SOURCE_DIR}/packaging/icon/STYM2149-256.png"
   FORMATS ${STYM_FORMATS})
 
-# Build identifier shown in Fuji > Information (D-211): the CI passes its run number and the commit it builds; a local
+# Build identifier shown in Fuji > Information: the CI passes its run number and the commit it builds; a local
 # build is "dev", without commit.
 set(STYM_BUILD_NUMBER "dev" CACHE STRING "Build number shown in Fuji > Information (the CI run number)")
 set(STYM_BUILD_COMMIT "" CACHE STRING "Commit of the build shown in Fuji > Information")
@@ -44,7 +43,7 @@ configure_file(BuildId.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp @ONLY)
 
 target_sources(STYM2149 PRIVATE PluginProcessor.cpp PluginEditor.cpp JucePainter.cpp KeyboardLayout.cpp
                                 StandaloneApp.cpp ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp)
-# Keyboard layout of the system (D-215): Carbon's input sources on macOS, Xlib loaded at run time on Linux.
+# Keyboard layout of the system: Carbon's input sources on macOS, Xlib loaded at run time on Linux.
 if(APPLE)
   target_link_libraries(STYM2149 PRIVATE "-framework Carbon")
 elseif(UNIX)
@@ -57,7 +56,7 @@ target_compile_definitions(STYM2149 PUBLIC
   JUCE_VST3_CAN_REPLACE_VST2=0
   JUCE_ASIO=$<IF:$<PLATFORM_ID:Windows>,1,0>
   JUCE_STRICT_REFCOUNTEDPOINTER=1
-  # The standalone application of StandaloneApp.cpp: its window's close box asks as File > Quit (D-439).
+  # The standalone application of StandaloneApp.cpp: its window's close box asks as File > Quit.
   JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_link_libraries(STYM2149
   PRIVATE

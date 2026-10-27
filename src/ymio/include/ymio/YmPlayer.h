@@ -16,7 +16,7 @@
 
 namespace stym::ymio {
 
-// When the frames are written (D-038).
+// When the frames are written.
 enum class YmTiming : uint8_t {
     // Like AtariAudio: one frame every floor(host × 313 × 512 × 50 / (rate × 8 021 247)) samples (real PAL VBL of
     // 50.05 Hz rounded to the sample), applied at the first step of the sample.
@@ -25,9 +25,9 @@ enum class YmTiming : uint8_t {
     Exact,
 };
 
-// Model of the timer effects (D-044).
+// Model of the timer effects.
 enum class YmFxModel : uint8_t {
-    // Interrupts timed to the MFP cycle; a stopped timer starts with its counter loaded. Default (D-044).
+    // Interrupts timed to the MFP cycle; a stopped timer starts with its counter loaded. Default.
     Exact,
     // Replica of the AtariAudio player: timers advanced once per host sample, at most one interrupt per sample, write
     // at the start of the next sample, first countdown of 256 periods at start, and Sinus-SID code handled like
@@ -71,7 +71,7 @@ public:
     uint32_t songFrame(uint64_t frame) const noexcept;
     uint32_t samplesPerFrameAtariAudio() const noexcept { return spt_; }
     // Frames carrying an effect that the player does not play (YM6 Sinus-SID, which neither AtariAudio nor ST-Sound
-    // plays: D-045).
+    // plays).
     uint64_t ignoredEffectFrames() const noexcept { return ignoredFx_; }
     // Frames that start or sustain an effect, and timer interrupts served.
     uint64_t effectFrames() const noexcept { return fxFrames_; }

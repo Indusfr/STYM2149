@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# STYM2149 — Atari logo of the menu bar: src/pluginui/src/FujiData.cpp, its outline and its bits (D-404).
+# STYM2149 — Atari logo of the menu bar: src/pluginui/src/FujiData.cpp, its outline and its bits.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 #
@@ -21,7 +21,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET = os.path.join(HERE, '..', '..', 'src', 'pluginui', 'src', 'FujiData.cpp')
 
-HEADER = '''// STYM2149 — pluginui: the Atari logo of the menu bar (file written by tools/icon/make_fuji_data.py, D-404)
+HEADER = '''// STYM2149 — pluginui: the Atari logo of the menu bar (file written by tools/icon/make_fuji_data.py)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

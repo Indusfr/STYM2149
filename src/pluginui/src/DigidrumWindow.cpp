@@ -68,13 +68,13 @@ void DigidrumWindow::build() {
     fine_.setRange(-ymengine::kDigidrumCentsMax, ymengine::kDigidrumCentsMax, 1);
     fine_.setTip("Fine tuning of this slot in cents");
     fine_.setId("digFine");
-    // Typed values (D-264): as many dashes as the longest value ("20000 Hz", "Sol#-1", "+100 ct").
+    // Typed values: as many dashes as the longest value ("20000 Hz", "Sol#-1", "+100 ct").
     for (gemui::ValueField* f : {&ratev_, &rootv_, &finev_, &startv_, &endv_}) f->setPx(14);
     rootv_.setPadChars(2);
     rootv_.setWholeText(true);  // a note name: C#4, Sol3 or a MIDI number
     rootv_.setTip("Click to type a note (C#4, Sol3) or a MIDI note number");
     finev_.setPadChars(1);
-    ratev_.setUnit(" Hz");  // the units stay in normal video under the pointer (D-451)
+    ratev_.setUnit(" Hz");  // the units stay in normal video under the pointer
     finev_.setUnit(" ct");
     load_.setTip("Load an audio file into this slot (first channel, resampled to the rate, 3 s at most)");
     play_.setTip("Play this slot's part at its rate, through the chip's volume table: once, or with Loop on in a loop "
@@ -107,7 +107,7 @@ void DigidrumWindow::build() {
 
 void DigidrumWindow::wire() {
     onClose = [this] {
-        stopPreview();  // a loop never plays on behind a closed window (D-449)
+        stopPreview();  // a loop never plays on behind a closed window
         m_.syncWindowButtons();
     };
     for (int k = 0; k < ymengine::kDigidrumSlots; ++k) slots_[size_t(k)].onClick = [this, k] { selectSlot(k); };
@@ -138,7 +138,7 @@ void DigidrumWindow::wire() {
     finev_.onCommit = typeInto(fine_);
     startv_.onCommit = typeInto(start_);
     endv_.onCommit = typeInto(end_);
-    // The part played (D-443), with or without Loop: Start stays before End (at least one value). End 0 (never set) or
+    // The part played, with or without Loop: Start stays before End (at least one value). End 0 (never set) or
     // past a shorter sample is its end (sampleSpan): a moved Start writes End too.
     bindSlider(start_, startArmed_, [this](DigidrumSlotState& s, double v) {
         const ymengine::SampleSpan part = ymengine::sampleSpan(s.play.start, s.play.end, uint32_t(nibbles().size()));
@@ -158,7 +158,7 @@ void DigidrumWindow::wire() {
     wave_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
     load_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
     // With Loop on, Play starts the part in a loop and a click while it loops stops it, as does Loop switched off
-    // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once (D-449).
+    // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once.
     play_.onClick = [this] {
         if (looping()) return stopPreview();
         m_.host_.seqCommand(Host::SeqCommand::DigiPreview, slot());
@@ -184,7 +184,7 @@ void DigidrumWindow::wire() {
     normalize_.onClick = [this] {
         editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::digiNormalize(src); });
     };
-    // Reverse mirrors Start and End, so that the part played stays the same sound read backwards (D-450).
+    // Reverse mirrors Start and End, so that the part played stays the same sound read backwards.
     reverse_.onClick = [this] {
         editBytes([](DigidrumSlotState& s, std::vector<int8_t>& src) {
             plugin::digiReverse(src);
@@ -201,7 +201,7 @@ void DigidrumWindow::wire() {
     gainUp_.onClick = [this] { gain(kGainDb); };
 }
 
-// Gain steps in a row (D-453): the run's total from the source before its first step, so that a step down gives back
+// Gain steps in a row: the run's total from the source before its first step, so that a step down gives back
 // the peaks a step up clipped.
 void DigidrumWindow::gain(double db) {
     const DigidrumSlotState& s0 = state();
@@ -291,7 +291,7 @@ void DigidrumWindow::edit(const std::function<void(DigidrumSlotState&)>& fn, boo
 }
 
 void DigidrumWindow::editBytes(const std::function<void(DigidrumSlotState&, std::vector<int8_t>&)>& fn) {
-    // Slot without a source (state from before M6): source inferred from the values; kept as soon as it is used.
+    // Slot without a source (older state): source inferred from the values; kept as soon as it is used.
     const DigidrumSlotState s0 = state();
     const std::vector<int8_t> src0 = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source;
     DigidrumSlotState s = s0;
@@ -498,7 +498,7 @@ void DigidrumWindow::refresh() {
     if (!finev_.editing()) finev_.setText(signedText(int(std::lround(s.play.cents))) + " ct");
 
     // Start runs over the values (0 to length - 1), End over the positions after them (1 to length); the ranges keep
-    // at least one step for an empty slot. They set the part played with or without Loop (Indus, 26/10/2026, D-443).
+    // at least one step for an empty slot. They set the part played with or without Loop (Indus, 26/10/2026).
     const bool has = !n.empty();
     const double len = double(n.size());
     start_.setRange(0, std::max(1.0, len - 1), 1);

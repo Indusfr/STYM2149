@@ -1,9 +1,9 @@
-// STYM2149 — plugincore: named DMA banks (D-462)
+// STYM2149 — plugincore: named DMA banks
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // A bank keeps the eight DMA samples (settings, signed bytes and names) under a name, as the Digidrum banks keep the
-// eight Digidrum slots (D-154). The library is shared by all projects: a JSON file next to the preferences file:
+// eight Digidrum slots. The library is shared by all projects: a JSON file next to the preferences file:
 //   {"kind": "dmalib", "version": 1, "banks": [{"name": ..., "slots": [{"name", "rate" (Hz, one of kDmaRateHz),
 //    "stereo", "root", "cents", "loop", "start", "end", "data" (the signed bytes in base64)}, ...]}, ...]}
 // Tolerant reading: missing keys at their default, a rate brought to the nearest of the four, values brought back

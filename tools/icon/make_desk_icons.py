@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# STYM2149 — icons of the GEM desktop: src/pluginui/src/DeskIcons.cpp, from the EmuTOS desktop's resource (D-423).
+# STYM2149 — icons of the GEM desktop: src/pluginui/src/DeskIcons.cpp, from the EmuTOS desktop's resource.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 #
@@ -9,7 +9,7 @@
 # commit 02c2db75fc875265c1449efea014450466cf20b7, that of the fonts), not kept in the repository (Indus, 16:47); it
 # holds 14 ICONBLKs of 32 × 32. This script finds the "floppy disk" and the "trash" by their text and writes their data
 # and masks, rows of '#', checking the drive letter's place (ib_xchar, ib_ychar) against DeskIcons.h. They replace the
-# TOS 1.04 pictures of D-419, which were Atari's. With --check, nothing is written and the exit status says whether the
+# TOS 1.04 pictures used before, which were Atari's. With --check, nothing is written and the exit status says whether the
 # file is up to date. Standard library only.
 import hashlib
 import os
@@ -28,7 +28,7 @@ HEADER = '''// STYM2149 — pluginui: the icons of the GEM desktop (floppy disk,
 //
 // Do not edit by hand: run `python3 tools/icon/make_desk_icons.py icon.rsc` again. The pictures and their masks are
 // those of the EmuTOS desktop (© The EmuTOS development team, GPL; THIRD_PARTY.md), read from its desk/icon.rsc at
-// Indus's request for the AGPLv3 (25/10/2026 16:09, D-423): {source}.
+// Indus's request for the AGPLv3 (25/10/2026 16:09): {source}.
 #include "pluginui/DeskIcons.h"
 
 #include <array>

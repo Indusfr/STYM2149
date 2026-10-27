@@ -1,4 +1,4 @@
-// STYM2149 — YM PLAYER window (M7, A2, D-169): File > Import > YM dump, alerts for a refused file, Play and Stop,
+// STYM2149 — YM PLAYER window: File > Import > YM dump, alerts for a refused file, Play and Stop,
 // Rewind, position read again in steps of 8 frames, subsong of an SNDH, register monitor that follows the tune,
 // closing that stops playback and forgets the tune, window kept by the session.
 // Programming: Pascal "Indus" Nowak (with Claude's help).

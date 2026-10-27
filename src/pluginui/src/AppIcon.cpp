@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: the application icon (D-218) as pixels (file written by tools/icon/make_icon_data.py)
+// STYM2149 — pluginui: the application icon as pixels (file written by tools/icon/make_icon_data.py)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

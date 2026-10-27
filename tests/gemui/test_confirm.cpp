@@ -1,4 +1,4 @@
-// STYM2149 — gemui tests: confirm and prompt boxes from the keyboard (gemConfirm, gemPrompt; P417, P365) and the
+// STYM2149 — gemui tests: confirm and prompt boxes from the keyboard (gemConfirm, gemPrompt) and the
 // buttons of every confirm and prompt of the editor.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -116,7 +116,7 @@ void typeText(pluginui::MainWindow& w, const std::string& text) {
 
 }  // namespace
 
-TEST_CASE("Confirm box: Tab and Shift+Tab move the focus between Cancel and OK (P417)", "[gemui][alert][keyboard]") {
+TEST_CASE("Confirm box: Tab and Shift+Tab move the focus between Cancel and OK", "[gemui][alert][keyboard]") {
     Desktop d(1272, 944);
     Result r;
     Alert& a = openConfirm(d, r);
@@ -136,7 +136,7 @@ TEST_CASE("Confirm box: Tab and Shift+Tab move the focus between Cancel and OK (
     CHECK(d.hasModal());
 }
 
-TEST_CASE("Confirm box: Enter and Esc cancel, even with the focus on OK; a click on OK confirms (P417)",
+TEST_CASE("Confirm box: Enter and Esc cancel, even with the focus on OK; a click on OK confirms",
           "[gemui][alert][keyboard]") {
     Desktop d(1272, 944);
     Result r;
@@ -170,7 +170,7 @@ TEST_CASE("Confirm box: Enter and Esc cancel, even with the focus on OK; a click
     CHECK_FALSE(d.hasModal());
 }
 
-TEST_CASE("Confirm box: the focus ring follows Tab, the 4 px frame stays on Cancel (P417)", "[gemui][alert]") {
+TEST_CASE("Confirm box: the focus ring follows Tab, the 4 px frame stays on Cancel", "[gemui][alert]") {
     Desktop d(1272, 944);
     Result r;
     Alert& a = openConfirm(d, r);
@@ -193,7 +193,7 @@ TEST_CASE("Confirm box: the focus ring follows Tab, the 4 px frame stays on Canc
     CHECK(s.at(ok.x + 3, ok.y + ok.h / 2) == gemui::colors::kWhite);
 }
 
-TEST_CASE("Prompt box: Cancel then OK; Tab goes field, Cancel, OK; Enter presses the focused button (P365)",
+TEST_CASE("Prompt box: Cancel then OK; Tab goes field, Cancel, OK; Enter presses the focused button",
           "[gemui][alert][keyboard]") {
     Desktop d(1272, 944);
     Result r;
@@ -251,7 +251,7 @@ TEST_CASE("Message box: Enter and Esc close it, Tab only moves the focus to OK",
     CHECK(r.button == 0);
 }
 
-TEST_CASE("Message box picture: centred above the text, each pixel a square, transparent pixels left out (D-235)",
+TEST_CASE("Message box picture: centred above the text, each pixel a square, transparent pixels left out",
           "[gemui][alert]") {
     Desktop d(1272, 944);
     constexpr gemui::Color kRed = 0xFFFF0000, kBlue = 0xFF0000FF;
@@ -286,8 +286,7 @@ TEST_CASE("Message box picture: centred above the text, each pixel a square, tra
     CHECK(red.y == box.y + 2 + 24);                             // top margin of the box
 }
 
-TEST_CASE("Information box: the STYM2149 icon above the text, OK framed as the default button, Enter closes it "
-          "(D-235, D-236)",
+TEST_CASE("Information box: the STYM2149 icon above the text, OK framed as the default button, Enter closes it ",
           "[ui][alert]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -316,7 +315,7 @@ TEST_CASE("Information box: the STYM2149 icon above the text, OK framed as the d
     CHECK_FALSE(w.desktop().hasModal());
 }
 
-TEST_CASE("Clear track confirm: Cancel by default; Enter, Tab then Enter, and Esc keep the notes (P417)",
+TEST_CASE("Clear track confirm: Cancel by default; Enter, Tab then Enter, and Esc keep the notes",
           "[ui][seq][alert]") {
     UiHost h;
     h.state.seq.cur().edit(0).pat[3] = 5;
@@ -348,11 +347,11 @@ TEST_CASE("Clear track confirm: Cancel by default; Enter, Tab then Enter, and Es
     CHECK(h.state.seq.cur().lane(0).pat[3] < 0);
 }
 
-TEST_CASE("Demo pattern and Quit confirms: Cancel by default, only OK goes on (P417)", "[ui][alert]") {
+TEST_CASE("Demo pattern and Quit confirms: Cancel by default, only OK goes on", "[ui][alert]") {
     UiHost h;
     h.state.seq.cur().edit(0).pat[0] = 5;  // channels 1-4 already contain data
     pluginui::MainWindow w(h);
-    // File > Demo pattern: its ^D went to the DMA generator (eighth DAW test, item 100, D-301).
+    // File > Demo pattern: its ^D went to the DMA generator (eighth DAW test, item 100).
     auto demo = [&w] {
         w.openMenu(1);
         const std::vector<std::string> labels = menuLabels(w);
@@ -409,7 +408,7 @@ TEST_CASE("Quit in a plugin: greyed in the File menu, ^Q left to the host", "[ui
     CHECK(h.quits == 0);
 }
 
-TEST_CASE("Quit: the close box of the standalone application's window opens the Quit box, once (D-439)",
+TEST_CASE("Quit: the close box of the standalone application's window opens the Quit box, once",
           "[ui][alert]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -438,7 +437,7 @@ TEST_CASE("Quit: the close box of the standalone application's window opens the 
     CHECK_FALSE(topAlert(pw));
 }
 
-TEST_CASE("Recorder Clear confirm: Cancel, then Delete; Enter keeps the take (P417)", "[ui][alert]") {
+TEST_CASE("Recorder Clear confirm: Cancel, then Delete; Enter keeps the take", "[ui][alert]") {
     UiHost h;
     h.rec.takeFrames = 500;
     pluginui::MainWindow w(h);
@@ -463,7 +462,7 @@ TEST_CASE("Recorder Clear confirm: Cancel, then Delete; Enter keeps the take (P4
     CHECK(h.rec.takeFrames == 0);
 }
 
-TEST_CASE("Digidrum bank confirms follow gemConfirm: Cancel first, framed and focused (P417)",
+TEST_CASE("Digidrum bank confirms follow gemConfirm: Cancel first, framed and focused",
           "[ui][digidrum][alert]") {
     UiHost h;
     h.digidrums = plugin::dumpDigidrumBanks({plugin::captureBank("Set A", h.state)});
@@ -501,7 +500,7 @@ TEST_CASE("Digidrum bank confirms follow gemConfirm: Cancel first, framed and fo
     CHECK(w.digidrums().banks().empty());
 }
 
-TEST_CASE("Prompts of the editor follow gemPrompt: Cancel then OK, none framed, Enter is OK (P365)",
+TEST_CASE("Prompts of the editor follow gemPrompt: Cancel then OK, none framed, Enter is OK",
           "[ui][alert]") {
     UiHost h;
     pluginui::MainWindow w(h);

@@ -4,7 +4,7 @@
 //
 // Never any anti-aliasing in the framebuffer (STYM2149_SPEC.md §6.1): each pixel takes a colour of the palette, or the
 // blend of an opacity group (the prototype's greyed-out controls, opacity 0.25 to 0.45). Another backend can draw the
-// same primitives at the screen's resolution (the plugin's juce::Graphics, D-201) by overriding the virtual ones.
+// same primitives at the screen's resolution (the plugin's juce::Graphics) by overriding the virtual ones.
 #pragma once
 #include <array>
 #include <cstdint>
@@ -27,7 +27,7 @@ struct Tile {
     Color at(int x, int y) const noexcept { return px[size_t(y * w + x)]; }
 };
 
-// Vector outline of a bitmap (24/10/2026, D-404): closed polygons in the bitmap's pixels, filled with the non-zero
+// Vector outline of a bitmap (24/10/2026): closed polygons in the bitmap's pixels, filled with the non-zero
 // winding rule.
 struct Outline {
     std::span<const float> xy;       // x, y of each vertex, polygon after polygon
@@ -38,7 +38,7 @@ struct Outline {
 
 // Monochrome image: rows of (w + 7) / 8 bytes, bit 7 = column 0. With an outline, the bits are its raster at scale 1
 // (a pixel lit when its centre lies inside), and a painter at another scale may fill the outline instead of enlarging
-// the pixels (the Atari logo of the menu bar, D-404).
+// the pixels (the Atari logo of the menu bar).
 struct Bitmap {
     int w = 0, h = 0;
     const uint8_t* bits = nullptr;
@@ -60,7 +60,7 @@ Tile halftone(Color ink, Color paper) noexcept;
 
 // Draws into a Surface, inside a clip rectangle; every primitive clips, so a widget can paint its whole box whatever
 // part of it is being repainted. The desktop makes one Painter per area to repaint (Desktop::paint) and sets the clip
-// to that area. The virtual primitives are the ones a second backend overrides (JucePainter, D-201); text(), textAt()
+// to that area. The virtual primitives are the ones a second backend overrides (JucePainter); text(), textAt()
 // and pixel() are built on them. Painting happens on the UI thread only.
 class Painter {
 public:

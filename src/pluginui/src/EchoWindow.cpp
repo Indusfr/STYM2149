@@ -42,7 +42,7 @@ std::optional<double> typed(const std::string& txt) {
     return std::round(raw);
 }
 
-// Names of the divisions of the tempo (those of the Delay Division parameter, D-299).
+// Names of the divisions of the tempo (those of the Delay Division parameter).
 const plugin::ParamSpec& divisions() { return plugin::paramSpec(plugin::paramIndex(Global::DelayDivision)); }
 std::string divisionName(int k) {
     const plugin::ParamSpec& s = divisions();
@@ -84,7 +84,7 @@ EchoWindow::EchoWindow(MainWindow& main) : m_(main) {
 }
 
 void EchoWindow::build() {
-    setTitle("EFFECTS");  // Echo / Delay up to the ninth DAW test (item 110, D-311)
+    setTitle("EFFECTS");  // Echo / Delay up to the ninth DAW test (item 110)
     on_.setTip(kEchoTip);
     div_.setTip("Time between two repeats: a division of the tempo");
     to_.setTip(
@@ -106,7 +106,7 @@ void EchoWindow::build() {
     level_.setRange(0, 100, 1);
     level_.setTip("Level of the echoes in the mix");
     // Typed values: the field's width in characters (its longest text) and its input mask (one 9 per digit); a unit
-    // after the digits stays out of the reverse video under the pointer and shows while typing (D-464).
+    // after the digits stays out of the reverse video under the pointer and shows while typing.
     repv_.setMinChars(1);
     repv_.setMask("9");
     dropv_.setMinChars(2);
@@ -250,7 +250,7 @@ void EchoWindow::refresh() {
     const TrackEcho& x = echo();
     on_.setOn(x.on);
     on_.setText(x.on ? "On" : "Off");
-    // Sync Buzzer in 3 channels: the echo greyed out, its settings kept (D-316).
+    // Sync Buzzer in 3 channels: the echo greyed out, its settings kept.
     const bool echoOk = !buzzer3();
     on_.setEnabled(echoOk);
     on_.setTip(echoOk ? kEchoTip : kEchoBuzzTip);
@@ -304,7 +304,7 @@ void EchoWindow::layout() {
         w->setVisible(echoOn);
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&ping_, &sync_, &labFb_, &fb_, &fbv_, &labCut_,
                                                                   &cut_, &cutv_, &labLevel_, &level_, &levelv_})
-        w->setVisible(delayRows);  // Ping-pong too (ninth DAW test, item 114, D-315)
+        w->setVisible(delayRows);  // Ping-pong too (ninth DAW test, item 114)
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labDelDiv_, &delDiv_})
         w->setVisible(delayRows && synced);
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labTime_, &time_, &timev_})

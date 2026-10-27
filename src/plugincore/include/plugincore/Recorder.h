@@ -1,10 +1,10 @@
-// STYM2149 — plugincore: register recorder take (M6, B11, D-157)
+// STYM2149 — plugincore: register recorder take
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Frames of one chip of the 3-channel modes, one per replay tick (ymengine::RegisterFrame), taken while the host
 // plays (Driver::armRecorder). The last take is kept in the plugin state (RECD block, State.h) for the YM6 and SNDH
-// export of M7; a new take replaces it.
+// export; a new take replaces it.
 #pragma once
 #include <cstdint>
 #include <vector>

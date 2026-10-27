@@ -1,4 +1,4 @@
-// STYM2149 — Song window (M5): Song mode linked to the window, Add, menu of the patterns, keyboard control (songKey),
+// STYM2149 — Song window: Song mode linked to the window, Add, menu of the patterns, keyboard control (songKey),
 // drag and drop of the blocks, undo, jump from one entry to another (songStep).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -178,7 +178,7 @@ TEST_CASE("Song: keyboard control when the window is in front", "[ui][song]") {
     CHECK(entries(h) == SongEntries{{0, 1, 0}, {2, 1, 0}, {0, 1, 0}, {0, 1, 0}, {1, 2, 0}});
     CHECK(song.cursor() == 1);
 
-    // With Ctrl, the letters go back to the main window's shortcuts (^D: the DMA generator, D-301).
+    // With Ctrl, the letters go back to the main window's shortcuts (^D: the DMA generator).
     const auto before = entries(h);
     CHECK(chr(w, U'd', {false, true, false}));
     CHECK(entries(h) == before);

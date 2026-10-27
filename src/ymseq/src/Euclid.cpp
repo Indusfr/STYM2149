@@ -81,7 +81,7 @@ void euclidApply(LaneEditor& e, Lane& l, const EuclidFigure& f, EuclidTarget tar
         if (!f.hits[i]) continue;
         if (target == EuclidTarget::Melodic)
             e.writeNoteAt(s, value);
-        else if (digid) {  // D-103: the row played is the slot (Chan: the track's own); SLT as in the prototype
+        else if (digid) {  // the row played is the slot (Chan: the track's own); SLT as in the prototype
             l.pat[size_t(s)] = int16_t(std::clamp(value > 0 ? value - 1 : e.context().digidrumSlot, 0, 7));
             l.slt[size_t(s)] = uint8_t(value);
         } else {

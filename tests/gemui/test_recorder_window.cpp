@@ -1,4 +1,4 @@
-// STYM2149 — Recorder window (M6, B11, D-157): Edit menu entry, chip chosen (2 in dual chip only), Rec that arms and
+// STYM2149 — Recorder window: Edit menu entry, chip chosen (2 in dual chip only), Rec that arms and
 // stops, states shown (16 voices, armed, in progress), take kept and its deletion after confirmation, session.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

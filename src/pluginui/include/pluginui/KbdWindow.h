@@ -9,9 +9,9 @@
 //
 // Keys: the prototype reads the physical position (KeyboardEvent.code); a plugin receives only the character.
 // The layout chosen in Settings > Keyboard layout says which character each position carries; Auto takes the
-// layout of the system keyboard (Host::keyboardLayout, D-215; QWERTY before, D-131). Positions and sizes: the
+// layout of the system keyboard (Host::keyboardLayout; QWERTY before). Positions and sizes: the
 // prototype's CSS boxes at 100 % (window at 120, 120).
-// Percussion track (Chipdrum, Digidrum, D-229): the eight keys of the middle row from A to K play pads 1 to 8 like the
+// Percussion track (Chipdrum, Digidrum): the eight keys of the middle row from A to K play pads 1 to 8 like the
 // pads of the main window, engraved with their sound; the other note keys, the octave keys and the octave settings
 // have no role.
 #pragma once
@@ -108,7 +108,7 @@ public:
     void show();
     // Octave, layout, held notes: reads everything again (buildTkl, refreshKbdOct).
     void refresh();
-    // Open window under Auto: drawing rebuilt when the system's layout changes (D-215).
+    // Open window under Auto: drawing rebuilt when the system's layout changes.
     void followLayout();
 
     // Keyboard playing (window open): CODEMAP key pressed (`offset`, already held: ignored) and released.
@@ -119,7 +119,7 @@ public:
     // Keys lit by a played note (piano, pads, MIDI: tklNote) and by the sequencer (tklNotes).
     void light(int note, bool on);
     void lightSeq(const std::vector<int>& notes);
-    // Percussion track: pads played by the sequencer (D-229).
+    // Percussion track: pads played by the sequencer.
     void lightSeqPads(const std::vector<int>& pads);
 
     // Rectangle of a control by the prototype's id (captures, tests): "kbdWin", "kbdOctDn", "kbdOctUp", "kbdOctV",
@@ -137,7 +137,7 @@ private:
     // Key of the drawing that plays `note` at the current octave (tklCodeOf); on a percussion track, the key of its
     // pad.
     std::string codeOf(int note) const;
-    // 0: melodic track, 1: Chipdrum, 2: Digidrum (pads, D-229).
+    // 0: melodic track, 1: Chipdrum, 2: Digidrum (pads).
     int drumKind() const noexcept;
     // Percussion track: what the pad keys show (kind, empty Digidrum slots), to rebuild the drawing when it changes.
     int padSignature() const;

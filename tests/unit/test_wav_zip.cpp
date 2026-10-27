@@ -1,4 +1,4 @@
-// STYM2149 — ymio: WAV files and ZIP archive of the exports (M7, A4)
+// STYM2149 — ymio: WAV files and ZIP archive of the exports
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

@@ -1,11 +1,11 @@
-// STYM2149 — pluginui: Recorder window (M6, B11, D-157), register recorder: chip, Rec, kept take
+// STYM2149 — pluginui: Recorder window, register recorder: chip, Rec, kept take
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// A STYM2149 window (the prototype has none; Q7 of the M6 plan). Rec arms a take on the chosen chip (2: dual chip
+// A STYM2149 window (the prototype has none). Rec arms a take on the chosen chip (2: dual chip
 // only): it starts with the host's playback (in Standalone, the sequencer's) and stops with it, one frame of R0 to
 // R13 per replay tick; a click while it is armed or rolling stops it. The last take is kept with the project; Clear
-// deletes it after confirmation; the Export row writes it as YM6, SNDH or VBL dump (M7, B3, D-172). In 16-channel
+// deletes it after confirmation; the Export row writes it as YM6, SNDH or VBL dump. In 16-channel
 // mode, no registers: the window says so.
 #pragma once
 #include <array>

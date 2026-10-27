@@ -1,5 +1,5 @@
-// STYM2149 — plugin processor (M3), with JUCE: host parameters, buses, MIDI → audio, state, CC → host,
-// configuration changes, independence from the block size, no allocation in processBlock; sequencer (M5): state,
+// STYM2149 — plugin processor, with JUCE: host parameters, buses, MIDI → audio, state, CC → host,
+// configuration changes, independence from the block size, no allocation in processBlock; sequencer: state,
 // default clock, host transport, interface commands.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -20,7 +20,7 @@
 using namespace stym;
 using namespace stym::plugin;
 
-// ThreadSanitizer brings its own operator new and delete (D-184): allocations are counted through its malloc hook,
+// ThreadSanitizer brings its own operator new and delete: allocations are counted through its malloc hook,
 // which sees every allocation (operator new included). Elsewhere, operator new is replaced.
 #if defined(__SANITIZE_THREAD__)
 #define STYM_TSAN 1
@@ -37,7 +37,7 @@ using namespace stym::plugin;
 namespace {
 
 // Allocations counted on the thread that calls processBlock only: another (JUCE) thread can allocate meanwhile
-// without the audio processing having anything to do with it (seen under TSan, D-184).
+// without the audio processing having anything to do with it (seen under TSan).
 thread_local bool g_watch = false;
 std::atomic<long> g_allocs{0};
 
@@ -333,7 +333,7 @@ TEST_CASE("Processor: state read back, value rescan requested from CLAP only", "
     juce::MemoryBlock saved;
     src.getStateInformation(saved);
 
-    // clap-juce-extensions translates programChanged into CLAP_PARAM_RESCAN_VALUES (D-066); the other formats do not
+    // clap-juce-extensions translates programChanged into CLAP_PARAM_RESCAN_VALUES; the other formats do not
     // receive it (the AU would see a preset in it).
     for (const bool clap : {false, true}) {
         INFO("CLAP: " << clap);
@@ -371,7 +371,7 @@ TEST_CASE("Processor: a prototype CC changes the parameter and notifies the host
     p.removeListener(&listener);
 }
 
-TEST_CASE("Processor: MIDI learn, learned CCs and notes caught for the editor (D-146)", "[processor][editor][learn]") {
+TEST_CASE("Processor: MIDI learn, learned CCs and notes caught for the editor", "[processor][editor][learn]") {
     juce::ScopedJuceInitialiser_GUI juce;
     StymProcessor p;
     p.prepareToPlay(48000, 256);
@@ -405,7 +405,7 @@ TEST_CASE("Processor: MIDI learn, learned CCs and notes caught for the editor (D
     learned.clear();
     while (p.popLearnMidi(m)) learned.push_back(m);
     CHECK(learned == std::vector<std::array<uint8_t, 3>>{{0xB0, 72, 0}, {0xB0, 72, 127}});
-    CHECK(p.currentValues()[size_t(idx("t01_envPeriod"))] == 32.0f);  // CC 74 is no longer learned: D-061
+    CHECK(p.currentValues()[size_t(idx("t01_envPeriod"))] == 32.0f);  // CC 74 is no longer learned
 
     // Messages caught with the editor closed: emptied when it opens.
     p.setMidiMap(R"({"CC1":{"id":"vol","kind":"range"}})");
@@ -485,7 +485,7 @@ TEST_CASE("Processor: render independent of the block size", "[processor]") {
 TEST_CASE("Processor: sequencer, default clock and state", "[processor][state][seq]") {
     juce::ScopedJuceInitialiser_GUI juce;
     StymProcessor p;
-    CHECK(p.extras().global.seqClock == ymengine::SeqClock::Host);  // in a host (D-114)
+    CHECK(p.extras().global.seqClock == ymengine::SeqClock::Host);  // in a host
     writePattern(p);
     p.editExtras([](NonParamState& s) {
         s.seq.current = 5;
@@ -510,7 +510,7 @@ TEST_CASE("Processor: sequencer, default clock and state", "[processor][state][s
     q.prepareToPlay(48000, 512);
     render(q, 512, 512, {});
     CHECK(q.driver().engine().seqStatus().pattern == 5);
-    // M3 state (without a sequencer): default clock of the format.
+    // First state format (without a sequencer): default clock of the format.
     std::ifstream f(std::string(STYM_TEST_DATA) + "/state_v1.bin", std::ios::binary);
     const std::vector<uint8_t> m3{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
     q.setStateInformation(m3.data(), int(m3.size()));
@@ -552,7 +552,7 @@ TEST_CASE("Processor: Host sync on the playhead, commands in Free run", "[proces
 }
 
 TEST_CASE("Processor: the metronome sounds, but not on the oscilloscope or the output meters (third DAW test, item "
-          "27, D-226)",
+          "27)",
           "[processor][seq]") {
     juce::ScopedJuceInitialiser_GUI juce;
     StymProcessor p;
@@ -614,17 +614,17 @@ TEST_CASE("Processor: no allocation in processBlock", "[processor][realtime]") {
         }
         if (b % 50 == 0) setPlain(p, "voiceMode", float(next() % 3));
         if (b % 7 == 0) setPlain(p, "t01_level", float(next() % 101));
-        // On-screen playing (editor, M4): read by processBlock, like the engine status it publishes.
+        // On-screen playing (editor): read by processBlock, like the engine status it publishes.
         if (b % 5 == 0) p.pushScreenMidi(0x90, uint8_t(48 + next() % 24), 100);
         if (b % 5 == 2) p.pushScreenMidi(0xB0, 120, 0);
-        // Sequencer (M5): Host sync, host jump, then Free run with the interface commands.
+        // Sequencer: Host sync, host jump, then Free run with the interface commands.
         if (b == 150) head.ppq = 0.3;
         if (b == 200) p.editExtras([](NonParamState& s) { s.global.seqClock = ymengine::SeqClock::Internal; });
         if (b % 40 == 1) p.pushSeqCommand(UiCommand::SeqPlay);
         if (b % 40 == 21) p.pushSeqCommand(UiCommand::SeqSelect, uint8_t(next() % 4));
         if (b % 40 == 31) p.pushSeqCommand(UiCommand::SeqPreview, 0, uint8_t(48 + next() % 24), 100);
         if (b % 80 == 39) p.pushSeqCommand(UiCommand::SeqStop);
-        // M6: extended Song (Rest, Note-off, jump) in Free run; recorder takes armed and collected (the mode change
+        // Extended Song (Rest, Note-off, jump) in Free run; recorder takes armed and collected (the mode change
         // every 50 blocks stops them).
         if (b == 210)
             p.editExtras([](NonParamState& s) {

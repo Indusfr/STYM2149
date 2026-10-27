@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: long job off the message thread (exports of the File menu, M7, D-170)
+// STYM2149 — pluginui: long job off the message thread (exports of the File menu)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/BackgroundJob.h"

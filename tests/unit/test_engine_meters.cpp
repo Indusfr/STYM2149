@@ -14,7 +14,7 @@ using ymengine::Engine;
 
 namespace {
 
-// Level of one channel alone at 5-bit index i, normalised to index 31 (D-049).
+// Level of one channel alone at 5-bit index i, normalised to index 31.
 double level(int i) { return double(ymcore::tables::kMixTable[i]) / ymcore::tables::kMixTable[31]; }
 
 struct Rig {

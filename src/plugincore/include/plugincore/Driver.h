@@ -6,20 +6,20 @@
 // - parameters: compared with the last applied ones, applied at the start of the block (track sound through
 //   setTrack, mixer through setTrackMix, STE bass and treble through setBoardTone);
 // - MIDI: Omni / Layer / per-channel routing, controllers of the prototype (CC 70-84, 7), mod wheel, pitch bend,
-//   MIDI clock (D-061; Start, Stop, Continue and Song Position Pointer for the sequencer). A CC that changes a
-//   parameter cuts the render at its sample and notifies the host. The DMA tracks (M6, D-153) follow the same
-//   routing as the other tracks (their dedicated MIDI channel was dropped, D-153);
+//   MIDI clock (Start, Stop, Continue and Song Position Pointer for the sequencer). A CC that changes a
+//   parameter cuts the render at its sample and notifies the host. The DMA tracks follow the same
+//   routing as the other tracks (their dedicated MIDI channel was dropped);
 // - sequencer: commands from the interface (Play, Stop, pattern choice, preview of a step, kit audition), host
 //   transport (Host sync) given at each render segment, patterns and Song published with the non-automatable
 //   settings;
 // - voice mode change: panic fade, then the new mode (the voices do not survive the change);
 // - clock, chain or resampling change: the engine must be prepared again (allocations). The audio thread requests
 //   it, the message thread prepares it (service()), the audio thread fades then switches over. Outside real time
-//   (offline render), the preparation is done at once, at the same sample on each render (D-064);
+//   (offline render), the preparation is done at once, at the same sample on each render;
 // - non-automatable settings: frozen copies published by the message thread (publish());
-// - register recorder (M6, D-157): take armed by the message thread, started and stopped by the audio thread at the
+// - register recorder: take armed by the message thread, started and stopped by the audio thread at the
 //   start of a block according to playback, handed back to the message thread;
-// - YM Player (M7, A2, D-169): playback prepared by the message thread (YmPlayback), played by the audio thread
+// - YM Player: playback prepared by the message thread (YmPlayback), played by the audio thread
 //   instead of the engine output, which keeps running without being heard.
 // Audio thread: process() does not allocate, lock or free anything (Mailbox), except outside real time.
 #pragma once
@@ -50,8 +50,8 @@ enum class UiCommand : uint8_t {
     SeqPreview,  // preview of a grid note: data[0] track, data[1] note, data[2] accent (0-127)
     SeqSongJump, // jump to a Song entry: data[0] | data[1] << 8
     DrumPreview, // audition of an instrument of the Chipdrum kit (Audition): data[0] slot (0-7)
-    DmaPreview,  // preview of a slot of the DMA bank (M6, D-153): data[0] slot (0-7), data[1] 1: stop (D-449)
-    DigiPreview, // preview of a Digidrum slot (editor, M6, D-154): data[0] slot (0-7), data[1] 1: stop (D-449)
+    DmaPreview,  // preview of a slot of the DMA bank: data[0] slot (0-7), data[1] 1: stop
+    DigiPreview, // preview of a Digidrum slot (editor): data[0] slot (0-7), data[1] 1: stop
 };
 
 // One event of a block, given to process() in time order: a host MIDI message, a note or CC from the editor
@@ -73,12 +73,12 @@ struct Snapshot {
     NonParamState state;
     uint64_t kitVersion = 0;
     std::array<uint64_t, ymengine::kDigidrumSlots> sampleVersion{};
-    std::array<uint64_t, ymengine::kDmaSlots> dmaVersion{};  // samples of the DMA bank (D-153)
+    std::array<uint64_t, ymengine::kDmaSlots> dmaVersion{};  // samples of the DMA bank
     // Patterns and Song played (fillSequence of state.seq); the engine reads them while this copy is the current one.
     ymengine::SeqData seq;
     // Changes when the engine must take state.seq.current as its pattern (state reloaded, preparation).
     uint64_t patternSerial = 0;
-    // Instruments played (M6): filled by the driver from state.instruments when it receives the copy.
+    // Instruments played: filled by the driver from state.instruments when it receives the copy.
     ymengine::InstrumentBank instruments{};
 };
 
@@ -105,7 +105,7 @@ public:
     Driver& operator=(const Driver&) = delete;
 
     // Before prepare: sequencer clock forced, whatever the Clock selector (offline render: Free run, with no MIDI
-    // clock to follow, D-188).
+    // clock to follow).
     void fixSeqClock(ymengine::SeqClock clock) noexcept { fixedSeqClock_ = clock; }
     // Message thread, audio thread stopped: prepares the engine (allocations) and applies all the settings.
     void prepare(const Setup& setup, const ParamValues& values, const Snapshot& snapshot);
@@ -126,7 +126,7 @@ public:
     void process(ParamValues& values, std::span<const MidiEvent> midi, const ymengine::Outputs& out, uint32_t n,
                  bool offline, ParamListener* listener) noexcept;
 
-    // Register recorder (M6, B11, D-157). Message thread: arms a take on chip `chip` (0, or 1 in dual chip; buffer of
+    // Register recorder. Message thread: arms a take on chip `chip` (0, or 1 in dual chip; buffer of
     // kRecorderMaxFrames frames allocated here); false if a take is already armed, running or not yet collected. The
     // audio thread starts it at the start of the first block where the host plays (or the sequencer, without host
     // transport), in 3 channels or in dual chip with this chip, and stops it at the start of the block where playback
@@ -145,7 +145,7 @@ public:
     int recorderChip() const noexcept { return recChip_.load(std::memory_order_relaxed); }
     uint32_t recordedFrames() const noexcept { return recFrames_.load(std::memory_order_relaxed); }
 
-    // YM Player (M7, A2, D-169). Message thread: tune loaded (stopped, at the default subsong), play and stop
+    // YM Player. Message thread: tune loaded (stopped, at the default subsong), play and stop
     // (playback resumes where it stopped), back to the start with playback (Rewind), subsong of an SNDH (back to its
     // start), close. Like the prototype (ymplay), each start of playback releases manual play and the sequencer
     // notes; during playback, the main output is the tune's (separate outputs silent). A change of chain, resampling
@@ -174,7 +174,7 @@ public:
     ymengine::Engine& engine() noexcept { return slot_->engine; }
     ConfigKey engineKey() const noexcept { return slot_->key; }
     bool fading() const noexcept { return action_ != Action::None; }
-    // Length of the fade before a mode change or an engine swap, in samples (D-064).
+    // Length of the fade before a mode change or an engine swap, in samples.
     uint32_t fadeSamples() const noexcept;
     uint64_t engineSwaps() const noexcept { return swaps_; }
     uint64_t droppedMidi() const noexcept { return droppedMidi_; }
@@ -238,7 +238,7 @@ private:
     ConfigKey wantKey_{};                // configuration wanted by the parameters
     uint32_t requestSerial_ = 0;         // + 1 each time wantKey_ changes (high half of request_)
     std::array<double, kTracks> bend_{}, wheel_{}, press_{};  // to replay on a new engine
-    std::array<uint8_t, kTracks> program_{};        // Program Change of each track (D-156), replayed likewise
+    std::array<uint8_t, kTracks> program_{};        // Program Change of each track, replayed likewise
     uint64_t swaps_ = 0;
     // Render outside real time in this block, and the value the global settings were last applied with (the
     // metronome depends on it, globalFor).

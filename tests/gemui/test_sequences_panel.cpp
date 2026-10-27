@@ -1,4 +1,4 @@
-// STYM2149 — sequences (M6, B2, D-148) below the Modulation table (fifth DAW test, D-240, D-241): no Edit entry nor
+// STYM2149 — sequences below the Modulation table (fifth DAW test): no Edit entry nor
 // Ctrl+L, rows shown with the table on, settings off on percussion; PER, NP, MIX, GEN and FIX rows drawn with the
 // mouse, wheel and right click, one undo step per gesture; Clear; fixed note, detune, hard sync, pitch matrix, chained
 // instrument, vibrato table; session.
@@ -146,7 +146,7 @@ gemui::Rect cell(MainWindow& w, Row row, int step) { return w.modulation().seque
 
 }  // namespace
 
-TEST_CASE("Sequences: below the Modulation table, without an Edit entry nor Ctrl+L (D-240, D-241)",
+TEST_CASE("Sequences: below the Modulation table, without an Edit entry nor Ctrl+L",
           "[ui][sequences]") {
     TestHost h;
     MainWindow w(h);
@@ -178,7 +178,7 @@ TEST_CASE("Sequences: below the Modulation table, without an Edit entry nor Ctrl
     }
     CHECK_FALSE(w.rectOf("seqxMx9"));
 
-    // On: the rows show inside the table, between its pitch rows and NSE / VOL (D-270), at the left of its grid; the
+    // On: the rows show inside the table, between its pitch rows and NSE / VOL, at the left of its grid; the
     // settings below the table; the window stays inside the desktop.
     click(w, "ornOn");
     CHECK(h.patch().ornamentOn);
@@ -307,8 +307,7 @@ TEST_CASE("Sequences: drawn rows, wheel, right click, menus; one undo step per g
 }
 
 
-TEST_CASE("Sequences: right click on PER and NP, a slider set back by a right click, its value typed (D-272 to "
-          "D-274)",
+TEST_CASE("Sequences: right click on PER and NP, a slider set back by a right click, its value typed",
           "[ui][sequences][undo]") {
     TestHost h;
     h.state.tracks[0].patch.ornamentOn = true;
@@ -432,7 +431,7 @@ TEST_CASE("Sequences: fixed note, detune, hard sync, matrix, chained instrument,
     CHECK(h.patch().rows.period == SequencesPanel::vibratoTable(-8, ymengine::kPeriodDeltaMax, 15, 0, 4));
 }
 
-TEST_CASE("Modulation on a DMA track: what moves no sample greyed, with the reason (Indus, 26/10/2026, D-463)",
+TEST_CASE("Modulation on a DMA track: what moves no sample greyed, with the reason (Indus, 26/10/2026)",
           "[ui][sequences][dma]") {
     TestHost h;
     h.values[size_t(paramIndex(plugin::Global::Computer))] = 1;  // the STE, for the DMA type in 16 ch
@@ -527,7 +526,7 @@ TEST_CASE("Sequences: shown again with the Modulation window of the session", "[
     CHECK_FALSE(c.rectOf("seqxGrid"));
 }
 
-TEST_CASE("Sequences: Fix, Detune, Analog and the vibrato table settings typed (sixth DAW test, item 77, D-275)",
+TEST_CASE("Sequences: Fix, Detune, Analog and the vibrato table settings typed (sixth DAW test, item 77)",
           "[ui][sequences]") {
     TestHost h;
     h.state.tracks[0].patch.ornamentOn = true;

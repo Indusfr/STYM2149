@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: LFO of the focused track (sixth DAW test, item 59, D-257), a part of the Modulation window
+// STYM2149 — pluginui: LFO of the focused track (sixth DAW test, item 59), a part of the Modulation window
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/LfoPanel.h"
@@ -48,9 +48,9 @@ double roundRate(double hz) noexcept {
 
 double depthMax(LfoTarget t) noexcept { return ymengine::kLfoDepthMax[size_t(t)]; }
 
-// Drawings of the shapes (D-291): 36 × 16, two cycles of 16 px from x = 1 between rows 1 (top) and 14 (bottom), a
+// Drawings of the shapes: 36 × 16, two cycles of 16 px from x = 1 between rows 1 (top) and 14 (bottom), a
 // 2 px stroke whose jumps are joined by vertical runs, like the envelope shapes of Shape R13. Triangle and Sine (ninth
-// DAW test, item 118, D-319, after the single cycle of D-292): the triangle in straight steep runs meeting in a point,
+// DAW test, item 118, after a single cycle): the triangle in straight steep runs meeting in a point,
 // the sine with its crests rounded off (the square root of the sine, its sign kept), so that the one is sharp and the
 // other round.
 constexpr int kIconW = 36, kIconH = 16, kIconBytes = (kIconW + 7) / 8 * kIconH;
@@ -171,7 +171,7 @@ void LfoPanel::build() {
     depth_.setTip("LFO depth on either side: volume steps, noise period steps, cents or percent of pan");
     for (gemui::ValueField* f : {&ratev_, &depthv_}) f->setPx(14);
     ratev_.setWholeText(true);  // a division (1/8T) as well as a number
-    ratev_.setUnit(" Hz");      // out of the reverse video, as the depth's unit (D-464)
+    ratev_.setUnit(" Hz");      // out of the reverse video, as the depth's unit
     ratev_.setTip("Click to type a rate in Hz, or a division (1/8T)");
     div_.setTip(kDivTip);
 }
@@ -192,7 +192,7 @@ void LfoPanel::edit(const std::function<void(TrackLfo&)>& fn) {
 void LfoPanel::wire() {
     on_.onClick = [this] { edit([](TrackLfo& l) { l.on = !l.on; }); };
     sync_.onClick = [this] { edit([](TrackLfo& l) { l.sync = !l.sync; }); };
-    retrig_.onClick = [this] { edit([](TrackLfo& l) { l.retrig = !l.retrig; }); };  // D-279
+    retrig_.onClick = [this] { edit([](TrackLfo& l) { l.retrig = !l.retrig; }); };
     shape_.onClick = [this] { shapeMenu(); };
     to_.onClick = [this] { targetMenu(); };
     div_.onClick = [this] { divisionMenu(); };
@@ -240,14 +240,14 @@ void LfoPanel::shapeMenu() {
     for (int k = 0; k < ymengine::kLfoShapes; ++k) {
         MenuItem m;
         m.label = kShapes[size_t(k)];
-        m.icon = &shapeIcon(LfoShape(k));  // the drawing, then its name (D-291)
+        m.icon = &shapeIcon(LfoShape(k));  // the drawing, then its name
         m.pick = [this, k] { edit([k](TrackLfo& l) { l.shape = LfoShape(k); }); };
         items.push_back(std::move(m));
     }
     m_.trackPopup(shape_, std::move(items), int(lfo().shape));
 }
 
-// Synced: the divisions in a menu, in place of the slider (ninth DAW test, item 119, D-320), like the Division of the
+// Synced: the divisions in a menu, in place of the slider (ninth DAW test, item 119), like the Division of the
 // Arpeggiator.
 void LfoPanel::divisionMenu() {
     std::vector<MenuItem> items;
@@ -261,7 +261,7 @@ void LfoPanel::divisionMenu() {
 }
 
 // A target that moves nothing on the focused track, from its settings: generator, source, mode (ninth DAW test, item
-// 120, D-321). The rows of the sequences (MIX, GEN) can change them during a note; the menu goes by the track.
+// 120). The rows of the sequences (MIX, GEN) can change them during a note; the menu goes by the track.
 std::string LfoPanel::whyOff(LfoTarget target) const {
     const Generator g = Generator(m_.generator());
     const bool buzzer = g == Generator::SyncBuzzer, sid = g == Generator::Sid, dma = g == Generator::Dma;
@@ -319,7 +319,7 @@ void LfoPanel::refresh() {
     on_.setText(live ? "On" : "Off");
     on_.setTip(dr ? "Percussion tracks do not use the LFO"
                   : "LFO: a slow wave that moves one setting of the sound");
-    // A target that moves nothing on this track (D-321): the other settings greyed, To left to pick another one, the
+    // A target that moves nothing on this track: the other settings greyed, To left to pick another one, the
     // reason in its tip.
     const std::string off = live ? whyOff(l.target) : std::string();
     const bool moves = live && off.empty();
@@ -332,7 +332,7 @@ void LfoPanel::refresh() {
     for (gemui::Label* lb : {&labShape_, &labRate_, &labDepth_}) lb->setDim(!moves);
     for (gemui::ValueField* f : {&ratev_, &depthv_}) f->setDim(!moves);
 
-    // The drawing of the shape in place of its name (D-291), named by the tooltip.
+    // The drawing of the shape in place of its name, named by the tooltip.
     const int shape = std::min<int>(int(l.shape), ymengine::kLfoShapes - 1);
     shape_.setIcon(&shapeIcon(LfoShape(shape)));
     shape_.setTip(std::string("LFO shape: ") + kShapes[size_t(shape)]);
@@ -340,7 +340,7 @@ void LfoPanel::refresh() {
     to_.setTip(off.empty() ? kToTip : off);
     sync_.setOn(l.sync);
     retrig_.setOn(l.retrig);
-    // Synced, the division in a menu button; otherwise the rate in Hz, slider and typed value (D-320).
+    // Synced, the division in a menu button; otherwise the rate in Hz, slider and typed value.
     div_.setText(divisionText(l.division));
     rate_.setTip("LFO rate in Hz (0.1 to 20)");
     if (m_.dragging_ != &rate_) rate_.setValue(positionOfRate(l.hz));
@@ -360,7 +360,7 @@ double LfoPanel::layout(double x, double y, double width, double pad) {
     auto lab = [](gemui::Label& l, double w) { return FlexItem{&l, w, 16}; };
 
     // Off (or on a percussion track): only "LFO" and its button, like the table above when it is off (eighth DAW
-    // test, item 97, D-298).
+    // test, item 97).
     const bool live = lfo().on && !m_.drumTrack(), synced = lfo().sync;
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labShape_, &shape_, &labTo_, &to_, &sync_,
                                                                   &retrig_, &labRate_, &labDepth_, &depth_, &depthv_})
@@ -387,7 +387,7 @@ double LfoPanel::layout(double x, double y, double width, double pad) {
     const FlexItem shape{&shape_, shape_.naturalWidth(), double(to_.naturalHeight())};
     std::vector<FlexItem> a2 = {lab(labShape_, lw2), shape};
     std::vector<FlexItem> a3 = {lab(labRate_, lw3), FlexItem{&rate_, sw3, 16}, FlexItem{&ratev_, vw3, 16}};
-    if (synced) a3 = {lab(labRate_, lw3), btn(div_)};  // the division in a menu (D-320)
+    if (synced) a3 = {lab(labRate_, lw3), btn(div_)};  // the division in a menu
     const double r1 = flexRow(x, y, w1, a1, kGap, false);
     if (!live) return y + r1;
     y += std::max({r1, flexRow(x2, y, w2, a2, kGap, false), flexRow(x3, y, w3, a3, kGap, false)}) + 6;

@@ -1,4 +1,4 @@
-// STYM2149 — plugin: the standalone application, its window's close box asking as File > Quit does (D-439)
+// STYM2149 — plugin: the standalone application, its window's close box asking as File > Quit does
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

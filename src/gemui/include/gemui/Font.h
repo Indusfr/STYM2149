@@ -5,12 +5,12 @@
 // 8×16 font, metrics of the prototype: a line is the size of the font (ascent 13/16, descent 3/16), each character
 // advances by half the size (8 px at 16 px), its origin placed at a quarter of a pixel as Skia does
 // (tools/gemfont/README.md); each glyph keeps its place in the EmuTOS cell, which the prototype's TrueType lost
-// (i and l stuck to the left: D-266). Small texts (12 px and less in the prototype): system fonts of the Atari ST's GEM
-// (D-071), placed on the baseline of the prototype's line box: the 8×8 (8 px advance) where it fits (tooltips,
+// (i and l stuck to the left). Small texts (12 px and less in the prototype): system fonts of the Atari ST's GEM,
+// placed on the baseline of the prototype's line box: the 8×8 (8 px advance) where it fits (tooltips,
 // alerts, key names, help line), the 6×6 (6 px advance, the AES's SMALL font) in the prototype's narrow spaces, on
 // request (Face::kSmall). Outside the font, a few characters of the prototype take the corresponding GEM glyph
-// (arrows, check mark, note, bullet; the em dash, the hyphen: D-127; ù, ², Ö, Ä, Ü, ß, ´ of the key legends in the
-// keyboard drawing: D-131); the others become "?".
+// (arrows, check mark, note, bullet; the em dash, the hyphen; ù, ², Ö, Ä, Ü, ß, ´ of the key legends in the
+// keyboard drawing); the others become "?".
 #pragma once
 #include <cstdint>
 #include <string>
@@ -31,7 +31,7 @@ public:
     // Nearest available size (8 to 16 px).
     static const fontdata::Size& size(int px) noexcept;
     // Glyph sets of the 8×16 font: fontdata::kSizes, or another table of the same sizes (nullptr: back to kSizes).
-    // gemshot draws the scenes of the prototype with the glyphs of its TrueType (D-266); not for the plugin.
+    // gemshot draws the scenes of the prototype with the glyphs of its TrueType; not for the plugin.
     static void useSizes(const fontdata::Size* sizes) noexcept;
     // Glyph index of a code point ("?" if missing).
     static int glyph(char32_t c) noexcept;
@@ -46,7 +46,7 @@ public:
         return c ? double(c) : size(px).adv64 / 64.0;
     }
     // Character of the GEM font (printable ASCII, glyphs E001-E008, non-breaking space); Chromium takes the others
-    // from the fallback font (see lineBox). The accented letters of the translated tooltips (D-185), absent from the
+    // from the fallback font (see lineBox). The accented letters of the translated tooltips, absent from the
     // prototype, keep the measurements of the GEM font.
     static bool native(char32_t c) noexcept {
         return (c >= 0x20 && c <= 0x7E) || (c >= 0xE001 && c <= 0xE008) || c == 0xA0 ||
@@ -54,7 +54,7 @@ public:
     }
     // Advance of a character: half the size for the GEM font; whole advance of the fallback font (DejaVu Sans Mono,
     // 1233 units out of 2048, rounded to the pixel: 8 px at 14 px, 7 px at 12 px) for the others, in 8×16 as in 6×6
-    // (font of the spaces where the prototype's widths matter: D-127); the cell for all of them in the 8×8 font.
+    // (font of the spaces where the prototype's widths matter); the cell for all of them in the 8×8 font.
     static double advance(char32_t c, int px, Face face = Face::kSystem) noexcept;
     // Ascent of the 8×16 metrics of the size, not rounded (lineBox rounds it).
     static double ascent(int px) noexcept { return size(px).asc64 / 64.0; }

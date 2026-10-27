@@ -1,8 +1,8 @@
 // STYM2149 — main window rows changed by the ninth DAW test: sliders as wide as their neighbours in VIBRATO and SOURCE
-// (items 103, 104, D-304, D-305), Chip Voice named in the register monitor (item 105, D-306), ADSR by its initials
-// (item 106, D-307), an Effects button among the window buttons (item 110, D-311). Rows the twelfth aligned: wider
-// Depth and Rate sliders (item 158, D-367), the Source, Voicing and Mode buttons and the Noise period slider on the
-// Volume and Level sliders (items 159, 160, D-368, D-369).
+// (items 103, 104), Chip Voice named in the register monitor (item 105), ADSR by its initials
+// (item 106), an Effects button among the window buttons (item 110). Rows the twelfth aligned: wider
+// Depth and Rate sliders (item 158), the Source, Voicing and Mode buttons and the Noise period slider on the
+// Volume and Level sliders (items 159, 160).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -55,7 +55,7 @@ TEST_CASE("Main window: the sliders of VIBRATO, SOURCE and ADSR as wide as their
         CHECK(boundsOf(w, id).x == atk.x);
         CHECK(boundsOf(w, id).w == atk.w);
     }
-    // In Chip mode too, with the 3 digits of the 100 ticks (D-428) and the 2 of Sustain.
+    // In Chip mode too, with the 3 digits of the 100 ticks and the 2 of Sustain.
     h.p(0, plugin::Track::AdsrMode) = 1;
     w.tick(0);
     const gemui::Rect chipAtk = boundsOf(w, "atk");

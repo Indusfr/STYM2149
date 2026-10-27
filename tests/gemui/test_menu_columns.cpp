@@ -1,4 +1,4 @@
-// STYM2149 — gemui tests: GEM menus laid out in columns (chordCols of the prototype, P400) and their keyboard.
+// STYM2149 — gemui tests: GEM menus laid out in columns (chordCols of the prototype) and their keyboard.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -127,7 +127,7 @@ public:
 
 }  // namespace
 
-TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop height needs (P400)", "[gemui][menu]") {
+TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop height needs", "[gemui][menu]") {
     SECTION("944 px (the editor's desktop): one column, moved above the anchor to the top margin") {
         Desktop d(1272, 944);
         const MenuList& m = MenuList::open(d, chordItems(), -1, kChordAnchor, false, true);
@@ -179,7 +179,7 @@ TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop heigh
     }
 }
 
-TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside the menu (P400)", "[gemui][menu]") {
+TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside the menu", "[gemui][menu]") {
     Desktop d(1272, 400);
     // Anchor near the right edge: the menu is pulled left, 4 px from the edge.
     const MenuList& m = MenuList::open(d, chordItems(), -1, Box{1200, 300, 60, 24}, false, true);
@@ -204,7 +204,7 @@ TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside t
     CHECK(m3.bounds().y == 4);
 }
 
-TEST_CASE("Menu columns: an entry of any column is hovered in inverse video and picked by a click (P400)",
+TEST_CASE("Menu columns: an entry of any column is hovered in inverse video and picked by a click",
           "[gemui][menu]") {
     Desktop d(1272, 400);
     int picked = -1;
@@ -250,7 +250,7 @@ TEST_CASE("Menu columns: as in the prototype, the keyboard only closes the menu 
     d.setRoot(nullptr);
 }
 
-TEST_CASE("Arpeggiator: Chord... opens the 39 chords with chordCols, the sequencer's Chord menu does not (P400)",
+TEST_CASE("Arpeggiator: Chord... opens the 39 chords with chordCols, the sequencer's Chord menu does not",
           "[ui][arp][menu]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::ArpOn))] = 1;

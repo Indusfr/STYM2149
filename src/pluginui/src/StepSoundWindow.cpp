@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: settings of the sound a step chooses (right click on GEN, SRC or ENV, D-392)
+// STYM2149 — pluginui: settings of the sound a step chooses (right click on GEN, SRC or ENV)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/StepSoundWindow.h"
@@ -79,7 +79,7 @@ StepSoundWindow::SliderRow& StepSoundWindow::addSlider(std::string id, const cha
     r.field.setMinChars(spec.minChars);
     if (spec.pad) r.field.setPadChars(spec.pad);
     if (!spec.mask.empty()) r.field.setMask(spec.mask);
-    r.field.setUnit(srcField.unit());  // out of the reverse video, as in the main window (D-464)
+    r.field.setUnit(srcField.unit());  // out of the reverse video, as in the main window
     r.field.setTip(srcField.tip());
     // The main window's callbacks: its parameter, its gesture, its undo step.
     gemui::Slider* s = &src;
@@ -191,7 +191,7 @@ void StepSoundWindow::build() {
             SliderRow& vmin = addSlider("vmin", "SID min vol", m.vmin_, m.vminv_, &m.labVmin_, {2, 3, ""}, true);
             vmin.alignTo = &ratio;
             sliderLine(vmin);
-            // The menu of its forms after its name (24/10/2026, D-411), as in the main window.
+            // The menu of its forms after its name (24/10/2026), as in the main window.
             gemui::Label& waveHead = addHeading("SID wave");
             ButtonItem& form = addButton("waveForm", m.waveForm_, [&m](gemui::Button& b) { m.waveFormMenu(b); });
             form.button.setMinWidth(m.waveForm_.naturalWidth());  // as wide as the widest form
@@ -213,9 +213,9 @@ void StepSoundWindow::build() {
             });
             // Steps on the line of its label, then right under it, in the same place, the period of the sine with
             // Sine or Bounce, or the width of the square with Square, the three sliders lined up after the widest
-            // label, as in the main window (Indus, 24/10/2026 15:50 to 18:41, D-406, D-408, D-411, D-412, D-414). The
+            // label, as in the main window (Indus, 24/10/2026 15:50 to 18:41). The
             // line keeps its place when neither shows: the window does not change size. With Base, the bars and Steps
-            // are hidden too, in their places (20:30, D-417).
+            // are hidden too, in their places (20:30).
             SliderRow& steps =
                 addSlider("waveSteps", "Steps", m.waveSteps_, m.waveStepsv_, &m.labWaveSteps_, {2, 3, "99"}, false);
             SliderRow& period = addSlider("wavePeriod", "Period", m.wavePeriod_, m.wavePeriodv_, &m.labWavePeriod_,
@@ -289,7 +289,7 @@ void StepSoundWindow::build() {
     } else if (kind_ == Kind::Source) {
         gen_ = m.seq_.stepSound(step_).gen;
         // The cell's source, or the track's (0): what it uses (SRC menu: Tone, Noise, Tone+Noise, then the same with
-        // the envelope, D-277).
+        // the envelope).
         bool noise = false, env = false;
         if (value_ > 0) {
             const int bits = value_ < 4 ? value_ : value_ - 4;
@@ -363,7 +363,7 @@ void StepSoundWindow::refresh() {
         SliderRow& r = *rp;
         const bool dimmed = r.ownDim && r.ownDimmed;
         if (r.src) {
-            // The range too: Width goes up to Steps - 1 (D-411).
+            // The range too: Width goes up to Steps - 1.
             if (r.slider.min() != r.src->min() || r.slider.max() != r.src->max())
                 r.slider.setRange(r.src->min(), r.src->max(), 1);
             if (!r.held) r.slider.setValue(r.src->value());
@@ -376,7 +376,7 @@ void StepSoundWindow::refresh() {
         r.label.setDim((!r.ownDim && r.srcLabel && r.srcLabel->dim()) || dimmed);
         r.pre.setDim(r.label.dim());
         r.unit.setDim(r.label.dim());
-        // Steps hidden with Base (D-417), Period with Sine or Bounce, Width with Square (D-408, D-411, D-414): the
+        // Steps hidden with Base, Period with Sine or Bounce, Width with Square: the
         // form of the track's SID wave, whatever its generator, unlike the visibility of the main window's rows.
         const bool shown = !r.showWith || r.showWith();
         for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&r.label, &r.slider, &r.pre, &r.field, &r.unit})

@@ -212,7 +212,7 @@ TEST_CASE("Player: AtariAudio frame rules", "[ymio][player]") {
         CHECK(r.chip().readRegister(8) == 0);
         CHECK(r.chip().readRegister(13) == 0x0a);
     }
-    SECTION("YM6 Sinus-SID (code $80): counted, not played, volume written by the frame (D-045)") {
+    SECTION("YM6 Sinus-SID (code $80): counted, not played, volume written by the frame") {
         const uint8_t regs[16] = {1, 0x90, 2, 0, 3, 0, 0x20, 0x38, 0x0f, 0, 0, 0x10, 0, 0x0a, 100, 0};
         auto f = ymio::parseYm(oneFrame("YM6!", regs));
         REQUIRE(f.file);

@@ -37,7 +37,7 @@ TEST_CASE("S8 power-on state", "[S8][registers]") {
     CHECK(s.envShape == 0);
     // First draw of rand() (seed 1) = 41: channels A and B high, C low (like AtariAudio).
     CHECK(s.toneEdges == 0x3ffu);
-    // Output at rest: volumes at 0 → level 1 on each channel (2v + 1, D-011).
+    // Output at rest: volumes at 0 → level 1 on each channel (2v + 1).
     CHECK(chip.tick() == tables::kMixTable[1 | (1 << 5) | (1 << 10)]);
 }
 
@@ -47,7 +47,7 @@ TEST_CASE("S8 same seed, same state; different seed, another state possible", "[
     Ym2149 a(c), b(c);
     CHECK(a.state().toneEdges == b.state().toneEdges);
     a.reset();
-    CHECK(a.state().toneEdges == b.state().toneEdges);  // reset() draws the same value again (D-019)
+    CHECK(a.state().toneEdges == b.state().toneEdges);  // reset() draws the same value again
     c.edgeSeed = 2745024u;  // state of the generator after one draw: second Reset of AtariAudio
     Ym2149 d(c);
     CHECK(d.state().toneEdges == ((18467u & 0x421u) * 0x1fu));  // second MSVC rand() = 18467
@@ -134,7 +134,7 @@ TEST_CASE("S8 mute per voice", "[S8][mixer]") {
     CHECK((chip.levels() & 31) == 31);
 }
 
-TEST_CASE("S8 fixed volume v → level 2v + 1 (D-011)", "[S8][registers]") {
+TEST_CASE("S8 fixed volume v → level 2v + 1", "[S8][registers]") {
     Ym2149 chip;
     for (uint8_t v = 0; v < 16; ++v) {
         chip.writeRegister(8, v);

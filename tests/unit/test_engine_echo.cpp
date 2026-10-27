@@ -1,6 +1,6 @@
-// STYM2149 — echo of the notes (eighth DAW test, item 98, D-299): repeats at each division of the tempo, quieter each
+// STYM2149 — echo of the notes (eighth DAW test, item 98): repeats at each division of the tempo, quieter each
 // time, in every mode; in 3 channels a repeat takes the channel of its target track only when it plays no note of its
-// own, none for a Sync Buzzer (D-316); the register recorder keeps the repeats; 16 channels: voices of the pool; panic.
+// own, none for a Sync Buzzer; the register recorder keeps the repeats; 16 channels: voices of the pool; panic.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

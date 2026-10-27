@@ -79,7 +79,7 @@ void OrnGrid::paint(gemui::Painter& p) {
     const Rect r = bounds();
     const Color ink = colors::kBlack;
     // .olab: 10 px (9 px for NSE and VOL), 9 px line box, right-aligned 2 px from the edge; 6×6 font in the 20 px
-    // column (D-071).
+    // column.
     auto label = [&](const std::string& t, int top, int px) {
         const double tw = Font::width(t, px, 0, Face::kSmall);
         p.textAt(t, r.x + kLabelW - 2 - tw, baselineIn(top, 9, px), px, ink, 0, Face::kSmall);
@@ -108,11 +108,11 @@ void OrnGrid::paint(gemui::Painter& p) {
             }
         }
     }
-    // Full-width separators: 3 black px, 2 px margins; between them, the sequence rows (D-270).
+    // Full-width separators: 3 black px, 2 px margins; between them, the sequence rows.
     p.fill({r.x, r.y + kSepY + 2, kWidth, 3}, colors::kBlack);
     p.fill({r.x, r.y + kSep2Y + 2, kWidth, 3}, colors::kBlack);
 
-    // A greyed NSE row (D-463): its label and its cells faded like the steps beyond the length.
+    // A greyed NSE row: its label and its cells faded like the steps beyond the length.
     const bool noiseOff = !st_.noiseOff.empty();
     if (noiseOff) {
         const double tw = Font::width("NSE", 9, 0, Face::kSmall);
@@ -134,7 +134,7 @@ void OrnGrid::paint(gemui::Painter& p) {
         const int bh = int(std::ceil(in.h * v / 15.0 - 0.5));  // .vbar: height v/15 × 100 %
         if (bh > 0) p.fill({in.x, in.bottom() - bh, in.w, bh}, shade(colors::kBlack));
         // .vnum: 8 px, at the top (top 1 px), or in white at the bottom (bottom 1 px) when the bar goes above 70 %; 6×6
-        // font centred, tightened by one pixel per letter beyond two characters (D-119).
+        // font centred, tightened by one pixel per letter beyond two characters.
         const bool low = v * 100 > 70 * 15;  // v / 15 > 70 %, in whole numbers
         const std::string t = std::to_string(v);
         const int base = low ? baselineIn(in.bottom() - 1 - 8, 8, 8) : baselineIn(in.y + 1, 8, 8);
@@ -269,12 +269,12 @@ ModulationWindow::ModulationWindow(MainWindow& main) : m_(main) {
 }
 
 void ModulationWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&on_, "ornOn"}, {&len_, "ornLen"}, {&loop_, "ornLoop"}, {&rate_, "ornRate"}, {&clear_, "ornClear"}})
         w->setId(id);
     setTitle("MODULATION");
-    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font (D-071).
+    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font.
     for (gemui::Label* l : {&hint_, &hint2_, &hint3_}) {
         l->setFace(Face::kSmall);
         l->setColor(colors::kHint);
@@ -289,8 +289,8 @@ void ModulationWindow::build() {
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&on_, &labLen_, &len_, &lenv_, &loop_, &rate_,
                                                                   &clear_, &hint_, &hint2_, &hint3_, &sep_, &grid_})
         add(*w);
-    seqx_.addTo(*this);  // the sequences (D-240): their rows over the table (D-270), their settings below it
-    lfo_.addTo(*this);   // the LFO below them (D-257)
+    seqx_.addTo(*this);  // the sequences: their rows over the table, their settings below it
+    lfo_.addTo(*this);   // the LFO below them
 }
 
 void ModulationWindow::wire() {
@@ -312,7 +312,7 @@ void ModulationWindow::wire() {
         m_.trackPopup(rate_, std::move(items), patch().ornamentRate - 1);
     };
     clear_.onClick = [this] {
-        // The whole table: pitch, NSE and VOL, and the sequence rows that play with it (D-240), one undo step.
+        // The whole table: pitch, NSE and VOL, and the sequence rows that play with it, one undo step.
         editPatch([](ymengine::TrackPatch& p) {
             p.ornamentPitch.fill(0);
             p.ornamentNoise.fill(0);
@@ -465,7 +465,7 @@ bool ModulationWindow::tableKey(const gemui::KeyEvent& e) {
         // KeyN: the physical key when the host gives it, otherwise the character.
         const int code = e.code ? e.code : (e.ch < 128 ? std::toupper(int(e.ch)) : 0);
         if (code != 'N' || e.mods.ctrl || e.mods.alt) return false;
-        if (dma()) return true;  // no noise on a DMA track: the NSE row is greyed (D-463)
+        if (dma()) return true;  // no noise on a DMA track: the NSE row is greyed
         const int c = s.ornCur;
         editPatch([c](ymengine::TrackPatch& p) { p.ornamentNoise[size_t(c)] = p.ornamentNoise[size_t(c)] ? 0 : 1; });
         return true;
@@ -506,8 +506,8 @@ void ModulationWindow::layout() {
     y += flexRow(x, y, contentW, row);
     double bottom = y;
     if (body) {
-        // #ornBody: .hint (margin-top 6), here with the notes of the sequence rows (D-271), 2 px rule up to the edges
-        // of the window (margin 8px -8px), grid and the sequence rows inside it (D-270).
+        // #ornBody: .hint (margin-top 6), here with the notes of the sequence rows, 2 px rule up to the edges
+        // of the window (margin 8px -8px), grid and the sequence rows inside it.
         y += 6;
         for (gemui::Label* l : {&hint_, &hint2_, &hint3_}) {
             l->setBox({x, y, l->naturalWidth(), 12});
@@ -520,12 +520,12 @@ void ModulationWindow::layout() {
         bottom = y + OrnGrid::kHeight;
     }
     seqx_.placeRows(x, grid_.box().y + OrnGrid::kSeqY, body);
-    // Their settings always, then the LFO (D-257).
+    // Their settings always, then the LFO.
     bottom = seqx_.layout(x, bottom, contentW, kPad);
     bottom = lfo_.layout(x, bottom, contentW, kPad);
 
     // Window: content, padding of 8, border and margin of .gwin (6 on each side). Grown past the bottom of the
-    // desktop (moved low, then switched on): raised to fit by place() (D-460).
+    // desktop (moved low, then switched on): raised to fit by place().
     const double w = contentW + 2 * kPad + 12;
     const double h = bottom + kPad + 6 - oy;
     if (std::abs(h - box().h) > 0.01 || std::abs(w - box().w) > 0.01) place({ox, oy, w, h});

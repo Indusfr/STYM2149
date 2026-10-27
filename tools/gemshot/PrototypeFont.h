@@ -2,7 +2,7 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// The TrueType starts the ink of every glyph at the origin, where gemui keeps EmuTOS's place in the cell (D-266):
+// The TrueType starts the ink of every glyph at the origin, where gemui keeps EmuTOS's place in the cell:
 // the scenes compared with the prototype's screenshots are drawn with these glyphs (gemui::Font::useSizes), the
 // STYM2149 scenes with gemui's.
 #pragma once

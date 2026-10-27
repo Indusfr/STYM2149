@@ -1,4 +1,4 @@
-// STYM2149 — GEM interface (M5): floating windows (moving, stacking, closing), scrollbars, vertical slider.
+// STYM2149 — GEM interface: floating windows (moving, stacking, closing), scrollbars, vertical slider.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -49,7 +49,7 @@ TEST_CASE("Floating window: dragged by its bar, bounded on the desktop, closed b
     CHECK(w.bounds() == Rect{140, 145, 300, 200});
     CHECK(w.titleBar().bounds() == Rect{146, 151, 288, 26});
     // Left and top edges never negative (mkWinDrag: Math.max(0, ...)); right and bottom edges never past the
-    // desktop's either (Indus, 26/10/2026, D-460).
+    // desktop's either (Indus, 26/10/2026).
     d.mouseDrag({10, 5}, {});
     CHECK(w.bounds().x == 0);
     CHECK(w.bounds().y == 0);
@@ -66,7 +66,7 @@ TEST_CASE("Floating window: dragged by its bar, bounded on the desktop, closed b
     d.setRoot(nullptr);
 }
 
-TEST_CASE("Floating window: grown or opened past the right and bottom edges, moved back inside (D-460)", "[gemui]") {
+TEST_CASE("Floating window: grown or opened past the right and bottom edges, moved back inside", "[gemui]") {
     Desktop d(1272, 944);
     d.setWorkTop(20);
     Widget root;
@@ -305,7 +305,7 @@ TEST_CASE("Scrollbar: repeated arrows, track by pages, dragged thumb, wheel", "[
     CHECK(s.scroll() == Point{0, 129});
 }
 
-TEST_CASE("Scroll bar on its own: drawn like the pane's, arrows by one, track by a jump, thumb, wheel (D-294)",
+TEST_CASE("Scroll bar on its own: drawn like the pane's, arrows by one, track by a jump, thumb, wheel",
           "[gemui]") {
     // The Step Sequencer's notes: 23 to 108, 13 rows shown, an octave per press on the track; 26 × 220 against the
     // right edge of the window.
@@ -408,7 +408,7 @@ TEST_CASE("Scroll bar on its own: drawn like the pane's, arrows by one, track by
     CHECK(s.value() == 60);
 }
 
-TEST_CASE("Horizontal slider: an arrow at each end, one step per press, repeated while held (D-297)", "[gemui]") {
+TEST_CASE("Horizontal slider: an arrow at each end, one step per press, repeated while held", "[gemui]") {
     // The vibrato rate's range: 1 to 20 by 0.5; 200 × 16.
     Desktop d(1272, 944);
     Widget root;
@@ -511,7 +511,7 @@ TEST_CASE("Horizontal slider: an arrow at each end, one step per press, repeated
     CHECK_FALSE(s.arrows());
 }
 
-TEST_CASE("Slider: a right click goes to onContext, neither the value nor a gesture (D-300)", "[gemui]") {
+TEST_CASE("Slider: a right click goes to onContext, neither the value nor a gesture", "[gemui]") {
     Desktop d(1272, 944);
     Widget root;
     root.setBounds(d.bounds());
@@ -537,7 +537,7 @@ TEST_CASE("Slider: a right click goes to onContext, neither the value nor a gest
 }
 
 TEST_CASE("Vertical slider: minimum at the bottom, checkerboard rotated with the track", "[gemui]") {
-    // The prototype's transposition slider of the Step Sequencer window (seqTr, a scroll bar since D-294): 16 × 220,
+    // The prototype's transposition slider of the Step Sequencer window (seqTr, now a scroll bar): 16 × 220,
     // notes 23 to 108, C3 (48) at the start.
     Desktop d(1272, 944);
     Widget root;

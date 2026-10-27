@@ -172,7 +172,7 @@ Snapshot StymProcessor::makeSnapshot() const {
 }
 
 // Host thread, audio stopped: everything that allocates is done here (metronome buffer, engine, engine status).
-// The enabled track outputs are read now: one enabled later stays silent until the next preparation (D-062).
+// The enabled track outputs are read now: one enabled later stays silent until the next preparation.
 void StymProcessor::prepareToPlay(double sampleRate, int maxBlock) {
     {
         const std::lock_guard<std::mutex> lock(controlLock_);
@@ -220,7 +220,7 @@ void StymProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     });
     for (const auto m : midi) {
         if (m.numBytes <= 0 || m.numBytes > 3) continue;  // SysEx: ignored
-        // MIDI learn: a learned CC or note, or one caught for the armed control, goes to the editor (D-146). A note off
+        // MIDI learn: a learned CC or note, or one caught for the armed control, goes to the editor. A note off
         // goes on to the engine too (not to the editor's host notes): a note that was sounding when its key was
         // learned is released.
         const int st = m.data[0] & 0xF0;
@@ -281,7 +281,7 @@ void StymProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         auto bus = getBusBuffer(buffer, false, kChipBusFirst + c);
         if (bus.getNumChannels() > 0) out.chip[size_t(c)] = bus.getWritePointer(0);
     }
-    // The metronome apart, added after the oscilloscope and the output meters have taken the output (D-226). A block
+    // The metronome apart, added after the oscilloscope and the output meters have taken the output. A block
     // longer than announced keeps it in the output, and on the oscilloscope.
     if (size_t(n) <= click_.size()) {
         std::fill(click_.begin(), click_.begin() + n, 0.0f);
@@ -473,7 +473,7 @@ void StymProcessor::applyExtras(const NonParamState& extras, const RegisterTake*
         extras_ = extras;
         sanitize(extras_);
         if (take) take_ = *take;
-        // State from before M5: default sequencer settings for this format.
+        // State from before the sequencer: default sequencer settings for this format.
         if (!hasSequencer) extras_.global.seqClock = defaultSeqClock();
         // Every version moves: the audio thread rebuilds the kit, the samples and the pattern from the new state.
         ++kitVersion_;
@@ -518,7 +518,7 @@ void StymProcessor::setStateInformation(const void* data, int size) {
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     auto* p = new stym::plugin::StymProcessor();
-    // MIDI learn map from the user's preferences: applied from creation, with the editor closed (D-146).
+    // MIDI learn map from the user's preferences: applied from creation, with the editor closed.
     // The tests create the processor without it.
     p->setMidiMap(stym::plugin::StymEditor::userPreferences()->getValue("midiMap").toStdString());
     return p;

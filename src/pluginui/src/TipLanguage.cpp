@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: tooltip languages (D-185, D-283)
+// STYM2149 — pluginui: tooltip languages
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/TipLanguage.h"
@@ -341,7 +341,7 @@ std::optional<TipFile> parseTipFile(std::string_view text, std::string_view file
 
 std::string tipTemplate(std::string_view version) {
     std::string out =
-        "# STYM2149 tooltips: template of a new language (D-283).\n"
+        "# STYM2149 tooltips: template of a new language.\n"
         "# Save a copy in the Languages folder as <code>.po (nl.po for Dutch), give the code and the name\n"
         "# of the language below, then write each translation in the msgstr under its English line (a text\n"
         "# editor or Poedit will do). Lines left empty stay in English. {1} to {9} stand for parts of the\n"
@@ -360,7 +360,7 @@ std::string tipTemplate(std::string_view version) {
 std::vector<std::pair<std::string, std::string>> tipFolderFiles(std::string_view version,
                                                                 std::string_view installedFolder) {
     std::string readme =
-        "STYM2149 tooltip languages (D-283)\n"
+        "STYM2149 tooltip languages\n"
         "\n"
         "Each .po file of this folder adds a language to the Language menu of Options > Settings,\n"
         "or corrects one of those installed with STYM2149. English is built in. The menu reads\n"

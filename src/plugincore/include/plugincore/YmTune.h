@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: YM Player tune and its playback (M7, A2, D-159, D-169)
+// STYM2149 — plugincore: YM Player tune and its playback
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -62,7 +62,7 @@ YmTuneLoad loadYmTune(std::span<const uint8_t> data, std::string fileName);
 class YmPlayback {
 public:
     // Message thread: `render` comes from the project settings (engineConfig); the clock is replaced by the tune's,
-    // and the AtariAudio averaging by the sinc if the host rate exceeds clk/8 (D-058). `stream`: SNDH stream already
+    // and the AtariAudio averaging by the sinc if the host rate exceeds clk/8. `stream`: SNDH stream already
     // started, taken over by continueFrom(); otherwise a new one is started (init of the subsong).
     YmPlayback(std::shared_ptr<const YmTune> tune, int subsong, const ymcore::RenderConfig& render,
                std::shared_ptr<ymio::SndhStream> stream = nullptr);

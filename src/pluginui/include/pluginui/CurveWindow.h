@@ -5,7 +5,7 @@
 // Free curve of 32 points (slideTable, global non-automatable state) used by the "Custom" entry of the sequencer's
 // CRV row: drawing with the mouse (#curvegrid), Linear (straight line), Smooth (moving average), Invert (upside down),
 // warning when the curve does not reach the target note. Positions and sizes: the prototype's CSS boxes at 100 %
-// (window at 180, 160, as wide as the row of buttons). Neither undo nor Escape, as in the prototype (D-130).
+// (window at 180, 160, as wide as the row of buttons). Neither undo nor Escape, as in the prototype.
 #pragma once
 #include <array>
 #include <functional>

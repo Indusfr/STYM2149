@@ -1,4 +1,4 @@
-// STYM2149 — Digidrum editor (M6, B9, D-154): rate, root note and fine tune per slot, held loop (released at the end
+// STYM2149 — Digidrum editor: rate, root note and fine tune per slot, held loop (released at the end
 // of the note), preview; DIGS chunk of the state, values brought back into their ranges; 4-bit Linear and YM levels
 // conversion, 8-bit source, tools; named banks (JSON, base64).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -146,7 +146,7 @@ TEST_CASE("Digidrum: slot settings brought back into their ranges", "[digidrum][
     CHECK(e.digidrumSlot(0) == ymengine::DigidrumSlot{});
 }
 
-TEST_CASE("Digidrum: Start to End looped while the note is held, then played on to End (D-154, D-443)",
+TEST_CASE("Digidrum: Start to End looped while the note is held, then played on to End",
           "[digidrum][engine]") {
     Rig rig;
     const uint8_t sample[] = {1, 2, 3, 4, 5, 6};
@@ -178,7 +178,7 @@ TEST_CASE("Digidrum: Start to End looped while the note is held, then played on 
     CHECK(rig.e.activeVoices() == 0);
 }
 
-TEST_CASE("Digidrum: Start and End, the part played without Loop (D-443)", "[digidrum][engine]") {
+TEST_CASE("Digidrum: Start and End, the part played without Loop", "[digidrum][engine]") {
     const uint8_t sample[] = {1, 2, 3, 4};
     struct Case {
         uint32_t start, end;
@@ -230,7 +230,7 @@ TEST_CASE("Digidrum: preview at the slot rate from Start to End, through the chi
     CHECK(peakOf(l, 0, 4700) > 0.2);
     CHECK(peakOf(l, 4900, 9600) < 1e-6);
     CHECK(l == r);
-    // The preview plays the part from Start to End (D-443): 390 values, i.e. 2400 samples.
+    // The preview plays the part from Start to End: 390 values, i.e. 2400 samples.
     d.start = 195;
     d.end = 585;
     e.setDigidrumSlot(4, d);
@@ -246,7 +246,7 @@ TEST_CASE("Digidrum: preview at the slot rate from Start to End, through the chi
     CHECK(peakOf(l, 0, 9600) < 1e-6);
 }
 
-TEST_CASE("Digidrum: the preview starts and ends at the level of silence, without a click (Indus, 26/10/2026, D-455)",
+TEST_CASE("Digidrum: the preview starts and ends at the level of silence, without a click (Indus, 26/10/2026)",
           "[digidrum][engine]") {
     Engine e;
     ymengine::EngineConfig c;
@@ -275,8 +275,7 @@ TEST_CASE("Digidrum: the preview starts and ends at the level of silence, withou
     CHECK(ym.rateHz == 11025);
 }
 
-TEST_CASE("Digidrum: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026, "
-          "D-449)", "[digidrum][engine]") {
+TEST_CASE("Digidrum: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026)", "[digidrum][engine]") {
     Engine e;
     ymengine::EngineConfig c;
     c.render.hostRate = 48000;

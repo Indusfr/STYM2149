@@ -108,7 +108,7 @@ const ymseq::Song& SongWindow::song() const noexcept { return m_.extras_.seq.son
 EditorSession& SongWindow::ses() const noexcept { return m_.host_.session(); }
 
 void SongWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&add_, "songAdd"}, {&play_, "trPlay"}, {&rec_, "trRec"}, {&loop_, "trLoop"}})
         w->setId(id);
@@ -508,7 +508,7 @@ void SongWindow::chipMenu(int i) {
         items.push_back(std::move(m));
     };
     // One undo step per action (pushSongUndo, de-duplicated for Copy).
-    // Jump (D-158): the number of jumps before continuing.
+    // Jump: the number of jumps before continuing.
     for (int rep : ymseq::kSongRepeats)
         item("Repeat x" + std::to_string(rep), [this, S, rep] {
             edit([&](ymseq::Song& s) { s.setRepeat(S, rep); });
@@ -577,7 +577,7 @@ void SongWindow::chipMenu(int i) {
     };
     item("Tempo...", [this, S] { tempoPrompt(S); });
     unless(plays, "A loop plays nothing: it has no tempo");
-    // Extended Song (D-158): special entries, their settings, loop point.
+    // Extended Song: special entries, their settings, loop point.
     items.push_back(MenuItem::separatorItem());
     item("Insert rest", [this, i] { insertSpecial(i, ymseq::SongEntry::rest(ymseq::SongKind::Rest)); });
     item("Insert note-off", [this, i] { insertSpecial(i, ymseq::SongEntry::rest(ymseq::SongKind::NoteOff)); });
@@ -739,7 +739,7 @@ void SongWindow::jump(int i) {
     if (!n) return;
     i = std::clamp(i, 0, n - 1);
     songPos_ = i;
-    // Special entry (D-158): no pattern to show; the player goes through a jump.
+    // Special entry: no pattern to show; the player goes through a jump.
     if (const ymseq::SongEntry& e = song().entries[size_t(i)]; !e.special()) {
         const int pat = e.pat;
         m_.seq_.edit([pat](plugin::NonParamState& s) { s.seq.applied(pat); });

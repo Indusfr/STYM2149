@@ -1,4 +1,4 @@
-# STYM2149 tooltips: Français (fr), installed with STYM2149 (D-185, D-283).
+# STYM2149 tooltips: Français (fr), installed with STYM2149.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #

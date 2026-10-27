@@ -1,6 +1,6 @@
-// STYM2149 — Arpeggiator window (M5): opening (button, Ctrl+B, Edit menu), on/off, mode, rate, Track, Land, MIDI
+// STYM2149 — Arpeggiator window: opening (button, Ctrl+B, Edit menu), on/off, mode, rate, Track, Land, MIDI
 // clock division, octaves, table (grid, number of steps, chords, keyboard), playing step, one track undo step per
-// setting (D-129), SYNC / STOP of the MIDI clock (D-084), Sync to the tempo (D-256).
+// setting, SYNC / STOP of the MIDI clock, Sync to the tempo.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -90,7 +90,7 @@ void click(MainWindow& w, const std::string& id) {
 }
 
 // Entry of a menu opened below a button (its frame on the button's bottom rule, or on its top rule above it when it
-// does not fit; 20 px entries inside a 2 px border, D-396).
+// does not fit; 20 px entries inside a 2 px border).
 void pick(MainWindow& w, const std::string& anchor, int entries, int index) {
     const auto r = w.rectOf(anchor);
     REQUIRE(r);
@@ -183,7 +183,7 @@ TEST_CASE("Arpeggiator: on/off, mode, rate, Track, Land, octaves, MIDI division"
     CHECK(h.track(0, Track::ArpOn) == 1.0f);
     CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 380, 180});
     CHECK(w.rectOf("arpModeSel") == gemui::Rect{134, 176, 38, 24});
-    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162, D-371)
+    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162)
     CHECK(w.rectOf("arpGlideRate") == gemui::Rect{327, 206, 59, 24});
     CHECK(w.rectOf("arpLand") == gemui::Rect{394, 206, 52, 24});
     CHECK(w.rectOf("arpOct2") == gemui::Rect{195, 236, 31, 24});
@@ -203,11 +203,11 @@ TEST_CASE("Arpeggiator: on/off, mode, rate, Track, Land, octaves, MIDI division"
     CHECK(h.arp().land);
     CHECK(h.arp().octaves == 3);
 
-    // MIDI clock: the division replaces the rate (global parameter ArpDivision), in a menu button (D-290) whose
+    // MIDI clock: the division replaces the rate (global parameter ArpDivision), in a menu button whose
     // entries follow the musical order, Tick last: 1/4, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/32T, 1/64, Tick.
     h.values[size_t(paramIndex(Global::ArpClock))] = 1;
     w.tick(0);
-    // Division on the row of the mode (D-295), the Rate row gone.
+    // Division on the row of the mode, the Rate row gone.
     CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 320, 150});
     CHECK_FALSE(w.rectOf("arpRate"));
     CHECK(w.rectOf("arpDiv") == gemui::Rect{334, 176, 52, 24});
@@ -217,7 +217,7 @@ TEST_CASE("Arpeggiator: on/off, mode, rate, Track, Land, octaves, MIDI division"
     CHECK(h.global(Global::ArpDivision) == 1.0f);
     click(w, "arpDiv");
     pick(w, "arpDiv", 9, 7);
-    CHECK(h.global(Global::ArpDivision) == 8.0f);  // 1/64, after the choices of the first versions (D-289)
+    CHECK(h.global(Global::ArpDivision) == 8.0f);  // 1/64, after the choices of the first versions
     click(w, "arpDiv");
     pick(w, "arpDiv", 9, 8);
     CHECK(h.global(Global::ArpDivision) == 6.0f);  // Tick
@@ -231,7 +231,7 @@ TEST_CASE("Arpeggiator: on/off, mode, rate, Track, Land, octaves, MIDI division"
     CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 177, 90});
 }
 
-TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and greyed with MIDI ext (D-256)",
+TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and greyed with MIDI ext",
           "[ui][arp]") {
     TestHost h;
     MainWindow w(h);
@@ -248,8 +248,8 @@ TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and gr
     click(w, "arpSync");
     CHECK(h.global(Global::ArpSync) == 1.0f);
     CHECK_FALSE(w.rectOf("arpRate"));
-    CHECK(w.rectOf("arpDiv")->y == mode->y);  // on the row of the mode (D-295)
-    // Tick is not offered with Sync (D-287): eight entries, 1/32T and 1/64 included (D-289).
+    CHECK(w.rectOf("arpDiv")->y == mode->y);  // on the row of the mode
+    // Tick is not offered with Sync: eight entries, 1/32T and 1/64 included.
     click(w, "arpDiv");
     pick(w, "arpDiv", 8, 3);
     CHECK(h.global(Global::ArpDivision) == 3.0f);
@@ -258,7 +258,7 @@ TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and gr
     CHECK(h.global(Global::ArpDivision) == 7.0f);  // 1/32T
     click(w, "arpSync");
     CHECK(h.global(Global::ArpSync) == 0.0f);
-    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162, D-371)
+    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162)
     CHECK_FALSE(w.rectOf("arpDiv"));
 
     // MIDI ext: the MIDI clock decides; the button stays lit and does nothing.
@@ -269,7 +269,7 @@ TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and gr
     CHECK(w.rectOf("arpDiv"));
 }
 
-TEST_CASE("Arpeggiator: division menu with Sync, a Tick kept from the MIDI clock shown but not offered (D-287)",
+TEST_CASE("Arpeggiator: division menu with Sync, a Tick kept from the MIDI clock shown but not offered",
           "[ui][arp]") {
     TestHost h;
     h.values[size_t(paramIndex(0, Track::ArpOn))] = 1;
@@ -290,9 +290,9 @@ TEST_CASE("Arpeggiator: table (grid, number of steps, chords, keyboard, playing 
     MainWindow w(h);
     w.arpeggiator().show();
     CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 394, 500});
-    CHECK(w.rectOf("arpgrid") == gemui::Rect{94, 290, 366, 278});  // +0 to +24 (D-322)
+    CHECK(w.rectOf("arpgrid") == gemui::Rect{94, 290, 366, 278});  // +0 to +24
     CHECK(w.rectOf("arpLen") == gemui::Rect{142, 236, 294, 16});
-    // Rate starts with Steps (thirteenth DAW test, item 162, D-371).
+    // Rate starts with Steps (thirteenth DAW test, item 162).
     CHECK(w.rectOf("arpRate")->x == 142);
     CHECK(w.rectOf("chordSel") == gemui::Rect{94, 258, 80, 24});
     CHECK_FALSE(w.rectOf("arpOct1"));
@@ -351,7 +351,7 @@ TEST_CASE("Arpeggiator: table (grid, number of steps, chords, keyboard, playing 
     CHECK(h.editor.arpCur == 5);
 }
 
-TEST_CASE("Arpeggiator: the grid shows the offsets up to +24 of the chords (D-322)", "[ui][arp]") {
+TEST_CASE("Arpeggiator: the grid shows the offsets up to +24 of the chords", "[ui][arp]") {
     TestHost h;
     h.values[size_t(paramIndex(0, Track::ArpOn))] = 1;
     h.state.tracks[0].arp.mode = ArpMode::Table;
@@ -374,7 +374,7 @@ TEST_CASE("Arpeggiator: the grid shows the offsets up to +24 of the chords (D-32
     CHECK(h.arp().table[0] == 24);
 }
 
-TEST_CASE("Arpeggiator: each setting is a track undo step (D-129)", "[ui][arp][undo]") {
+TEST_CASE("Arpeggiator: each setting is a track undo step", "[ui][arp][undo]") {
     TestHost h;
     MainWindow w(h);
     w.arpeggiator().show();
@@ -422,7 +422,7 @@ TEST_CASE("Arpeggiator: each setting is a track undo step (D-129)", "[ui][arp][u
 TEST_CASE("Undo: settings of the main window, one step per gesture on the focused track", "[ui][undo]") {
     TestHost h;
     MainWindow w(h);
-    // Source menu: Tone+Noise (three parameters with Mode, one step; D-246).
+    // Source menu: Tone+Noise (three parameters with Mode, one step).
     click(w, "srcSel");
     pick(w, "srcSel", 7, 2);
     CHECK(h.track(0, Track::Noise) == 1.0f);
@@ -447,7 +447,7 @@ TEST_CASE("Undo: settings of the main window, one step per gesture on the focuse
     CHECK(h.track(0, Track::Generator) == float(ymengine::Generator::Sid));
 }
 
-TEST_CASE("MIDI clock: waiting, then SYNC or STOP at each publication (D-084)", "[ui][clock]") {
+TEST_CASE("MIDI clock: waiting, then SYNC or STOP at each publication", "[ui][clock]") {
     TestHost h;
     MainWindow w(h);
     CHECK(w.rectOf("clkStatus")->w == 0);

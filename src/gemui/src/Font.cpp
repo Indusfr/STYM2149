@@ -118,7 +118,7 @@ int Font::glyph(char32_t c) noexcept {
     case 0x2014: return '-' - 0x20; // — (the Atari ST encoding has no em dash: hyphen)
     default: break;
     }
-    // Fallback font (FontData.h): ♪, •, keyboard key legends (D-131), accented letters of the tooltips (D-185).
+    // Fallback font (FontData.h): ♪, •, keyboard key legends, accented letters of the tooltips.
     for (int i = 0; i < fontdata::kFallbackCount; ++i)
         if (fontdata::kFallbackCodes[i] == c) return fontdata::kFallbackFirst + i;
     return '?' - 0x20;

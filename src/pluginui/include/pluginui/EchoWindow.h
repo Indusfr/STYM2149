@@ -1,5 +1,5 @@
-// STYM2149 — pluginui: Effects window, the echo and the delay (eighth DAW test, item 98, D-299; named Effects by the
-// ninth, items 110 to 112, D-311 to D-313)
+// STYM2149 — pluginui: Effects window, the echo and the delay (eighth DAW test, item 98; named Effects by the
+// ninth, items 110 to 112)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -7,13 +7,13 @@
 // Echo, in every mode: the notes of the focused track's sound played again (ymengine::TrackEcho, in the
 // non-automatable state; each setting is one undo step of the track): On / Off, Division (the time between two
 // repeats, a division of the tempo) and To (the track that plays them: the same one or another), Repeats (1 to 8)
-// and Drop (steps of the 4-bit volume lost at each repeat). Off, only "Echo" and its button show, like the LFO (D-298).
-// A Sync Buzzer in the 3-channel modes has none (D-316): its level is the hardware envelope that the channels share,
+// and Drop (steps of the 4-bit volume lost at each repeat). Off, only "Echo" and its button show, like the LFO.
+// A Sync Buzzer in the 3-channel modes has none: its level is the hardware envelope that the channels share,
 // which a repeat would restart at full level; the Echo is greyed out there and the engine plays no repeat.
 // Delay, in 16 channels only: the audio that each track sends to it (Send row of the Mixer) comes back as echoes,
 // from host parameters: On / Off and Ping-pong, Sync (a division of the tempo) or Time in ms, Feedback, Hi cut and
 // Level. In the 3-channel modes, its On / Off is greyed out and nothing else of it shows; Off, only On / Off shows
-// (Ping-pong hidden too, ninth DAW test, item 114, D-315).
+// (Ping-pong hidden too, ninth DAW test, item 114).
 // Below a rule, as wide as the window, like the LFO in the Modulation window.
 #pragma once
 #include <functional>
@@ -65,7 +65,7 @@ private:
     void wire();
     void layout();
     bool studio() const noexcept;  // 16 channels: the delay applies
-    bool buzzer3() const noexcept;  // Sync Buzzer in 3 channels: no echo (D-316)
+    bool buzzer3() const noexcept;  // Sync Buzzer in 3 channels: no echo
     const ymengine::TrackEcho& echo() const noexcept;
     // Changes the focused track's echo in the state, one undo step of the track.
     void editEcho(const std::function<void(ymengine::TrackEcho&)>& fn);

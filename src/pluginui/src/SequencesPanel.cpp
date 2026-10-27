@@ -48,7 +48,7 @@ constexpr std::array<const char*, 3> kTargets = {"Sq", "Tm", "Bz"};
 constexpr std::array<const char*, 3> kTargetNames = {"the square (tone period)",
                                                      "the timer (SID, Sync Buzzer) and the DMA sample",
                                                      "the envelope period (buzzer)"};
-// A DMA track plays its sample (D-463): the Sq and Bz columns move nothing on it.
+// A DMA track plays its sample: the Sq and Bz columns move nothing on it.
 constexpr std::array<const char*, 3> kDmaTargetOff = {"A DMA track has no square: the Tm column moves its sample", "",
                                                       "A DMA track has no envelope: the Tm column moves its sample"};
 constexpr std::array<const char*, 3> kSourceNames = {"Table pitch (ARP, PER, FIX)", "Slides", "Vibrato"};
@@ -124,7 +124,7 @@ void SeqRowsGrid::paint(gemui::Painter& p) {
     for (int k = 0; k < kRowCount; ++k) {
         const Row row = Row(k);
         const int top = r.y + rowTop(row);
-        const bool off = !st_.off[size_t(k)].empty();  // greyed row (D-463): label and cells faded
+        const bool off = !st_.off[size_t(k)].empty();  // greyed row: label and cells faded
         const double tw = Font::width(kRowNames[size_t(k)], 9, 0, Face::kSmall);
         const Color ink = shadeOf(off)(colors::kBlack);
         p.textAt(kRowNames[size_t(k)], r.x + kLabelW - 2 - tw, baselineIn(top, 9, 9), 9, ink, 0, Face::kSmall);
@@ -211,7 +211,7 @@ void SeqRowsGrid::mouseDown(const gemui::MouseEvent& e) {
     if (!cellAt(e.pos, &row, &c)) return;
     if (row == Row::Out || !st_.off[size_t(row)].empty()) return;
     if (e.button == gemui::MouseButton::Right) {
-        // PER and NP: a slider (D-272); the other rows return to 0, the sound of the note.
+        // PER and NP: a slider; the other rows return to 0, the sound of the note.
         if (row == Row::Period || row == Row::Noise) {
             if (onSliderMenu) onSliderMenu(row, c, cellRect(row, c));
         } else if (onSet) {
@@ -271,7 +271,7 @@ bool SeqRowsGrid::mouseWheel(const gemui::WheelEvent& e) {
     Row row{};
     int c = 0;
     if (!cellAt(e.pos, &row, &c) || e.dy == 0 || row == Row::Fix || row == Row::Out) return false;
-    if (!st_.off[size_t(row)].empty()) return true;  // greyed row (D-463): the notch is taken, nothing changes
+    if (!st_.off[size_t(row)].empty()) return true;  // greyed row: the notch is taken, nothing changes
     const int dir = e.dy < 0 ? 1 : -1;
     const int stepBy = row == Row::Period && e.mods.shift ? 10 : 1;
     const int v = std::clamp(value(st_.rows, row, c) + dir * stepBy, minValue(row), maxValue(row));
@@ -311,7 +311,7 @@ std::string SeqRowsGrid::tipAt(gemui::Point p) const {
     case Row::Out: {
         // YM-Tracker preview: period, nearest note and deviation in cents, frequency. The frequency is clock / 16 /
         // period (the inverse of ymengine::tonePeriodFor), the note 69 + 12 × log2(f / A4) (A4 = MIDI 69 at the Tuning
-        // A4, 440 Hz by default, D-429).
+        // A4, 440 Hz by default).
         const ymseq::NoteNames names = st_.latin ? ymseq::NoteNames::Latin : ymseq::NoteNames::English;
         const int tp = std::max<int>(1, st_.periods[size_t(c)]);
         const double hz = st_.clockHz / 16 / tp;
@@ -361,9 +361,9 @@ void SequencesPanel::build() {
     vibCyc_.setTip("Oscillations over the table length");
     vibRamp_.setTip("Steps for the vibrato to reach its full depth");
     vibWrite_.setTip("Write the vibrato table into the PER row, over the table length");
-    // Typed values (sixth DAW test, item 77, D-275); the fixed note by its name.
+    // Typed values (sixth DAW test, item 77); the fixed note by its name.
     for (gemui::ValueField* f : {&fixv_, &detv_, &anav_, &minv_, &maxv_, &cycv_, &rampv_}) f->setPx(14);
-    for (gemui::ValueField* f : {&detv_, &anav_}) f->setUnit("c");  // out of the reverse video (D-464)
+    for (gemui::ValueField* f : {&detv_, &anav_}) f->setUnit("c");  // out of the reverse video
     fixv_.setWholeText(true);
     fixv_.setTip("Click to type a note (C#4, Sol3) or a MIDI note number");
 }
@@ -400,8 +400,8 @@ void SequencesPanel::wire() {
     };
     grid_.onMenu = [this](Row row, int step, const Rect& cell) { cellMenu(row, step, cell); };
     grid_.onSliderMenu = [this](Row row, int step, const Rect& cell) {
-        // PER and NP like VOL in the table (D-272): the value applies live (the undo step was taken on press); a right
-        // click on the slider gives 0 back, the sound of the note (D-273).
+        // PER and NP like VOL in the table: the value applies live (the undo step was taken on press); a right
+        // click on the slider gives 0 back, the sound of the note.
         gemui::Desktop& d = m_.desktop();
         d.closePopups();
         SliderPopupSpec spec;
@@ -551,7 +551,7 @@ void SequencesPanel::refresh() {
                                                                   &vibCyc_, &vibRamp_, &vibWrite_})
         w->setEnabled(!dr);
     for (gemui::ValueField* f : {&fixv_, &detv_, &anav_, &minv_, &maxv_, &cycv_, &rampv_}) f->setEditable(!dr);
-    // A DMA track plays its sample (Indus, 26/10/2026, D-463): the table pitch, PER, FIX, the slides and the vibrato
+    // A DMA track plays its sample (Indus, 26/10/2026): the table pitch, PER, FIX, the slides and the vibrato
     // move it through the timer column, VOL its level; the noise, the mixer, the generator, the square, the envelope
     // and the hard sync are greyed, their tooltips saying why.
     const bool dm = dma();

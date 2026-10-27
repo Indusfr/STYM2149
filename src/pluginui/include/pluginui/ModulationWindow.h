@@ -6,14 +6,14 @@
 // step), Clear, and the #orngrid grid: pitch in semitones (+12 to -12), NSE row (noise on the step) and VOL row
 // (4-bit level), to draw with the mouse or the keyboard. Positions and sizes: the prototype's CSS boxes at 100 %
 // (window at 140, 140, as wide as its content). Between the pitch and NSE, the sequence rows (sixth DAW test, item
-// 72, D-270), their notes with those of the table above it (item 73, D-271).
+// 72), their notes with those of the table above it (item 73).
 //
 // The table lives in the non-automatable state (ornament* fields of ymengine::TrackPatch). Each setting is one undo
 // step of the track (pushCur of the prototype); a mouse stroke makes only one.
 //
 // The sequences (PER, NP, MIX, GEN, FIX and OUT rows inside the table, pitch settings and vibrato table below it:
-// SequencesPanel), formerly a window of their own (fifth DAW test, D-240). Clear empties the sequence rows too.
-// Below them, the LFO of the track (sixth DAW test, item 59, D-257: LfoPanel).
+// SequencesPanel), formerly a window of their own (fifth DAW test). Clear empties the sequence rows too.
+// Below them, the LFO of the track (sixth DAW test, item 59, LfoPanel).
 #pragma once
 #include <array>
 #include <functional>
@@ -33,7 +33,7 @@ class MainWindow;
 
 // #orngrid: 20 px label column and 64 columns of 10 px, spaced by 1 px. Rows: 25 of pitch (9 px, +12 at the top),
 // 3 px black separator (2 px margins), the place of the sequence rows (SeqRowsGrid, a widget of its own laid over
-// this one: D-270), a second separator, NSE (11 px), VOL (34 px), spaced by 1 px.
+// this one), a second separator, NSE (11 px), VOL (34 px), spaced by 1 px.
 // Cell (.oc): 1 px #999 border, white, #DDD on row 0, black on the value; keyboard cursor: 4 px green frame inside
 // the border; beyond the length (.dead): the whole cell at 30 % over the white background.
 // VOL: black bar rising from the bottom (level / 15 of the height), 8 px digit at the top, or in white at the bottom
@@ -58,7 +58,7 @@ public:
         std::array<uint8_t, kSteps> volume{};  // 0 to 15
         int length = 8;                        // steps played; the others are drawn faded
         int curStep = 0, curRow = kSpan;  // keyboard cursor (row 0 at the top = +12)
-        // Why the NSE row moves nothing on this track (a DMA track, D-463), empty when it applies: the row is drawn
+        // Why the NSE row moves nothing on this track (a DMA track), empty when it applies: the row is drawn
         // faded, takes no click, and its tooltip gives the reason.
         std::string noiseOff;
         bool operator==(const State&) const = default;
@@ -132,7 +132,7 @@ private:
     void wire();
     void layout();
     bool drum() const noexcept;
-    bool dma() const noexcept;   // a DMA track: what moves no sample is greyed (Indus, 26/10/2026, D-463)
+    bool dma() const noexcept;   // a DMA track: what moves no sample is greyed (Indus, 26/10/2026)
     bool live() const noexcept;  // On state shown (Off on a percussion track)
     const ymengine::TrackPatch& patch() const noexcept;
     // Changes the focused track's table in the state, one undo step of the track.
@@ -146,7 +146,7 @@ private:
     gemui::Slider len_;
     gemui::ValueField lenv_;
     gemui::Button loop_{"Loop"}, rate_{"1/frame"}, clear_{"Clear"};
-    // Notes of the table and of the sequence rows (D-271).
+    // Notes of the table and of the sequence rows.
     gemui::Label hint_{
         "Per-VBL-frame tables (the tracker \"ornament\"): pitch in semitones, NSE row toggles noise, VOL row sets "
         "level. Click / drag to draw.",

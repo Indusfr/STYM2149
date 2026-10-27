@@ -1,8 +1,8 @@
-// STYM2149 — Effects window (eighth DAW test, item 98, D-299; renamed by the ninth, items 110 to 112, D-311 to
-// D-313): Edit > Effects, ^F or the Effects button; the echo of the focused track's sound in every mode (On / Off,
-// Division, To, Repeats, Drop, one undo step each, in the state), greyed out for a Sync Buzzer in 3 channels (D-316);
+// STYM2149 — Effects window (eighth DAW test, item 98; renamed by the ninth, items 110 to 112):
+// Edit > Effects, ^F or the Effects button; the echo of the focused track's sound in every mode (On / Off,
+// Division, To, Repeats, Drop, one undo step each, in the state), greyed out for a Sync Buzzer in 3 channels;
 // the delay of the 16 channels from host parameters (On / Off, Ping-pong, Sync and Division or Time, Feedback, Hi cut,
-// Level), greyed out in the 3-channel modes, Ping-pong hidden while it is off (D-315).
+// Level), greyed out in the 3-channel modes, Ping-pong hidden while it is off.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -79,7 +79,7 @@ TEST_CASE("Effects: opened by Edit > Effects between Modulation and Patches; Ech
         INFO(id);
         CHECK(w.rectOf(id));
     }
-    CHECK_FALSE(w.rectOf("delayPing"));  // the delay off (D-315)
+    CHECK_FALSE(w.rectOf("delayPing"));  // the delay off
     for (const char* id : echoIds) {
         INFO(id);
         CHECK_FALSE(w.rectOf(id));
@@ -122,7 +122,7 @@ TEST_CASE("Effects: opened by Edit > Effects between Modulation and Patches; Ech
     CHECK(w.rectOf("echoWin")->bottom() == off.bottom());
 }
 
-TEST_CASE("Echo: Division and To menus, Repeats and Drop dragged and typed, in the state (D-299)", "[ui][echo]") {
+TEST_CASE("Echo: Division and To menus, Repeats and Drop dragged and typed, in the state", "[ui][echo]") {
     UiHost h;
     h.state.tracks[0].patch.echo.on = true;
     MainWindow w(h);
@@ -174,7 +174,7 @@ TEST_CASE("Echo: Division and To menus, Repeats and Drop dragged and typed, in t
     CHECK(echo(h, 1).repeats == 3);
 }
 
-TEST_CASE("Echo: in 3 channels too, To lists its tracks; a percussion track has its echo (D-299)",
+TEST_CASE("Echo: in 3 channels too, To lists its tracks; a percussion track has its echo",
           "[ui][echo][3ch]") {
     UiHost h;
     h.p(Global::VoiceMode) = 1;
@@ -194,7 +194,7 @@ TEST_CASE("Echo: in 3 channels too, To lists its tracks; a percussion track has 
     CHECK(echo(h).drop == 7);
 }
 
-TEST_CASE("Delay: 16 channels, host parameters; Sync and Division, or Time in ms (D-299)", "[ui][echo][delay]") {
+TEST_CASE("Delay: 16 channels, host parameters; Sync and Division, or Time in ms", "[ui][echo][delay]") {
     CHECK(EchoWindow::timeOfPosition(0) == int(ymengine::kDelayMinMs));
     CHECK(EchoWindow::timeOfPosition(EchoWindow::kLogPositions) == int(ymengine::kDelayMaxMs));
     CHECK(EchoWindow::cutOfPosition(0) == int(ymengine::kDelayHiCutMin));
@@ -256,7 +256,7 @@ TEST_CASE("Delay: 16 channels, host parameters; Sync and Division, or Time in ms
     click(w, "delayPing");
     CHECK(h.p(Global::DelayPingPong) == 1.0f);
 
-    // Off: its On / Off only, Ping-pong hidden too (D-315), the window as wide.
+    // Off: its On / Off only, Ping-pong hidden too, the window as wide.
     const int wide = w.rectOf("echoWin")->w;
     click(w, "delayOn");
     CHECK(h.p(Global::DelayOn) == 0.0f);
@@ -266,7 +266,7 @@ TEST_CASE("Delay: 16 channels, host parameters; Sync and Division, or Time in ms
     CHECK(w.rectOf("echoWin")->w == wide);
 }
 
-TEST_CASE("Delay: greyed out in the 3-channel modes, nothing else of it shows (D-299)", "[ui][echo][delay][3ch]") {
+TEST_CASE("Delay: greyed out in the 3-channel modes, nothing else of it shows", "[ui][echo][delay][3ch]") {
     for (float mode : {1.0f, 2.0f}) {
         INFO(mode);
         UiHost h;
@@ -277,7 +277,7 @@ TEST_CASE("Delay: greyed out in the 3-channel modes, nothing else of it shows (D
         const gemui::Button* on = w.echoWindow().button("delayOn");
         CHECK_FALSE(on->enabled());
         CHECK(on->tip() == "Delay: 16 ch only. In 3 ch, the Echo repeats the notes on the chip");
-        CHECK_FALSE(w.rectOf("delayPing"));  // hidden (D-315)
+        CHECK_FALSE(w.rectOf("delayPing"));  // hidden
         CHECK_FALSE(w.rectOf("delaySync"));
         CHECK_FALSE(w.rectOf("delayFb"));
         // Back to 16 channels: its settings.

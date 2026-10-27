@@ -83,7 +83,7 @@ Instrument instrumentFromEntry(const PatchEntry& e) {
     const PatchChange c = patchChange(e, kFresh, 0);
     ParamValues v = defaultValues();  // 16 channels: the generator stays the entry's
     for (const auto& [i, x] : c.params) v[size_t(i)] = x;
-    v[size_t(paramIndex(Global::Computer))] = 1;  // STE machine: the DMA type stays too (D-153)
+    v[size_t(paramIndex(Global::Computer))] = 1;  // STE machine: the DMA type stays too
     const ymengine::TrackParams t = toTrack(v, 0, c.track);
     Instrument ins;
     ins.used = true;

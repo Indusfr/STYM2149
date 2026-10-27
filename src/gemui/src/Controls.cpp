@@ -23,8 +23,8 @@ constexpr int kGlyphFull = 101;  // E007: full-screen box
 bool isDigit(char32_t c) noexcept { return c >= '0' && c <= '9'; }
 
 // A glyph of the 8×8 font at twice its size, each pixel a 2×2 square, its ink centred in a: the close and
-// full-screen boxes of a title bar, twice as big (Indus, 24/10/2026 20:40, D-418) and square like those of the ST's
-// desktop in low resolution, where the AES draws them from the 8×8 font (25/10/2026 16:28, D-424); the 8×16 glyphs
+// full-screen boxes of a title bar, twice as big (Indus, 24/10/2026 20:40) and square like those of the ST's
+// desktop in low resolution, where the AES draws them from the 8×8 font (25/10/2026 16:28); the 8×16 glyphs
 // are 7 × 11.
 void doubledGlyph(Painter& p, int index, const Rect& a, Color c) {
     const Font::Raster g = Font::raster(8, index, 0, Face::kSystem);
@@ -477,7 +477,7 @@ void Slider::setFromPos(int pos) {
 void Slider::arrowStep() {
     // Only while the pointer stays on the pressed arrow, as the scroll bars' buttons.
     if (arrowDir_ == 0 || !arrowRect(arrowDir_ > 0).contains(pointer_)) return;
-    // The slider's step, or a hundredth of its range when it has none (D-297).
+    // The slider's step, or a hundredth of its range when it has none.
     const double step = step_ > 0 ? step_ : (max_ - min_) / 100;
     const double v = clampStep(value_ + arrowDir_ * step);
     if (v == value_) return;
@@ -704,7 +704,7 @@ std::string ValueField::maskRead() const {
 
 // Masked input, as the prototype's maskEdit places it: with a point, at the point while the integer part is typed,
 // then after the last decimal; without a point, at the n-th free position for n digits typed; after the mask's last
-// digit position once that part is full (before a unit that follows it, " Hz", D-434).
+// digit position once that part is full (before a unit that follows it, " Hz").
 int ValueField::caretChar() const {
     if (mask_.empty()) return Font::length(free_);
     std::vector<int> left, right;
@@ -814,7 +814,7 @@ void ValueField::paint(Painter& p) {
     const double tw = Font::width(text_, px_, 0, face_);
     const double x = centered_ ? b.x + (b.w - tw) / 2 : b.x + b.w - tw;
     // The unit that a mask puts after its last digit (" Hz"), or the one set without a mask, is not typed: the pointer
-    // leaves it in normal video (Indus, 26/10/2026 03:51 and 15:25, D-438, D-451).
+    // leaves it in normal video (Indus, 26/10/2026 03:51 and 15:25).
     const size_t last = mask_.find_last_of('9');
     std::string unit = last != std::string::npos ? mask_.substr(last + 1) : mask_.empty() ? unit_ : std::string();
     if (unit.size() > text_.size() || text_.compare(text_.size() - unit.size(), unit.size(), unit) != 0) unit.clear();
@@ -969,7 +969,7 @@ void GroupBox::paint(Painter& p) {
     const double x = box().x + inset_ + 6;  // the legend's 6 px left padding
     const int baseline = snap(box().y + Font::ascent(16));
     p.textAt(text, x, baseline, 16, colors::kBlack, 1);
-    // Note of the legend ("(per channel)"): 6×6 font, the 8×8 would bite into the rule (D-071).
+    // Note of the legend ("(per channel)"): 6×6 font, the 8×8 would bite into the rule.
     if (!hint_.empty()) p.textAt(hint_, x + Font::width(text, 16, 1), baseline, 12, colors::kHint, 1, Face::kSmall);
 }
 
@@ -1012,7 +1012,7 @@ void TitleBar::paint(Painter& p) {
     p.fill({r.x, r.y, r.w, kBox}, colors::kWhite);
     p.fill({r.x, r.y + kBox, r.w, 2}, colors::kBlack);
     const Rect c = closeRect(), f = fullRect();
-    // Each box: a 2 px rule on its inner side; the 8×8 glyph at twice its size (D-418, D-424), 16 × 14 px, centred in
+    // Each box: a 2 px rule on its inner side; the 8×8 glyph at twice its size, 16 × 14 px, centred in
     // the 22 px left beside it.
     if (close_) {
         p.fill({c.right() - 2, c.y, 2, kBox}, colors::kBlack);
@@ -1077,7 +1077,7 @@ FloatWindow::FloatWindow() {
     bar_.onClose = [this] { requestClose(); };
     bar_.onGrab = [this](Point p) { grab_ = {p.x - bounds().x, p.y - bounds().y}; };
     // The window follows the pointer at the offset where its bar was grabbed, its left edge never negative and its
-    // top never above the work area (mkWinDrag, D-302), its right and bottom edges never past the desktop's (D-460).
+    // top never above the work area (mkWinDrag), its right and bottom edges never past the desktop's.
     bar_.onDrag = [this](Point p) {
         const Point at = onDesktop(p.x - grab_.x, p.y - grab_.y);
         moveBy(at.x - bounds().x, at.y - bounds().y);
@@ -1101,7 +1101,7 @@ void FloatWindow::place(const Box& b) {
     setBox(b);
     const Rect r = bounds();
     bar_.setBounds({r.x + kInset, r.y + kInset, r.w - 2 * kInset, TitleBar::kHeight});
-    keepOnDesktop();  // grown near the right or bottom edge: moved back inside (D-460)
+    keepOnDesktop();  // grown near the right or bottom edge: moved back inside
 }
 
 void FloatWindow::open() {
@@ -1158,7 +1158,7 @@ void DeskIcon::paint(Painter& p) {
     const int px = b.x + (kW - kPicture) / 2;
     if (mask_) p.bitmap(*mask_, px, b.y, colors::kWhite);
     if (data_) p.bitmap(*data_, px, b.y, colors::kBlack);
-    if (letter_) {  // the top of the 6×6 cell at letterAt_ (D-419)
+    if (letter_) {  // the top of the 6×6 cell at letterAt_
         const int g = Font::glyph(char32_t(uint8_t(letter_)));
         const int top = Font::raster(8, g, 0, Face::kSmall).top;
         p.glyph(g, px + letterAt_.x, b.y + letterAt_.y - top, 8, colors::kBlack, 0, Face::kSmall);

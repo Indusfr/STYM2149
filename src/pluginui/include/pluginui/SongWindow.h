@@ -114,7 +114,7 @@ private:
     void clickChip(int i, bool shift);
     void chipMenu(int i);
     void tempoPrompt(const ymseq::SongSel& s);
-    // Extended Song (D-158): special entry after block i, length of Rest and Note-off, entries of a jump.
+    // Extended Song: special entry after block i, length of Rest and Note-off, entries of a jump.
     void insertSpecial(int i, const ymseq::SongEntry& e);
     void lengthPrompt(const ymseq::SongSel& s);
     void loopPrompt(const ymseq::SongSel& s);

@@ -4,8 +4,8 @@
 //
 // Timer effects (SID, Sync Buzzer, Digidrum) are register writes made by an MFP interrupt routine. The "exact"
 // model dates each interrupt to the MFP cycle, then converts it to a cycle of the YM master clock: the write
-// lands on the intended internal step, not on the host sample (AtariAudio rounds to the host sample,
-// docs/m0/AUDIT_DSP.md). MfpTimerAtariAudio reproduces AtariAudio 1.26 (Mk68901.cpp, © 2026 Arnaud Carré, MIT
+// lands on the intended internal step, not on the host sample (AtariAudio rounds to the host sample).
+// MfpTimerAtariAudio reproduces AtariAudio 1.26 (Mk68901.cpp, © 2026 Arnaud Carré, MIT
 // licence) for the oracle comparisons.
 #pragma once
 #include <cstdint>

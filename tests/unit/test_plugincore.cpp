@@ -1,4 +1,4 @@
-// STYM2149 — plugin core without JUCE (M3): parameter table, conversion to the engine settings, state format, MIDI
+// STYM2149 — plugin core without JUCE: parameter table, conversion to the engine settings, state format, MIDI
 // routing and controllers of the prototype, transitions (voice mode, new preparation of the engine).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -72,13 +72,13 @@ PluginState referenceState() {
     return s;
 }
 
-// Reference state of the file tests/data/state_v1_m5.bin: the M3 one, plus the parameters and the sequencer of M5.
+// Reference state of the file tests/data/state_v1_m5.bin: the first one, plus the parameters and the sequencer.
 PluginState referenceStateM5() {
     PluginState s = referenceState();
     s.values[size_t(idx("freeTempo"))] = 133.5f;
     s.values[size_t(idx("swing"))] = 62;
     s.values[size_t(idx("t02_gate"))] = 30;
-    s.values[size_t(idx("gate"))] = 70;  // global gate (D-134)
+    s.values[size_t(idx("gate"))] = 70;  // global gate
     s.values[size_t(idx("gateAll"))] = 1;
     auto& g = s.extras.global;
     g.seqClock = ymengine::SeqClock::Host;
@@ -194,9 +194,9 @@ std::vector<uint8_t> parm(const std::vector<std::pair<std::string, float>>& entr
     return b;
 }
 
-// M5 file as it is rewritten now: PARM chunk completed with the Computer parameter (ST or STE machine, D-153), the
-// frequency of the Custom clock (D-237), Arp Sync (D-256), the Master of the stereo outputs (D-284), the delay
-// (D-299), the Tuning A4 (D-429) and the MIDI expression (D-432), at their defaults, inserted after "gateAll" (index
+// state_v1_m5.bin as it is rewritten now: PARM chunk completed with the Computer parameter (ST or STE machine), the
+// frequency of the Custom clock, Arp Sync, the Master of the stereo outputs, the delay,
+// the Tuning A4 and the MIDI expression, at their defaults, inserted after "gateAll" (index
 // order), parameter count and chunk length updated.
 std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
     auto get32 = [&](size_t i) {
@@ -223,8 +223,8 @@ std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
     f.insert(f.begin() + std::ptrdiff_t(after), add.begin(), add.end());
     set32(at + 4, get32(at + 4) + uint32_t(add.size()));
     set32(at + 8, get32(at + 8) + uint32_t(added.size()));
-    // Sixth DAW test (D-254): Vibrato On of each track, after its Gate; then its Send (D-299) and the right side of a
-    // stereo DMA sample (D-459).
+    // Sixth DAW test: Vibrato On of each track, after its Gate; then its Send and the right side of a
+    // stereo DMA sample.
     for (int t = 1; t <= kTracks; ++t) {
         const std::string id = std::string(t < 10 ? "t0" : "t") + std::to_string(t) + "_gate";
         std::vector<uint8_t> key = {uint8_t(id.size()), 0};
@@ -241,7 +241,7 @@ std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
         set32(at + 4, get32(at + 4) + uint32_t(on.size()));
         set32(at + 8, get32(at + 8) + uint32_t(fields.size()));
     }
-    // Seventh DAW test (D-288): the level of the metronome (100 %) at the end of the SEQS chunk.
+    // Seventh DAW test: the level of the metronome (100 %) at the end of the SEQS chunk.
     const std::string seqs = "SEQS";
     const auto sq = std::search(f.begin(), f.end(), seqs.begin(), seqs.end());
     REQUIRE(sq != f.end());
@@ -296,10 +296,10 @@ TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
         CHECK(s.def >= s.min);
         CHECK(s.def <= s.max);
         CHECK(clampToSpec(s, s.def) == s.def);
-        // Version of appearance: 2 for the sequencer parameters (M5), 3 for the ST or STE machine (M6, D-153), 4 for
-        // the frequency of the Custom clock (D-237), the Vibrato On of the tracks (D-254) and Arp Sync (D-256), 5 for
-        // the Master of the stereo outputs (D-284), 6 for the delay and the Send of the tracks (D-299), 7 for the
-        // Tuning A4 (D-429), 8 for the MIDI expression (D-432), 9 for the right side of a stereo DMA sample (D-459).
+        // Version of appearance: 2 for the sequencer parameters, 3 for the ST or STE machine, 4 for
+        // the frequency of the Custom clock, the Vibrato On of the tracks and Arp Sync, 5 for
+        // the Master of the stereo outputs, 6 for the delay and the Send of the tracks, 7 for the
+        // Tuning A4, 8 for the MIDI expression, 9 for the right side of a stereo DMA sample.
         const bool delay = s.id.starts_with("delay") || s.id.ends_with("_send");
         const bool master = s.id == "master2" || s.id == "masterPan" || s.id == "masterLink";
         const bool m5 = s.id == "freeTempo" || s.id == "swing" || s.id == "gate" || s.id == "gateAll" ||
@@ -333,7 +333,7 @@ TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
     CHECK(v[size_t(idx("swing"))] == 50.0f);
     CHECK(v[size_t(idx("t09_gate"))] == 50.0f);
     CHECK(specs[size_t(idx("t09_gate"))].group == "Track 9");
-    // Global gate (D-134), under the id reserved in M3: 50 %, off.
+    // Global gate, under its reserved id: 50 %, off.
     CHECK(v[size_t(idx("gate"))] == 50.0f);
     CHECK(v[size_t(idx("gateAll"))] == 0.0f);
     CHECK(specs[size_t(idx("gate"))].group == "Global");
@@ -403,7 +403,7 @@ TEST_CASE("Mapping: parameter defaults = defaults of the engine and of the proto
     CHECK(toTrack(v, 3, base).seq.gate == base.seq.gate);
 }
 
-TEST_CASE("Mapping: the right side of a stereo DMA sample, a setting of the Mixer (Indus, 26/10/2026, D-459)",
+TEST_CASE("Mapping: the right side of a stereo DMA sample, a setting of the Mixer (Indus, 26/10/2026)",
           "[plugin]") {
     ParamValues v = defaultValues();
     v[size_t(paramIndex(2, Track::Level))] = 80;
@@ -430,7 +430,7 @@ TEST_CASE("Mapping: the right side of a stereo DMA sample, a setting of the Mixe
     CHECK(inPatch(Track::Level));
 }
 
-TEST_CASE("Mapping: global gate takes priority when Gate All is on (D-134)", "[plugin][seq]") {
+TEST_CASE("Mapping: global gate takes priority when Gate All is on", "[plugin][seq]") {
     ParamValues v = defaultValues();
     v[size_t(idx("t03_gate"))] = 20;
     v[size_t(idx("t16_gate"))] = 95;
@@ -453,13 +453,13 @@ TEST_CASE("Mapping: global gate takes priority when Gate All is on (D-134)", "[p
     CHECK(toTrack(v, 2, base).seq.gate == 0.2);
 }
 
-TEST_CASE("Mapping: Clock selector, clock of the arpeggio and of the sequencer (D-188)", "[plugin][seq]") {
+TEST_CASE("Mapping: Clock selector, clock of the arpeggio and of the sequencer", "[plugin][seq]") {
     using ymengine::SeqClock;
     const ParamSpec& spec = paramSpecs()[size_t(idx("arpClock"))];
     CHECK(spec.name == "Clock");  // id unchanged: projects and automations kept
     ParamValues v = defaultValues();
     ymengine::GlobalParams base;
-    // Internal: the state's clock stays (Host sync in a host, Free run in Standalone, D-110).
+    // Internal: the state's clock stays (Host sync in a host, Free run in Standalone).
     for (const SeqClock c : {SeqClock::Host, SeqClock::Internal, SeqClock::Midi}) {
         base.seqClock = c;
         CHECK(seqClockOf(v, c) == c);
@@ -474,7 +474,7 @@ TEST_CASE("Mapping: Clock selector, clock of the arpeggio and of the sequencer (
         CHECK(toGlobal(v, base).seqClock == SeqClock::Midi);
         CHECK(toGlobal(v, base).arpClock == ymengine::ArpClock::MidiClock);
     }
-    // Arp Sync (D-256): the tempo with the internal clock; MIDI ext keeps the MIDI clock.
+    // Arp Sync: the tempo with the internal clock; MIDI ext keeps the MIDI clock.
     v[size_t(idx("arpSync"))] = 1;
     CHECK(toGlobal(v, base).arpClock == ymengine::ArpClock::MidiClock);
     v[size_t(idx("arpClock"))] = 0;
@@ -508,7 +508,7 @@ TEST_CASE("Mapping: roles imposed in 3 channels (fxAllowed), setting kept", "[pl
     CHECK(v[size_t(idx("t01_generator"))] == 2.0f);              // the parameter keeps the user's choice
 }
 
-TEST_CASE("Mapping: STE machine, DMA tracks and DMA type (D-153)", "[plugin]") {
+TEST_CASE("Mapping: STE machine, DMA tracks and DMA type", "[plugin]") {
     using ymengine::Generator;
     using ymengine::VoiceMode;
     ParamValues v = defaultValues();
@@ -590,7 +590,7 @@ TEST_CASE("Mapping: engine configuration, sinc fallback beyond clk/8", "[plugin]
     CHECK(configKey(v).clock == 3);
 }
 
-TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other modes (D-237)", "[plugin]") {
+TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other modes", "[plugin]") {
     ParamValues v = defaultValues();
     const ParamSpec& s = paramSpecs()[size_t(idx("chipClockHz"))];
     CHECK(paramSpecs()[size_t(idx("chipClock"))].choices[0] == "Custom");
@@ -616,7 +616,7 @@ TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other mod
     v[size_t(idx("voiceMode"))] = 0;
     v[size_t(idx("chipClockHz"))] = 50;  // value outside the range read from a state: clamped
     CHECK(configKey(v).hz == 100000);
-    // Above clk/8 (12.5 kHz at 100 kHz): sinc (D-058).
+    // Above clk/8 (12.5 kHz at 100 kHz): sinc.
     v[size_t(idx("resampling"))] = 1;
     CHECK(engineConfig(configKey(v), v, 48000, 0).render.mode == ymcore::OutputMode::Raw);
     // Another clock: the frequency of the Custom clock is not part of the key (no new engine when it changes).
@@ -625,7 +625,7 @@ TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other mod
     CHECK(chipClock(v).hz() == 8021247.0 / 4.0);
 }
 
-TEST_CASE("Mapping: Tuning A4, 350 to 480 Hz, 440 by default (D-429, D-434)", "[plugin]") {
+TEST_CASE("Mapping: Tuning A4, 350 to 480 Hz, 440 by default", "[plugin]") {
     ParamValues v = defaultValues();
     const ParamSpec& s = paramSpecs()[size_t(idx("a4Hz"))];
     CHECK(s.min == 350.0f);
@@ -638,16 +638,16 @@ TEST_CASE("Mapping: Tuning A4, 350 to 480 Hz, 440 by default (D-429, D-434)", "[
     CHECK(toGlobal(v, {}).a4Hz == 432.0);
     // Hundredths of a hertz; a value outside the range read from a state is clamped.
     CHECK(clampToSpec(s, 442.123f) == 442.12f);
-    CHECK(clampToSpec(s, 392.0f) == 392.0f);  // below 400 Hz (D-434)
+    CHECK(clampToSpec(s, 392.0f) == 392.0f);  // below 400 Hz
     CHECK(clampToSpec(s, 300.0f) == 350.0f);
     CHECK(clampToSpec(s, 1000.0f) == 480.0f);
 }
 
-TEST_CASE("Mapping: targets of the MIDI expression and their depths (D-432)", "[plugin]") {
+TEST_CASE("Mapping: targets of the MIDI expression and their depths", "[plugin]") {
     ParamValues v = defaultValues();
     for (const char* id : {"bendTarget", "wheelTarget", "aftertouch", "mpe", "mpeBendRange", "mpeSlide"}) {
         INFO(id);
-        CHECK_FALSE(paramSpecs()[size_t(idx(id))].automatable);  // MIDI settings (D-057)
+        CHECK_FALSE(paramSpecs()[size_t(idx(id))].automatable);  // MIDI settings
     }
     ymengine::GlobalParams g = toGlobal(v, {});
     CHECK(g.bendTarget == ymengine::BendTarget::Pitch);
@@ -683,8 +683,8 @@ TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     CHECK(back.state.values == ref.values);
     CHECK(sameExtras(back.state.extras, ref.extras));
 
-    // M3 file: reads back identically (M5 parameters and chunks missing: defaults). It is no longer rewritten byte
-    // for byte: the M5 state has five more parameters and three more chunks (D-065: new chunks in v1).
+    // state_v1.bin: reads back identically (later parameters and chunks missing: defaults). It is no longer rewritten byte
+    // for byte: state_v1_m5.bin has five more parameters and three more chunks (new chunks in v1).
     const std::vector<uint8_t> golden = readFile(std::string(STYM_TEST_DATA) + "/state_v1.bin");
     REQUIRE(!golden.empty());
     const DecodeResult g = decodeState(golden);
@@ -694,7 +694,7 @@ TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     CHECK(sameExtras(g.state.extras, ref.extras));
     CHECK(sameSequencer(g.state.extras, NonParamState{}));
 
-    // Frozen v1 format of M5: the reference file reads back identically and is rewritten byte for byte.
+    // Frozen v1 format of state_v1_m5.bin: the reference file reads back identically and is rewritten byte for byte.
     const PluginState m5 = referenceStateM5();
     if (const char* out = std::getenv("STYM_STATE_GOLDEN_OUT")) {  // deliberate regeneration of the file
         const auto bytes5 = encodeState(m5);
@@ -709,13 +709,13 @@ TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     CHECK(g5.state.values == m5.values);
     CHECK(sameExtras(g5.state.extras, m5.extras));
     CHECK(sameSequencer(g5.state.extras, m5.extras));
-    // M6 (D-153) and the fourth DAW test (D-237): two more parameters (Computer, Custom clock), written at their
-    // defaults just after "gateAll"; the sixth (D-254): Vibrato On after the Gate of each track; the rest of the file
+    // Then two more parameters (Computer, Custom clock), written at their
+    // defaults just after "gateAll"; the sixth: Vibrato On after the Gate of each track; the rest of the file
     // is rewritten byte for byte.
     CHECK(encodeState(g5.state) == withNewParams(golden5));
 }
 
-TEST_CASE("State: level of the metronome kept (D-288)", "[plugin][state][metronome]") {
+TEST_CASE("State: level of the metronome kept", "[plugin][state][metronome]") {
     PluginState s = referenceStateM5();
     for (const uint8_t level : {uint8_t(0), uint8_t(35), uint8_t(100)}) {
         s.extras.global.metronomeLevel = level;
@@ -768,10 +768,10 @@ TEST_CASE("State: sequencer, cells clamped, unknown rows ignored", "[plugin][sta
     REQUIRE(r.ok);
     const auto& x = r.state.extras;
     CHECK(x.global.seqClock == ymengine::SeqClock::Host);
-    CHECK(x.global.resolution == 8);  // the last resolution, 1/32T (D-433)
+    CHECK(x.global.resolution == 8);  // the last resolution, 1/32T
     CHECK(x.global.sigNum == 4);  // 4/3 is not a time signature of the prototype: 4/4
     CHECK(x.global.sigDen == 4);
-    CHECK(x.global.metronomeLevel == 100);  // no level (before D-288): full level
+    CHECK(x.global.metronomeLevel == 100);  // no level (older state): full level
     CHECK(x.seq.current == 31);
     CHECK(x.seq.viewBank == 3);
     CHECK(x.seq.used.test(4));
@@ -785,7 +785,7 @@ TEST_CASE("State: sequencer, cells clamped, unknown rows ignored", "[plugin][sta
     CHECK(x.seq.song.entries[0].rep == 1);
 }
 
-TEST_CASE("State: INS row of M6 (id 31), clamped to the 32 instruments", "[plugin][state]") {
+TEST_CASE("State: INS row (id 31), clamped to the 32 instruments", "[plugin][state]") {
     PluginState st;
     ymseq::Lane& l = st.extras.seq.patterns[0].edit(1);
     l.pat[0] = 2;
@@ -827,8 +827,8 @@ TEST_CASE("State: CMD rows (ids 32 to 52), unknown command cleared", "[plugin][s
     l.setCmd(3, seqCmd(SeqCmd::Speed, 0x03));
     l.setCmd(9, seqCmd(SeqCmd::Retrig, 0x00));
     l.setCmd(255, seqCmd(SeqCmd::Sync, 0xff));
-    l.setCmd(0, seqCmd(SeqCmd::Vibrato, 0));  // several commands on a step (tenth DAW test, item 122, D-330)
-    // D-338, items 142 to 144, D-393, D-394: one step each
+    l.setCmd(0, seqCmd(SeqCmd::Vibrato, 0));  // several commands on a step (tenth DAW test, item 122)
+    // Step effects, items 142 to 144: one step each
     for (int k = int(SeqCmd::VolSlide); k <= int(SeqCmd::NoiseCurve); ++k)
         if (k != int(SeqCmd::PitchSlide)) l.setCmd(20 + k, seqCmd(SeqCmd(k), uint8_t(k * 9)));
     l.setCmd(1, seqCmd(SeqCmd::Fine, 100));
@@ -846,12 +846,12 @@ TEST_CASE("State: CMD rows (ids 32 to 52), unknown command cleared", "[plugin][s
     std::vector<uint8_t> s = header(1);
     std::vector<uint8_t> lane = {
         3,                                // three rows
-        32, 4, 0, 4, 0x47, 0x01,          // CMD (Xyz): step 4 = X47, retired (D-340): dropped
+        32, 4, 0, 4, 0x47, 0x01,          // CMD (Xyz): step 4 = X47, retired: dropped
         6, 0x00, 0x16,                    // step 6 = letter 22 (unknown): empty
         7, 0xff, 0xff,                    // step 7 = -1: empty
-        4, 0x8c, 0x05,                    // step 4 = T8C: the single CMD row of a state before D-330, to its kind
+        4, 0x8c, 0x05,                    // step 4 = T8C: the single CMD row of an older state, to its kind
         37, 1, 0, 4, 0x00, 0x06,          // CMD (Vxx): step 4 = V00
-        46, 1, 0, 4, 0x64, 0x0f,          // CMD (Fxx, D-338): step 4 = F64
+        46, 1, 0, 4, 0x64, 0x0f,          // CMD (Fxx): step 4 = F64
     };
     std::vector<uint8_t> pat = {16, 0, 1, 0};
     pat.insert(pat.end(), lane.begin(), lane.end());
@@ -975,7 +975,7 @@ TEST_CASE("Driver: a host that prepares at 0 Hz gets a playable engine", "[plugi
     for (float x : l) CHECK(std::isfinite(x));
 }
 
-TEST_CASE("Driver: delay parameters and Send of the track reach the engine, 16 ch only (D-299)",
+TEST_CASE("Driver: delay parameters and Send of the track reach the engine, 16 ch only",
           "[plugin][driver][delay]") {
     for (const int mode : {0, 1, 2}) {
         CAPTURE(mode);
@@ -1017,7 +1017,7 @@ static int voiceOf(const Driver& d, int note, int nth = 0) {
     return nth < int(found.size()) ? found[size_t(nth)].second : -1;
 }
 
-TEST_CASE("Driver: channel and polyphonic pressure drive the Aftertouch target (D-432)",
+TEST_CASE("Driver: channel and polyphonic pressure drive the Aftertouch target",
           "[plugin][driver][expression]") {
     Rig g;
     g.v[size_t(idx("aftertouch"))] = 2;  // Volume
@@ -1040,7 +1040,7 @@ TEST_CASE("Driver: channel and polyphonic pressure drive the Aftertouch target (
     CHECK(g.d.engine().voice(a).volume == 8);
 }
 
-TEST_CASE("Driver: MPE in 16 ch, one note per member channel, routing of the keyboard (D-432)",
+TEST_CASE("Driver: MPE in 16 ch, one note per member channel, routing of the keyboard",
           "[plugin][driver][expression][mpe]") {
     Rig g;
     g.v[size_t(idx("mpe"))] = 1;
@@ -1185,8 +1185,7 @@ TEST_CASE("Engine status: LEDs of audible tracks, attacked note, followed envelo
     CHECK(tap.latest().arpStep < 3);
 }
 
-TEST_CASE("Engine status: a voice sounding until the release ends, the last period kept (Indus, 26/10/2026 04:00, "
-          "D-440)",
+TEST_CASE("Engine status: a voice sounding until the release ends, the last period kept (Indus, 26/10/2026 04:00)",
           "[plugin][engine-status]") {
     Rig g;
     EngineStatusTap tap;
@@ -1213,7 +1212,7 @@ TEST_CASE("Engine status: a voice sounding until the release ends, the last peri
 }
 
 TEST_CASE("Engine status: one envelope point per note sounding on the focused track, the newest first (Indus, "
-          "24/10/2026 11:45, D-403)",
+          "24/10/2026 11:45)",
           "[plugin][engine-status]") {
     Rig g;
     EngineStatusTap tap;
@@ -1386,7 +1385,7 @@ TEST_CASE("Driver: voice mode change after a fade, notes ignored meanwhile", "[p
     for (int i = 0; i < ymengine::Engine::kVoices; ++i) CHECK(g.d.engine().voice(i).note != 64);
 }
 
-TEST_CASE("Driver: Digidrum definition kept from 16 to 3 channels and back (D-063)", "[plugin][driver]") {
+TEST_CASE("Driver: Digidrum definition kept from 16 to 3 channels and back", "[plugin][driver]") {
     using ymengine::Generator;
     Rig g;
     Snapshot s;
@@ -1485,7 +1484,7 @@ TEST_CASE("Driver: new clock prepared outside the audio thread, then switch", "[
     CHECK(g.energy() > 1e-3);
 }
 
-TEST_CASE("Driver: Custom clock, a new engine at each frequency, 2 MHz outside 16 ch (D-237)", "[plugin][driver]") {
+TEST_CASE("Driver: Custom clock, a new engine at each frequency, 2 MHz outside 16 ch", "[plugin][driver]") {
     Rig g;
     auto settle = [&g] {
         g.run(512);
@@ -1699,7 +1698,7 @@ TEST_CASE("Driver: Drum Kit Audition, audition of an instrument outside the voic
     CHECK(g.energy() > 0);
 }
 
-TEST_CASE("Driver: Gate All on, off or global gate changed: all tracks take it up (D-134)",
+TEST_CASE("Driver: Gate All on, off or global gate changed: all tracks take it up",
           "[plugin][driver][seq]") {
     Rig g;
     g.v[size_t(idx("t03_gate"))] = 20;
@@ -1766,11 +1765,11 @@ TEST_CASE("Driver: MIDI Start, Stop, Continue and Song Position Pointer", "[plug
     CHECK(g.status().step == 4);
 }
 
-TEST_CASE("Driver: Clock selector on MIDI ext, the sequencer follows the MIDI clock (D-188)", "[plugin][driver][seq]") {
+TEST_CASE("Driver: Clock selector on MIDI ext, the sequencer follows the MIDI clock", "[plugin][driver][seq]") {
     SeqRig g(ymengine::SeqClock::Internal);
     g.run(4800, {command(0, UiCommand::SeqPlay)});
     REQUIRE(g.status().playing);
-    // Clock switches to MIDI ext during playback: new clock, stop (D-110).
+    // Clock switches to MIDI ext during playback: new clock, stop.
     g.v[size_t(idx("arpClock"))] = 1;
     g.run(256);
     CHECK_FALSE(g.status().playing);

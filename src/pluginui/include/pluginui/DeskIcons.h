@@ -2,9 +2,9 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Ninth DAW test, item 102 (D-303): the floppy disks A and B and the trash of a GEM desktop, decorative. The 32 × 32
+// Ninth DAW test, item 102: the floppy disks A and B and the trash of a GEM desktop, decorative. The 32 × 32
 // pictures of the EmuTOS desktop (© The EmuTOS development team, GPL), which replace those of TOS 1.04 for the AGPLv3
-// at Indus's request (25/10/2026 16:09, D-423; DeskIcons.cpp is written by tools/icon/make_desk_icons.py from EmuTOS's
+// at Indus's request (25/10/2026 16:09; DeskIcons.cpp is written by tools/icon/make_desk_icons.py from EmuTOS's
 // desk/icon.rsc): the data in black, the mask in white under it. MainWindow gives them to its gemui::DeskIcon widgets
 // (setPicture, setLetter).
 #pragma once

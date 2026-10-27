@@ -11,9 +11,9 @@
 // of the cycle in a prompt box); the browser's focus ring, rounded corners on the button's border, only shows after
 // a Tab (:focus-visible). Confirmation: Enter and Escape cancel, whatever has the focus; prompt box: Enter activates
 // the button that has the focus, OK from the field.
-// Picture (STYM2149, Information box, D-235): an image centred above the text, each pixel drawn as a square of
+// Picture (STYM2149, Information box): an image centred above the text, each pixel drawn as a square of
 // `pictureScale` pixels (transparent pixels, alpha 0, left out), followed by the 16 px of a paragraph.
-// Choice rows (STYM2149, WAV dialogue of the File menu, D-164): below the text, one row per setting, its label
+// Choice rows (STYM2149, WAV dialogue of the File menu): below the text, one row per setting, its label
 // followed by radio buttons (.btn, the chosen option in reverse video, .on), one space apart; 10 px between the rows;
 // the labels form a column, the block is centred.
 #pragma once

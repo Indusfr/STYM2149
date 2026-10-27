@@ -1,4 +1,4 @@
-# JUCE 8.0.15 (AGPLv3, licence choice D-001) and clap-juce-extensions (MIT), pinned (D-059, THIRD_PARTY.md).
+# JUCE 8.0.15 (AGPLv3) and clap-juce-extensions (MIT), pinned (THIRD_PARTY.md).
 # Local sources possible without download: -DFETCHCONTENT_SOURCE_DIR_JUCE=... and
 # -DFETCHCONTENT_SOURCE_DIR_CLAP_JUCE_EXTENSIONS=... (the commit is checked in every case).
 include(FetchContent)

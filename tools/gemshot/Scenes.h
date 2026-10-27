@@ -21,24 +21,24 @@ const std::vector<std::string>& sceneNames();
 // rendering (tests/data/visual/stym), checked by eye when it is created or changed.
 const std::vector<std::string>& stymSceneNames();
 
-// Zone that the comparison ignores: intended deviation, accepted in DECISIONS.md, which covers the whole zone.
+// Zone that the comparison ignores: an intended deviation that covers the whole zone.
 struct Mask {
     int x = 0, y = 0, w = 0, h = 0;
     std::string decision;
     bool contains(int px, int py) const noexcept { return px >= x && py >= y && px < x + w && py < y + h; }
 };
 
-// Inserted row (intended deviation, accepted in DECISIONS.md): the band [y − dy, y) is new, absent from the capture,
+// Inserted row (intended deviation): the band [y − dy, y) is new, absent from the capture,
 // and is not compared (the STYM2149 scenes check it to the pixel); in the zone [y, y + h), the rows moved down by
 // `dy`: a pixel matches if it equals the capture at the same place (what covers the zone: window, menu) or `dy`
-// pixels higher. A negative `dy` is a removed row (two entries of the prototype made one, D-217): the rows of the zone
+// pixels higher. A negative `dy` is a removed row (two entries of the prototype made one): the rows of the zone
 // moved up, a pixel matches the capture at the same place or −dy pixels lower; no band.
 struct Shift {
     int x = 0, y = 0, w = 0, h = 0, dy = 0;
     std::string decision;
     int band = -1;  // height of the ignored band above the zone; -1: dy (the zone moved down by one inserted row)
-    int dx = 0;     // horizontal move of a row (D-247): the zone is compared with the capture dx px to its left
-    // Compared with the capture of Shot::alt instead: the former place of a moved frame (D-268) that a menu or an
+    int dx = 0;     // horizontal move of a row: the zone is compared with the capture dx px to its left
+    // Compared with the capture of Shot::alt instead: the former place of a moved frame that a menu or an
     // alert covers in the scene's capture, seen in the capture of the same window without it.
     bool alt = false;
     bool contains(int px, int py) const noexcept { return px >= x && py >= y && px < x + w && py < y + h; }
@@ -48,13 +48,13 @@ struct Shift {
     }
 };
 
-// Zone dimmed where the prototype left it as it is (intended deviation, accepted in DECISIONS.md): a pixel matches if
+// Zone dimmed where the prototype left it as it is (intended deviation): a pixel matches if
 // it equals the capture, or the capture under the same veil, blended at `alpha` over `under` (the CSS opacity of the
 // prototype's .inert class over the window's white). Alpha 0: the zone shows `under` alone, like the place that the
-// centred window buttons left (D-247). `desktopRow` >= 0: the zone shows the desktop, like the place of the
-// prototype's help line under the shorter main window (D-267); a pixel matches the capture's desktop in the same
+// centred window buttons left. `desktopRow` >= 0: the zone shows the desktop, like the place of the
+// prototype's help line under the shorter main window; a pixel matches the capture's desktop in the same
 // column below that row, at the same phase of the checkerboard (4 rows), veiled as the capture is there. `dx`, `dy`:
-// the zone moved with its frame (D-268), compared with the capture that far up and to the left.
+// the zone moved with its frame, compared with the capture that far up and to the left.
 struct Dim {
     int x = 0, y = 0, w = 0, h = 0;
     double alpha = 1;
@@ -65,7 +65,7 @@ struct Dim {
     bool contains(int px, int py) const noexcept { return px >= x && py >= y && px < x + w && py < y + h; }
 };
 
-// The tooltip languages installed with STYM2149 (D-283): the PO files of languages/ in the sources, by name, as the
+// The tooltip languages installed with STYM2149: the PO files of languages/ in the sources, by name, as the
 // plugin reads them from the folder the installers fill. Every scene has them.
 std::vector<pluginui::Host::TextFile> installedLanguages();
 
@@ -76,7 +76,7 @@ struct Shot {
     std::vector<Mask> masks;
     std::vector<Shift> shifts;
     std::vector<Dim> dims;
-    // Allowed deviation, in % of the M4 desktop: 1, or 2 for a floating window (small GEM texts, D-121).
+    // Allowed deviation, in % of the original desktop: 1, or 2 for a floating window (small GEM texts).
     int budget = 1;
     // Scene of the prototype whose capture shows the same window without the menu or the alert of this one
     // (Shift::alt), and the opacity of the black veil the alert lays over it (25 %).

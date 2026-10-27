@@ -1,4 +1,4 @@
-// STYM2149 — ymio: writing register dumps (M7, A5, B1, STYM2149_SPEC.md §8)
+// STYM2149 — ymio: writing register dumps (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "ymio/YmWriter.h"

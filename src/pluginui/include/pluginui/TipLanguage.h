@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: tooltip languages (D-185, D-283)
+// STYM2149 — pluginui: tooltip languages
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -6,9 +6,9 @@
 // shows it (Desktop::translateTip), line by line, through the book of the chosen language: an entry gives one English
 // line and its translation. An English line may hold placeholders {1} to {9}, each matching a non-empty part of the
 // line (a number, a name); the translation puts each captured part where its placeholder stands. A line missing from
-// the book stays in English. Menus and labels stay in English (D-178).
+// the book stays in English. Menus and labels stay in English.
 //
-// Every other language is a file (seventh DAW test, item 82, D-283): a gettext PO file (the format of translation
+// Every other language is a file (seventh DAW test, item 82): a gettext PO file (the format of translation
 // tools such as Poedit) per language, read when the Options menu opens. French, German, Spanish, Portuguese and
 // Italian are the files of languages/ in the sources, installed with STYM2149 into a folder of the computer; the
 // user's own files are in the Languages folder next to the preferences. The header names the language ("Language:
@@ -29,7 +29,7 @@ namespace stym::pluginui {
 // "Track {1}" swallowing a whole tooltip that has no entry of its own.
 std::optional<std::vector<std::string>> tipPlaceholderParts(std::string_view english);
 
-// Language read from a file (D-283).
+// Language read from a file.
 struct TipFile {
     std::string id;    // code of the "Language" header, otherwise of the file name: lower case, '-' ("nl", "pt-pt")
     std::string name;  // "X-Language-Name" header (the language's name in that language), otherwise the code

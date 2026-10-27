@@ -1,4 +1,4 @@
-// STYM2149 — voice engine, additions of the plugin (M3): separate outputs of the tracks and chips, notes, bend and
+// STYM2149 — voice engine, additions of the plugin: separate outputs of the tracks and chips, notes, bend and
 // wheel per track, effect of the velocity, bass and treble setting of the STE chain during playback.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -332,7 +332,7 @@ TEST_CASE("Velocity: accent, 4-bit volume or ignored", "[engine][velocity]") {
     const auto acc127 = voiceAfter(VoiceMode::Studio16, VelocityMode::Accent, 127);
     REQUIRE(acc64.first == 13);
     REQUIRE(acc64.second < acc127.second * 0.7);
-    // 16-channel, volume: the 4-bit level nearest to volume 13 × 64/127 (−13.4 dB): 11, without accent (D-200).
+    // 16-channel, volume: the 4-bit level nearest to volume 13 × 64/127 (−13.4 dB): 11, without accent.
     REQUIRE(voiceAfter(VoiceMode::Studio16, VelocityMode::Volume, 64).first == 11);
     // Ignored: like velocity 127.
     const auto off = voiceAfter(VoiceMode::Studio16, VelocityMode::Off, 10);

@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: WAV and stem exports (M7, A4, D-163, D-164, D-171)
+// STYM2149 — plugincore: WAV and stem exports
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_approx.hpp>
@@ -178,7 +178,7 @@ TEST_CASE("WAV export: formats, two-pass Song, cancel requested, write refused",
     CHECK(d->files == 0);
 }
 
-TEST_CASE("WAV export: Clock on MIDI ext, the sequencer plays at the free tempo (D-188)", "[audioexport]") {
+TEST_CASE("WAV export: Clock on MIDI ext, the sequencer plays at the free tempo", "[audioexport]") {
     // Offline, no MIDI clock to follow: the sequencer keeps Free run, the arpeggio receives the pulses.
     Project pr;
     ymio::MemorySink a, b;

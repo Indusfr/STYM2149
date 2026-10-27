@@ -1,4 +1,4 @@
-// STYM2149 — ymio: writing SNDH files (M7, A5, B2, STYM2149_SPEC.md §8, D-162)
+// STYM2149 — ymio: writing SNDH files (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -40,11 +40,11 @@ constexpr int kPtr = 0, kEnd = 4, kVal = 8, kPhase = 9;  // per channel: digidru
 constexpr int kSaved = 64;    // vectors and MFP registers saved by the init
 constexpr int kSaveVec = 66;  // vectors of timers A, B and D
 constexpr int kSaveMfp = 78;  // IERA, IERB, IMRA, IMRB, TACR, TBCR, TCDCR
-constexpr int kSync = 86;     // demo sync byte: last Zxx command played (D-150), 0 at init
+constexpr int kSync = 86;     // demo sync byte: last Zxx command played, 0 at init
 constexpr int kVarsSize = 88;
 constexpr int voiceVar(int v, int field) { return kVoiceVars + v * kVoiceSize + field; }
 
-// Timer of each channel: A, B, D (C stays with the system, D-138). MC68901: TACR $FFFA19, TBCR $FFFA1B, TCDCR $FFFA1D
+// Timer of each channel: A, B, D (C stays with the system). MC68901: TACR $FFFA19, TBCR $FFFA1B, TCDCR $FFFA1D
 // (C in bits 4-6, D in bits 0-2), TADR $FFFA1F, TBDR $FFFA21, TDDR $FFFA25; end of interrupt in software mode (S bit
 // of the vector register, set by TOS): 0 written to the timer's bit in ISRA $FFFA0F (A: bit 5, B: bit 0) or ISRB
 // $FFFA11 (D: bit 4), the 1s change nothing there. Atari ST vectors (MFP at $40): A $134, B $120, D $110.
@@ -549,7 +549,7 @@ public:
                 }
                 owned[size_t(v)] = type != kBuzzer;
                 buzzOn = buzzOn || type == kBuzzer;
-                if (type == kDrum) {  // the engine still loops the sample (D-154): the SNDH has finished it
+                if (type == kDrum) {  // the engine still loops the sample: the SNDH has finished it
                     if (s.irqs > double(info_.digidrums[value].size()) + 1) ++report_.heldDrums;
                     s.irqs += e.timer.hz() / std::max(1u, info_.frameHz);
                 }
@@ -617,7 +617,7 @@ private:
                 on = false;
                 return;
             }
-            if (d.start * ch >= s.data.size()) {  // Oxx past the end (D-338): the engine does not play it either
+            if (d.start * ch >= s.data.size()) {  // Oxx past the end: the engine does not play it either
                 if (on) ops.push_back(kOpDmaStop);
                 on = false;
                 return;
@@ -636,7 +636,7 @@ private:
 
     static int gainLevel(float g) { return int(std::lround(std::clamp(double(g), 0.0, 1.0) * 16)); }  // 0-16
 
-    // Copy of the slot from the frame start (its Start, D-444, then Oxx, D-338) to the end of its bytes (End) at the
+    // Copy of the slot from the frame start (its Start, then Oxx) to the end of its bytes (End) at the
     // pitch (read step, like the engine: sample at the integer position) and the volume (sixteen levels) of the attack,
     // at the slot's rate; even length (even DMA addresses). The loop of the copy resumes at its first frame, as in the
     // engine.

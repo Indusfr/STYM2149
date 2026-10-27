@@ -1,4 +1,4 @@
-// STYM2149 — audio delay (eighth DAW test, item 98, D-299): no change while it is off or in the 3-channel modes, echoes
+// STYM2149 — audio delay (eighth DAW test, item 98): no change while it is off or in the 3-channel modes, echoes
 // of the send of each track after its fader at the time set (ms or division of the tempo), feedback, ping-pong,
 // switched on during playback.
 // Programming: Pascal "Indus" Nowak (with Claude's help).

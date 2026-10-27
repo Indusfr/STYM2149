@@ -4,7 +4,7 @@
 //
 // Reading Arnaud Carré's YM files (formats YM2!, YM3!, YM3b, YM5!, YM6!), from the format documentation
 // (ST-Sound, "YM file format") and the AtariAudio 1.26 player (YmRenderer.cpp, MIT licence).
-// LHA-compressed files are decompressed by parseYm (Lzh.h, D-043).
+// LHA-compressed files are decompressed by parseYm (Lzh.h).
 #pragma once
 #include <cstdint>
 #include <optional>
@@ -34,7 +34,7 @@ struct YmFile {
     ymcore::MasterClock clock = ymcore::clocks::kDefault;  // YM2/3: implicit 2 MHz
     uint16_t playerRate = 50;                               // frames per second; YM2/3: implicit 50 Hz
     std::string title, author, comment;
-    std::vector<std::vector<uint8_t>> digidrums;  // YM5/6, played by YmPlayer (D-044)
+    std::vector<std::vector<uint8_t>> digidrums;  // YM5/6, played by YmPlayer
     std::vector<uint8_t> frames;                  // frameCount × kStride, frame by frame
 
     uint8_t reg(uint32_t frame, unsigned r) const noexcept { return frames[size_t(frame) * kStride + r]; }

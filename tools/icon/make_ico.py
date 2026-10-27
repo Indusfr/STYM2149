@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# STYM2149 — application icon: packaging/icon/STYM2149.ico from the drawn PNG sizes (D-218).
+# STYM2149 — application icon: packaging/icon/STYM2149.ico from the drawn PNG sizes.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 #

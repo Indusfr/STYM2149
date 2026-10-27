@@ -1,6 +1,6 @@
-// STYM2149 — LFO of a track (sixth DAW test, item 59, D-257): shapes, rate in Hz or at the tempo, depth on each
+// STYM2149 — LFO of a track (sixth DAW test, item 59): shapes, rate in Hz or at the tempo, depth on each
 // target (volume, noise period, envelope period, SID ratio, pitch, pan), restart at each note or free running (Retrig
-// Off, D-279), Authentic 3ch, drums.
+// Off), Authentic 3ch, drums.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -204,7 +204,7 @@ TEST_CASE("LFO: synced to the tempo, one cycle per division", "[engine][lfo]") {
     CHECK(run(true, 20, 4) == run(false, 2, 4));
     CHECK(run(true, 20, 5) == run(false, 4, 0));
     CHECK(run(true, 20, 5) != run(true, 20, 4));
-    // 1/32T and 1/64 after 1/32 (ninth DAW test, item 119, D-320): at 60 BPM, 12 Hz and 16 Hz.
+    // 1/32T and 1/64 after 1/32 (ninth DAW test, item 119): at 60 BPM, 12 Hz and 16 Hz.
     CHECK(run(true, 20, 10, 60) == run(false, 12, 0, 60));
     CHECK(run(true, 20, 11, 60) == run(false, 16, 0, 60));
     CHECK(run(true, 20, 9, 60) == run(false, 8, 0, 60));
@@ -258,7 +258,7 @@ TEST_CASE("LFO: restarted at each note, Random held over a cycle, no LFO on the 
     }
 }
 
-TEST_CASE("LFO: Retrig Off, free running: a note takes the phase of the LFO of its track (D-279)", "[engine][lfo]") {
+TEST_CASE("LFO: Retrig Off, free running: a note takes the phase of the LFO of its track", "[engine][lfo]") {
     SECTION("Rate in Hz") {
         Rig r;
         r.t.patch.lfo.retrig = false;
@@ -292,7 +292,7 @@ TEST_CASE("LFO: Retrig Off, free running: a note takes the phase of the LFO of i
 }
 
 TEST_CASE("LFO: it goes on from one note of the keyboard arpeggio to the next", "[engine][lfo][arp]") {
-    // Like the table and the vibrato (D-203): restarted at each note of a 37 Hz arpeggio, it would stay near its
+    // Like the table and the vibrato: restarted at each note of a 37 Hz arpeggio, it would stay near its
     // start (+1); carried, it plays its cycle, two frames up and two down.
     for (const VoiceMode mode : {VoiceMode::Studio16, VoiceMode::Authentic3}) {
         CAPTURE(int(mode));

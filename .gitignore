@@ -7,8 +7,6 @@
 .vscode/
 .idea/
 CMakeUserPresets.json
-docs/m0/essai/ext/
-docs/m0/essai/out/*.i16
-docs/m0/essai/out/*.f32
-docs/m0/essai/trial
-docs/m0/essai/ymffi/target/
+
+
+

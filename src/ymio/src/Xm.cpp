@@ -1,4 +1,4 @@
-// STYM2149 — ymio: reading XM modules (M7, B5, D-056, D-166)
+// STYM2149 — ymio: reading XM modules
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "ymio/Xm.h"

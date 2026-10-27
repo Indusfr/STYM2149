@@ -1,4 +1,4 @@
-// STYM2149 — record of the fidelity measurements (M1 report)
+// STYM2149 — record of the fidelity measurements
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #pragma once

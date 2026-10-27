@@ -229,7 +229,7 @@ TEST_CASE("Prototype: VBL frames (ornament, vibrato, Chip ADSR, SID, Sync Buzzer
         const auto frames = split(kv.at("frames"), ',');
         const double frame = 48000.0 / num("vbl");
         // The prototype's SID timer toggles at the note × ratio, which plays an octave lower: ours at twice that, so
-        // that ratio 1 plays the note (Indus, 25/10/2026 17:39, D-426).
+        // that ratio 1 plays the note (Indus, 25/10/2026 17:39).
         const double timerScale = p.generator == Generator::Sid ? 2 : 1;
         uint64_t at = 0;
         for (size_t k = 0; k < frames.size(); ++k) {

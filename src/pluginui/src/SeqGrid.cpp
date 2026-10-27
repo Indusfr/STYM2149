@@ -4,7 +4,7 @@
 //
 // Rendering: classes of refreshSeqGrid and CSS cascade of the prototype (.cell, .qtr, .bar, .offsc, .nope, .dead, .sel,
 // .onc, .held, .play, .mute, .psel, .ghost, .rz…), cell by cell in DOM order. Gestures: pointerdown, pointerover,
-// pointerup and contextmenu of #seqgrid, in the same order of priority. Deviations: DECISIONS.md (D-120).
+// pointerup and contextmenu of #seqgrid, in the same order of priority. Deviations.
 //
 // Coordinates: a shown column col (0-63) is the absolute step viewStart + col (SeqWindow::absCol); a visual note row
 // r (0 at the top) is the relative row off = viewSemi + 12 - r (rowOff), in semitones above the C of the track's
@@ -25,9 +25,9 @@
 // 5 Select.
 //
 // Undo: press() calls SeqWindow::armUndo, and SeqWindow::editLane pushes the pattern as it was before the gesture's
-// first change, or nothing if the gesture changes nothing (D-282); the drags of sizing_ and moving_ use that step too
-// (D-325). Some paths also push their own step: release() before the action of a click, the eraser drag once per
-// erased note (D-120), the menus before their action. UndoHistory drops a step equal to the last one, so a pushUndo
+// first change, or nothing if the gesture changes nothing; the drags of sizing_ and moving_ use that step too.
+// Some paths also push their own step: release() before the action of a click, the eraser drag once per
+// erased note, the menus before their action. UndoHistory drops a step equal to the last one, so a pushUndo
 // followed by the armed editLane still leaves a single step.
 #include <algorithm>
 #include <cmath>
@@ -125,7 +125,7 @@ int baselineIn(double lineTop, double lineH, int px) {
     return gemui::snap(lineTop + std::floor((lineH - lb.height()) / 2) + lb.ascent);
 }
 
-// Small text of a cell (D-119): 6×6 font, tightened by one pixel per letter beyond two characters; bold of the
+// Small text of a cell: 6×6 font, tightened by one pixel per letter beyond two characters; bold of the
 // prototype (font-weight:bold) rendered by a second pass offset by one pixel.
 void smallText(Painter& p, std::string_view t, double x0, double w, int baseline, Color c, bool bold = false) {
     if (t.empty()) return;
@@ -347,7 +347,7 @@ void SeqGrid::refresh() {
     const bool latinNames = w_.latin();
     const int sc = w_.scale(), root = w_.scaleRoot();
     const bool m3 = w_.mode3(), chords = w_.chordsPlay();
-    // Deviation (D-282): the notes picked one by one and the selection box belong to the track they were made on
+    // Deviation: the notes picked one by one and the selection box belong to the track they were made on
     // (they stayed when another track was shown, and -1/+1, < and > then edited that track at the same places).
     if (w_.cur() != selTrack_) {
         if (selTrack_ >= 0) {
@@ -400,7 +400,7 @@ void SeqGrid::refresh() {
     show(SeqLane::NoteCut, w_.ownRowShown(ymengine::SeqCmd::Cut));
     show(SeqLane::Smp, w_.smpShown());
     show(SeqLane::Gat, !drum_);
-    show(SeqLane::Pnr, !m3 || w_.m_.dmaTrack(w_.cur()));  // DMA track in 3-channel mode: pan (D-153)
+    show(SeqLane::Pnr, !m3 || w_.m_.dmaTrack(w_.cur()));  // DMA track in 3-channel mode: pan
     show(SeqLane::Rtg, true);
     show(SeqLane::Cnd, true);
     show(SeqLane::Vol, true);
@@ -438,7 +438,7 @@ void SeqGrid::refresh() {
         for (int v = 2; v <= ymseq::kPolyMax; ++v)
             if (const auto rr = ed.voiceRow(a, v)) polyRows.push_back(*rr);
         if (!drum_)
-            for (int k = 0; k <= a; ++k)  // a voice can be held up to 256 steps (D-282: 64 steps back only)
+            for (int k = 0; k <= a; ++k)  // a voice can be held up to 256 steps (64 steps back only)
                 for (int v = 2; v <= ymseq::kPolyMax; ++v) {
                     const auto rr = ed.voiceRow(k, v);
                     if (!rr) continue;
@@ -478,7 +478,7 @@ void SeqGrid::refresh() {
             // .rz: resize pointer (end of a note); .nend: right end of a note, which gets a white right border.
             nc.rz = !drum_ && (((on || held) && last) || (on && lane.tie[A]));
             nc.nend = last && (on || held);
-            // Chord voice not played. Deviation (D-282): its held part is greyed too (it was drawn as played).
+            // Chord voice not played. Deviation: its held part is greyed too (it was drawn as played).
             nc.mute = !chords && (has(polyRows, row) || polyOn) && noteRow != row && !rootHeld;
             if (!picked.empty() && (on || held))
                 for (const ymseq::SelNote& it : picked)
@@ -492,7 +492,7 @@ void SeqGrid::refresh() {
             nc.cur = a == s.curStep && r == s.curRow;
             nc.on = on;
             nc.qtr = q;
-            nc.bar = barHit && c > 0;  // first column: the black name column already marks it (D-223)
+            nc.bar = barHit && c > 0;  // first column: the black name column already marks it
             nc.dead = dead;
             nc.octave = ymseq::octaveOf(lane.oct[A], trackOct);
         }
@@ -514,7 +514,7 @@ void SeqGrid::refresh() {
         volTo_[size_t(c)] = lane.cmdAt(ymengine::SeqCmd::VolGlide, int(A))
                                 ? std::clamp<int>(lane.vol[a + 1 < effLen ? A + 1 : 0], 0, 15)
                                 : -1;
-        static const std::array<const char*, 8> mixT = {"-", "T", "N", "TN", "E", "TE", "NE", "TNE"};  // D-277
+        static const std::array<const char*, 8> mixT = {"-", "T", "N", "TN", "E", "TE", "NE", "TNE"};
         static const std::array<const char*, 5> fxT = {"-", "CV", "SID", "SB", "CD"};
         static const std::array<const char*, 4> rtgT = {"-", "2", "3", "4"};
         static const std::array<const char*, 8> cndT = {"-", "1:2", "2:2", "1:4", "4:4", "25", "50", "75"};
@@ -536,7 +536,7 @@ void SeqGrid::refresh() {
         lc(SeqLane::Ton).text = lane.ton[A] ? sg(lane.ton[A]) : "-";
         lc(SeqLane::Ins).text = lane.ins[A] ? hex2(lane.ins[A]) : "-";
         lc(SeqLane::Cmd).text = ymseq::cmdCellText(lane, int(A));
-        {  // rows of their own (D-341, D-342, D-347 to D-349, D-351 to D-362): On or Off, the tempo of the pattern, the
+        {  // rows of their own: On or Off, the tempo of the pattern, the
            // shape (8 to F) and R for a restart, a tick, the offset, the cents
             using ymengine::SeqCmd;
             auto param = [&](SeqCmd k) { return int(ymengine::seqCmdParam(lane.cmdAt(k, int(A)))); };
@@ -568,9 +568,9 @@ void SeqGrid::refresh() {
                 ? "C"
                 : std::string(pnv < ymseq::kPanCenter ? "L" : "R") +
                       std::to_string(std::max(1, int(std::lround(std::abs(pnv - ymseq::kPanCenter) / 10.0))));
-        // Values that cannot act there: greyed and crossed (twelfth DAW test, item 145, D-354); empty cells where
+        // Values that cannot act there: greyed and crossed (twelfth DAW test, item 145); empty cells where
         // nothing written could act, from the sound of the step, crossed too in the length of the track (thirteenth,
-        // item 165, D-374).
+        // item 165).
         for (const SeqLane r : {SeqLane::Mix, SeqLane::Fx, SeqLane::Ins, SeqLane::Env, SeqLane::Smp, SeqLane::Gat,
                                 SeqLane::Rtg, SeqLane::Cnd, SeqLane::Oct, SeqLane::Ton, SeqLane::Afl, SeqLane::Vib,
                                 SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun, SeqLane::Dly, SeqLane::Slc, SeqLane::Bpm}) {
@@ -586,7 +586,7 @@ void SeqGrid::refresh() {
 
 void SeqGrid::buildGhosts(const ymseq::LaneEditor& ed) {
     // buildGhostIndex: notes of the other melodic tracks, at the pitch of the current track. Only the playable tracks
-    // count (D-120: the prototype went through the 16 tracks even in 3-channel mode).
+    // count (the prototype went through the 16 tracks even in 3-channel mode).
     for (auto& col : ghosts_) col.fill(Ghost{});
     if (!w_.ses().ghost || drum_) return;
     (void)ed;
@@ -731,7 +731,7 @@ void SeqGrid::paintHeader(Painter& p, const RowBox& b) const {
         const bool play = start + c == playStep_;
         p.fill(r, play ? colors::kGreen : colors::kWhite);
         // No stroke on the first column: against the black name column, it made that column look 4 px wider (third
-        // DAW test, item 24, D-223).
+        // DAW test, item 24).
         if (sn.bar && c > 0) p.fill({r.x, r.y, 4, r.h}, colors::kBlack);
         const Color ink = play ? colors::kWhite : sn.bar || sn.qtr ? colors::kBlack : kStepNum;
         smallText(p, sn.text, r.x, r.w, base, ink, sn.bar);
@@ -798,7 +798,7 @@ void SeqGrid::paintLaneCell(Painter& p, const Rect& r, SeqLane lane, int col, bo
     const LaneCell& c = lanes_[size_t(lane)][size_t(col)];
     if (lane == SeqLane::Vol) {
         // .volbar: white background (green while playing), 11 px bar from the bottom, 8 px value at the top, or in
-        // white inside the bar when it goes above 70 %. A step that slides (Gxx, D-393) draws a ramp from its volume to
+        // white inside the bar when it goes above 70 %. A step that slides (Gxx) draws a ramp from its volume to
         // that of the next step, its value inside when the whole ramp goes above 70 %.
         const int v = vol_[size_t(col)], to = volTo_[size_t(col)];
         p.fill(r, play ? colors::kGreen : colors::kWhite);
@@ -820,7 +820,7 @@ void SeqGrid::paintLaneCell(Painter& p, const Rect& r, SeqLane lane, int col, bo
         return;
     }
     if (c.nope) {
-        // A value that cannot act there (twelfth DAW test, item 145, D-354): grey, crossed by a 9-pixel X; the value
+        // A value that cannot act there (twelfth DAW test, item 145): grey, crossed by a 9-pixel X; the value
         // is in the help of the cell.
         p.fill(r, play ? kOffscPlay : colors::kGrey);
         const int x0 = r.x + (r.w - 9) / 2, y0 = r.y + (r.h - 9) / 2;
@@ -861,7 +861,7 @@ gemui::Pointer SeqGrid::pointerAt(gemui::Point pt) const noexcept {
                          : tool == 5 ? Pointer::Cell
                          : tool == 0 ? Pointer::Move
                                      : Pointer::Arrow;
-    // Draw tool, a note held under the button: it can be dragged, so the hand until the release (24/10/2026, D-383).
+    // Draw tool, a note held under the button: it can be dragged, so the hand until the release (24/10/2026).
     if (moving_ && tool == 1) return Pointer::Hand;
     const Hit h = hitAt(pt);
     if (drawing_ && h.cell()) return Pointer::Pencil;  // #seqgrid.drawing .cell
@@ -927,7 +927,7 @@ bool SeqGrid::mouseWheel(const gemui::WheelEvent& e) {
 
 std::optional<SeqGrid::Edge> SeqGrid::edgeAt(const Hit& h, gemui::Point p) const {
     const int tool = w_.ses().tool;
-    // The Draw tool alone (bug of 24/10/2026, D-381): with the Move tool, the edge moves the note as its middle does.
+    // The Draw tool alone (bug of 24/10/2026): with the Move tool, the edge moves the note as its middle does.
     if (h.kind != Hit::Kind::Note || drum_ || alt_ || tool != 1) return std::nullopt;
     const int c = w_.absCol(h.col);
     ymseq::Lane copy = w_.lane();
@@ -986,7 +986,7 @@ void SeqGrid::mouseDrag(const gemui::MouseEvent& e) {
         return;
     }
     const Hit h = hitAt(e.pos);
-    // pointerover: only on entering another cell. Deviation (D-282): a drag on VOL follows the pointer inside the
+    // pointerover: only on entering another cell. Deviation: a drag on VOL follows the pointer inside the
     // cell too, the level being read from the height.
     const bool volDrag = paint_ && paint_->vol && h.kind == Hit::Kind::Lane && h.lane == SeqLane::Vol;
     if (h == last_ && !volDrag) return;
@@ -1002,7 +1002,7 @@ void SeqGrid::mouseUp(const gemui::MouseEvent& e) {
     }
     pressed_ = false;
     release();
-    // Context menu on release of the right button (Windows order: pointerup then contextmenu, D-120).
+    // Context menu on release of the right button (Windows order: pointerup then contextmenu).
     if (button_ == gemui::MouseButton::Right) contextMenu(hitAt(e.pos));
 }
 
@@ -1024,7 +1024,7 @@ void SeqGrid::mouseCancel() {
 }
 
 void SeqGrid::resetFlag(SeqLane lane, int c) {
-    // Reset of a control row (VOL: 15; CMD: all its commands, D-330).
+    // Reset of a control row (VOL: 15; CMD: all its commands).
     // BPM: the row of the pattern; ENV: the shape and the restart (twelfth DAW test, items 146, 150).
     if (lane == SeqLane::Bpm) {
         w_.setBpm(c, 0);
@@ -1044,17 +1044,17 @@ void SeqGrid::resetFlag(SeqLane lane, int c) {
 
 // pointerdown on a cell: the right button first, then Shift (selections), then a plain press (pressLane, pressNote).
 void SeqGrid::press(const Hit& h, const gemui::MouseEvent& e) {
-    w_.armUndo();  // one undo step per gesture, taken at its first change (D-282)
+    w_.armUndo();  // one undo step per gesture, taken at its first change
     const int c = w_.absCol(h.col);
     const bool right = e.button == gemui::MouseButton::Right;
     if (right && h.kind == Hit::Kind::Lane && h.lane == SeqLane::Vol && selA_ < 0) {  // VOL: slider
         w_.openVol(h.r, c);
         return;
     }
-    if (right && h.kind == Hit::Kind::Lane && selA_ < 0 && w_.openStepSound(h.lane, c)) return;  // D-392
+    if (right && h.kind == Hit::Kind::Lane && selA_ < 0 && w_.openStepSound(h.lane, c)) return;
     if (right && selA_ >= 0 && c >= blockLo() && c <= blockHi()) return;  // block menu on release
     if (right && rect_ && h.kind == Hit::Kind::Note) {
-        // Deviation (D-282): the box menu on release, the box kept (the right button drew a new one-cell box over
+        // Deviation: the box menu on release, the box kept (the right button drew a new one-cell box over
         // it, which the release dropped: the box menu never came).
         const ymseq::RectBounds rb = rectBounds();
         const int off = rowOff(h.row);
@@ -1108,7 +1108,7 @@ void SeqGrid::press(const Hit& h, const gemui::MouseEvent& e) {
                 refresh();
                 return;
             }
-            // The prototype added viewStart a second time (ABS(c)): fixed (D-120).
+            // The prototype added viewStart a second time (ABS(c)): fixed.
             rect_ = RectSel{c, c, off, off};
             selA_ = selB_ = -1;
             selRow_.reset();
@@ -1211,7 +1211,7 @@ void SeqGrid::laneMenu(const Hit& h, int c) {
     std::vector<int> values;  // values of the entries when they do not follow from base
     std::vector<const gemui::Bitmap*> pics;  // icons of the entries
     switch (lane) {
-    case SeqLane::Vib:  // V01 starts the vibrato of the track, V00 stops it (D-254, D-341)
+    case SeqLane::Vib:  // V01 starts the vibrato of the track, V00 stops it
     case SeqLane::Lfo:  // likewise the LFO (Lxx), the modulation table (Mxx) and the arpeggiator (Jxx): items 142-144
     case SeqLane::Mod:
     case SeqLane::Afl: {
@@ -1220,7 +1220,7 @@ void SeqGrid::laneMenu(const Hit& h, int c) {
         values = {0, ymengine::seqCmd(k, 1), ymengine::seqCmd(k, 0)};
         break;
     }
-    case SeqLane::Mix:  // the Env entries put the volume on the envelope (sixth DAW test, item 79, D-277)
+    case SeqLane::Mix:  // the Env entries put the volume on the envelope (sixth DAW test, item 79)
         labels = {"Channel", "Tone", "Noise", "Tone+Noise", "Env", "Tone+Env", "Noise+Env", "Tone+Noise+Env"};
         seps = {ymengine::kSeqMixEnv};
         break;
@@ -1271,7 +1271,7 @@ void SeqGrid::laneMenu(const Hit& h, int c) {
 }
 
 void SeqGrid::envMenu(const Hit& h, int c) {
-    // ENV (eleventh and twelfth DAW tests, items 138 and 146, D-347, D-355): the shapes of the Shape R13 menu (D-221),
+    // ENV (eleventh and twelfth DAW tests, items 138 and 146): the shapes of the Shape R13 menu,
     // No change keeping the shape of the track; Restart: the envelope restarts at once (R00) or at a tick of the line.
     using ymengine::SeqCmd;
     const ymseq::Lane& l = w_.lane();
@@ -1435,7 +1435,7 @@ void SeqGrid::pressNote(const Hit& h, int c, const gemui::MouseEvent& e) {
                     return;
                 }
             }
-            const int n = ndrum ? 1 : ed.noteLenAt(st);  // a held Digidrum hit moves whole (D-282)
+            const int n = ndrum ? 1 : ed.noteLenAt(st);  // a held Digidrum hit moves whole
             if (edge && !edge->voice) {
                 sizing_ = Sizing{st, off, n, 0, edge->left};
                 s.curStep = keepStep;
@@ -1450,7 +1450,7 @@ void SeqGrid::pressNote(const Hit& h, int c, const gemui::MouseEvent& e) {
             return;
         }
     }
-    // Snap (D-280): a press on a greyed row writes on the nearest degree of the scale; if that degree already sounds
+    // Snap: a press on a greyed row writes on the nearest degree of the scale; if that degree already sounds
     // at this step, the press changes nothing (it does not take the note away).
     const int put = ed.snapRow(off);
     if (put != off && ed.stepBusyAt(c, put)) {
@@ -1610,7 +1610,7 @@ void SeqGrid::over(const Hit& h, gemui::Point pos) {
             });
         };
         if (w_.steps() > kCols) {  // pattern wider than the grid: the view follows at the edge
-            // Deviation (D-282): only when the note is pulled toward that edge (a note dragged up or down in the
+            // Deviation: only when the note is pulled toward that edge (a note dragged up or down in the
             // first or last column went one step sideways at each row).
             const int want0 = c2 - m.grab;
             const int hdir = dcol == 0 && want0 < m.from ? -1 : dcol == kCols - 1 && want0 > m.from ? 1 : 0;
@@ -1625,7 +1625,7 @@ void SeqGrid::over(const Hit& h, gemui::Point pos) {
             }
         }
         if (!drum_) {  // top or bottom edge: the view follows by a semitone
-            // Deviation (D-282): only when the note is pulled toward that edge (a note dragged along the top or
+            // Deviation: only when the note is pulled toward that edge (a note dragged along the top or
             // bottom row went a semitone further at each column).
             const int dir = h.row == 0 && off2 > m.row ? 1 : h.row == kRows - 1 && off2 < m.row ? -1 : 0;
             if (dir) {
@@ -1641,8 +1641,8 @@ void SeqGrid::over(const Hit& h, gemui::Point pos) {
         const int want = c2 - m.grab;  // the grabbed step follows the pointer
         if (want != m.from || off2 != m.row) {
             move(want, off2);
-            // Listening to the moved note, at its new start (the prototype read the cell passed over, D-120); a chord
-            // voice at its own pitch (D-282: the root of its step was heard).
+            // Listening to the moved note, at its new start (the prototype read the cell passed over); a chord
+            // voice at its own pitch (the root of its step was heard).
             ymseq::Lane copy = w_.lane();
             w_.previewNote(m.voice ? ymseq::absoluteNote(copy, m.voice, m.from, w_.trackOct())
                                    : ymseq::LaneEditor(copy, w_.context()).previewNote(m.from));
@@ -1692,7 +1692,7 @@ void SeqGrid::over(const Hit& h, gemui::Point pos) {
     if (pt.note && h.kind == Hit::Kind::Note) {
         ymseq::Lane copy = w_.lane();
         const ymseq::LaneEditor ed(copy, w_.context());
-        const int off2 = ed.snapRow(rowOff(h.row));  // Snap: a greyed row paints on its degree (D-280)
+        const int off2 = ed.snapRow(rowOff(h.row));  // Snap: a greyed row paints on its degree
         if (!w_.chipdrum() && off2 == pt.row && c > pt.from) {
             const int pv = ed.voiceAt(pt.from, off2);
             if (pv >= 2) {  // chord voice: its own duration
@@ -1759,7 +1759,7 @@ void SeqGrid::release() {
     selDrag_ = 0;
     if (rightSel_) {
         // Single click: no area. Area drawn with the right button: no menu (the prototype also raised this flag after a
-        // frame of the Select tool, which deprived the next right click of its menu, D-120).
+        // frame of the Select tool, which deprived the next right click of its menu).
         if (!rightSel_->moved) rect_.reset();
         else if (button_ == gemui::MouseButton::Right) erasedByRight_ = true;
         rightSel_.reset();
@@ -1788,7 +1788,7 @@ void SeqGrid::release() {
         moving_ = ymseq::LaneEditor::Moving{z.from, z.row, z.len, false, false, z.voice, 0};
     }
     if (moving_ && !moving_->moved && w_.ses().tool == 0) {
-        // Move tool, a click without a drag (eighth DAW test, item 92, D-293): only the cursor goes there. It used to
+        // Move tool, a click without a drag (eighth DAW test, item 92): only the cursor goes there. It used to
         // act like the Draw tool, removing the note or cutting it to the length of the figure.
         moving_.reset();
         paint_.reset();
@@ -1806,7 +1806,7 @@ void SeqGrid::release() {
         w_.editLane([&](ymseq::LaneEditor& ed, ymseq::Lane& l) {
             const int s = m.from;
             if (m.voice) ed.delVoiceAt(s, m.voice);  // chord voice: the click removes it
-            else if (m.drum && m.len > 1) ed.cutNoteAt(s);  // held Digidrum hit: its hold with it (D-282)
+            else if (m.drum && m.len > 1) ed.cutNoteAt(s);  // held Digidrum hit: its hold with it
             else if (m.drum) l.pat[size_t(s)] = -1;
             else if (ed.figLenAt(s) == fig) {
                 ed.clearFigure(s);
@@ -2022,7 +2022,7 @@ void SeqGrid::laneLabelMenu(const Hit& h) {
         w_.pushUndo();
         const ymseq::Lane src = w_.ses().rowClip->second;
         w_.editLane([&](ymseq::LaneEditor&, ymseq::Lane& l) {
-            if (ymseq::isCmdBoxRow(row))  // every kind of the CMD row, one row on screen (D-330)
+            if (ymseq::isCmdBoxRow(row))  // every kind of the CMD row, one row on screen
                 for (int s = 0; s < ymseq::kSteps; ++s) l.copyBoxCmds(s, src, s);
             else
                 for (int s = 0; s < ymseq::kSteps; ++s) {

@@ -1,4 +1,4 @@
-// STYM2149 — ymio: reading XM 1.04 modules (M7, B5, D-056, D-166): header, order table, packed or full cells, 8 and
+// STYM2149 — ymio: reading XM 1.04 modules: header, order table, packed or full cells, 8 and
 // 16-bit delta samples, bounded loops, cut or refused files.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

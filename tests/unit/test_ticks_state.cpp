@@ -1,4 +1,4 @@
-// STYM2149 — Ticks timing in the plugin state (TIMG chunk, M6, B5, D-149) and entry of the speed and the groove.
+// STYM2149 — Ticks timing in the plugin state (TIMG chunk) and entry of the speed and the groove.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

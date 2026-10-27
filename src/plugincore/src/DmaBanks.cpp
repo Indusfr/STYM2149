@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: named DMA banks (D-462)
+// STYM2149 — plugincore: named DMA banks
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/DmaBanks.h"

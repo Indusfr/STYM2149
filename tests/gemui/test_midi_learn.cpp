@@ -1,4 +1,4 @@
-// STYM2149 — MIDI learn (M6, A4, D-146): Options menu, banner, control armed by a click, learnt CCs and notes that
+// STYM2149 — MIDI learn: Options menu, banner, control armed by a click, learnt CCs and notes that
 // drive sliders and buttons, shared map kept in the preferences.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -24,7 +24,7 @@ namespace {
 class TestHost : public pluginui::Host {
 public:
     bool audioSettings = false;  // the standalone application's audio and MIDI window
-    bool renderers = false;      // Settings > Renderer (Windows, D-420)
+    bool renderers = false;      // Settings > Renderer (Windows)
     int audioOpened = 0;
     plugin::ParamValues values = plugin::defaultValues();
     plugin::NonParamState state;
@@ -113,7 +113,7 @@ void options(MainWindow& w, int entry) {
 
 }  // namespace
 
-TEST_CASE("Options: one Audio/MIDI settings entry, greyed out in a host (second DAW test, item 16, D-217)",
+TEST_CASE("Options: one Audio/MIDI settings entry, greyed out in a host (second DAW test, item 16)",
           "[ui][menu]") {
     auto labels = [](MainWindow& w) {
         w.openMenu(3);
@@ -143,8 +143,7 @@ TEST_CASE("Options: one Audio/MIDI settings entry, greyed out in a host (second 
     CHECK(h.audioOpened == 1);
 }
 
-TEST_CASE("Settings > Pixels: Smooth by default, Sharp stored as a preference (items 123 and 130, D-331, D-339, "
-          "D-430)",
+TEST_CASE("Settings > Pixels: Smooth by default, Sharp stored as a preference (items 123 and 130)",
           "[ui][menu]") {
     TestHost h;
     MainWindow w(h);
@@ -167,7 +166,7 @@ TEST_CASE("Settings > Pixels: Smooth by default, Sharp stored as a preference (i
     CHECK(s.button("setPixels")->text() == "Smooth");
 }
 
-TEST_CASE("Settings > Renderer: on Windows only, Software by default, Direct2D stored as a preference (D-420, D-430)",
+TEST_CASE("Settings > Renderer: on Windows only, Software by default, Direct2D stored as a preference",
           "[ui][menu]") {
     TestHost h;
     {
@@ -200,7 +199,7 @@ TEST_CASE("Settings > Renderer: on Windows only, Software by default, Direct2D s
 }
 
 TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as a preference, what follows moves up "
-          "(twelfth DAW test, item 149, D-358)",
+          "(twelfth DAW test, item 149)",
           "[ui][menu]") {
     TestHost h;
     MainWindow w(h);
@@ -212,7 +211,7 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
         w.desktop().closePopups();
         for (size_t i = 0; i < items.size(); ++i)
             if (items[i].label == "Oscilloscope") {
-                CHECK(items[i - 1].separator);  // VBL frequency went to the Settings window (D-441)
+                CHECK(items[i - 1].separator);  // VBL frequency went to the Settings window
                 return items[i];
             }
         FAIL("no Oscilloscope entry");
@@ -246,7 +245,7 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
 }
 
 TEST_CASE("Options > Register monitor: shown by default, hidden as a preference like the oscilloscope, what follows "
-          "moves up (D-436)",
+          "moves up",
           "[ui][menu]") {
     TestHost h;
     MainWindow w(h);
@@ -301,8 +300,7 @@ TEST_CASE("Options > Register monitor: shown by default, hidden as a preference 
     CHECK(*w.rectOf("kbd") == kbd);
 }
 
-TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden as a preference, nothing moves "
-          "(D-442)",
+TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden as a preference, nothing moves ",
           "[ui][menu]") {
     // Indus, 26/10/2026 04:05: the Note line (TP and Hz) in the Options menu, as the oscilloscope and the register
     // monitor.
@@ -347,7 +345,7 @@ TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden
 
 TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without acting", "[ui][learn]") {
     TestHost h;
-    // Noise in the source, so that the noise period slider is in use (greyed out otherwise, D-253).
+    // Noise in the source, so that the noise period slider is in use (greyed out otherwise).
     h.values[size_t(plugin::paramIndex(0, Track::Noise))] = 1;
     MainWindow w(h);
     CHECK(h.captures == 1);  // map from the preferences (empty) given to the host
@@ -392,7 +390,7 @@ TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without ac
 
 TEST_CASE("MIDI learn: learnt CCs and notes drive sliders and buttons; shared map", "[ui][learn]") {
     TestHost h;
-    h.values[size_t(plugin::paramIndex(0, Track::Noise))] = 1;  // noise period slider in use (D-253)
+    h.values[size_t(plugin::paramIndex(0, Track::Noise))] = 1;  // noise period slider in use
     MainWindow w(h);
     w.setMidiLearn(true);
 

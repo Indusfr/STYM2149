@@ -11,7 +11,7 @@
 namespace stym::gemui {
 namespace {
 
-// Tooltip: 2 px frame, 12 px text (size of the prototype's .hint) in the 8×8 font (D-072), one line per "\n", wrapped
+// Tooltip: 2 px frame, 12 px text (size of the prototype's .hint) in the 8×8 font, one line per "\n", wrapped
 // at spaces beyond half of the desktop (like the alerts).
 constexpr int kTipPx = 12;
 constexpr int kTipLine = 14;
@@ -413,7 +413,7 @@ Widget* Desktop::tipTarget(Widget& w, Point p) const {
 }
 
 // Called on each move of the pointer: a shown tooltip stays while the text under the pointer is the same; otherwise
-// the delay starts again, so a tooltip appears after kTipDelayMs without movement (D-072). The translation is made
+// the delay starts again, so a tooltip appears after kTipDelayMs without movement. The translation is made
 // when it appears, the comparison on the widget's own text.
 void Desktop::armTip() {
     std::string text;
@@ -508,7 +508,7 @@ void Desktop::invalidate(const Rect& r) noexcept {
 void Desktop::paintTree(Painter& p, Widget& w) {
     if (!w.visible_) return;
     const double a = w.opacity();
-    // The group blends the children that overflow the widget too (CSS opacity, D-220).
+    // The group blends the children that overflow the widget too (CSS opacity).
     const Rect area = a < 1 ? w.extent().intersect(p.clip()) : Rect{};
     const bool group = !area.empty();
     if (group) p.beginOpacity(area, a);

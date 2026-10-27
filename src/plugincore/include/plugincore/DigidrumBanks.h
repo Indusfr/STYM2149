@@ -1,14 +1,14 @@
-// STYM2149 — plugincore: named Digidrum banks (M6, B9, D-154)
+// STYM2149 — plugincore: named Digidrum banks
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // A bank keeps the eight Digidrum slots (name, playback, conversion, 8-bit source and played 4-bit values) under a
-// name. The library is shared by all projects, like the Patches one (Q8 of the M6 plan): a JSON file next to the
+// name. The library is shared by all projects, like the Patches one: a JSON file next to the
 // preferences file:
 //   {"kind": "digidrumlib", "version": 1, "banks": [{"name": ..., "slots": [{"name", "rate", "root", "cents",
 //    "loop", "loopStart", "loopEnd", "convert" ("linear" or "ym"), "data" (one hexadecimal digit per 4-bit value),
 //    "source" (signed bytes in base64)}, ...]}, ...]}
-// "loopStart" and "loopEnd" keep their names from before D-443: they hold the slot's Start and End, the part played.
+// "loopStart" and "loopEnd" keep their former names: they hold the slot's Start and End, the part played.
 // Tolerant reading: missing keys at their default, values brought back into their ranges, unknown characters ignored.
 #pragma once
 #include <array>

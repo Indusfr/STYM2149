@@ -1,4 +1,4 @@
-# ymseq: sequencer model (patterns, edits, Song, undo) (M5).
+# ymseq: sequencer model (patterns, edits, Song, undo).
 add_library(ymseq STATIC
   src/Tables.cpp
   src/Pattern.cpp

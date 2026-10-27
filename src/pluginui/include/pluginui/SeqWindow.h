@@ -4,7 +4,7 @@
 //
 // The window edits the current channel's track in the current pattern (ymseq::Project of the non-automatable state):
 // tools and clipboard, length, tempo, gate, swing, scale, time signature, resolution, input note value and chord,
-// 64-column grid, view transposition (a scroll bar at the window's right edge, D-294), transport, banks and
+// 64-column grid, view transposition (a scroll bar at the window's right edge), transport, banks and
 // patterns. Behaviours taken from the prototype's functions
 // named in the comments (buildSeqGrid, refreshSeqGrid, markStep, grid gestures, row menus, transport, banks).
 // Positions and sizes: the prototype's CSS boxes at 100 % (window at 36, 96).
@@ -34,18 +34,18 @@ namespace stym::pluginui {
 class MainWindow;
 class SeqWindow;
 
-// Control rows of the grid, in DOM order (buildSeqGrid); INS (M6, D-147) and CMD (M6, D-150) before SRC. The rows of
+// Control rows of the grid, in DOM order (buildSeqGrid); INS and CMD before SRC. The rows of
 // the eleventh and twelfth DAW tests come after them in the enumeration (stable values: blocks, clipboards) and take
-// their place on screen through kSeqLaneOrder: VIB (Vxx, item 132, D-341), BPM (item 133, D-342; the row of the
-// pattern, item 150, D-359), ENV (Exx and Rxx, items 138 and 146, D-347, D-355), DLY (Dxx, item 139, D-348), the Note
-// Cut row CUT (Cxx, item 140, D-349; the Cut flag of the prototype stays hidden), LFO (Lxx, item 142, D-351), MOD
-// (Mxx, item 143, D-352), SMP (Oxx, item 152, D-361) and TUN (Fxx, item 153, D-362). ARP holds Jxx (item 144, D-353).
+// their place on screen through kSeqLaneOrder: VIB (Vxx, item 132), BPM (item 133; the row of the
+// pattern, item 150), ENV (Exx and Rxx, items 138 and 146), DLY (Dxx, item 139), the Note
+// Cut row CUT (Cxx, item 140; the Cut flag of the prototype stays hidden), LFO (Lxx, item 142), MOD
+// (Mxx, item 143), SMP (Oxx, item 152) and TUN (Fxx, item 153). ARP holds Jxx (item 144).
 enum class SeqLane : uint8_t {
     Slt, Oct, Ton, Ins, Cmd, Mix, Fx, Afl, Tie, Cut, Slide, Slc, Gat, Pnr, Rtg, Cnd, Vol, Vib, Bpm, Env, Dly, NoteCut,
     Lfo, Mod, Smp, Tun
 };
 inline constexpr int kSeqLanes = 26;
-// Order on screen, by what the rows do to the note (thirteenth DAW test, item 166, D-375): its pitch (OCT, TON, TUN);
+// Order on screen, by what the rows do to the note (thirteenth DAW test, item 166): its pitch (OCT, TON, TUN);
 // its sound (INS, GEN, then SRC, ENV and SMP, which GEN decides); its modulations (ARP, VIB, LFO, MOD); its slide
 // (SLD, CRV); its timing in the step (CND, DLY, RTG, GAT, HLD, CUT); the other commands (CMD); its place in the mix
 // (PAN, VOL); then BPM, shared by the tracks, under VOL behind a separator (item 150).
@@ -68,8 +68,7 @@ struct SeqStepTarget {
 
 // .seqgrid: 38 px label column then 64 columns of 16 px, 1 px gap on a black background, 2 px line; header of the
 // step numbers (13 px, 3 px bottom rule), 13 note rows of 16 px (8 for a percussion track), 4 px separator, control
-// rows of 13 px and VOL of 44 px. The gaps between the columns and between the rows are 2 px (Indus, 26/10/2026,
-// D-458).
+// rows of 13 px and VOL of 44 px. The gaps between the columns and between the rows are 2 px (Indus, 26/10/2026).
 class SeqGrid : public gemui::Widget {
 public:
     static constexpr int kCols = 64;  // NCOLS
@@ -171,8 +170,8 @@ private:
     struct LaneCell {
         std::string text;
         bool on = false, dim = false, sel = false, qtr = false, dead = false;
-        bool nope = false;  // a value that cannot act there: greyed and crossed (twelfth DAW test, item 145, D-354)
-        // Empty, and nothing written there could act (thirteenth DAW test, item 165, D-374): crossed, a click opens
+        bool nope = false;  // a value that cannot act there: greyed and crossed (twelfth DAW test, item 145)
+        // Empty, and nothing written there could act (thirteenth DAW test, item 165): crossed, a click opens
         // nothing.
         bool blocked = false;
     };
@@ -224,7 +223,7 @@ private:
     std::array<std::array<NoteCell, kRows>, kCols> cells_{};
     std::array<std::array<LaneCell, kCols>, kSeqLanes> lanes_{};
     std::array<int, kCols> vol_{};
-    std::array<int, kCols> volTo_{};  // Gxx (D-393): VOL of the next step that the step glides to, -1: no glide
+    std::array<int, kCols> volTo_{};  // Gxx: VOL of the next step that the step glides to, -1: no glide
     std::array<StepNum, kCols> stepNums_{};
     std::array<std::string, kRows> noteLabels_{};
     std::array<bool, kRows> labelDis_{};
@@ -303,7 +302,7 @@ private:
     bool pressed_ = false;
     SeqStepTarget pressAt_;  // track and pattern of the press: the gesture ends if either changes under it
     gemui::MouseButton button_ = gemui::MouseButton::Left;
-    int selTrack_ = -1;     // track of noteSel_ and rect_ (D-282)
+    int selTrack_ = -1;     // track of noteSel_ and rect_
 };
 
 // canvas#overMap: the whole pattern (256 steps, B0 to C9), one line per note, current channel in black, the others in
@@ -328,7 +327,7 @@ private:
 // holds the undo entry points of the whole editor (undo, redo, applyUndo).
 class SeqWindow : public gemui::FloatWindow {
 public:
-    // #seqWin: top 96, 112 + 64 × 17 px wide; 64 px wider with the 2 px gaps of the grid (D-458), so 4 px from the
+    // #seqWin: top 96, 112 + 64 × 17 px wide; 64 px wider with the 2 px gaps of the grid, so 4 px from the
     // left of the desktop instead of 36.
     static constexpr int kX = 4, kY = 96, kW = SeqGrid::kWidth + 70;
 
@@ -370,7 +369,7 @@ public:
     void setAlt(bool alt) { grid_.setAlt(alt); }
 
     // Rectangle of a control by the prototype's id (captures, tests); "seqTrProto": where the prototype's slider of
-    // the view stood, beside the grid (D-294).
+    // the view stood, beside the grid.
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     // Control by the same id (tests), plus "bpmVal" and "swingVal" (values of the tempo and the swing) and
     // "seqScrollv" (steps shown by the scrolling).
@@ -422,11 +421,11 @@ private:
     bool modShown() const;
     bool smpShown() const;
     bool tunShown() const;
-    bool crvShown() const;  // an SLD cell lit, or a curve written (D-387)
+    bool crvShown() const;  // an SLD cell lit, or a curve written
     bool ownRowShown(ymengine::SeqCmd k) const;  // the preference, or a command of kind k written in the track
     bool written(ymengine::SeqCmd k) const;      // a command of kind k written in the track
     bool envPlays() const;  // Env source, Sync Buzzer, an Env entry of SRC or a Sync Buzzer step of GEN
-    // The sound of step s as the engine plays it (thirteenth DAW test, item 165, D-374): the generator of its note (of
+    // The sound of step s as the engine plays it (thirteenth DAW test, item 165): the generator of its note (of
     // a note written there on a rest step), and how the note of the track goes through the step.
     struct StepSound {
         int gen = 0;               // ymengine::Generator
@@ -438,7 +437,7 @@ private:
         int ins = 0;               // instrument of the note (INS, 1 to 32), 0 for the sound of the track
     };
     StepSound stepSound(int s) const;
-    // A slide of the CMD box (Axy, Bxy, Nxy) written at step s can move a note of the track (D-386).
+    // A slide of the CMD box (Axy, Bxy, Nxy) written at step s can move a note of the track.
     bool slideActs(ymengine::SeqCmd kind, int s) const;
     // What the sound of step s forbids to a row, written or not (item 165: the cell is crossed even empty).
     std::string stepBlocks(SeqLane lane, int s) const;
@@ -456,7 +455,7 @@ private:
     int beatSteps() const noexcept;
     int barSteps() const noexcept;
     int figSteps() const noexcept;
-    // Note length written: the one chosen, or Step while it is not a whole number of steps of the resolution (D-425).
+    // Note length written: the one chosen, or Step while it is not a whole number of steps of the resolution.
     int inputFigure() const noexcept;
     bool latin() const;
     std::string noteName(int pitchClass) const;
@@ -468,14 +467,13 @@ private:
     // Change of the non-automatable state through the host (Host::editExtras), read back at once (pullExtras), which
     // refreshes the windows. No undo step.
     void edit(const std::function<void(plugin::NonParamState&)>& fn);
-    // Ticks rate (M6, D-149): Resolution menu, input boxes of the speed and the groove.
+    // Ticks rate: Resolution menu, input boxes of the speed and the groove.
     void resolutionMenu();
-    // Resolution i chosen (BPM rate); with notes in the patterns, an alert first asks whether they fit the new grid
-    // (D-448).
+    // Resolution i chosen (BPM rate); with notes in the patterns, an alert first asks whether they fit the new grid.
     void setResolution(int i);
     void askSpeed();
     void askGroove();
-    // CMD row (M6, D-150): box of the commands of step s (CmdBox, tenth DAW test: D-330).
+    // CMD row: box of the commands of step s (CmdBox, tenth DAW test).
     void askCmd(int s);
     void prompt(const std::string& message, const std::string& text, int chars,
                 std::function<void(const std::string&)> ok);
@@ -486,7 +484,7 @@ private:
     void previewNote(int note);         // absolute note (melodic) or row (percussion)
     void previewStep(int s);            // note of step s (root)
     void pushUndo();                    // step of the current pattern (pushUndo of the prototype)
-    // Undo step of a grid gesture, taken by editLane at its first change only (D-282: a click that changes
+    // Undo step of a grid gesture, taken by editLane at its first change only (a click that changes
     // nothing no longer empties Redo).
     void armUndo() noexcept { undoArmed_ = true; }
     void pushUndoFor(int idx);  // step of pattern idx (pattern menus, which may target another pattern)
@@ -542,7 +540,7 @@ private:
     void openTrackLength();
     void openVol(const gemui::Rect& cell, int s);   // openVolMenu
     // Right click on a GEN, SRC or ENV cell that holds a value: the window of the settings it brings into play
-    // (24/10/2026, D-392); false for an empty cell (the right button erases, as before).
+    // (24/10/2026); false for an empty cell (the right button erases, as before).
     bool openStepSound(SeqLane row, int s);
     void openGate(const gemui::Rect& cell, int s);  // gatPopup
     void openPan(const gemui::Rect& cell, int s);   // panPopup
@@ -566,12 +564,12 @@ private:
     std::array<gemui::Button, 3> clips_;
     gemui::Button stepRec_{"Step"}, clear_{"Clear"}, euclid_{"Euclid"}, rotL_{"<"}, rotR_{">"}, trDn_{"-1"},
         trUp_{"+1"}, trOctDn_{"Oct-"}, trOctUp_{"Oct+"}, follow_{"Follow"}, plen_{"Len ="}, song_{"Song"};
-    // Rows 2 and 3. BPM: "Tempo" in the prototype (fifth DAW test, item 46, D-244).
+    // Rows 2 and 3. BPM: "Tempo" in the prototype (fifth DAW test, item 46).
     gemui::Label labSteps_{"Steps"}, labBpm_{"BPM"}, labGate_{"Gate"}, labSwing_{"Swing"}, gatePct_{"%"},
         swingPct_{"%"};
     gemui::Slider steps_, bpm_, gate_, swing_;
     gemui::ValueField stepsv_, bpmv_, gatev_, swingv_;
-    // Global gate (D-134, not in the prototype): when lit, the Gate slider sets the gate of every track.
+    // Global gate (not in the prototype): when lit, the Gate slider sets the gate of every track.
     gemui::Button gateAll_{"All"};
     // Row 4.
     gemui::Label labScale_{"Scale"}, labSig_{"Signature"}, labReso_{"Resolution"}, labNote_{"Note"},
@@ -580,7 +578,7 @@ private:
         over_{"Overview"};
     // Grid and view transposition.
     SeqGrid grid_{*this};
-    gemui::ScrollBar tr_;  // at the right edge of the window (D-294)
+    gemui::ScrollBar tr_;  // at the right edge of the window
     gemui::Box trProto_;   // the prototype's place of it, beside the grid (captures)
     int trHeight_ = 180;  // .trwrap as long as it has not been measured (fitTrSlider)
     int trTop_ = 8;

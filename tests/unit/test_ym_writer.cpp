@@ -1,4 +1,4 @@
-// STYM2149 — ymio: writing register dumps (M7, A5, B1): VBL, YM3 and YM6 with timer effects.
+// STYM2149 — ymio: writing register dumps: VBL, YM3 and YM6 with timer effects.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -221,7 +221,7 @@ TEST_CASE("YM6 of a captured pattern: a SID code at each frame where the channel
     const ymio::YmParseResult r = ymio::parseYm(ym6);
     REQUIRE(r.file);
     CHECK(rep.droppedEffects == 0);
-    // Compressed with -lh5- (D-161): read back identically, much smaller.
+    // Compressed with -lh5-: read back identically, much smaller.
     const std::vector<uint8_t> lzh = ymio::packLzh("stym2149-song.ym", ym6);
     CHECK(lzh.size() * 3 < ym6.size());
     const ymio::YmParseResult packed = ymio::parseYm(lzh);

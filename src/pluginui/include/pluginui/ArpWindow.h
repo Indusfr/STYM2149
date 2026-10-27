@@ -3,15 +3,13 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // On / Off (not applicable on a percussion track), mode (Up, Down, UpDn, Order, Random, Table), rate in Hz with Track
-// and Land, or a menu of divisions of the MIDI clock or of the tempo with "MIDI ext" or Sync (D-290), octaves (except
+// and Land, or a menu of divisions of the MIDI clock or of the tempo with "MIDI ext" or Sync, octaves (except
 // in Table mode), and in Table
-// mode: number of steps, menu of the 39 chords that fills the table, grid of 16 steps by 25 semitones (#arpgrid,
-// D-322).
+// mode: number of steps, menu of the 39 chords that fills the table, grid of 16 steps by 25 semitones (#arpgrid).
 // Positions and sizes: the prototype's CSS boxes at 100 % (window at 80, 100, as wide as its content).
 //
 // On, rate and division are host parameters (ArpOn, the track's ArpRate, ArpDivision); mode, octaves, Track, Land
-// and table live in the non-automatable state (ymengine::TrackArp). Each setting is one undo step of the track
-// (D-129).
+// and table live in the non-automatable state (ymengine::TrackArp). Each setting is one undo step of the track.
 #pragma once
 #include <array>
 #include <functional>
@@ -36,7 +34,7 @@ class MainWindow;
 // border.
 class ArpGrid : public gemui::Widget {
 public:
-    // Offsets +0 to +24 (the reach of the chords, kept by the state); the prototype showed +0 to +15 (D-322).
+    // Offsets +0 to +24 (the reach of the chords, kept by the state); the prototype showed +0 to +15.
     static constexpr int kSteps = ymengine::kArpSteps, kRows = 25;
     static constexpr int kLabelW = 26, kCellW = 20, kCellH = 10, kBorder = 2;
     static constexpr int kWidth = kBorder * 2 + kLabelW + kSteps * (kCellW + 1);    // 366
@@ -103,12 +101,12 @@ private:
     gemui::Label hint_{"50 Hz = VBL rate", 12};
     gemui::Label labMode_{"Mode"}, labRate_{"Rate"}, labDiv_{"Division"}, labOct_{"Octaves"}, labSteps_{"Steps"};
     gemui::Button mode_;
-    gemui::Button sync_{"Sync"};  // Arp Sync: Rate in Hz, or the tempo with Division (D-256)
+    gemui::Button sync_{"Sync"};  // Arp Sync: Rate in Hz, or the tempo with Division
     gemui::Slider rate_;
     gemui::ValueField ratev_;
     gemui::Label hz_{"Hz"};
     gemui::Button track_{"Track"}, land_{"Land"};
-    gemui::Button div_;  // division: a menu button (D-290), without Tick with Sync (D-287)
+    gemui::Button div_;  // division: a menu button, without Tick with Sync
     std::array<gemui::Button, 3> octs_;
     gemui::Slider len_;
     gemui::ValueField lenv_;

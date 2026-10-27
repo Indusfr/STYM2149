@@ -1,4 +1,4 @@
-// STYM2149 — YM Player in the plugin (M7, A2, D-169): files read and refused, playback in place of the engine, stop
+// STYM2149 — YM Player in the plugin: files read and refused, playback in place of the engine, stop
 // and resume, Rewind, subsong, close, loop, resume on a new chip, SNDH and crashed routine.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

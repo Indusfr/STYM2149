@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: the application icon (D-218) as pixels, for the Information box (D-235)
+// STYM2149 — pluginui: the application icon as pixels, for the Information box
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

@@ -1,7 +1,7 @@
-// STYM2149 — LFO of the focused track in the Modulation window (sixth DAW test, item 59, D-257): below the settings
-// of the sequences, On / Off, shape and target menus, Sync and division, Retrig (D-279), rate and depth sliders and
+// STYM2149 — LFO of the focused track in the Modulation window (sixth DAW test, item 59): below the settings
+// of the sequences, On / Off, shape and target menus, Sync and division, Retrig, rate and depth sliders and
 // typed values, one undo step per setting; nothing on a percussion track; Pan greyed in the 3-channel modes; off, only
-// "LFO" and its button (D-298).
+// "LFO" and its button.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -50,7 +50,7 @@ void type(MainWindow& w, const std::string& id, std::string_view text) {
 
 }  // namespace
 
-TEST_CASE("LFO: below the settings of the sequences, off by default, its settings shown once on (D-257, D-298)",
+TEST_CASE("LFO: below the settings of the sequences, off by default, its settings shown once on",
           "[ui][lfo]") {
     UiHost h;
     MainWindow w(h);
@@ -58,7 +58,7 @@ TEST_CASE("LFO: below the settings of the sequences, off by default, its setting
     w.modulation().show();
     const char* const ids[] = {"lfoOn",    "lfoShape", "lfoTo",    "lfoSync",  "lfoRetrig",
                                "lfoRate",  "lfoDepth", "lfoRateV", "lfoDepthV"};
-    // Off: "LFO" and its button only (eighth DAW test, item 97, D-298); the window ends below them.
+    // Off: "LFO" and its button only (eighth DAW test, item 97); the window ends below them.
     const gemui::Rect off = *w.rectOf("ornWin");
     REQUIRE(w.rectOf("lfoOn"));
     CHECK(w.rectOf("lfoOn")->y > w.rectOf("seqxVibWrite")->bottom());
@@ -101,7 +101,7 @@ TEST_CASE("LFO: below the settings of the sequences, off by default, its setting
     CHECK(w.rectOf("lfoDepth")->x == w.rectOf("lfoRate")->x);
     CHECK(w.rectOf("lfoDepth")->y > w.rectOf("lfoRate")->bottom());
 
-    // Retrig (D-279): lit by default, restarted at each note; off, the LFO runs free.
+    // Retrig: lit by default, restarted at each note; off, the LFO runs free.
     const gemui::Button* retrig = w.modulation().lfo().button("lfoRetrig");
     REQUIRE(retrig);
     CHECK(retrig->enabled());
@@ -119,10 +119,10 @@ TEST_CASE("LFO: below the settings of the sequences, off by default, its setting
     CHECK(w.rectOf("ornWin")->bottom() == off.bottom());
 }
 
-TEST_CASE("LFO: shape and target menus, the depth kept in proportion (D-257)", "[ui][lfo]") {
+TEST_CASE("LFO: shape and target menus, the depth kept in proportion", "[ui][lfo]") {
     UiHost h;
     h.state.tracks[0].patch.lfo.on = true;
-    h.values[size_t(plugin::paramIndex(0, plugin::Track::Noise))] = 1;  // a noise period to move (D-321)
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::Noise))] = 1;  // a noise period to move
     MainWindow w(h);
     w.modulation().show();
 
@@ -154,7 +154,7 @@ TEST_CASE("LFO: shape and target menus, the depth kept in proportion (D-257)", "
     CHECK(lfo(h).depth == 2400);
 }
 
-TEST_CASE("LFO: rate in Hz or a division of the tempo, dragged and typed (D-257)", "[ui][lfo]") {
+TEST_CASE("LFO: rate in Hz or a division of the tempo, dragged and typed", "[ui][lfo]") {
     CHECK(LfoPanel::rateOfPosition(0) == ymengine::kLfoMinHz);
     CHECK(LfoPanel::rateOfPosition(LfoPanel::kRatePositions) == ymengine::kLfoMaxHz);
     for (double hz : {0.1, 0.5, 1.0, 4.0, 7.5, 12.5, 20.0}) {
@@ -186,7 +186,7 @@ TEST_CASE("LFO: rate in Hz or a division of the tempo, dragged and typed (D-257)
     type(w, "lfoRateV", "fast");  // rejected
     CHECK(h.editor.undo.undoSize() == undo);
 
-    // Sync: a menu button in place of the slider and its value (ninth DAW test, item 119, D-320), on the same row, at
+    // Sync: a menu button in place of the slider and its value (ninth DAW test, item 119), on the same row, at
     // the place of the slider; 1/4 by default, from 4/1 to 1/64.
     const gemui::Rect slider = *w.rectOf("lfoRate");
     click(w, "lfoSync");
@@ -226,7 +226,7 @@ TEST_CASE("LFO: rate in Hz or a division of the tempo, dragged and typed (D-257)
     CHECK(lfo(h).hz == 3);
 }
 
-TEST_CASE("LFO: nothing on a percussion track, Pan greyed in the 3-channel modes (D-257)", "[ui][lfo]") {
+TEST_CASE("LFO: nothing on a percussion track, Pan greyed in the 3-channel modes", "[ui][lfo]") {
     UiHost h;
     h.state.tracks[0].patch.lfo.on = true;
     MainWindow w(h);
@@ -235,7 +235,7 @@ TEST_CASE("LFO: nothing on a percussion track, Pan greyed in the 3-channel modes
     const size_t undo = h.editor.undo.undoSize();
     click(w, "lfoOn");
     CHECK(lfo(h).on);
-    // Only "LFO" and its greyed button (D-298).
+    // Only "LFO" and its greyed button.
     CHECK_FALSE(w.rectOf("lfoSync"));
     CHECK_FALSE(w.modulation().lfo().slider("lfoDepth")->enabled());
     CHECK(h.editor.undo.undoSize() == undo);
@@ -253,7 +253,7 @@ TEST_CASE("LFO: nothing on a percussion track, Pan greyed in the 3-channel modes
     CHECK(lfo(h3).target == LfoTarget::Volume);
 }
 
-TEST_CASE("LFO: the targets that move nothing on the track greyed, with the reason (ninth DAW test, item 120, D-321)",
+TEST_CASE("LFO: the targets that move nothing on the track greyed, with the reason (ninth DAW test, item 120)",
           "[ui][lfo]") {
     using ymengine::Generator;
     UiHost h;
@@ -322,8 +322,7 @@ TEST_CASE("LFO: the targets that move nothing on the track greyed, with the reas
     CHECK(whys().front() == buzzVol);
 }
 
-TEST_CASE("LFO: the Triangle drawing comes to a point, the Sine one is round (D-292, ninth DAW test, item 118, "
-          "D-319)",
+TEST_CASE("LFO: the Triangle drawing comes to a point, the Sine one is round (ninth DAW test, item 118)",
           "[ui][lfo]") {
     // Each over two cycles, two crests on its top row. The apex of the triangle is no wider than its 2 px stroke and
     // one more pixel, its sides are straight steep runs; the crest of the sine is wider, its sides fall straight down

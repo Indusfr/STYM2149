@@ -1,4 +1,4 @@
-// STYM2149 — Ticks cadence of the sequencer (M6, B5, D-149): rows of Speed replay ticks (50 to 200 Hz) plus the
+// STYM2149 — Ticks cadence of the sequencer: rows of Speed replay ticks (50 to 200 Hz) plus the
 // groove, without swing; MIDI clock (one pulse per tick) and Song Position Pointer; Host sync keeps the BPM
 // cadence; speed changed during playback.
 // Programming: Pascal "Indus" Nowak (with Claude's help).

@@ -4,7 +4,7 @@
 //
 // Behaviours taken from the prototype functions quoted in comments (refreshUI, syncTabs, focusCh, setEffect, setMode3,
 // refreshAdsrScale, refreshAdsrEnable, buildPads, press / release, chanMenu, chipIssues, menus of the GEM bar). The
-// functions that come with later milestones keep their buttons and menu entries in place, which explains them.
+// functions that come with later versions keep their buttons and menu entries in place, which explains them.
 //
 // Map of the file (the File menu, its dialogues and its exports are in FileMenu.cpp):
 // - Widgets. MainWindow is the root widget of the gemui::Desktop desk_, which covers the whole editor (kWidth ×
@@ -68,14 +68,14 @@ namespace colors = gemui::colors;
 
 namespace {
 
-// Forms of the SID wave, in the order of ymengine::SidForm (24/10/2026, D-411), and in that of its menu: Bounce after
-// Sine (D-414).
+// Forms of the SID wave, in the order of ymengine::SidForm (24/10/2026), and in that of its menu: Bounce after
+// Sine.
 constexpr std::array<const char*, ymengine::kSidForms> kSidFormNames = {"Base", "Square", "Sine", "Custom", "Bounce"};
 constexpr std::array<ymengine::SidForm, ymengine::kSidForms> kSidFormMenu = {
     ymengine::SidForm::Base, ymengine::SidForm::Square, ymengine::SidForm::Sine, ymengine::SidForm::Bounce,
     ymengine::SidForm::Custom};
 
-// Prototype names; the Source menu adds the envelope (fifth DAW test, item 48, D-246): entry = tone + 2 × noise − 1
+// Prototype names; the Source menu adds the envelope (fifth DAW test, item 48): entry = tone + 2 × noise − 1
 // + 3 × envelope, Env alone being entry 3.
 constexpr std::array<const char*, 7> kSrcNames = {"Tone",    "Noise",    "Tone+Noise",    "Env",
                                                   "Tone+Env", "Noise+Env", "Tone+Noise+Env"};
@@ -87,11 +87,11 @@ constexpr std::array<const char*, 3> kModeNames = {"16 ch", "Authentic 3ch", "Du
 constexpr std::array<const char*, 2> kClkModes = {"Internal", "MIDI ext"};
 constexpr std::array<const char*, 2> kAdsrModes = {"Smooth", "Chip"};
 constexpr std::array<const char*, 6> kFxNames = {"Chip Voice", "SID Voice", "Digidrum", "Sync Buzzer", "Chipdrum", "DMA"};
-constexpr std::array<int, 6> kFxOrder = {0, 1, 3, 4, 2, 5};  // melodic, drums, then the STE DMA (D-153)
-// Per generator code; DMA took ^D from the demo pattern (eighth DAW test, item 100, D-301).
+constexpr std::array<int, 6> kFxOrder = {0, 1, 3, 4, 2, 5};  // melodic, drums, then the STE DMA
+// Per generator code; DMA took ^D from the demo pattern (eighth DAW test, item 100).
 constexpr std::array<char, 6> kFxKeys = {'V', 'S', 'I', 'U', 'C', 'D'};
 // Register monitor: generator of the track (the prototype said NOISE DRUM for the Chipdrum).
-// Chip Voice named like the others (ninth DAW test, item 105, D-306): the prototype showed "-".
+// Chip Voice named like the others (ninth DAW test, item 105): the prototype showed "-".
 constexpr std::array<const char*, 6> kFxShort = {"CHIP VOICE", "SID VOICE", "DIGIDRUM",
                                                  "SYNC BUZZER", "CHIPDRUM",  "DMA"};
 constexpr std::array<const char*, 8> kDrumFull = {"Kick",     "Snare",      "Clap",  "Hat",
@@ -116,7 +116,7 @@ constexpr std::array<Track, 9> kMixFields = {Track::Level, Track::Pan,    Track:
 constexpr int kPlayLo = 23, kPlayHi = 120;  // PLAY_LO, MAP_HI: B0 to C9
 constexpr int kPolyMax = 6;                 // voices of a polyphonic track (named in the Voicing tooltip)
 constexpr double kRowW = 204.5;             // usable width of a frame (228.5 - 2 × 12)
-constexpr int kHelpLine = 32;               // help line of the prototype under the buttons, and its margin (D-267)
+constexpr int kHelpLine = 32;               // help line of the prototype under the buttons, and its margin
 // X coordinates: from the left edge of the main window (kWx + 18 = inner edge of its frames).
 // Y coordinates: from the top of the desktop, the window being at its home place (kWinY); layout() carries both to
 // where the window was dragged.
@@ -151,7 +151,7 @@ std::optional<long long> parseMHz(const std::string& text) {
 
 std::string fmt(const char* f, double v) { return gemui::formatDecimal(f, v); }
 
-// ` "name"` after a slot number, nothing for a sample without a name (D-445).
+// ` "name"` after a slot number, nothing for a sample without a name.
 std::string quotedName(const std::string& name) { return name.empty() ? std::string() : " \"" + name + "\""; }
 
 // Item of a flex row of the prototype (.row: gap 8 px, items centred vertically).
@@ -199,7 +199,7 @@ Item unitW(Label& l, double width) { return {&l, width, 16, 0, 0}; }  // unit wh
 Item slider(gemui::Slider& s) { return {&s, -1, 16}; }
 
 void hintStyle(Label& l) { l.setColor(colors::kHint); }
-// .hint of a frame, next to a button: 6×6 font, the 8×8 one would overflow the frame ("audio gain", D-071).
+// .hint of a frame, next to a button: 6×6 font, the 8×8 one would overflow the frame ("audio gain").
 void frameHintStyle(Label& l) {
     hintStyle(l);
     l.setFace(gemui::Face::kSmall);
@@ -230,7 +230,7 @@ MainWindow::MainWindow(Host& host) : host_(host) {
     buildMenus();
     wireControls();
     desk_.setTooltips(host_.preference("tooltips", "1") != "0");
-    // Tooltip language (D-185, D-283): the chosen one, otherwise the system's if the menu has it (its file installed
+    // Tooltip language: the chosen one, otherwise the system's if the menu has it (its file installed
     // or added), otherwise English.
     scanTipLanguages();
     auto known = [this](std::string_view wanted) -> std::string {
@@ -298,7 +298,7 @@ void MainWindow::build() {
     frame_.add(allOn_);
     frame_.add(allOff_);
 
-    // Frames (sixth DAW test, item 70, D-268): SOURCE then VIBRATO; ENVELOPE, ADSR then ADSR ENVELOPE; GENERATOR;
+    // Frames (sixth DAW test, item 70): SOURCE then VIBRATO; ENVELOPE, ADSR then ADSR ENVELOPE; GENERATOR;
     // SYSTEM. Each column ends at the bottom of the prototype's frames.
     // Four columns 228.5 px wide and 10 px apart, from kWx + 18; the first frame of each starts at y = 122. Here
     // the frames get their boxes and the controls their ranges and tooltips; layoutHome() places the rows inside.
@@ -309,25 +309,25 @@ void MainWindow::build() {
                                                                   &np_, &npv_, &labVol_, &vol_, &volv_, &labVm_,
                                                                   &vmSel_, &labLevel_, &level_, &levelv_})
         srcFs_.add(*w);
-    np_.setRange(1, 31, 1);  // tips set by refresh (D-253, D-261, D-262)
+    np_.setRange(1, 31, 1);  // tips set by refresh
     npv_.setMinChars(2);
-    npv_.setPadChars(1);  // Volume's width: the slider ends with Volume's (twelfth DAW test, item 160, D-369)
+    npv_.setPadChars(1);  // Volume's width: the slider ends with Volume's (twelfth DAW test, item 160)
     vol_.setRange(0, 15, 1);
     volv_.setMinChars(2);
-    volv_.setPadChars(1);  // the width of Level's value: both sliders as wide (ninth DAW test, item 104, D-305)
+    volv_.setPadChars(1);  // the width of Level's value: both sliders as wide (ninth DAW test, item 104)
     level_.setRange(0, 100, 1);
     level_.setTip("Channel level in the mix");
     levelv_.setMinChars(3);
 
     // ENVELOPE.
     frame_.add(envFs_);
-    envFs_.setBox({kWx + 256.5, 122, 228.5, 118});  // without the space above Shape R13 (item 57, D-255)
+    envFs_.setBox({kWx + 256.5, 122, 228.5, 118});  // without the space above Shape R13 (item 57)
     for (gemui::Widget* w :
          std::initializer_list<gemui::Widget*>{&labEf_, &ef_, &efv_, &efUnit_, &labEp_, &epv_, &shapeLab_, &shapeSel_})
         envFs_.add(*w);
     ef_.setRange(0, 4000, 1);
     ef_.setTip("Envelope frequency: the shape repeat rate");
-    efv_.setMinChars(4);  // "_0.6" beside EP (D-296)
+    efv_.setMinChars(4);  // "_0.6" beside EP
     efv_.setMask("999.9");
     epv_.setMinChars(8);
     shapeSel_.setTip("Hardware envelope shape (register R13)");
@@ -341,7 +341,7 @@ void MainWindow::build() {
         vibFs_.add(*w);  // tips set by refresh
     vibDepth_.setRange(0, 200, 1);
     vibDepthv_.setMinChars(3);
-    vibDepthv_.setPadChars(1);  // the width of Rate's value: both sliders as wide (ninth DAW test, item 103, D-304)
+    vibDepthv_.setPadChars(1);  // the width of Rate's value: both sliders as wide (ninth DAW test, item 103)
     vibDepthv_.setMask("999");
     vibRate_.setRange(1, 20, 0.5);
     vibRatev_.setMinChars(4);
@@ -388,16 +388,15 @@ void MainWindow::build() {
     vmin_.setRange(0, 15, 1);
     vmin_.setTip("Floor of the software envelope: the level the sound never falls below");
     vminv_.setMinChars(2);
-    // As wide as "x" and the ratio's field together: the slider ends with Timer ratio's (thirteenth DAW test, item 163,
-    // D-372).
+    // As wide as "x" and the ratio's field together: the slider ends with Timer ratio's (thirteenth DAW test, item 163).
     vminv_.setPadChars(3);
-    // SID wave and Sync Buzzer steps, formerly in the Timer Wave window (D-251, D-252, D-278).
+    // SID wave and Sync Buzzer steps, formerly in the Timer Wave window.
     static_assert(SidWaveGrid::kSteps == ymengine::kSidWaveSteps);
-    // Steps from 2 (the square of Base has 2, D-411).
+    // Steps from 2 (the square of Base has 2).
     waveSteps_.setRange(2, ymengine::kSidWaveSteps, 1);
     waveStepsv_.setMinChars(2);
     waveStepsv_.setMask("99");
-    waveStepsv_.setPadChars(3);  // like SID min vol: the slider ends with Timer ratio's (D-390)
+    waveStepsv_.setPadChars(3);  // like SID min vol: the slider ends with Timer ratio's
     waveSteps_.setTip("Steps of the SID wave, one per timer interrupt: those of a period of the Square, or the bars "
                       "played of Sine, Bounce and Custom. Base has none");
     waveForm_.setTip("Form of the SID wave: Base, the plain square; Square, a square of Steps steps, the note volume "
@@ -410,7 +409,7 @@ void MainWindow::build() {
         formW = std::max(formW, waveForm_.naturalWidth());
     }
     waveForm_.setMinWidth(formW);
-    // Period of the sine in bars, 8 by default (24/10/2026, D-406; the Phase slider of D-405 before): like Steps, its
+    // Period of the sine in bars, 8 by default (24/10/2026; formerly a Phase slider): like Steps, its
     // field as wide as Timer ratio's.
     wavePeriod_.setRange(ymengine::kSidWavePeriodMin, ymengine::kSidWaveSteps, 1);
     wavePeriodv_.setMinChars(2);
@@ -418,8 +417,7 @@ void MainWindow::build() {
     wavePeriodv_.setPadChars(3);
     wavePeriod_.setTip("Period of the Sine-SID in bars (8 by default): the bars of one cycle of the sine. Sine and "
                        "Bounce only");
-    // Width of the Square in steps, up to Steps - 1 (refresh), 4 of the 8 Steps (half and half) by default (24/10/2026,
-    // D-408, D-411).
+    // Width of the Square in steps, up to Steps - 1 (refresh), 4 of the 8 Steps (half and half) by default (24/10/2026).
     waveWidth_.setRange(1, ymengine::kSidWidthMax, 1);
     waveWidthv_.setMinChars(2);
     waveWidthv_.setMask("99");
@@ -439,19 +437,19 @@ void MainWindow::build() {
         buzzStep_[size_t(k)].setTip("Sync Buzzer step " + std::to_string(k + 1) +
                                     ": envelope shape. Right click: the track's shape");
     }
-    // Sync Buzzer (D-227): the controls of the Buzzer window, with its tips.
+    // Sync Buzzer: the controls of the Buzzer window, with its tips.
     buzTuned_.setTip("Tuned envelope: the envelope period follows the note (Env freq is then unused)");
     buzN_.setRange(1, ymengine::kEnvRatioMax, 1);
     buzD_.setRange(1, ymengine::kEnvRatioMax, 1);
     buzFine_.setRange(-ymengine::kEnvFineMax, ymengine::kEnvFineMax, 1);
-    // Typed values (sixth DAW test, item 66, D-264), as wide as "+100c" so that the three sliders line up.
+    // Typed values (sixth DAW test, item 66), as wide as "+100c" so that the three sliders line up.
     for (gemui::ValueField* f : {&buzNv_, &buzDv_}) {
         f->setMinChars(2);
         f->setPadChars(3);
         f->setMask("99");
     }
     buzFinev_.setMinChars(5);  // signed: typed without a mask
-    buzFinev_.setUnit("c");    // out of the reverse video (D-464)
+    buzFinev_.setUnit("c");    // out of the reverse video
     buzN_.setTip("N: the envelope plays the note x N / D");
     buzD_.setTip("D: the envelope plays the note x N / D");
     buzFine_.setTip("Fine tune of the envelope, in cents");
@@ -469,15 +467,15 @@ void MainWindow::build() {
     digiChSel_.setTip("ST voice used by the Digidrum track in 3 ch mode");
     digiChHint_.setText("3ch: the drum takes over this channel");
     digiEdit_.setTip("Digidrums window: load the eight samples, set their rate, root note, tuning and loop");
-    // D-029: an empty slot plays nothing (the prototype announced a built-in DrumNoise kit).
-    // D-154: the rate is that of the slot (7 800 Hz by default), set in the Digidrum editor. D-213: the drawing no
+    // an empty slot plays nothing (the prototype announced a built-in DrumNoise kit).
+    // the rate is that of the slot (7 800 Hz by default), set in the Digidrum editor. the drawing no
     // longer loads a file, the Digidrum samples button opens the editor on the slot.
     digiHint_.setText("4-bit samples at the slot rate.");
-    // DMA type (D-153): one of the eight samples of the bank, tuned from its root note.
+    // DMA type: one of the eight samples of the bank, tuned from its root note.
     for (int k = 0; k < ymengine::kDmaSlots; ++k) dmaSlots_[size_t(k)].setText(std::to_string(k + 1));
     dmaEdit_.setTip("DMA window: load the eight samples, set their rate, format, root note and loop");
 
-    // ADSR curve, under ADSR (D-268): 22 px taller than the prototype's, down to the bottom of the column.
+    // ADSR curve, under ADSR: 22 px taller than the prototype's, down to the bottom of the column.
     frame_.add(curveFs_);
     curveFs_.setBox({kWx + 256.5, 420, 228.5, 102});
     curveFs_.setLegendInset(10);
@@ -493,8 +491,8 @@ void MainWindow::build() {
         sysFs_.add(*w);
     modeSel_.setTip(
         "16 ch: sixteen channels with panning and polyphony. 3 ch: the authentic YM, three voices, mono");
-    // Machine (STYM2149 row, D-155): the STE adds the DMA sound (D-153). A menu button since the thirteenth DAW test
-    // (item 164, D-373); its tooltip, the lines of the former ST and STE buttons.
+    // Machine (STYM2149 row): the STE adds the DMA sound. A menu button since the thirteenth DAW test
+    // (item 164); its tooltip, the lines of the former ST and STE buttons.
     compSel_.setTip("Computer: Atari ST, the YM alone\nComputer: Atari STE, the YM plus the DMA sound: eight DMA tracks "
                     "in 3 ch, the DMA type on any track in 16 ch");
     clkSel_.setTip("Clock source: internal tempo, or follow an incoming MIDI clock");
@@ -510,7 +508,7 @@ void MainWindow::build() {
         "Effects: echo of the notes, and the audio delay in 16 ch (Ctrl+F)",
         "Step Sequencer: write patterns and chain them into a song (Ctrl+E)",
         "Patches: save and recall channel settings (Ctrl+P)"};
-    // Centred in the window, over the width of the oscilloscope (fifth DAW test, item 49, D-247); the prototype
+    // Centred in the window, over the width of the oscilloscope (fifth DAW test, item 49); the prototype
     // put them at its left edge.
     double total = 6.0 * double(winBtns_.size() - 1);
     for (const Button& b : winBtns_) total += b.naturalWidth();
@@ -538,7 +536,7 @@ void MainWindow::build() {
     octv_.setTip("Octaves shown on the virtual keyboard");
     kbdMap_.setTip("Open the computer keyboard: play with the keys or click them. Typing only plays while this "
                    "window is open.");
-    // No help line of shortcuts under the buttons (sixth DAW test, item 69, D-267).
+    // No help line of shortcuts under the buttons (sixth DAW test, item 69).
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&latchBtn_, &layerBtn_, &octDown_, &octUp_, &octv_,
                                                                   &kbdMap_})
         frame_.add(*w);
@@ -564,7 +562,7 @@ void MainWindow::build() {
     add(help_);
     add(badge_);  // #learnBadge, in front of the windows
 
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146). The learned map (preferences) stores
+    // Prototype ids of the sliders and buttons that MIDI learn can learn. The learned map (preferences) stores
     // these ids, so they must not change.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&srcSel_, "srcSel"}, {&polySel_, "polySel"}, {&vmSel_, "vmSel"}, {&np_, "np"}, {&vol_, "vol"},
@@ -611,7 +609,7 @@ void MainWindow::wireControls() {
         if (host_.standalone()) confirmQuit();
     };
     title_.setCloseTip(host_.standalone() ? "Quit STYM2149" : "Close the plugin window from the host");
-    // Moved by its title bar like the other windows (third DAW test, item 25, D-224).
+    // Moved by its title bar like the other windows (third DAW test, item 25).
     title_.setMovable(true);
     title_.onGrab = [this](gemui::Point p) { grab_ = {p.x - frame_.bounds().x, p.y - frame_.bounds().y}; };
     title_.onDrag = [this](gemui::Point p) { moveMainTo(p.x - grab_.x, p.y - grab_.y); };
@@ -629,7 +627,7 @@ void MainWindow::wireControls() {
         for (int i = 0; i < int(kSrcNames.size()); ++i) {
             MenuItem m;
             m.label = kSrcNames[size_t(i)];
-            // A SID Voice writes its own volumes: the envelope entries do nothing there (D-262).
+            // A SID Voice writes its own volumes: the envelope entries do nothing there.
             m.disabled = i >= 3 && generator() == int(Generator::Sid) && !drumTrack();
             if (m.disabled) m.why = "A SID Voice writes its own volumes: the envelope is not used";
             m.pick = [this, i] {  // one undo step for the three settings
@@ -678,7 +676,7 @@ void MainWindow::wireControls() {
             m.label = kVmNames[size_t(i)];
             m.pick = [this, i] {
                 set(Track::VolMode, float(i));
-                // Vol 4-bit without square or noise would be a constant level: the square comes back (D-246).
+                // Vol 4-bit without square or noise would be a constant level: the square comes back.
                 if (i == 0 && iv(Track::Tone) == 0 && iv(Track::Noise) == 0) set(Track::Tone, 1.0f);
             };
             items.push_back(std::move(m));
@@ -715,7 +713,7 @@ void MainWindow::wireControls() {
         return true;
     };
     shapeSel_.onClick = [this] {
-        // Shapes 8 to F only (third DAW test, item 22, D-221): 0 to 3 play as 9 and 4 to 7 as F. A value below 8 (YM
+        // Shapes 8 to F only (third DAW test, item 22): 0 to 3 play as 9 and 4 to 7 as F. A value below 8 (YM
         // import, MIDI CC) stays as it is and the menu marks the shape it plays as.
         std::vector<MenuItem> items;
         for (int i = 8; i < 16; ++i) {
@@ -840,14 +838,14 @@ void MainWindow::wireControls() {
     };
     for (int k = 0; k < ymengine::kDmaSlots; ++k) dmaSlots_[size_t(k)].onClick = [this, k] { selectDmaSlot(k); };
     dmaEdit_.onClick = [this] { dma_.showSlot(dmaSlot(cur_)); };
-    // Sync Buzzer (third DAW test, item 28, D-227): the settings of the former Buzzer window (D-238), one undo step
+    // Sync Buzzer (third DAW test, item 28): the settings of the former Buzzer window, one undo step
     // each.
     buzTuned_.onClick = [this] { editPatch([](ymengine::TrackPatch& p) { p.envTuned = !p.envTuned; }); };
     buzPad_.onClick = [this] { editPatch([](ymengine::TrackPatch& p) { p.ymPad = !p.ymPad; }); };
     bindSlider(buzN_, [this](double v) { editPatch([v](ymengine::TrackPatch& p) { p.envRatioN = uint8_t(v); }); });
     bindSlider(buzD_, [this](double v) { editPatch([v](ymengine::TrackPatch& p) { p.envRatioD = uint8_t(v); }); });
     bindSlider(buzFine_, [this](double v) { editPatch([v](ymengine::TrackPatch& p) { p.envFineCents = v; }); });
-    // Their values typed (sixth DAW test, item 66, D-264), like the Steps of the SID wave and of the Sync Buzzer.
+    // Their values typed (sixth DAW test, item 66), like the Steps of the SID wave and of the Sync Buzzer.
     auto typeInto = [](gemui::Slider& sl) {
         return [&sl](const std::string& t) {
             const auto v = gemui::typedNumber(t);
@@ -863,10 +861,10 @@ void MainWindow::wireControls() {
     wavePeriodv_.onCommit = typeInto(wavePeriod_);
     waveWidthv_.onCommit = typeInto(waveWidth_);
     buzzLenv_.onCommit = typeInto(buzzLen_);
-    // SID wave and Sync Buzzer steps of the former Timer Wave window (sixth DAW test, items 52 to 54 and 80, D-250 to
-    // D-252, D-278): one undo step per setting or gesture.
-    // Sine lit (D-402), or Bounce (D-414): a bar moved shifts the sine to the phase that brings it nearest
-    // (24/10/2026, D-405), the other bars following.
+    // SID wave and Sync Buzzer steps of the former Timer Wave window (sixth DAW test, items 52 to 54 and 80):
+    // one undo step per setting or gesture.
+    // Sine lit, or Bounce: a bar moved shifts the sine to the phase that brings it nearest
+    // (24/10/2026), the other bars following.
     sidWave_.onSet = [this](int step, int v) {
         editPatch([step, v](ymengine::TrackPatch& p) {
             if (!ymengine::sineForm(p.sidForm)) {
@@ -881,7 +879,7 @@ void MainWindow::wireControls() {
     };
     sidWave_.onWheel = [this](int step, int v) {
         armCur();  // one undo step per wheel notch, like a key
-        // Sine lit (D-405), or Bounce: the next volume the sine can give the bar that way, so that each notch moves it.
+        // Sine lit, or Bounce: the next volume the sine can give the bar that way, so that each notch moves it.
         const ymengine::TrackPatch& tp = extras_.tracks[size_t(cur_)].patch;
         if (ymengine::sineForm(tp.sidForm)) {
             const bool bounce = tp.sidForm == WaveForm::Bounce;
@@ -898,7 +896,7 @@ void MainWindow::wireControls() {
         sidWave_.onSet(step, v);
     };
     sidWave_.onMenu = [this](int step, const Rect& cell) {
-        // The slider of the Modulation window's cells (seventh DAW test, item 84, D-285): 0 to 15, typed or dragged,
+        // The slider of the Modulation window's cells (seventh DAW test, item 84): 0 to 15, typed or dragged,
         // back to 0 on a right click on it (what a right click on the step did before); each move applies.
         desk_.closePopups();
         SliderPopupSpec spec;
@@ -907,7 +905,7 @@ void MainWindow::wireControls() {
         spec.set = [this, step](int v) { sidWave_.onSet(step, v); };
         desk_.openPopup(makeSliderPopup(std::move(spec), cell, desk_.width(), desk_.height()));
     };
-    // Steps (D-411): the steps of a period of the Square, the bars played of Sine, Bounce and Custom; Base has none
+    // Steps: the steps of a period of the Square, the bars played of Sine, Bounce and Custom; Base has none
     // (greyed).
     bindSlider(waveSteps_, [this](double v) {
         const int n = std::clamp(int(v), 2, ymengine::kSidWaveSteps);
@@ -916,8 +914,7 @@ void MainWindow::wireControls() {
         });
     });
     waveForm_.onClick = [this] { waveFormMenu(waveForm_); };
-    // Period (D-406): the sine redrawn between its volumes, only with Sine or Bounce (the slider shown then, D-408,
-    // D-411, D-414).
+    // Period: the sine redrawn between its volumes, only with Sine or Bounce (the slider shown then).
     bindSlider(wavePeriod_, [this](double v) {
         editPatch([v](ymengine::TrackPatch& p) {
             p.sidWavePeriod = uint8_t(v);
@@ -926,7 +923,7 @@ void MainWindow::wireControls() {
                                                     p.sidForm == WaveForm::Bounce);
         });
     });
-    // Width (D-408): the Square's, shown with it (D-411).
+    // Width: the Square's, shown with it.
     bindSlider(waveWidth_, [this](double v) {
         editPatch([v](ymengine::TrackPatch& p) { p.sidWidth = uint8_t(v); });
     });
@@ -955,8 +952,7 @@ void MainWindow::wireControls() {
             };
             items.push_back(std::move(m));
         }
-        // The machine (D-155) is set in the Computer row and the Settings window, no longer here (24/10/2026,
-        // D-397).
+        // The machine is set in the Computer row and the Settings window, no longer here (24/10/2026).
         popup(modeSel_, std::move(items), iv(Global::VoiceMode));
     };
     compSel_.onClick = [this] {
@@ -1015,7 +1011,7 @@ void MainWindow::wireControls() {
         manPanic();
     };
     // Piano octave (0 to 6): Oct + brings an octave of 7 to 9 chosen on the computer keyboard back to 6, like the
-    // prototype (D-131).
+    // prototype.
     octDown_.onClick = [this] { setBaseOctave(std::max(0, baseOct_ - 1)); };
     octUp_.onClick = [this] { setBaseOctave(std::min(6, baseOct_ + 1)); };
 
@@ -1066,7 +1062,7 @@ void MainWindow::buildMenus() {
             break;
         }
         case 1: {  // File
-            // JSON files of the prototype (M7, A1): Preset, Pattern, Song, Drum kit submenus (order of FileKind).
+            // JSON files of the prototype: Preset, Pattern, Song, Drum kit submenus (order of FileKind).
             auto files = [&](std::string label, std::function<void(plugin::FileKind)> act) {
                 MenuItem m;
                 m.label = std::move(label);
@@ -1077,7 +1073,7 @@ void MainWindow::buildMenus() {
                 }
                 return m;
             };
-            // New (D-225): the only STYM2149 entry above Load (rectOf "menuNew").
+            // New: the only STYM2149 entry above Load (rectOf "menuNew").
             menuNew_ = int(items.size());
             MenuItem fresh = item("New", "^N");
             fresh.pick = [this] { newProject(); };
@@ -1097,7 +1093,7 @@ void MainWindow::buildMenus() {
             pattern.sub[1].pick = [this] { exportAudio(false, false); };
             pattern.sub[2].pick = [this] { exportAudio(true, false); };
             items.push_back(std::move(pattern));
-            // regSub of the prototype, YM6 added (D-161): register formats in Authentic 3ch only (D-160).
+            // regSub of the prototype, YM6 added: register formats in Authentic 3ch only.
             MenuItem song = subOf("Export song", {"VBL dump", "YM3", "YM6", "SNDH"}, "Exporting songs");
             const plugin::RegisterFormat regs[4] = {plugin::RegisterFormat::Vbl, plugin::RegisterFormat::Ym3,
                                                     plugin::RegisterFormat::Ym6, plugin::RegisterFormat::Sndh};
@@ -1116,13 +1112,13 @@ void MainWindow::buildMenus() {
             song.sub[6].pick = [this] { exportAudio(false, true); };
             song.sub[7].pick = [this] { exportAudio(true, true); };
             items.push_back(std::move(song));
-            // Register recorder (D-157): under the exports, which it prepares (YM6 and SNDH export of M7); the only
+            // Register recorder: under the exports, which it prepares (YM6 and SNDH export); the only
             // STYM2149 entry in this menu.
             MenuItem rec = item("Recorder");
             rec.pick = [this] { recWin_.show(); };
             items.push_back(std::move(rec));
             items.push_back(MenuItem::separatorItem());
-            MenuItem demo = item("Demo pattern");  // ^D went to the DMA generator (D-301)
+            MenuItem demo = item("Demo pattern");  // ^D went to the DMA generator
             demo.pick = [this] { demoPattern(); };
             items.push_back(std::move(demo));
             items.push_back(MenuItem::separatorItem());
@@ -1161,8 +1157,7 @@ void MainWindow::buildMenus() {
                 mod.why = "Not used by percussion tracks";
             }
             items.push_back(std::move(mod));
-            // Echo / Delay renamed Effects, between Modulation and Patches (ninth DAW test, items 110 to 112, D-311 to
-            // D-313).
+            // Echo / Delay renamed Effects, between Modulation and Patches (ninth DAW test, items 110 to 112).
             MenuItem fx = item("Effects", "^F");
             fx.pick = [this] { echo_.show(); };
             items.push_back(std::move(fx));
@@ -1171,7 +1166,7 @@ void MainWindow::buildMenus() {
             items.push_back(std::move(lib));
             MenuItem kit = item("Drum kit", "^K");
             kit.pick = [this] { kit_.show(); };
-            if (!chipdrumTrack()) {  // the kit is played by Chipdrum tracks only (second DAW test, item 18, D-219)
+            if (!chipdrumTrack()) {  // the kit is played by Chipdrum tracks only (second DAW test, item 18)
                 kit.disabled = true;
                 kit.why = "Used by Chipdrum tracks only";
             }
@@ -1204,17 +1199,15 @@ void MainWindow::buildMenus() {
             redo.pick = [this] { seq_.redo(); };
             items.push_back(std::move(undo));
             items.push_back(std::move(redo));
-            // STYM2149 windows that the prototype does not have, under its entries (M6).
+            // STYM2149 windows that the prototype does not have, under its entries.
             menuExtra_ = int(items.size());
             items.push_back(MenuItem::separatorItem());
-            MenuItem ins = item("Instruments", "^T");  // D-147
+            MenuItem ins = item("Instruments", "^T");
             ins.pick = [this] { ins_.show(); };
             items.push_back(std::move(ins));
-            // Sequences (D-148) left the menu for the Modulation window (fifth DAW test, items 42 and 43, D-240,
-            // D-241).
-            // Timer wave (D-151) and Buzzer (D-152) left the menu for the GENERATOR frame (fourth DAW test, item 40,
-            // D-238).
-            // Samples: Digidrum editor (D-154) and STE DMA track (D-153), under one entry so that the menu does not
+            // Sequences left the menu for the Modulation window (fifth DAW test, items 42 and 43).
+            // Timer wave and Buzzer left the menu for the GENERATOR frame (fourth DAW test, item 40).
+            // Samples: Digidrum editor and STE DMA track, under one entry so that the menu does not
             // grow.
             MenuItem samples = item("Samples");
             MenuItem digi = item("Digidrums");
@@ -1222,7 +1215,7 @@ void MainWindow::buildMenus() {
             samples.sub.push_back(std::move(digi));
             MenuItem dma = item("DMA (STE)");
             dma.pick = [this] { dma_.show(); };
-            if (!ste()) {  // fourth DAW test, item 36 (D-234), like the STE output chain (D-206)
+            if (!ste()) {  // fourth DAW test, item 36, like the STE output chain
                 dma.disabled = true;
                 dma.why = "STE only: set Computer to STE";
             }
@@ -1232,9 +1225,9 @@ void MainWindow::buildMenus() {
         }
         case 3: {  // Options
             // No Zoom entry: the size follows the window, resized in the host or by the system (tenth DAW test,
-            // item 127, D-335).
+            // item 127).
             // One entry for the prototype's Audio output and MIDI input: the standalone application sets both in the
-            // same window (second DAW test, item 16, D-217).
+            // same window (second DAW test, item 16).
             MenuItem devices = item("Audio/MIDI settings");
             if (host_.hasAudioSettings()) {
                 devices.pick = [this] { host_.openAudioSettings(); };
@@ -1253,8 +1246,8 @@ void MainWindow::buildMenus() {
             items.push_back(std::move(clear));
             items.push_back(MenuItem::separatorItem());
             // Parts of the main window shown or hidden, a preference each, shown by default: the oscilloscope (twelfth
-            // DAW test, item 149, D-358), the register monitor (Indus, 25/10/2026 21:53, D-436) and the Note line of
-            // SYSTEM, its TP and Hz (26/10/2026 04:05, D-442).
+            // DAW test, item 149), the register monitor (Indus, 25/10/2026 21:53) and the Note line of
+            // SYSTEM, its TP and Hz (26/10/2026 04:05).
             auto shownEntry = [this, &item](const char* label, bool shown, const char* key) {
                 MenuItem m = item(label);
                 m.subMarks = true;
@@ -1272,9 +1265,9 @@ void MainWindow::buildMenus() {
             items.push_back(shownEntry("Oscilloscope", scopeShown(), "mainScope"));
             items.push_back(shownEntry("Register monitor", regsShown(), "mainRegs"));
             items.push_back(shownEntry("Note monitor", noteShown(), "mainNote"));
-            // Sound engine (D-080), Keyboard layout, Note names, Renderer (D-420), Pixels (D-331) and Tooltips (D-185,
-            // D-265, D-283) left the menu for the Settings window (Indus, 25/10/2026 19:33, D-430), then VBL frequency
-            // (26/10/2026 04:03, D-441).
+            // Sound engine, Keyboard layout, Note names, Renderer, Pixels and Tooltips
+            // left the menu for the Settings window (Indus, 25/10/2026 19:33), then VBL frequency
+            // (26/10/2026 04:03).
             menuExtra_ = int(items.size());
             items.push_back(MenuItem::separatorItem());
             MenuItem settings = item("Settings...");
@@ -1407,7 +1400,7 @@ bool MainWindow::dmaTrack(int track) const noexcept {
     return plugin::dmaTrack(plugin::voiceMode(values_), ste(), track);
 }
 int MainWindow::dmaSlot(int track) const noexcept {
-    // Slot played by a DMA track: its own, otherwise its rank (D-153).
+    // Slot played by a DMA track: its own, otherwise its rank.
     const int own = extras_.tracks[size_t(std::clamp(track, 0, plugin::kTracks - 1))].patch.dmaSlot;
     if (own >= 0) return own & 7;
     return (mode3() ? track - 4 * chips() : track) & 7;
@@ -1428,7 +1421,7 @@ bool MainWindow::adsrChip() const noexcept {
     return (mode3() && generator() != int(Generator::Dma)) || iv(Track::AdsrMode) == 1;  // DMA: ADSR of the track
 }
 double MainWindow::msPerTick() const noexcept {
-    // Length of one VBL tick in ms at the chosen rate (Settings > VBL frequency, D-441).
+    // Length of one VBL tick in ms at the chosen rate (Settings > VBL frequency).
     const int i = std::clamp(iv(Global::VblRate), 0, int(plugin::kVblRates.size()) - 1);
     return 1000.0 / plugin::kVblRates[size_t(i)];
 }
@@ -1586,14 +1579,14 @@ void MainWindow::refresh() {
     if (!keep(vol_)) vol_.setValue(iv(Track::Volume));
     if (!volv_.editing()) volv_.setText(std::to_string(iv(Track::Volume)));
     vmSel_.setText(kVmNames[size_t(std::clamp(iv(Track::VolMode), 0, 1))]);
-    // What the sound does not use is greyed out, with the reason in its tip (sixth DAW test, items 55, 63 and 64,
-    // D-253, D-261, D-262): without noise, the noise period is not heard; a Sync Buzzer plays the hardware envelope
+    // What the sound does not use is greyed out, with the reason in its tip (sixth DAW test, items 55, 63 and 64):
+    // without noise, the noise period is not heard; a Sync Buzzer plays the hardware envelope
     // alone (no square, no noise, no fixed volume); a SID Voice writes its own volumes and ignores the envelope.
     const bool sbSrc = gen == int(Generator::SyncBuzzer) && !drum;
     const bool sidSrc = gen == int(Generator::Sid) && !drum;
     // A DMA track plays its sample, a percussion track its own sounds (Drum Kit frames or 4-bit samples): the square,
-    // the noise, the fixed volume and the envelope of the track are not used (thirteenth DAW test, items 169 and 170,
-    // D-378). Voicing and Level still act.
+    // the noise, the fixed volume and the envelope of the track are not used (thirteenth DAW test, items 169 and 170).
+    // Voicing and Level still act.
     const bool dma = gen == int(Generator::Dma);
     const bool ownSound = dma || drum;
     static const std::string kDmaWhy = "A DMA track plays its sample: no square, no noise, no 4-bit volume, no "
@@ -1644,8 +1637,8 @@ void MainWindow::refresh() {
     char epText[24];
     std::snprintf(epText, sizeof epText, "%d ($%04X)", ep, unsigned(ep));
     if (!epv_.editing()) epv_.setText(epText);
-    // Tuned envelope (D-152), a Sync Buzzer setting (D-231): the period follows the note, Env freq and EP are no
-    // longer used; their labels and unit are greyed out with them (fourth DAW test, item 34, D-232).
+    // Tuned envelope, a Sync Buzzer setting: the period follows the note, Env freq and EP are no
+    // longer used; their labels and unit are greyed out with them (fourth DAW test, item 34).
     const ymengine::TrackPatch& tp = extras_.tracks[size_t(cur_)].patch;
     const bool tunedEnv = tp.envTuned && gen == int(Generator::SyncBuzzer) && !drum;
     for (Label* l : {&labEf_, &efUnit_, &labEp_}) l->setDim(tunedEnv);
@@ -1655,17 +1648,17 @@ void MainWindow::refresh() {
     const int shape = std::clamp(iv(Track::EnvShape), 0, 15);
     shapeSel_.setText(std::string(1, "0123456789ABCDEF"[shape]));
     shapeSel_.setIcon(&icons::kShapes[size_t(shape)]);
-    // R13 ignored otherwise; a SID Voice ignores the envelope (D-262).
+    // R13 ignored otherwise; a SID Voice ignores the envelope.
     const bool shapeUsed = !ownSound && ((iv(Track::VolMode) == 1 && gen != int(Generator::Sid)) ||
                                          gen == int(Generator::SyncBuzzer));
     shapeSel_.setEnabled(shapeUsed);
     shapeLab_.setDim(!shapeUsed);
-    // ENVELOPE of a DMA or percussion track: dimmed with its title and content, as ADSR on a drum track (D-378).
+    // ENVELOPE of a DMA or percussion track: dimmed with its title and content, as ADSR on a drum track.
     ef_.setEnabled(!tunedEnv && !ownSound);
     envFs_.setOpacity(ownSound ? gemui::kOpacityInert : 1.0);
     envFs_.setInert(ownSound);
 
-    // VIBRATO: Off greys Depth and Rate out, like Tuning greys Env freq out (D-254). Percussion plays no vibrato (no
+    // VIBRATO: Off greys Depth and Rate out, like Tuning greys Env freq out. Percussion plays no vibrato (no
     // VBL frames): the frame is dimmed like ADSR.
     const bool vibOn = iv(Track::VibOn) != 0;
     vibOn_.setOn(vibOn);
@@ -1695,7 +1688,7 @@ void MainWindow::refresh() {
     const int refCols = chip ? 3 : 4;  // positions of the time maximum: 100 or 2000
     for (size_t k = 0; k < 4; ++k) {
         // Ranges shown: Smooth, A, D and R 0-2000 ms, S 0-100 %; Chip, A, D and R 0-100 ticks, the 2000 ms of Smooth
-        // at 50 Hz, S 0-15 (Indus, 25/10/2026 18:30, D-428; the prototype stopped A and D at 1000 ms and 64 ticks, R at
+        // at 50 Hz, S 0-15 (Indus, 25/10/2026 18:30; the prototype stopped A and D at 1000 ms and 64 ticks, R at
         // 64 ticks). The stored ms and % are converted to the shown unit, the inverse of `store` in wireControls.
         const bool sus = k == 2;
         const int max = chip ? (sus ? 15 : 100) : (sus ? 100 : 2000);
@@ -1715,8 +1708,8 @@ void MainWindow::refresh() {
     }
     adsrMode_.setText(kAdsrModes[chip ? 1 : 0]);
     // ADSR not applicable (the frame takes no click): Sync Buzzer in Chip mode and the percussion in every mode, each
-    // hit playing to its end with its own shape (the engine ignores the ADSR of a drum, D-205). The ADSR and ADSR
-    // ENVELOPE frames are dimmed with their titles and content (third DAW test, item 21, D-220); the prototype dimmed
+    // hit playing to its end with its own shape (the engine ignores the ADSR of a drum). The ADSR and ADSR
+    // ENVELOPE frames are dimmed with their titles and content (third DAW test, item 21); the prototype dimmed
     // only the ADSR frame of a Sync Buzzer.
     const bool buzzer = gen == int(Generator::SyncBuzzer) && chip;
     const bool inert = buzzer || drum;
@@ -1724,8 +1717,7 @@ void MainWindow::refresh() {
     adsrMode_.setEnabled(!lockMode && !drum);
     adsrModeLab_.setDim(lockMode);
     adsrHint_.setOpacity(lockMode ? gemui::kOpacityLabelOff : 1.0);
-    // Sync Buzzer: "envelope only", the prototype's "buzzer: envelope only" ran past the frame into ADSR ENVELOPE
-    // (D-220).
+    // Sync Buzzer: "envelope only", the prototype's "buzzer: envelope only" ran past the frame into ADSR ENVELOPE.
     adsrHint_.setText(drum ? "drums: off" : buzzer ? "envelope only" : chip ? "4-bit reg" : "audio gain");
     adsrFs_.setOpacity(inert ? gemui::kOpacityInert : 1.0);
     curveFs_.setOpacity(inert ? gemui::kOpacityInert : 1.0);
@@ -1742,7 +1734,7 @@ void MainWindow::refresh() {
     for (size_t k = 0; k < 4; ++k) {
         adsr_[k].setEnabled(!inert);
         adsr_[k].setTip(inert ? inertWhy : kAdsrTips[k]);
-        adsrLab_[k].setTip(adsr_[k].tip());  // the initial alone: its tip names it (D-307)
+        adsrLab_[k].setTip(adsr_[k].tip());  // the initial alone: its tip names it
     }
     adsrFs_.setInert(inert);
     AdsrCurve::Shape cs;
@@ -1766,9 +1758,9 @@ void MainWindow::refresh() {
     if (!ratiov_.editing()) ratiov_.setText(fmt("%.2f", pv(Track::SidRatio)));
     if (!keep(vmin_)) vmin_.setValue(iv(Track::SidVmin));
     if (!vminv_.editing()) vminv_.setText(std::to_string(iv(Track::SidVmin)));
-    // Sync Buzzer: settings of the Buzzer window (D-227); N, D and Fine apply to a tuned envelope.
+    // Sync Buzzer: settings of the Buzzer window; N, D and Fine apply to a tuned envelope.
     buzTuned_.setOn(tp.envTuned);
-    buzTuned_.setText(tp.envTuned ? "On" : "Off");  // after the Tuning label (fourth DAW test, item 35, D-233)
+    buzTuned_.setText(tp.envTuned ? "On" : "Off");  // after the Tuning label (fourth DAW test, item 35)
     if (!keep(buzN_)) buzN_.setValue(tp.envRatioN);
     if (!keep(buzD_)) buzD_.setValue(tp.envRatioD);
     if (!keep(buzFine_)) buzFine_.setValue(tp.envFineCents);
@@ -1781,13 +1773,12 @@ void MainWindow::refresh() {
     for (Label* l : {&labBuzN_, &labBuzD_, &labBuzFine_}) l->setDim(!tp.envTuned);
     for (gemui::ValueField* f : {&buzNv_, &buzDv_, &buzFinev_}) f->setDim(!tp.envTuned);
     buzPad_.setOn(tp.ymPad);
-    // SID wave and Sync Buzzer steps (D-251, D-252): beyond the length of the wave or of the steps, faded.
+    // SID wave and Sync Buzzer steps: beyond the length of the wave or of the steps, faded.
     SidWaveGrid::State wave;
     wave.wave = tp.sidWave;
-    // The form of the menu (D-411). Base and Square (24/10/2026, D-407): the bars show the square played, the note's
-    // volume (15) over the first half or the first Width of its Steps (D-408), SID min vol over the others, inert; the
-    // bars drawn before are kept for Custom. Base has two steps, the halves of its period, its bars and Steps hidden
-    // (D-417).
+    // The form of the menu. Base and Square (24/10/2026): the bars show the square played, the note's
+    // volume (15) over the first half or the first Width of its Steps, SID min vol over the others, inert; the
+    // bars drawn before are kept for Custom. Base has two steps, the halves of its period, its bars and Steps hidden.
     const WaveForm form = waveFormOf(tp);
     const bool square = form == WaveForm::Base || form == WaveForm::Square;
     wave.length = form == WaveForm::Base ? 2 : std::min<int>(tp.sidWaveLen, ymengine::kSidWaveSteps);
@@ -1802,8 +1793,8 @@ void MainWindow::refresh() {
     if (!keep(waveSteps_)) waveSteps_.setValue(wave.length);
     if (!waveStepsv_.editing()) waveStepsv_.setText(std::to_string(wave.length));
     waveForm_.setText(kSidFormNames[size_t(form)]);
-    // Period (D-406) and Width (D-408): each shown only with its form (layoutHome), its value kept for the next time.
-    // Width counts steps of the Square, up to Steps - 1 (D-411): alone at 2 Steps, greyed.
+    // Period and Width: each shown only with its form (layoutHome), its value kept for the next time.
+    // Width counts steps of the Square, up to Steps - 1: alone at 2 Steps, greyed.
     if (!keep(wavePeriod_)) wavePeriod_.setValue(tp.sidWavePeriod);
     if (!wavePeriodv_.editing()) wavePeriodv_.setText(std::to_string(tp.sidWavePeriod));
     waveWidth_.setRange(1, std::max(2, wave.length - 1), 1);
@@ -1904,7 +1895,7 @@ void MainWindow::refresh() {
     compSel_.setText(ste() ? "STE" : "ST");
     const bool midiClock = iv(Global::ArpClock) == 1;
     clkSel_.setText(kClkModes[midiClock ? 1 : 0]);
-    // setClkMode: waiting for the clock, then SYNC or STOP at each publication of the engine state (D-084).
+    // setClkMode: waiting for the clock, then SYNC or STOP at each publication of the engine state.
     if (midiClock != midiClockShown_) {
         midiClockShown_ = midiClock;
         clockRun_ = -1;
@@ -1951,7 +1942,7 @@ void MainWindow::refresh() {
 
 void MainWindow::moveMainTo(int x, int y) {
     // Like the floating windows: left edge never negative and top edge below the menu bar, right and bottom edges
-    // never past the desktop's (D-460).
+    // never past the desktop's.
     const gemui::Rect f = frame_.bounds();
     x = std::max(0, std::min(x, kWidth - f.w));
     y = std::max(int(kMenuH), std::min(y, kHeight - f.h));
@@ -1962,7 +1953,7 @@ void MainWindow::moveMainTo(int x, int y) {
 }
 
 void MainWindow::layout() {
-    // Moved main window (D-224): the layout is made at the window's home place, then carried by the offset; the
+    // Moved main window: the layout is made at the window's home place, then carried by the offset; the
     // areas to repaint are those of the moved window.
     const gemui::Point off = off_;
     const bool moved = off.x != 0 || off.y != 0;
@@ -1980,7 +1971,7 @@ void MainWindow::layout() {
 }
 
 void MainWindow::placeEnvHz() {
-    // At its natural width, which follows its text (D-296): "12800 ($3200)" and "_0.6" fit side by side.
+    // At its natural width, which follows its text: "12800 ($3200)" and "_0.6" fit side by side.
     const gemui::Box e = epv_.box();
     const double right = labEp_.box().x + kRowW, uw = efUnit_.naturalWidth(), vw = efv_.naturalWidth();
     efUnit_.setBox({right - uw, e.y, uw, 16});
@@ -2010,8 +2001,8 @@ void MainWindow::layoutHome() {
     // SOURCE (frame as a flex column: 12 px between the rows).
     double y = 152;
     const double sx = kWx + 30;
-    // Volume and Level as in ADSR: one label column, one value column, sliders as wide (item 104, D-305). The Source,
-    // Voicing and Mode buttons start with these sliders (twelfth DAW test, item 159, D-368).
+    // Volume and Level as in ADSR: one label column, one value column, sliders as wide (item 104). The Source,
+    // Voicing and Mode buttons start with these sliders (twelfth DAW test, item 159).
     y += placeRow(sx, y, {label(labSrc_, 58), button(srcSel_)}) + 12;
     y += placeRow(sx, y, {label(labPoly_, 58), button(polySel_)}) + 12;
     y += placeRow(sx, y, {label(labNp_)}) + 12;
@@ -2023,23 +2014,23 @@ void MainWindow::layoutHome() {
     // ENVELOPE (frame as a block: collapsed margins, 6 px).
     const double ex = kWx + 268.5;
     y = 152;
-    // The slider over the whole row, its value on the row of EP = (eighth DAW test, item 95, D-296).
+    // The slider over the whole row, its value on the row of EP = (eighth DAW test, item 95).
     y += placeRow(ex, y, {label(labEf_, 64), slider(ef_)}) + 6;
-    // Shape R13 right under EP =, without the prototype's 10 px space (sixth DAW test, item 57, D-255).
+    // Shape R13 right under EP =, without the prototype's 10 px space (sixth DAW test, item 57).
     y += placeRow(ex, y, {label(labEp_), value(epv_)}) + 6;
     placeEnvHz();
     placeRow(ex, y, {label(shapeLab_, 72), button(shapeSel_)});
 
-    // VIBRATO, under SOURCE (D-268): On/Off, Depth, Rate.
+    // VIBRATO, under SOURCE: On/Off, Depth, Rate.
     y = 436;
     y += placeRow(sx, y, {label(labVibOn_, 58), button(vibOn_)}) + 6;
     // Depth and Rate: a label column as wide as "Depth", not the 58 px of the On/Off row, for wider sliders, both as
-    // wide (twelfth DAW test, item 158, D-367).
+    // wide (twelfth DAW test, item 158).
     const double vw = std::max(labDepth_.naturalWidth(), labRate_.naturalWidth());
     y += placeRow(sx, y, {label(labDepth_, vw), slider(vibDepth_), value(vibDepthv_), unit(depthUnit_)}) + 6;
     placeRow(sx, y, {label(labRate_, vw), slider(vibRate_), value(vibRatev_), unit(rateUnit_)});
 
-    // ADSR, under ENVELOPE (D-268).
+    // ADSR, under ENVELOPE.
     y = 280;
     for (size_t k = 0; k < 4; ++k)
         y += placeRow(ex, y, {label(adsrLab_[k]), slider(adsr_[k]), value(adsrv_[k]), unit(adsrUnit_[k])}) + 6;
@@ -2060,8 +2051,8 @@ void MainWindow::layoutHome() {
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labRatio_, &ratio_, &ratioX_, &ratiov_, &labVmin_,
                                                                   &vmin_, &vminv_})
         w->setVisible(sid);
-    // The bars and Steps hidden with Base, the plain square (Indus, 24/10/2026 20:30, D-417); Period only with Sine
-    // (and Bounce, D-414), Width only with Square (16:19, D-408; the menu's forms, D-411).
+    // The bars and Steps hidden with Base, the plain square (Indus, 24/10/2026 20:30); Period only with Sine
+    // (and Bounce), Width only with Square (16:19; the menu's forms).
     const WaveForm form = waveForm();
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labSidWave_, &waveForm_}) w->setVisible(sid);
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&sidWave_, &labWaveSteps_, &waveSteps_, &waveStepsv_})
@@ -2095,14 +2086,14 @@ void MainWindow::layoutHome() {
         y += placeRow(gx, y, {slider(ratio_), {&ratioX_, ratioX_.naturalWidth()}, value(ratiov_, 0)}) + 6;
         y += placeRow(gx, y, {label(labVmin_)}) + 6;
         y += placeRow(gx, y, {slider(vmin_), value(vminv_)}) + 12;
-        // The SID wave of the former Timer Wave window, centred (sixth DAW test, items 53 and 80, D-251, D-278), the
-        // menu of its forms after its name (24/10/2026, D-411).
+        // The SID wave of the former Timer Wave window, centred (sixth DAW test, items 53 and 80), the
+        // menu of its forms after its name (24/10/2026).
         y += placeRow(gx, y, {label(labSidWave_), button(waveForm_)}) + 6;
         sidWave_.setBox({gx + std::round((kRowW - SidWaveGrid::kWidth) / 2), y, double(SidWaveGrid::kWidth),
                          double(SidWaveGrid::kHeight)});
         y += SidWaveGrid::kHeight + 8;
-        // Steps on the line of its label (Indus, 24/10/2026 17:42, D-412; above it before, D-390), then right under it
-        // (17:43), in the same place, the period of the sine (D-406) or the width of the square (D-408), the one of
+        // Steps on the line of its label (Indus, 24/10/2026 17:42; above it before), then right under it
+        // (17:43), in the same place, the period of the sine or the width of the square, the one of
         // the form chosen; the three sliders lined up after the widest label.
         const double lw = std::max({labWaveSteps_.naturalWidth(), labWavePeriod_.naturalWidth(),
                                     labWaveWidth_.naturalWidth()});
@@ -2111,17 +2102,17 @@ void MainWindow::layoutHome() {
         placeRow(gx, y, {label(labWaveWidth_, lw), slider(waveWidth_), value(waveWidthv_)});
     }
     if (sync) {
-        // The Buzzer window's settings (third DAW test, item 28, D-227): sliders aligned after the widest label.
+        // The Buzzer window's settings (third DAW test, item 28): sliders aligned after the widest label.
         const double lw = labBuzTune_.naturalWidth();
         y = 208;
         y += placeRow(gx, y, {label(labBuzTune_, lw), button(buzTuned_)}) + 6;
         y += placeRow(gx, y, {label(labBuzN_, lw), slider(buzN_), value(buzNv_)}) + 6;
         y += placeRow(gx, y, {label(labBuzD_, lw), slider(buzD_), value(buzDv_)}) + 6;
         y += placeRow(gx, y, {label(labBuzFine_, lw), slider(buzFine_), value(buzFinev_)}) + 12;
-        // YM Pad and Presets centred in the frame (sixth DAW test, item 61, D-259).
+        // YM Pad and Presets centred in the frame (sixth DAW test, item 61).
         const double padsW = buzPad_.naturalWidth() + 8 + buzPresets_.naturalWidth();
         y += placeRow(gx + std::round((kRowW - padsW) / 2), y, {button(buzPad_), button(buzPresets_)}) + 12;
-        // Its steps, from the former Timer Wave window (sixth DAW test, items 54 and 80, D-252, D-278): four buttons
+        // Its steps, from the former Timer Wave window (sixth DAW test, items 54 and 80): four buttons
         // across the frame, the shape's icon alone.
         y += placeRow(gx, y, {label(labBuzzSteps_)}) + 6;
         const double bw = std::floor((kRowW - 3 * 4) / 4), bh = icons::kShapes[0].h + 8;
@@ -2132,7 +2123,7 @@ void MainWindow::layoutHome() {
         placeRow(gx, y, {label(labBuzzLen_), slider(buzzLen_), value(buzzLenv_), unitW(buzzUnit_, stepsW)});
     }
     if (cdrum) placeRow(gx, 208, {button(openKit_), hintItem(kitName_)});
-    // Samples button under slots 5 to 8, as wide as them (second DAW test, item 12, D-213).
+    // Samples button under slots 5 to 8, as wide as them (second DAW test, item 12).
     auto samplesButton = [&](Button& b, double gridX, double gridW, double top) {
         const double h = b.naturalHeight();
         b.setBox({gridX, top, gridW, h});
@@ -2175,10 +2166,10 @@ void MainWindow::layoutHome() {
     const double yx = kWx + 745.5;
     y = 152;
     // Voices, Computer and Clock: their buttons start together, after the widest label (thirteenth DAW test, item
-    // 161, D-370).
+    // 161).
     const double sw = std::max({labVoices_.naturalWidth(), labComputer_.naturalWidth(), labClock_.naturalWidth()});
     y += placeRow(yx, y, {label(labVoices_, sw), button(modeSel_)}) + 12;
-    // Computer row under Voices (Indus's choice, D-155): the following rows move down by as much.
+    // Computer row under Voices (Indus's choice): the following rows move down by as much.
     y += placeRow(yx, y, {label(labComputer_, sw), button(compSel_)}) + 12;
     const double fit = sw + 8 + clkSel_.naturalWidth() + 8 + clkStatus_.naturalWidth();
     if (fit <= kRowW) {
@@ -2191,13 +2182,13 @@ void MainWindow::layoutHome() {
     y += placeRow(yx, y, {label(labMaster_), slider(master_), value(masterv_)}) + 12;
     y += placeRow(yx, y, {label(labLeds_), {&leds_, 124, 28}}) + 12;
     placeRow(yx, y, {label(labNote_), label(tpread_)});
-    // Options > Note monitor (D-442): hidden, the SYSTEM frame keeps its size, nothing moves.
+    // Options > Note monitor: hidden, the SYSTEM frame keeps its size, nothing moves.
     const bool note = noteShown();
     labNote_.setVisible(note);
     tpread_.setVisible(note);
 
-    // Oscilloscope (Options > Oscilloscope, twelfth DAW test, item 149, D-358) and register monitor (Options >
-    // Register monitor, D-436): hidden, what follows moves up by its height and its margin; keyboard or pads, bottom
+    // Oscilloscope (Options > Oscilloscope, twelfth DAW test, item 149) and register monitor (Options >
+    // Register monitor): hidden, what follows moves up by its height and its margin; keyboard or pads, bottom
     // row, height of the window.
     const bool scope = scopeShown(), regs = regsShown();
     const double up = scope ? 0 : 100, below = up + (regs ? 0 : 50);
@@ -2221,7 +2212,7 @@ void MainWindow::layoutHome() {
     octv_.setBox({bx, y0 + 10, octv_.naturalWidth(), 16});
     const double mapW = kbdMap_.naturalWidth();
     kbdMap_.setBox({kWx + 962 - mapW, y0 + 6, mapW, 24});
-    // Without the prototype's help line (D-267), the window ends kHelpLine px higher: same margin under the buttons
+    // Without the prototype's help line, the window ends kHelpLine px higher: same margin under the buttons
     // as the prototype under that line.
     frame_.setBox({kWx, kWinY, kWinW, y0 + 88 - kHelpLine - kWinY});
 }
@@ -2240,19 +2231,19 @@ void MainWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
                         fmt("%.2f Hz", clk / (16.0 * t.notePeriod)));
         layout();
     }
-    // No voice sounds any more, its release ended: "Note -", as at launch (Indus, 26/10/2026 04:00-04:02, D-440).
+    // No voice sounds any more, its release ended: "Note -", as at launch (Indus, 26/10/2026 04:00-04:02).
     if (!t.noteSounding && tpread_.text() != "-") {
         tpread_.setText("-");
         layout();
     }
     // A note held on screen, Latch or not, whose voice the sequencer took no longer sounds: its key lets go (Indus,
-    // 25/10/2026 19:41, D-431). In 16 channels the engine moves such a note to a free voice instead.
+    // 25/10/2026 19:41). In 16 channels the engine moves such a note to a free voice instead.
     for (int n = 0; n < 128; ++n)
         if (t.manualCut[size_t(n)] != manualCut_[size_t(n)]) {
             manualCut_[size_t(n)] = t.manualCut[size_t(n)];
             forceRelease(n);
         }
-    std::array<AdsrCurve::LivePoint, plugin::kEnvPoints> live;  // one per note sounding on the track (D-403)
+    std::array<AdsrCurve::LivePoint, plugin::kEnvPoints> live;  // one per note sounding on the track
     const int points = std::min<int>(t.envCount, plugin::kEnvPoints);
     for (int k = 0; k < points; ++k) live[size_t(k)] = {t.env[size_t(k)].stage, t.env[size_t(k)].level};
     curve_.setLive(std::span(live.data(), size_t(points)));
@@ -2279,7 +2270,7 @@ void MainWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
 
 void MainWindow::refreshRegisters() {
     // YM Player playing: the monitor follows the registers of the tune, channel A ("The register strip and scope
-    // follow", note of #ymWin; the prototype's monitor stayed on the focused track, D-169).
+    // follow", note of #ymWin; the prototype's monitor stayed on the focused track).
     if (ymWin_.isOpen() && ymWin_.playing()) {
         const Host::YmPlayer y = host_.ymPlayer();
         if (y.playing) {
@@ -2310,7 +2301,7 @@ void MainWindow::refreshRegisters() {
     } else {
         ch = std::to_string(cur_ + 1);
     }
-    // Instrument chosen by Program Change (D-156): it replaces the sound of the track, its name replaces the generator.
+    // Instrument chosen by Program Change: it replaces the sound of the track, its name replaces the generator.
     std::string sound = kFxShort[size_t(generator())];
     if (const int pc = program_[size_t(cur_)]; pc > 0 && !drumTrack()) {
         char b[12];
@@ -2322,8 +2313,7 @@ void MainWindow::refreshRegisters() {
 
 std::vector<std::string> MainWindow::chipIssues() const {
     // chipIssues: what a register dump (VBL, YM3, YM6, SNDH) would not render, according to the current pattern and the
-    // settings of the tracks that have notes in it. Digidrum, DMA and dual chip lines according to the M7 exports
-    // (D-172).
+    // settings of the tracks that have notes in it. Digidrum, DMA and dual chip lines according to the register exports.
     std::vector<std::string> out;
     const ymseq::Pattern& pat = extras_.seq.cur();
     const bool m3 = mode3();
@@ -2340,13 +2330,13 @@ std::vector<std::string> MainWindow::chipIssues() const {
         out.push_back(std::to_string(live.size()) + " tracks with notes \u2014 a YM2149 has three voices (A, B, C)");
     if (m3 && chips() > 1) out.push_back("Dual chip: VBL, YM and SNDH exports need Authentic 3ch (one chip)");
 
-    // Machine: the ZX Spectrum and Amstrad CPC clocks (D-058), greyed out in Authentic 3ch (D-207).
+    // Machine: the ZX Spectrum and Amstrad CPC clocks, greyed out in Authentic 3ch.
     const auto& clocks = plugin::paramSpec(paramIndex(Global::ChipClock)).choices;
     const int clock = std::clamp(iv(Global::ChipClock), 0, int(clocks.size()) - 1);
     if (clock >= kFirstAyClock)
         out.push_back("Chip clock " + std::string(clocks[size_t(clock)]) +
                       " is not an Atari clock (an ST or STE runs its YM at 2 MHz)");
-    // Custom clock (D-237): another frequency than 2 MHz, in 16 ch (2 MHz in the other modes).
+    // Custom clock: another frequency than 2 MHz, in 16 ch (2 MHz in the other modes).
     if (clock == 0 && plugin::chipClock(values_).num != uint64_t(plugin::kCustomClockDefaultHz))
         out.push_back("Chip clock Custom " + clockMHz(uint32_t(plugin::chipClock(values_).num)) +
                       " MHz is not an Atari clock (an ST or STE runs its YM at 2 MHz)");
@@ -2374,7 +2364,7 @@ std::vector<std::string> MainWindow::chipIssues() const {
         int low = 0, high = 0;
         for (int s = 0; s < ymseq::kSteps; ++s) {
             if (l.pat[size_t(s)] < 0) continue;
-            // MIDI note of the step (C4 = 60), its equal-tempered frequency (from the Tuning A4, D-429), then TP =
+            // MIDI note of the step (C4 = 60), its equal-tempered frequency (from the Tuning A4), then TP =
             // clock / (16 × f).
             const int abs = (ymseq::octaveOf(l.oct[size_t(s)], trackOct) + 1) * 12 + l.pat[size_t(s)];
             const double f = ymengine::noteHz(abs, a4);
@@ -2407,17 +2397,17 @@ std::vector<std::string> MainWindow::chipIssues() const {
         if (g == int(Generator::Chipdrum) && !m3)
             out.push_back(trackName(i) +
                           ": Chipdrum uses sample tables here (Authentic 3ch synthesises it from registers)");
-        // The prototype's limit, a timer at 4 times the note: ratio 2 since ratio 1 plays the note (D-426).
+        // The prototype's limit, a timer at 4 times the note: ratio 2 since ratio 1 plays the note.
         const float ratio = values_[size_t(paramIndex(i, Track::SidRatio))];
         if (g == int(Generator::Sid) && ratio > 2)
             out.push_back(trackName(i) + ": SID ratio x" + fmt("%.2f", ratio) +
                           " needs a timer faster than most ST replayers run");
     }
-    // Free timer (greyed out in Authentic 3ch, D-207): the exports round its rates to the MFP's, like an ST or STE.
+    // Free timer (greyed out in Authentic 3ch): the exports round its rates to the MFP's, like an ST or STE.
     if (timed && iv(Global::Timer) == kTimerFree)
         out.push_back("Timer Free: exact timer rates, which the MFP of an ST or STE rounds");
 
-    // A single DMA channel on the STE: the SNDH plays the most recent DMA note (D-162).
+    // A single DMA channel on the STE: the SNDH plays the most recent DMA note.
     const auto dmaLive = std::count_if(live.begin(), live.end(), [&](int i) {
         return plugin::effectiveGenerator(values_, i) == Generator::Dma;
     });
@@ -2463,7 +2453,7 @@ std::vector<std::string> MainWindow::chipIssues() const {
         // 70: the default of Master (Parameters.cpp).
         if (iv(Global::Master) != 70) out.push_back("Master level is a playback gain, not a register value");
         if (iv(Global::MasterPan) != 0 || (iv(Global::MasterLink) == 0 && iv(Global::Master2) != iv(Global::Master)))
-            out.push_back("Master L / R and balance are ignored (the ST is mono)");  // D-284
+            out.push_back("Master L / R and balance are ignored (the ST is mono)");
     }
     return out;
 }
@@ -2615,7 +2605,7 @@ void MainWindow::press(int note, int velocity, bool mouse) {
     seq_.recordNote(note, velocity);
     host_.screenMidi(0x90, uint8_t(note), uint8_t(velocity));
     kbd_.setHeld(note, true);
-    if (drumNow && note >= kPadNote && note < kPadNote + 8) pads_.setHeld(note - kPadNote, true);  // D-229
+    if (drumNow && note >= kPadNote && note < kPadNote + 8) pads_.setHeld(note - kPadNote, true);
     kbdWin_.light(note, true);  // tklNote
 }
 
@@ -2660,7 +2650,7 @@ void MainWindow::seqKbdLight(int step) {
             if (l.pat[size_t(step)] >= 0) keys.push_back(noteOf(1, step));
             else if (held && seqRootKey_ >= 0) keys.push_back(seqRootKey_);
             seqRootKey_ = keys.empty() ? -1 : keys.front();
-            // Deviation (D-281): every chord voice that sounds at this step, started here or earlier and still within
+            // Deviation: every chord voice that sounds at this step, started here or earlier and still within
             // its steps. The prototype lit only the voices starting at the step and kept the keys of a held root, so
             // a voice started under a held note never lit and went dark with the root.
             for (int v = 2; v <= played; ++v)
@@ -2683,7 +2673,7 @@ void MainWindow::seqKbdLight(int step) {
         kbd_.setHeld(n, on);
     };
     auto pad = [this](int n, bool on) {
-        if (!on && held_.count(kPadNote + n)) return;  // still held on the Computer Keyboard (D-229)
+        if (!on && held_.count(kPadNote + n)) return;  // still held on the Computer Keyboard
         pads_.setHeld(n, on);
     };
     if (step < 0) {  // seqKbdClear
@@ -2767,7 +2757,7 @@ void MainWindow::selectDmaSlot(int slot) {
 }
 
 void MainWindow::setComputer(int machine) {
-    // Changing machine cuts the notes like a mode change (D-153); in 3-channel mode, a DMA track that is left hands
+    // Changing machine cuts the notes like a mode change; in 3-channel mode, a DMA track that is left hands
     // control back to the first track.
     if (machine == iv(Global::Computer)) return;
     set(Global::Computer, float(machine));
@@ -2812,9 +2802,9 @@ void MainWindow::waveFormMenu(gemui::Widget& anchor) {
     trackPopup(anchor, std::move(items), checked);
 }
 
-// A form of the SID wave menu (24/10/2026, D-411), one undo step; each form keeps the Steps, Period and Width of the
-// others. Sine (D-401) and Bounce (D-414): the sine at the phase and period of the track, between volumes 3 and 15;
-// from Base, as many Steps as its Period, one cycle in a period of the note, which plays the note (D-426; 16 Steps
+// A form of the SID wave menu (24/10/2026), one undo step; each form keeps the Steps, Period and Width of the
+// others. Sine and Bounce: the sine at the phase and period of the track, between volumes 3 and 15;
+// from Base, as many Steps as its Period, one cycle in a period of the note, which plays the note (16 Steps
 // before). Custom: the bars drawn; bars all at 0 from Base or Square take the square played then, to draw from.
 void MainWindow::setWaveForm(WaveForm f) {
     const WaveForm was = waveForm();
@@ -2860,7 +2850,7 @@ void MainWindow::buzzStepMenu(int step, gemui::Widget& anchor) {
 
 void MainWindow::applyBuzzerPreset(int k) {
     // A single undo step: the first setting pushes the previous state (armed when the button is pressed). The track
-    // stays a Sync Buzzer, its volume mode, tone and noise untouched (D-230).
+    // stays a Sync Buzzer, its volume mode, tone and noise untouched.
     if (drumTrack() || generator() != int(Generator::SyncBuzzer)) return;
     const BuzzerPreset& p = kBuzzerPresets[size_t(k)];
     set(Track::EnvShape, float(p.shape));
@@ -2935,7 +2925,7 @@ void MainWindow::songStep(int dir) {
     if (!extras_.global.songMode || extras_.seq.song.empty()) return;
     const auto& entries = extras_.seq.song.entries;
     const int n = int(entries.size());
-    // Jumps (D-158) are not played: the arrow skips them.
+    // Jumps are not played: the arrow skips them.
     int i = song_.songPos_;
     for (int k = 0; k < n; ++k) {
         i = ((i + dir) % n + n) % n;  // wraps around at both ends
@@ -2991,7 +2981,7 @@ UndoEntry MainWindow::undoEntryLike(const UndoEntry& e) const {
         if (e.digiBytes) u.digiNibbles = extras_.digidrums[size_t(k)];
         else u.digi.source.clear();  // settings only: the source stays the current one
     } else if (e.kind == UndoEntry::Kind::Grid) {
-        // Resolution change that fitted the notes (D-448): every pattern, the Song, the tracks' own lengths and the
+        // Resolution change that fitted the notes: every pattern, the Song, the tracks' own lengths and the
         // rate.
         const ymseq::Project& p = extras_.seq;
         u.index = extras_.global.resolution;
@@ -3211,7 +3201,7 @@ void MainWindow::saveWindows() {
         p.open = w->visible();
         p.order = ++order;
     }
-    WindowPlace& main = s.windows["main"];  // D-224
+    WindowPlace& main = s.windows["main"];
     main.at = mainPlace();
     main.open = true;
 }
@@ -3320,7 +3310,7 @@ void MainWindow::newProject() {
 void MainWindow::doNew() {
     // Like File > Load > Preset with the defaults; the recorder's take, the YM Player's tune, the undo history and the
     // files that Save rewrites go too. The preferences (Patches library, Digidrum banks, MIDI map, window size...) stay.
-    // The sequencer stops and Rec is disarmed (sixth DAW test, item 51, D-249); in Host sync the host plays it.
+    // The sequencer stops and Rec is disarmed (sixth DAW test, item 51); in Host sync the host plays it.
     panic();
     if (seqClock() != ymengine::SeqClock::Host) host_.seqCommand(Host::SeqCommand::Stop);
     host_.session().record = false;
@@ -3404,7 +3394,7 @@ void MainWindow::doDemo() {
           {Row::Vol, {15, 15, 9, 15, 13, 14, 9, 15, 15, 15, 9, 14, 13, 14, 9, 11}},
           {Row::Pnr, {0, 0, 141, 0, 71, 0, 141, 0, 0, 0, 141, 0, 71, 0, 141, 141}}}},
     };
-    if (!m3)  // EP 1 of the prototype: 32 as a chip value (D-021)
+    if (!m3)  // EP 1 of the prototype: 32 as a chip value
         demo.push_back({3,
                         {{Track::Generator, float(Generator::SyncBuzzer)}, {Track::EnvPeriod, 32},
                          {Track::EnvShape, 8}, {Track::Volume, 14}, {Track::Tone, 0}},
@@ -3423,7 +3413,7 @@ void MainWindow::doDemo() {
     const std::array<float, 4> levels = {100, 80, 100, m3 ? 100.0f : 50.0f};
     for (int t = 0; t < 4; ++t) params.emplace_back(paramIndex(t, Track::Level), levels[size_t(t)]);
     params.emplace_back(paramIndex(0, Track::ArpOn), 1.0f);
-    // 3 channels: track 4 plays the Digidrum; its generator, restored on the return to 16 channels (D-063), becomes
+    // 3 channels: track 4 plays the Digidrum; its generator, restored on the return to 16 channels, becomes
     // Sync Buzzer (ch3Saved[0].fx = 3 of the prototype).
     if (m3) params.emplace_back(paramIndex(3, Track::Generator), float(Generator::SyncBuzzer));
     // Written to the host directly, not through set(): no undo step of the track is taken, and the screen is refreshed
@@ -3501,17 +3491,17 @@ void MainWindow::showInfo() {
     gemui::Alert::Spec spec;
     spec.lines = {{"STYM2149"},
                   {""},
-                  {"Programming: Pascal \"Indus\" Nowak (with Claude's help)"},  // D-248
+                  {"Programming: Pascal \"Indus\" Nowak (with Claude's help)"},
                   {"YM2149F emulator - GEM edition"},
                   {"Version: " + host_.version()},
                   {"Copyright (c) 2026 Indus / PRISM"},
                   {""},
-                  // Notes in the 8×8 font (D-071): lines of 55 characters at most, the width of the alert.
+                  // Notes in the 8×8 font: lines of 55 characters at most, the width of the alert.
                   {"Free software under the GNU Affero General Public", 12, colors::kHint},
                   {"License v3: you may share and modify it under its", 12, colors::kHint},
                   {"terms (see LICENSE).", 12, colors::kHint},
                   {""},
-                  // Credits required by THIRD_PARTY.md (checked again in M8, D-186).
+                  // Credits required by THIRD_PARTY.md.
                   {"Emulation after AtariAudio by Leonard/Oxygene", 12, colors::kHint},
                   {"(Arnaud Carr\u00e9) and ym2149-rs by slippyex (MIT).", 12, colors::kHint},
                   {"SNDH played by AtariAudio's machine and the Musashi", 12, colors::kHint},
@@ -3521,8 +3511,8 @@ void MainWindow::showInfo() {
                   {"(Apache-2.0). Fonts and icons from EmuTOS (GPL).", 12, colors::kHint},
                   {"Built with JUCE (AGPLv3). Licences: see the", 12, colors::kHint},
                   {"licenses folder and THIRD_PARTY.md.", 12, colors::kHint}};
-    // The application icon above the text (D-235), each pixel doubled; OK is the default button, Enter closes the
-    // box, so it gets the bold border of GEM's default button (D-236; the prototype's #infoOk had none).
+    // The application icon above the text, each pixel doubled; OK is the default button, Enter closes the
+    // box, so it gets the bold border of GEM's default button (the prototype's #infoOk had none).
     spec.picture = icons::kApp.px;
     spec.pictureW = icons::kApp.w;
     spec.pictureH = icons::kApp.h;
@@ -3566,9 +3556,9 @@ std::vector<MenuItem> MainWindow::paramItems(Global g, int stride, int& checked)
 }
 
 void MainWindow::customClock() {
-    if (mode3()) return;  // 16 ch only (D-237)
+    if (mode3()) return;  // 16 ch only
     gemui::Alert::Spec spec;
-    // In MHz, ##.#### (fifth DAW test, D-239): 100 Hz steps, the parameter stays in Hz.
+    // In MHz, ##.#### (fifth DAW test): 100 Hz steps, the parameter stays in Hz.
     const std::string range = "(" + clockMHz(plugin::kCustomClockMinHz) + " to " +
                               clockMHz(plugin::kCustomClockMaxHz) + "):";
     spec.lines = {{"Custom chip clock in MHz"}, {range}};
@@ -3629,8 +3619,8 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
                            {"octUp", &octUp_},     {"allOn", &allOn_},     {"allOff", &allOff_}};
     for (const Named& n : named)
         if (id == n.id) return n.w->showing() ? std::optional<Rect>(n.w->bounds()) : std::nullopt;
-    // Rows of the Sync Buzzer settings in the GENERATOR frame (D-227): "genBuzzer0" Tuning, 1 to 3 N, D and Fine, 4
-    // YM Pad and Presets (its steps below, D-252: "buzz0" to "buzz7", "buzzSteps").
+    // Rows of the Sync Buzzer settings in the GENERATOR frame: "genBuzzer0" Tuning, 1 to 3 N, D and Fine, 4
+    // YM Pad and Presets (its steps below, "buzz0" to "buzz7", "buzzSteps").
     if (id.size() == 10 && id.substr(0, 9) == "genBuzzer" && id[9] >= '0' && id[9] <= '4') {
         if (!buzTuned_.showing()) return std::nullopt;
         using Row = std::initializer_list<const gemui::Widget*>;
@@ -3662,7 +3652,7 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
     if (const int k = number("genSlot", ymengine::kDigidrumSlots); k >= 0)
         return slots_[size_t(k)].showing() ? std::optional<Rect>(slots_[size_t(k)].bounds()) : std::nullopt;
     if (id == "genFrame") return genFs_.bounds();
-    // Computer row (D-155), across the inner width of the SYSTEM frame: "computerRow", the row and the gap that follows
+    // Computer row, across the inner width of the SYSTEM frame: "computerRow", the row and the gap that follows
     // it; "systemBelow", the rows moved down by as much, down to the bottom of the frame (comparison with the
     // captures).
     if (id == "computerRow" || id == "systemBelow") {
@@ -3693,13 +3683,13 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
     if (auto r = stepWin_.rectOf(id)) return r;
     if (auto r = help_.rectOf(id)) return r;
     if (id == "learnBadge") return badge_.visible() ? std::optional<Rect>(badge_.bounds()) : std::nullopt;
-    // Menu of a control open under it, its frame on the control's bottom rule (D-396).
+    // Menu of a control open under it, its frame on the control's bottom rule.
     if (id == "anchoredMenu") {
         const auto* m = dynamic_cast<const gemui::MenuList*>(desk_.topPopup());
         if (!m || !popupAnchor_ || m->bounds().y != popupAnchor_->bounds().bottom() - 2) return std::nullopt;
         return m->bounds();
     }
-    // Shape R13 menu open, eight shapes where the prototype listed sixteen (D-221), and the place of the eight rows it
+    // Shape R13 menu open, eight shapes where the prototype listed sixteen, and the place of the eight rows it
     // no longer has, under it.
     if (id == "shapeMenu" || id == "shapeMenuGone") {
         const auto* m = dynamic_cast<const gemui::MenuList*>(desk_.topPopup());
@@ -3709,24 +3699,24 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
         // Eight more rows of the height of one (distance between the tops of rows 0 and 1).
         return Rect{b.x, b.bottom(), b.w, 8 * (m->rowsFrom(1).y - m->rowsFrom(0).y)};
     }
-    // ADSR frames dimmed where the prototype left them as they are (D-220): ADSR of a drum track (the prototype dimmed
+    // ADSR frames dimmed where the prototype left them as they are: ADSR of a drum track (the prototype dimmed
     // only that of a Sync Buzzer), ADSR ENVELOPE of either ("adsrInert", "curveInert", further down).
-    // Window buttons, centred (D-247): their row.
+    // Window buttons, centred: their row.
     if (id == "winButtons") {
         const Rect first = winBtns_.front().bounds(), last = winBtns_.back().bounds();
         return Rect{first.x, first.y, last.right() - first.x, first.h};
     }
-    // Rows whose sliders got the width of their neighbours' (ninth DAW test, items 103, 104 and 106: D-304, D-305,
-    // D-307), from the label to the unit; the info cell of the register monitor (item 105, D-306).
+    // Rows whose sliders got the width of their neighbours' (ninth DAW test, items 103, 104 and 106),
+    // from the label to the unit; the info cell of the register monitor (item 105).
     if (id == "volRow") return labVol_.bounds().unite(volv_.bounds());
     if (id == "levelRow") return labLevel_.bounds().unite(levelv_.bounds());
     if (id == "vibRows") return labDepth_.bounds().unite(rateUnit_.bounds());
-    // Rows aligned on the sliders of Volume and Level (twelfth DAW test, items 159 and 160: D-368, D-369).
+    // Rows aligned on the sliders of Volume and Level (twelfth DAW test, items 159 and 160).
     if (id == "srcRow") return labSrc_.bounds().unite(srcSel_.bounds());
     if (id == "polyRow") return labPoly_.bounds().unite(polySel_.bounds());
     if (id == "vmRow") return labVm_.bounds().unite(vmSel_.bounds());
     if (id == "npRow") return np_.bounds().unite(npv_.bounds());
-    // Voices and Clock rows, their buttons after the Computer label (thirteenth DAW test, item 161, D-370).
+    // Voices and Clock rows, their buttons after the Computer label (thirteenth DAW test, item 161).
     if (id == "voicesRow") return labVoices_.bounds().unite(modeSel_.bounds());
     if (id == "clockRow") return labClock_.bounds().unite(clkSel_.bounds()).unite(clkStatus_.bounds());
     if (id == "adsrRows") return adsrLab_.front().bounds().unite(adsrUnit_.back().bounds());
@@ -3735,7 +3725,7 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
     if (id == "regInfo") return regs_.showing() ? std::optional<Rect>(regs_.infoRect()) : std::nullopt;
     if (id == "srcFrame") return srcFs_.bounds();
     if (id == "mainBottom" || id == "mainGone") {
-        // Bottom margin and border of the window, kHelpLine px higher than in the prototype (D-267), and the place of
+        // Bottom margin and border of the window, kHelpLine px higher than in the prototype, and the place of
         // the prototype's help line that the desktop now shows.
         const Rect f = frame_.bounds();
         if (id == "mainBottom") return Rect{f.x, f.bottom() - 26, f.w, 26};
@@ -3753,7 +3743,7 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
         return r.w > 0 ? std::optional<Rect>(r) : std::nullopt;
     }
     if (id == "menuNew") {
-        // New, STYM2149 entry above those of the prototype (File menu, D-225), in the open menu.
+        // New, STYM2149 entry above those of the prototype (File menu), in the open menu.
         const auto* m = dynamic_cast<const gemui::MenuList*>(desk_.firstPopup());
         if (!m || menuNew_ < 0) return std::nullopt;
         const Rect from = m->rowsFrom(menuNew_), below = m->rowsFrom(menuNew_ + 1);
@@ -3775,7 +3765,7 @@ std::optional<Rect> MainWindow::rectOf(std::string_view id) const {
 
 // ------------------------------------------------------------------------------------------- MIDI learn
 
-// MIDI learn (P462, D-146) works on the controls, not on the parameters: a binding links a MIDI key (a CC or a note,
+// MIDI learn works on the controls, not on the parameters: a binding links a MIDI key (a CC or a note,
 // plugin::midiKey) to the prototype id of a slider or a button, and a message moves the slider or clicks the button as
 // the mouse would. The map is a user preference ("midiMap"), shared by every instance. The host keeps the learned keys
 // for the editor instead of the engine (pushCapture) and hands them back through Host::learnMidi, read at each tick.
@@ -3802,7 +3792,7 @@ void MainWindow::pushCapture() { host_.setMidiCapture(plugin::midiKeys(midiMap_)
 bool MainWindow::learnPress(gemui::Widget* w) {
     // Capturing pointerdown listener of the prototype: in learn mode, a press on a slider or a button (the closest to
     // the point touched) that has an id arms it. The press stops there: the control does not act (the click of a button
-    // still went through in the prototype, D-146).
+    // still went through in the prototype).
     if (!learn_) return false;
     for (gemui::Widget* p = w; p; p = p->parent()) {
         const bool range = dynamic_cast<gemui::Slider*>(p) != nullptr;
@@ -3885,7 +3875,7 @@ void MainWindow::paintOver(gemui::Painter& p) {
 }
 
 void MainWindow::buildDeskIcons() {
-    // On an invisible grid of cells of the icons' size (thirteenth DAW test, item 167, D-376), its first row level
+    // On an invisible grid of cells of the icons' size (thirteenth DAW test, item 167), its first row level
     // with the main window's top at its home place: A and B side by side in the first two cells, beside the main window,
     // the trash in the last cell at the bottom right (tenth DAW test, item 124), or where they were dragged.
     constexpr int kW = gemui::DeskIcon::kW, kH = gemui::DeskIcon::kH;
@@ -3910,7 +3900,7 @@ void MainWindow::buildDeskIcons() {
         ok = ok && ec == std::errc();
         p = next;
     }
-    // The places of the preference are brought to their nearest cell (free places before D-376); two icons in one cell:
+    // The places of the preference are brought to their nearest cell (free places in older versions); two icons in one cell:
     // the home places.
     const gemui::Rect area{0, kMenuH, kWidth, kHeight - kMenuH};
     for (size_t k = 0; ok && k < at.size(); ++k) {
@@ -3937,7 +3927,7 @@ void MainWindow::buildDeskIcons() {
             i.setLetter(char('A' + k), icons::kFloppyLetterX, icons::kFloppyLetterY);
         } else {
             i.setPicture(&icons::kTrash, &icons::kTrashMask);
-            // A click on the trash is File > New, with its confirmation (thirteenth DAW test, item 168, D-377).
+            // A click on the trash is File > New, with its confirmation (thirteenth DAW test, item 168).
             i.onClick = [this] { newProject(); };
         }
         i.onMoved = [this](gemui::Point) {
@@ -3974,7 +3964,7 @@ bool MainWindow::keyDown(const gemui::KeyEvent& e) {
                    repeatable;
     }
     armCur();  // a key prepares an undo step of the track, like a press
-    if (settings_.dialogKey(e)) return true;  // Enter: Cancel, the default button of Settings in front (D-435)
+    if (settings_.dialogKey(e)) return true;  // Enter: Cancel, the default button of Settings in front
     // A key that changes the Song, the current pattern or the focused track closes an open menu or value popup, as a
     // click elsewhere does: its entries were built for what the key changes (entry indices, track, pattern).
     if (song_.songKey(e)) {  // arrangement from the keyboard
@@ -4005,7 +3995,7 @@ bool MainWindow::keyDown(const gemui::KeyEvent& e) {
             return true;
         case 'G': desk_.closePopups(); openSong(); return true;
         case 'P': desk_.closePopups(); lib_.show(); return true;
-        case 'F': desk_.closePopups(); echo_.show(); return true;  // Effects (D-313)
+        case 'F': desk_.closePopups(); echo_.show(); return true;  // Effects
         case 'T': desk_.closePopups(); ins_.show(); return true;
         case 'K':
             desk_.closePopups();
@@ -4090,7 +4080,7 @@ bool MainWindow::keyDown(const gemui::KeyEvent& e) {
         }
     }
     // Numeric keypad (keyboard window open: direct octave), M, Z, X, then the keys that play (window open only),
-    // according to the chosen layout (D-131).
+    // according to the chosen layout.
     const KbdAction a = kbdAction(e, keyLayout());
     switch (a.kind) {
     case KbdAction::Kind::Numpad:

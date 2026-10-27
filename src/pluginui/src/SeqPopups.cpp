@@ -169,7 +169,7 @@ private:
     Button chan_, set_;
 };
 
-// Slider that a right click sets back (sixth DAW test, item 75, D-273).
+// Slider that a right click sets back (sixth DAW test, item 75).
 class ResetSlider : public Slider {
 public:
     std::function<void()> onReset;
@@ -182,8 +182,8 @@ public:
     }
 };
 
-// #volmenu: vertical slider (96 px), value below; each move is heard at once. The value can be typed (D-274): two
-// positions, or the signed values without a mask. A toggle can follow the value (Slide of the VOL row, D-393).
+// #volmenu: vertical slider (96 px), value below; each move is heard at once. The value can be typed: two
+// positions, or the signed values without a mask. A toggle can follow the value (Slide of the VOL row).
 class VolPopup : public PopupBox {
 public:
     VolPopup(SliderPopupSpec spec, const Rect& anchor, int deskW, int deskH)
@@ -289,7 +289,7 @@ std::unique_ptr<gemui::Widget> makeVolumePopup(int value, std::function<void(int
 // ------------------------------------------------------------------------------------------- volume, gate, pan
 
 void SeqWindow::openVol(const Rect& cell, int s) {
-    // openVolMenu: the value applies live (the undo step armed by the press is taken at the first change, D-282).
+    // openVolMenu: the value applies live (the undo step armed by the press is taken at the first change).
     desk().closePopups();
     SliderPopupSpec spec;
     spec.value = std::clamp<int>(lane().vol[size_t(s)], 0, 15);
@@ -300,7 +300,7 @@ void SeqWindow::openVol(const Rect& cell, int s) {
             return true;
         });
     };
-    // Slide (D-393): the volume of the step glides to that of the next step (Gxx); not on the drums.
+    // Slide: the volume of the step glides to that of the next step (Gxx); not on the drums.
     spec.toggle = "Slide";
     spec.toggleOn = lane().cmdAt(ymengine::SeqCmd::VolGlide, s) != 0;
     spec.toggleEnabled = !drum();
@@ -367,7 +367,7 @@ void SeqWindow::openGate(const Rect& cell, int s) {
 }
 
 // panPopup: pan of step s from -10 to +10, stored as v·10 + 101 (0 = the channel's pan, also Center), so that a typed
-// 0 is an explicit centre. The centre shows its 0 too (24/10/2026, D-384: the field was empty).
+// 0 is an explicit centre. The centre shows its 0 too (24/10/2026, the field was empty).
 void SeqWindow::openPan(const Rect& cell, int s) {
     desk().closePopups();
     const int stored = lane().pnr[size_t(s)];
@@ -392,9 +392,9 @@ void SeqWindow::openPan(const Rect& cell, int s) {
 }
 
 void SeqWindow::openCmdValue(Rect cell, int s, ymengine::SeqCmd k) {
-    // Rows of their own of the eleventh and twelfth DAW tests: DLY (Dxx, a tick of the line from 1, item 139, D-348),
-    // CUT (Cxx, a tick of the line from 0, item 140, D-349), the restart tick of ENV (Rxx, from 0, item 146, D-355),
-    // SMP (Oxx, item 152, D-361) and TUN (Fxx in signed cents, item 153, D-362). The slider of the ticks spans the
+    // Rows of their own of the eleventh and twelfth DAW tests: DLY (Dxx, a tick of the line from 1, item 139),
+    // CUT (Cxx, a tick of the line from 0, item 140), the restart tick of ENV (Rxx, from 0, item 146),
+    // SMP (Oxx, item 152) and TUN (Fxx in signed cents, item 153). The slider of the ticks spans the
     // line at the current tempo; a tick typed beyond it is kept (the engine ignores it while the line is shorter).
     // None takes the command out of the step.
     using ymengine::SeqCmd;
@@ -452,7 +452,7 @@ void SeqWindow::openCmdValue(Rect cell, int s, ymengine::SeqCmd k) {
 }
 
 void SeqWindow::openBpm(const Rect& cell, int s) {
-    // BPM row of the pattern (Txx from 32, item 133, D-342; shared by the tracks, item 150, D-359).
+    // BPM row of the pattern (Txx from 32, item 133; shared by the tracks, item 150).
     desk().closePopups();
     const int cur0 = proj().cur().bpm[size_t(s)];
     ValuePopup::Spec spec;

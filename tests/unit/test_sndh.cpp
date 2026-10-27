@@ -1,4 +1,4 @@
-// STYM2149 — reading SNDH files (M7, A2, D-159): header, refusals, timed capture, stream, resume, damaged data
+// STYM2149 — reading SNDH files: header, refusals, timed capture, stream, resume, damaged data
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

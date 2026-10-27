@@ -304,7 +304,7 @@ TEST_CASE("3-channel: the velocity and the track level go through the 4-bit volu
     t.mix.level = 0.8;
     rig.e.setTrack(0, t);
     // Level 0.8 × velocity 64/127: −7.9 dB under volume 13 (−7.4 dB), that is −15.4 dB; the nearest 4-bit level is
-    // volume 10 (−16.5 dB), not round(13 × 0.8 × 64/127) = 5 (−32.3 dB) as in the prototype (D-200).
+    // volume 10 (−16.5 dB), not round(13 × 0.8 × 64/127) = 5 (−32.3 dB) as in the prototype.
     rig.e.noteOn(0, 60, 64);
     rig.run(100);
     const Log vol = rig.writes(8);
@@ -312,7 +312,7 @@ TEST_CASE("3-channel: the velocity and the track level go through the 4-bit volu
     REQUIRE(vol[0].value == 10);
 }
 
-TEST_CASE("3-channel and 16-channel: a track level and a velocity lower a note alike (D-200)", "[engine][3ch]") {
+TEST_CASE("3-channel and 16-channel: a track level and a velocity lower a note alike", "[engine][3ch]") {
     // RMS of a held note alone, after its attack. The two modes stay within half of the largest 4-bit step (3.9 dB
     // from volume 13 to 14); the prototype's rounding of the 4-bit index made the 3-channel mode 10.6 dB quieter at
     // the plugin's defaults (level 0.75, velocity 100).
@@ -336,7 +336,7 @@ TEST_CASE("3-channel and 16-channel: a track level and a velocity lower a note a
     }
 }
 
-TEST_CASE("3-channel: the track level and the velocity lower the frame volumes of a Chipdrum hit (D-286)",
+TEST_CASE("3-channel: the track level and the velocity lower the frame volumes of a Chipdrum hit",
           "[engine][3ch][kit]") {
     // Kick of the Classic kit: its first frame is at volume 15. Level 0.5 (-6 dB): the nearest 4-bit level is 13
     // (-7.4 dB), not 14 (-3.5 dB); at level 1 the frame plays as it is.
@@ -358,7 +358,7 @@ TEST_CASE("3-channel: the track level and the velocity lower the frame volumes o
     }
 }
 
-TEST_CASE("3-channel and 16-channel: a Digidrum and a Chipdrum hit play alike (D-286)", "[engine][3ch][kit]") {
+TEST_CASE("3-channel and 16-channel: a Digidrum and a Chipdrum hit play alike", "[engine][3ch][kit]") {
     // RMS of the left output over the first 250 ms of a hit, track level and velocity as the plugin's defaults and
     // at full level. A Digidrum is a chip channel playing its 4-bit values in both modes (no gain in 16 channels:
     // it was 5, +14 dB); the 16-channel Chipdrum sample (gain 1.8) follows the register drums of the 3 channels.
@@ -547,7 +547,7 @@ TEST_CASE("3-channel: SID effect with the MFP timer or continuous", "[engine][3c
         sid.patch.sidRatio = 1.5;
         sid.patch.sidMinVolume = 3;
         rig.e.setTrack(0, sid);
-        rig.e.noteOn(0, 57, 127);  // 220 Hz × 1.5 = 330 Hz, two interrupts per period: 660 Hz (D-426)
+        rig.e.noteOn(0, 57, 127);  // 220 Hz × 1.5 = 330 Hz, two interrupts per period: 660 Hz
         rig.run(4800);
         const auto info = rig.e.voice(0);
         REQUIRE(info.timerHz == ymengine::noteHz(57) * 1.5 * 2);
@@ -570,7 +570,7 @@ TEST_CASE("Timer: mode frozen at the attack, changing it only affects the follow
     rig.e.setTrack(0, sid);
     rig.e.noteOn(0, 57, 127);
     rig.run(2400);
-    const double mfpHz = ymengine::mfpQuantize(2 * ymengine::noteHz(57)).hz();  // two interrupts per period (D-426)
+    const double mfpHz = ymengine::mfpQuantize(2 * ymengine::noteHz(57)).hz();  // two interrupts per period
     REQUIRE(rig.e.voice(0).timerActualHz == mfpHz);
     rig.global([](auto& g) { g.timer = ymengine::TimerMode::Free; });
     rig.run(2400);
@@ -633,7 +633,7 @@ TEST_CASE("16-channel: smooth ADSR, stages and sustain level", "[engine][adsr]")
     REQUIRE(with.e.activeVoices() == 0);
 }
 
-TEST_CASE("The ADSR of a drum track has no effect: Chipdrum and Digidrum, 16 and 3 channels (D-205)",
+TEST_CASE("The ADSR of a drum track has no effect: Chipdrum and Digidrum, 16 and 3 channels",
           "[engine][adsr]") {
     std::vector<uint8_t> sample(2000);
     for (size_t i = 0; i < sample.size(); ++i) sample[i] = uint8_t((i * 7) % 16);
@@ -709,7 +709,7 @@ TEST_CASE("16-channel: pitch bend on the sounding voices", "[engine]") {
     REQUIRE(rig.e.voice(0).note == 69);
 }
 
-// One note whose envelope runs on from step to step: Monophonic in 16 channels, any track in 3 channels (D-416).
+// One note whose envelope runs on from step to step: Monophonic in 16 channels, any track in 3 channels.
 TEST_CASE("Arpeggio: Monophonic or 3 channels, the last note keeps cycling during the release", "[engine][arp]") {
     for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {
         CAPTURE(int(mode));
@@ -744,7 +744,7 @@ TEST_CASE("Arpeggio: Monophonic or 3 channels, the last note keeps cycling durin
     }
 }
 
-// One note per key pressed, not per step (Indus, 24/10/2026 20:33, D-416): its envelope runs on through the steps
+// One note per key pressed, not per step (Indus, 24/10/2026 20:33): its envelope runs on through the steps
 // of the arpeggio, a key pressed starts it again from the attack, the note before cut.
 TEST_CASE("Arpeggio: Monophonic or 3 channels, one ADSR per key pressed, running on through the steps",
           "[engine][arp]") {
@@ -791,7 +791,7 @@ TEST_CASE("Arpeggio: Monophonic or 3 channels, one ADSR per key pressed, running
 }
 
 TEST_CASE("Arpeggio: Polyphonic in 16 channels, one ADSR per key pressed, the note before in its release; keys up, "
-          "the last note keeps cycling during its release (Indus, 24/10/2026 19:14, 19:32 and 20:33, D-416)",
+          "the last note keeps cycling during its release (Indus, 24/10/2026 19:14, 19:32 and 20:33)",
           "[engine][arp]") {
     Rig rig(ymengine::VoiceMode::Studio16);
     auto t = track();
@@ -945,7 +945,7 @@ TEST_CASE("Arpeggio: MIDI clock, one step every `division` pulses", "[engine][ar
     Rig rig(ymengine::VoiceMode::Studio16);
     rig.global([](auto& g) {
         g.arpClock = ymengine::ArpClock::MidiClock;
-        g.arpDivision = 12;  // half pulses (D-289): one sixteenth note, six clock pulses
+        g.arpDivision = 12;  // half pulses: one sixteenth note, six clock pulses
     });
     auto t = track();
     t.arp.on = true;
@@ -968,7 +968,7 @@ TEST_CASE("Arpeggio: MIDI clock, one step every `division` pulses", "[engine][ar
     REQUIRE(notes == std::vector<int>{60, 64, 60, 64});
 }
 
-TEST_CASE("Arpeggio: 1/32T and 1/64 on the MIDI clock, a half pulse between two clocks (D-289)", "[engine][arp]") {
+TEST_CASE("Arpeggio: 1/32T and 1/64 on the MIDI clock, a half pulse between two clocks", "[engine][arp]") {
     for (const int division : {3, 4}) {  // half pulses: 1/64, 1/32T
         INFO("division " << division);
         Rig rig(ymengine::VoiceMode::Studio16);
@@ -1038,7 +1038,7 @@ TEST_CASE("Engine: beyond kMaxEvents per block, events are counted and ignored",
     REQUIRE(rig.e.activeVoices() == Engine::kLaneVoices + Engine::kPoolVoices);
 }
 
-TEST_CASE("Master of the stereo outputs: right level unlinked, balance; mono outputs on Master (D-284)", "[engine]") {
+TEST_CASE("Master of the stereo outputs: right level unlinked, balance; mono outputs on Master", "[engine]") {
     auto cfg = config();
     cfg.render.dc = ymcore::DcFilter::None;  // linear output: exact ratios
     auto render = [&](ymengine::VoiceMode mode, double master, double master2, double pan) {
@@ -1085,7 +1085,7 @@ TEST_CASE("Master of the stereo outputs: right level unlinked, balance; mono out
     CHECK(mono.r == mono.l);
 }
 
-TEST_CASE("Master per chip in 2x3 channels: chip 2 on Master 2, no balance (D-284)", "[engine]") {
+TEST_CASE("Master per chip in 2x3 channels: chip 2 on Master 2, no balance", "[engine]") {
     auto cfg = config();
     cfg.render.dc = ymcore::DcFilter::None;  // linear output: exact ratios
     auto render = [&](int tr, double master, double master2, double pan) {

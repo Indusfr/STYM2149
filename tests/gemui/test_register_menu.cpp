@@ -1,4 +1,4 @@
-// STYM2149 — register exports (M7, A5, B1 to B3, D-160 to D-162): Export song > VBL dump, YM3, YM6 and SNDH
+// STYM2149 — register exports: Export song > VBL dump, YM3, YM6 and SNDH
 // (Authentic 3ch only, empty Song refused, worker thread under the bee, alert with what the file does not render),
 // and export of the take from the Recorder window.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -83,7 +83,7 @@ TEST_CASE("Export song > VBL dump, YM3, YM6, SNDH: Authentic 3ch, files, alerts"
     double now = 0;
     w.tick(now);
 
-    // The prototype's regSub: register formats, separator, then MIDI, WAV and Stems; YM6 added (D-161).
+    // The prototype's regSub: register formats, separator, then MIDI, WAV and Stems; YM6 added.
     std::vector<gemui::MenuItem> menu = songMenu(w);
     REQUIRE(menu.size() == 8);
     const std::vector<std::string> labels = {"VBL dump", "YM3", "YM6", "SNDH"};
@@ -92,7 +92,7 @@ TEST_CASE("Export song > VBL dump, YM3, YM6, SNDH: Authentic 3ch, files, alerts"
         CHECK_FALSE(menu[i].disabled);
     }
     CHECK(menu[4].separator);
-    // 16 voices and dual chip: greyed out (D-160).
+    // 16 voices and dual chip: greyed out.
     for (const float mode : {0.0f, 2.0f}) {
         h.p(Global::VoiceMode) = mode;
         w.tick(now += 20);

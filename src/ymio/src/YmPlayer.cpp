@@ -202,7 +202,7 @@ uint32_t YmPlayer::decodeFx(ymcore::ChipRenderer& renderer, uint64_t cycle, uint
             skip = 1u << (voice + 8);
             setTimer(renderer, cycle, slot, prediv, count);
             break;
-        default:  // 0x80: Sinus-SID, not played (D-045)
+        default:  // 0x80: Sinus-SID, not played
             ++ignoredFx_;
             if (!aa && fx.type != FxType::Digidrum) {
                 setTimer(renderer, cycle, slot, 0, 0);
@@ -267,7 +267,7 @@ void YmPlayer::pushFrame(ymcore::ChipRenderer& r, uint64_t cycle, uint32_t t) no
     r.write(cycle, 7, r7);
     skip |= 1u << 7;
     // Zero envelope period → $FFFF: some files enable the envelope one frame before setting its period (rule of the
-    // AtariAudio player, D-036).
+    // AtariAudio player).
     if (f.reg(t, 11) == 0 && f.reg(t, 12) == 0) {
         r.write(cycle, 11, 0xff);
         r.write(cycle, 12, 0xff);

@@ -1,4 +1,4 @@
-// STYM2149 — board filters (ST and STE output chains, D-047)
+// STYM2149 — board filters (ST and STE output chains)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

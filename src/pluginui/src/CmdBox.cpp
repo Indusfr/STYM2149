@@ -25,7 +25,7 @@ constexpr int kPadX = 32, kPadY = 24, kParagraphGap = 16, kButtonsGap = 18, kBut
 constexpr int kRowGap = 10, kColGap = 12, kSliderW = 208;
 
 // Form of a row: one slider and a decimal field; a slide adds its Up/Down button, its slider and field giving the
-// speed from 0 to 15 (24/10/2026, D-391; before: one slider over xy from 0 to 255 and a hexadecimal field, D-385).
+// speed from 0 to 15 (24/10/2026; before: one slider over xy from 0 to 255 and a hexadecimal field).
 enum class Form { Number, Slide };
 struct Kind {
     const char* label;
@@ -275,13 +275,13 @@ void CmdBox::paint(gemui::Painter& p) {
 }
 
 bool CmdBox::keyDown(const gemui::KeyEvent& e) {
-    // Enter and Escape: Cancel, the default button (tenth DAW test, item 121, D-329).
+    // Enter and Escape: Cancel, the default button (tenth DAW test, item 121).
     if (e.key == gemui::Key::Enter || e.key == gemui::Key::Escape) finish(kCancel);
     return true;  // a modal box keeps the keyboard
 }
 
 void CmdBox::finish(int button) {
-    // The curves of the slides shown: with their slide, a shape other than Linear (D-394).
+    // The curves of the slides shown: with their slide, a shape other than Linear.
     for (size_t i = 0; i < kOrder.size(); ++i) {
         const SeqCmd k = kOrder[i];
         if (!spec_.shown[i] || !hasCurve(k)) continue;

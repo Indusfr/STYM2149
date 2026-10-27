@@ -1,4 +1,4 @@
-// STYM2149 — ymio: reading XM modules (M7, B5, D-056, D-166)
+// STYM2149 — ymio: reading XM modules
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -71,7 +71,7 @@ struct XmModule {
     int restart = 0;     // entry of the order table where the song restarts
     bool linear = true;  // linear frequency table (otherwise Amiga)
     int tempo = 6;       // ticks per row
-    int bpm = 125;       // tick rate: a tick lasts 2.5 / bpm seconds (D-173)
+    int bpm = 125;       // tick rate: a tick lasts 2.5 / bpm seconds
     std::vector<uint8_t> order;  // order table (song length)
     std::vector<XmPattern> patterns;
     std::vector<XmInstrument> instruments;
@@ -82,7 +82,7 @@ struct XmModule {
     }
 };
 
-// Either a module, or no module and the reason shown to the user in the "XM not imported" alert (D-173).
+// Either a module, or no module and the reason shown to the user in the "XM not imported" alert.
 struct XmParseResult {
     std::optional<XmModule> module;
     std::string error;

@@ -2,10 +2,10 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// C++ port of pylzh (© 2026 Hirofumi Ukawa, Apache-2.0 licence, commit 37727d9, D-043): level 0, 1 and 2 headers
+// C++ port of pylzh (© 2026 Hirofumi Ukawa, Apache-2.0 licence, commit 37727d9): level 0, 1 and 2 headers
 // (headers.py), methods -lh0-, -lh4- to -lh7- (decompress/lzhuf.py, huffman.py, bitio.py) and CRC-16 (crc.py).
 // Original licence: third_party/licenses/pylzh-LICENSE.txt. Modifications: see Lzh.cpp.
-// The compression (packLzh, LzhPack.cpp, M7, D-161) is written for STYM2149 from this format.
+// The compression (packLzh, LzhPack.cpp) is written for STYM2149 from this format.
 #pragma once
 #include <cstdint>
 #include <span>

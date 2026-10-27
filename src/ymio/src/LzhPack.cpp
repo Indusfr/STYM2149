@@ -1,4 +1,4 @@
-// STYM2149 — ymio: LHA -lh5- compression (compressed YM6 files, M7, A5, D-161)
+// STYM2149 — ymio: LHA -lh5- compression (compressed YM6 files)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

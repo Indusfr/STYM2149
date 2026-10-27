@@ -1,7 +1,7 @@
-# ymio: file formats. Reading YM2/YM3/YM3b/YM5/YM6 (LHA-compressed or not) and frame player with timer effects
-# (M2); reading SNDH files through the AtariAudio Atari machine, Ice-packed or not (M7, D-159); standard MIDI files
-# (M7, D-170); WAV and ZIP exports, written as the render goes (M7, A4); writing VBL, YM3, YM6 and SNDH dumps (M7, A5);
-# reading XM modules (M7, B5).
+# ymio: file formats. Reading YM2/YM3/YM3b/YM5/YM6 (LHA-compressed or not) and frame player with timer effects;
+# reading SNDH files through the AtariAudio Atari machine, Ice-packed or not; standard MIDI files;
+# WAV and ZIP exports, written as the render goes; writing VBL, YM3, YM6 and SNDH dumps;
+# reading XM modules.
 find_package(Threads REQUIRED)
 add_library(ymio STATIC
   src/ByteSink.cpp

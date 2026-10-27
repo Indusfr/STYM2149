@@ -43,12 +43,12 @@ public:
     Widget* root() const noexcept { return root_; }
 
     // Top of the work area: the windows are not moved above it (the GEM desktop's menu bar is there, ninth DAW test,
-    // item 101, D-302).
+    // item 101).
     void setWorkTop(int y) noexcept { workTop_ = y; }
     int workTop() const noexcept { return workTop_; }
 
     // Drop-down menus: the desktop takes the menu and shows it above those already open; closing destroys it. A menu
-    // opened while a modal box is open lies over that box and takes the mouse before it (24/10/2026, D-394); closing
+    // opened while a modal box is open lies over that box and takes the mouse before it (24/10/2026); closing
     // the box closes it.
     Widget& openPopup(std::unique_ptr<Widget> popup);
     void closePopup(Widget& popup);  // also closes those opened after it
@@ -117,7 +117,7 @@ public:
     // Tooltips (the prototype's Options > Tooltips menu).
     void setTooltips(bool on);
     bool tooltips() const noexcept { return tipsOn_; }
-    // Translation of a tooltip when it is shown (language chosen by the host, D-185); without it, the widget's text as
+    // Translation of a tooltip when it is shown (language chosen by the host); without it, the widget's text as
     // it is.
     std::function<std::string(const std::string&)> translateTip;
     static constexpr double kTipDelayMs = 700;
@@ -129,14 +129,14 @@ public:
     void invalidate(const Rect& r) noexcept;
     void invalidateAll() noexcept { invalidate(bounds()); }
     // Offset of the invalidated rectangles: widgets laid out at another place than the one they are moved to (the
-    // moved main window, laid out at its home place: D-224).
+    // moved main window, laid out at its home place).
     void setInvalidateShift(Point d) noexcept { shift_ = d; }
     bool needsPaint() const noexcept { return !dirty_.empty(); }
     // Repaints the pending areas and returns their union (empty if there is nothing to do); the repainted areas are in
     // painted() until the next call.
     Rect paint();
     const std::vector<Rect>& painted() const noexcept { return painted_; }
-    // Drawing with another backend (the plugin's juce::Graphics, D-201): takes the pending areas without painting the
+    // Drawing with another backend (the plugin's juce::Graphics): takes the pending areas without painting the
     // framebuffer (they are in painted() until the next call); the caller then draws each one with draw().
     const std::vector<Rect>& takePending() noexcept;
     // Draws area r of the desktop with p, whose drawing area becomes r.

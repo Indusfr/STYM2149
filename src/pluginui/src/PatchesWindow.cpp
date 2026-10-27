@@ -32,7 +32,7 @@ PatchesWindow::PatchesWindow(MainWindow& main) : m_(main) {
 }
 
 void PatchesWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&save_, "libSave"}, {&import_, "libImport"}, {&export_, "libExport"}})
         w->setId(id);
@@ -54,7 +54,7 @@ void PatchesWindow::wire() {
             append(plugin::snapPatch(n, m_.values_, m_.extras_, m_.cur_));  // the file read again first
         });
     };
-    // Library files (M7, D-141): Import appends the patches of the file at the end (patchLib.push), Export writes the
+    // Library files: Import appends the patches of the file at the end (patchLib.push), Export writes the
     // library in the prototype's format.
     import_.onClick = [this] {
         m_.openFile(plugin::FileKind::Patches, [this](const std::string& text) { importText(text); });
@@ -99,7 +99,7 @@ void PatchesWindow::append(plugin::PatchEntry e) {
 }
 
 // The imported file is checked before the library is read again; a file written by a newer version is taken for what
-// is known, and an alert says so (D-174).
+// is known, and an alert says so.
 void PatchesWindow::importText(const std::string& text) {
     bool newer = false;
     std::optional<std::vector<plugin::PatchEntry>> read = plugin::parsePatchLibrary(text, nullptr, &newer);

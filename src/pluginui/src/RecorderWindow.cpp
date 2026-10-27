@@ -26,7 +26,7 @@ namespace {
 
 constexpr double kPad = 8, kGap = 8;  // padding of the content and gap between the items of a row (px)
 
-// Export row (B3): YM6, SNDH and VBL dump, in the order of the M7 plan.
+// Export row: YM6, SNDH and VBL dump.
 constexpr std::array<plugin::RegisterFormat, 3> kExports = {plugin::RegisterFormat::Ym6, plugin::RegisterFormat::Sndh,
                                                             plugin::RegisterFormat::Vbl};
 constexpr std::array<const char*, 3> kExportNames = {"YM6", "SNDH", "VBL"};

@@ -1,5 +1,5 @@
-// STYM2149 — gemui tests: Step Sequencer buttons and keys: ghost notes (P355), overview row (P356), Follow (P411),
-// scissors pointer with Alt (P442), digit keys (P451), arrows (P454, P455), Enter (P456) and Delete (P457).
+// STYM2149 — gemui tests: Step Sequencer buttons and keys: ghost notes, overview row, Follow,
+// scissors pointer with Alt, digit keys, arrows, Enter and Delete.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -82,7 +82,7 @@ void publishStep(UiHost& h, pluginui::MainWindow& w, int step, double now) {
 
 }  // namespace
 
-TEST_CASE("Ghost notes: the other melodic tracks behind the grid, at the pitch of the focused track (P355)",
+TEST_CASE("Ghost notes: the other melodic tracks behind the grid, at the pitch of the focused track",
           "[ui][seq][ghost]") {
     UiHost h;
     ymseq::Lane& b = h.state.seq.cur().edit(1);
@@ -133,7 +133,7 @@ TEST_CASE("Ghost notes: the other melodic tracks behind the grid, at the pitch o
     CHECK_FALSE(h.editor.ghost);
     CHECK(ghostPixels(w) == 0);
 
-    // 3ch: only the tracks of the chip (D-120).
+    // 3ch: only the tracks of the chip.
     UiHost h3;
     h3.p(Global::VoiceMode) = 1;
     h3.state.seq.cur().edit(1).pat[4] = 5;
@@ -145,9 +145,9 @@ TEST_CASE("Ghost notes: the other melodic tracks behind the grid, at the pitch o
     CHECK(cellPixel(w3, 10, 7) != kGhost);
 }
 
-// D-209 (DAW test, item 10): Ghost is on when the plugin starts, where the prototype started with it off; the
+// DAW test, item 10: Ghost is on when the plugin starts, where the prototype started with it off; the
 // choice then lasts as long as the plugin (editor session), the editor closed and opened again included.
-TEST_CASE("Ghost notes: on by default, with or without the overview; switched off, they stay off (D-209)",
+TEST_CASE("Ghost notes: on by default, with or without the overview; switched off, they stay off",
           "[ui][seq][ghost]") {
     UiHost h;
     CHECK(h.editor.ghost);
@@ -176,7 +176,7 @@ TEST_CASE("Ghost notes: on by default, with or without the overview; switched of
     CHECK(ghostPixels(w) == 0);
 }
 
-TEST_CASE("Overview button: shows and hides the overview row (P356)", "[ui][seq][overview]") {
+TEST_CASE("Overview button: shows and hides the overview row", "[ui][seq][overview]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.sequencer().show();
@@ -191,12 +191,12 @@ TEST_CASE("Overview button: shows and hides the overview row (P356)", "[ui][seq]
     click(w, "seqOver");
     CHECK_FALSE(h.editor.overview);
     CHECK_FALSE(w.rectOf("overMap"));
-    // As high as before; moved up if the overview took it past the bottom of the desktop (D-458), it stays there.
+    // As high as before; moved up if the overview took it past the bottom of the desktop, it stays there.
     CHECK(w.rectOf("seqWin")->h == win->h);
     CHECK(w.rectOf("seqWin")->y <= win->y);
 }
 
-TEST_CASE("Follow: the view pages with the play head when on, stays when off (P411)", "[ui][seq][follow]") {
+TEST_CASE("Follow: the view pages with the play head when on, stays when off", "[ui][seq][follow]") {
     UiHost h;
     h.state.seq.cur().steps = 128;
     pluginui::MainWindow w(h);
@@ -230,7 +230,7 @@ TEST_CASE("Follow: the view pages with the play head when on, stays when off (P4
     CHECK(h.editor.viewStart == 0);
 }
 
-TEST_CASE("Alt held over the grid: scissors on the notes that can be split, not on a drum track (P442)",
+TEST_CASE("Alt held over the grid: scissors on the notes that can be split, not on a drum track",
           "[ui][seq][tools]") {
     UiHost h;
     ymseq::Lane& l = h.state.seq.cur().edit(0);
@@ -273,7 +273,7 @@ TEST_CASE("Alt held over the grid: scissors on the notes that can be split, not 
     CHECK(pointer(w, 4, 9) == Pointer::Hand);  // fourth instrument
 }
 
-TEST_CASE("Digit keys: 1-8 pick a pattern of the bank shown, Shift+1-4 a bank, never the numeric keypad (P451)",
+TEST_CASE("Digit keys: 1-8 pick a pattern of the bank shown, Shift+1-4 a bank, never the numeric keypad",
           "[ui][seq][keys]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -309,7 +309,7 @@ TEST_CASE("Digit keys: 1-8 pick a pattern of the bank shown, Shift+1-4 a bank, n
     CHECK(h.state.seq.viewBank == 3);
     CHECK(h.takeCommands().empty());
 
-    // Numeric keypad: never a pattern; the octave of the keys when the Computer Keyboard window is open (D-131).
+    // Numeric keypad: never a pattern; the octave of the keys when the Computer Keyboard window is open.
     CHECK_FALSE(numpad(w, 3));
     CHECK(h.state.seq.current == 31);
     w.keyboardWindow().show();
@@ -319,7 +319,7 @@ TEST_CASE("Digit keys: 1-8 pick a pattern of the bank shown, Shift+1-4 a bank, n
     CHECK(h.takeCommands().empty());
 }
 
-TEST_CASE("Left and Right: the grid cursor when the grid is open, else the channel, modulo the tracks (P454)",
+TEST_CASE("Left and Right: the grid cursor when the grid is open, else the channel, modulo the tracks",
           "[ui][seq][keys]") {
     UiHost h;
     h.state.seq.cur().steps = 32;
@@ -382,7 +382,7 @@ TEST_CASE("Left and Right: the grid cursor when the grid is open, else the chann
     CHECK(h.editor.viewStart == 0);
 }
 
-TEST_CASE("Up and Down in the grid: the cursor row, the view scrolls between 24 and 84, eight drum rows (P455)",
+TEST_CASE("Up and Down in the grid: the cursor row, the view scrolls between 24 and 84, eight drum rows",
           "[ui][seq][keys]") {
     UiHost h;
     h.editor.viewAbsBase = 82;
@@ -432,7 +432,7 @@ TEST_CASE("Up and Down in the grid: the cursor row, the view scrolls between 24 
     CHECK(h.editor.viewAbsBase == 24);
 }
 
-TEST_CASE("Enter toggles the note at the cursor with a preview; Shift+Space stays Play / Stop (P456)",
+TEST_CASE("Enter toggles the note at the cursor with a preview; Shift+Space stays Play / Stop",
           "[ui][seq][keys]") {
     UiHost h;
     h.p(Global::FocusTrack) = 2;
@@ -484,7 +484,7 @@ TEST_CASE("Enter toggles the note at the cursor with a preview; Shift+Space stay
     CHECK(h.takeCommands().empty());
 }
 
-TEST_CASE("Delete and Backspace clear the step at the cursor, every row and chord voice, one undo step (P457)",
+TEST_CASE("Delete and Backspace clear the step at the cursor, every row and chord voice, one undo step",
           "[ui][seq][keys]") {
     UiHost h;
     ymseq::Lane& l = h.state.seq.cur().edit(0);

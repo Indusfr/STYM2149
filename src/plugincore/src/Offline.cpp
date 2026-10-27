@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: offline render of the exports (M7, STYM2149_SPEC.md §8, D-160, D-163, D-170)
+// STYM2149 — plugincore: offline render of the exports (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/Offline.h"
@@ -36,7 +36,7 @@ OfflineRender::OfflineRender(Source source, uint32_t sampleRate, const ParamValu
     fillSequence(s.state.seq, s.seq);
     s.patternSerial = 1;  // the engine starts from the current pattern (state.seq.current)
     midiClock_ = toGlobal(values_, g).arpClock == ymengine::ArpClock::MidiClock;
-    driver_->fixSeqClock(ymengine::SeqClock::Internal);  // pulses below for the arpeggio only (D-188)
+    driver_->fixSeqClock(ymengine::SeqClock::Internal);  // pulses below for the arpeggio only
     driver_->prepare({rate_, trackOutputs}, values_, s);
     log_.reserve(kLogCapacity);
     driver_->engine().setSeqLog(&log_);

@@ -1,6 +1,6 @@
-// STYM2149 — SID wave and Sync Buzzer steps (M6, B6, D-151), in the GENERATOR frame since the sixth DAW test (D-250 to
-// D-252, D-278; the Timer Wave window before): SID wave drawn with the mouse, wheel and right click, the menu of its
-// forms (Base, Square, Sine, Bounce, Custom, D-411, D-414), Steps, Period and Width; Sync Buzzer steps and their
+// STYM2149 — SID wave and Sync Buzzer steps, in the GENERATOR frame since the sixth DAW test (
+// the Timer Wave window before): SID wave drawn with the mouse, wheel and right click, the menu of its
+// forms (Base, Square, Sine, Bounce, Custom), Steps, Period and Width; Sync Buzzer steps and their
 // shapes; one undo step per gesture.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -125,7 +125,7 @@ void pick(MainWindow& w, int index) {
     press(w, {r.x + 20, r.y + 10});
 }
 
-// Picks a form of the SID wave in its menu (D-411).
+// Picks a form of the SID wave in its menu.
 void form(MainWindow& w, const std::string& name) {
     click(w, "waveForm");
     const std::vector<std::string> l = labels(w);
@@ -150,7 +150,7 @@ const gemui::ValueField& field(MainWindow& w, std::string_view id) {
     return *f;
 }
 
-// Clicks a typed value, empties it, types `text` and confirms with Enter (D-264).
+// Clicks a typed value, empties it, types `text` and confirms with Enter.
 void typeValue(MainWindow& w, const std::string& id, std::string_view text) {
     click(w, id);
     REQUIRE(field(w, id).editing());
@@ -172,7 +172,7 @@ void generator(TestHost& h, ymengine::Generator g) {
 }  // namespace
 
 TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave window (sixth DAW test, items 52 to 54 "
-          "and 80, D-250 to D-252, D-278); not on percussion",
+          "and 80); not on percussion",
           "[ui][timerwave]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);
@@ -182,7 +182,7 @@ TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave 
     CHECK_FALSE(w.rectOf("timerWave"));
 
     // Edit menu: Instruments, then Samples (Timer wave and Buzzer left for the GENERATOR frame, Sequences for the
-    // Modulation window, D-241).
+    // Modulation window).
     w.openMenu(2);
     const std::vector<std::string> edit = labels(w);
     CHECK(std::find(edit.begin(), edit.end(), "Timer wave") == edit.end());
@@ -193,7 +193,7 @@ TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave 
     CHECK(edit[at + 1] == "Samples");
     key(w, gemui::Key::Escape);
 
-    // SID Voice: the SID wave, Base by default (the square of the prototype, its two halves), its menu alone (D-417);
+    // SID Voice: the SID wave, Base by default (the square of the prototype, its two halves), its menu alone;
     // no buzzer steps.
     CHECK(w.rectOf("waveForm"));
     CHECK_FALSE(w.rectOf("waveGrid"));
@@ -222,7 +222,7 @@ TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave 
 }
 
 TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Square of Steps steps (Indus, 24/10/2026 "
-          "17:40 to 17:47, D-411, D-412); one undo step per gesture",
+          "17:40 to 17:47); one undo step per gesture",
           "[ui][timerwave][undo]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);
@@ -232,7 +232,7 @@ TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Squar
     const ymengine::TrackPatch& p = h.patch();
 
     // The menu after the name of the SID wave, on its line, Base checked; with Base, the plain square, neither the
-    // bars nor Steps (Indus, 24/10/2026 20:30, D-417), its two steps kept behind: the note's volume, then SID min vol
+    // bars nor Steps (Indus, 24/10/2026 20:30), its two steps kept behind: the note's volume, then SID min vol
     // (4).
     const gemui::Button* menuButton = &w.waveFormButton();
     CHECK(menuButton->text() == "Base");
@@ -278,7 +278,7 @@ TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Squar
     wheel(w, centre(col(w, 2)), -1);
     CHECK(p.sidWave[2] == 10);
     CHECK(h.editor.undo.undoSize() == 5);
-    // Right click: the slider of the Modulation window's cells (seventh DAW test, item 84, D-285), 96 px below the
+    // Right click: the slider of the Modulation window's cells (seventh DAW test, item 84), 96 px below the
     // step; its bottom is worth 0, one undo step.
     const gemui::Rect c5 = col(w, 5);
     press(w, centre(c5), gemui::MouseButton::Right);
@@ -293,7 +293,7 @@ TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Squar
     CHECK(p.sidWave[5] == 4);
 
     // Square: its Steps kept (16), the bars drawn kept for Custom. The bars show the square played (Indus, 24/10/2026
-    // 15:43, D-407): the note's volume over the first Width (4) steps, SID min vol over the others; the mouse does
+    // 15:43): the note's volume over the first Width (4) steps, SID min vol over the others; the mouse does
     // nothing on them.
     form(w, "Square");
     w.tick(0);
@@ -339,8 +339,8 @@ TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Squar
     CHECK_FALSE(w.rectOf("waveSteps"));
     CHECK(steps->value() == 2);
 
-    // Sine from Base: the Sine-SID on the 16 bars (D-401), cycles of 8 (D-406), as many played as its Period: one
-    // cycle in a period of the note, the note played (D-426); undone, Base and the bars back.
+    // Sine from Base: the Sine-SID on the 16 bars, cycles of 8, as many played as its Period: one
+    // cycle in a period of the note, the note played; undone, Base and the bars back.
     form(w, "Sine");
     CHECK(p.sidForm == ymengine::SidForm::Sine);
     CHECK(p.sidWaveLen == 8);
@@ -352,7 +352,7 @@ TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Squar
 }
 
 TEST_CASE("SID wave: Sine, a bar moved shifts the sine; Period, 8 by default, shown with Sine, under Steps; Custom "
-          "frees the bars (Indus, 24/10/2026 11:29, 14:07, 15:41, 16:19, 17:43, D-402, D-405, D-406, D-408, D-411)",
+          "frees the bars (Indus, 24/10/2026 11:29, 14:07, 15:41, 16:19, 17:43)",
           "[ui][timerwave][undo]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);
@@ -364,7 +364,7 @@ TEST_CASE("SID wave: Sine, a bar moved shifts the sine; Period, 8 by default, sh
         const gemui::Rect c = col(w, step);
         return gemui::Point{c.x + 5, c.bottom() - 3 * v};
     };
-    // Period, in place of the Phase slider of D-405: hidden without Sine, at 8.
+    // Period, in place of the former Phase slider: hidden without Sine, at 8.
     CHECK_FALSE(w.stepsSlider("wavePhase"));
     const gemui::Slider* period = w.stepsSlider("wavePeriod");
     REQUIRE(period);
@@ -398,7 +398,7 @@ TEST_CASE("SID wave: Sine, a bar moved shifts the sine; Period, 8 by default, sh
     CHECK(p.sidWavePeriod == 2);
     typeValue(w, "wavePeriodv", "40");
     CHECK(p.sidWavePeriod == 16);
-    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 16));  // one cycle over the 16 bars, the sine of D-401
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 16));  // one cycle over the 16 bars, the former sine
     w.tick(0);
     CHECK(field(w, "wavePeriodv").text() == "16");
 
@@ -455,7 +455,7 @@ TEST_CASE("SID wave: Sine, a bar moved shifts the sine; Period, 8 by default, sh
 }
 
 TEST_CASE("SID wave: Bounce, the sine of the chip's levels, after Sine in the menu; Period shown with it, a bar moved "
-          "shifts it (Indus, 24/10/2026 18:41, D-414)",
+          "shifts it (Indus, 24/10/2026 18:41)",
           "[ui][timerwave][undo]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);
@@ -466,7 +466,7 @@ TEST_CASE("SID wave: Bounce, the sine of the chip's levels, after Sine in the me
         const gemui::Rect c = col(w, step);
         return gemui::Point{c.x + 5, c.bottom() - 3 * v};
     };
-    // From Base, like Sine: one cycle of 8 bars played (D-426), from volume 3 to 15 on the chip's levels; Period
+    // From Base, like Sine: one cycle of 8 bars played, from volume 3 to 15 on the chip's levels; Period
     // under Steps; one undo step.
     form(w, "Bounce");
     w.tick(0);
@@ -498,7 +498,7 @@ TEST_CASE("SID wave: Bounce, the sine of the chip's levels, after Sine in the me
 }
 
 TEST_CASE("SID wave: Width of the Square, in its Steps, half and half by default, drawn in the bars, shown with Square "
-          "where Period is with Sine (Indus, 24/10/2026 16:00 to 17:47, D-408, D-411, D-412)",
+          "where Period is with Sine (Indus, 24/10/2026 16:00 to 17:47)",
           "[ui][timerwave][undo]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);

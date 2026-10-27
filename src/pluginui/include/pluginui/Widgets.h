@@ -202,7 +202,7 @@ public:
         int stage = -1;
         double level = 0;
     };
-    // One point per note sounding (24/10/2026, D-403), the first one, the newest, drawn over the others.
+    // One point per note sounding (24/10/2026), the first one, the newest, drawn over the others.
     void setLive(std::span<const LivePoint> points);
     const std::vector<LivePoint>& live() const noexcept { return live_; }  // tests
     // Time (ms, on the drawing's axis, its 400 ms sustain included) of a voice's point, found back from its level;
@@ -218,10 +218,10 @@ private:
 
 // canvas#drumwave of the prototype, 360 × 48 inside a 2 px line: empty slot, frame; otherwise the sample, its length
 // and its playback rate (drawDrum of the prototype, which always wrote 7800 Hz; the rate is set in the Digidrums
-// window, D-154), after the name of the slot when it has one (D-445). The sample is drawn at the box's pixels, under
-// the line of text (D-447: the prototype's canvas, a value every n / 360 reduced into the box, dropped most of them).
-// A drawing only: the samples are loaded in the Digidrums window (the prototype loaded a file on a click, D-213). The
-// line of text is in the GEM 6×6 font (D-222).
+// window), after the name of the slot when it has one. The sample is drawn at the box's pixels, under
+// the line of text (the prototype's canvas, a value every n / 360 reduced into the box, dropped most of them).
+// A drawing only: the samples are loaded in the Digidrums window (the prototype loaded a file on a click). The
+// line of text is in the GEM 6×6 font.
 class DrumWave : public gemui::Widget {
 public:
     static constexpr int kW = 360, kH = 48;  // the prototype's canvas: columns and rows of the design
@@ -239,20 +239,20 @@ private:
     int baseline_ = 14;  // of the line of text, in the rows of the design
 };
 
-// Sample of the DMA track (M6, D-153): 360 × 56 inside a 2 px line in the design. Empty slot: frame (and an invitation
+// Sample of the DMA track: 360 × 56 inside a 2 px line in the design. Empty slot: frame (and an invitation
 // to load when it loads); otherwise the envelope around zero, the left channel at the top and the right one at the
-// bottom for a stereo sample, marked L and R (D-456), the part played (D-444: grey lines at Start and End, the frames
-// outside it grey, the top of the band when it loops) and a line of text (name of the sample when it has one, D-445;
-// size, duration, rate, format). The sample is drawn at the box's pixels (D-447). In the DMA window, a click loads a
-// file; in the GENERATOR frame, it is a drawing only (D-213). The line of text is in the GEM 6×6 font, at the screen's
-// pixels (D-222).
+// bottom for a stereo sample, marked L and R, the part played (grey lines at Start and End, the frames
+// outside it grey, the top of the band when it loops) and a line of text (name of the sample when it has one;
+// size, duration, rate, format). The sample is drawn at the box's pixels. In the DMA window, a click loads a
+// file; in the GENERATOR frame, it is a drawing only. The line of text is in the GEM 6×6 font, at the screen's
+// pixels.
 class DmaWave : public gemui::Widget {
 public:
     static constexpr int kW = 360, kH = 56;  // columns and rows of the design, stretched to the box
 
     explicit DmaWave(bool loads = true);  // loads: a click calls onClick (DMA window), otherwise a drawing only
     // Signed 8-bit bytes of sample `slot` (0-based, shown from 1), interleaved left then right when stereo; rateHz
-    // is the playback rate written in the caption. The part played covers frames start to end - 1 (D-444) and is drawn
+    // is the playback rate written in the caption. The part played covers frames start to end - 1 and is drawn
     // like that of a DigiWave when start < end <= the number of frames; `name` (empty: none) opens the line of text.
     // Repaints only when something changed.
     void setSample(int slot, std::span<const int8_t> bytes, double rateHz, bool stereo, bool loop = false,
@@ -279,10 +279,10 @@ private:
     std::vector<int8_t> bytes_;
 };
 
-// Digidrum sample of the editor (M6, D-154): 360 × 72 inside a 2 px line. Empty slot: frame and an invitation to
-// load; otherwise the 4-bit values (0 at the bottom, 15 at the top) drawn at the box's pixels (D-447), the part played
-// (D-443: two grey lines at Start and End, the values outside it grey, the top of the band when it loops) and a line of
-// text (values, duration, rate) in the GEM 6×6 font (D-222). A click loads a file.
+// Digidrum sample of the editor: 360 × 72 inside a 2 px line. Empty slot: frame and an invitation to
+// load; otherwise the 4-bit values (0 at the bottom, 15 at the top) drawn at the box's pixels, the part played
+// (two grey lines at Start and End, the values outside it grey, the top of the band when it loops) and a line of
+// text (values, duration, rate) in the GEM 6×6 font. A click loads a file.
 class DigiWave : public gemui::Widget {
 public:
     static constexpr int kW = 360, kH = 72;  // columns and rows of the design, stretched to the box
@@ -290,7 +290,7 @@ public:
     DigiWave();
     // 4-bit values (0 to 15) of slot `slot` (0-based, shown from 1); the part played covers values start to end - 1
     // and is drawn only when start < end <= the number of values (the lines when it is not the whole sample or it
-    // loops); `name` (empty: none) opens the line of text (D-445). Repaints only when something changed.
+    // loops); `name` (empty: none) opens the line of text. Repaints only when something changed.
     void setSample(int slot, std::span<const uint8_t> nibbles, double rateHz, bool loop, uint32_t start,
                    uint32_t end, std::string_view name = {});
     std::function<void()> onClick;
@@ -311,7 +311,7 @@ private:
     std::vector<uint8_t> nibbles_;
 };
 
-// Bars of the SID wave of a SID Voice, in the GENERATOR frame (D-251; the Timer Wave window's before D-278): 16 columns
+// Bars of the SID wave of a SID Voice, in the GENERATOR frame (formerly in the Timer Wave window): 16 columns
 // of 11 px spaced by 1 px; a bar rises from the bottom by 3 px per volume step (0 to 15), the volume is written in
 // hexadecimal under the column (6×6 text). Beyond the length of the wave, or with the square wave, the columns are
 // faded as in #orngrid.
@@ -325,7 +325,7 @@ public:
     struct State {
         std::array<uint8_t, kSteps> wave{};
         int length = 0;  // bars played, the others faded
-        // The square wave played, drawn in `wave` (24/10/2026, D-407; Base and Square, D-411): the mouse without
+        // The square wave played, drawn in `wave` (24/10/2026; Base and Square): the mouse without
         // effect.
         bool square = false;
         bool operator==(const State&) const = default;
@@ -338,7 +338,7 @@ public:
 
     // Writes requested by the mouse; one wheel notch is one on its own (onWheel, otherwise onSet).
     std::function<void(int step, int value)> onSet, onWheel;
-    // Right click on a step: its slider (seventh DAW test, item 84, D-285); without it, the step returns to 0.
+    // Right click on a step: its slider (seventh DAW test, item 84); without it, the step returns to 0.
     std::function<void(int step, const gemui::Rect& cell)> onMenu;
 
     void paint(gemui::Painter& p) override;
@@ -377,7 +377,7 @@ private:
 };
 
 // Note over several lines (div.hint): wrapped at spaces and after a hyphen between letters within the width of the
-// box, 12 px, #222; 6×6 font, which keeps the line breaks of the prototype (D-071).
+// box, 12 px, #222; 6×6 font, which keeps the line breaks of the prototype.
 class Paragraph : public gemui::Widget {
 public:
     explicit Paragraph(std::string text = {}) : text_(std::move(text)) {}
@@ -413,12 +413,12 @@ private:
 };
 
 // #volmenu (openVolMenu): vertical slider from `min` to `max` under the `anchor` cell (above it if there is not
-// enough room), each movement passed at once to `set`; its value below can be typed (sixth DAW test, item 76, D-274)
-// and a right click on the slider sets `reset` (item 75, D-273). To be opened by Desktop::openPopup (SeqPopups.cpp).
+// enough room), each movement passed at once to `set`; its value below can be typed (sixth DAW test, item 76)
+// and a right click on the slider sets `reset` (item 75). To be opened by Desktop::openPopup (SeqPopups.cpp).
 struct SliderPopupSpec {
     int min = 0, max = 15, value = 15, reset = 15;
     std::function<void(int)> set;
-    // A toggle button under the value (the Slide of a VOL cell, D-393): its text (none when empty), state, help, and
+    // A toggle button under the value (the Slide of a VOL cell): its text (none when empty), state, help, and
     // the action given the new state; greyed when not enabled.
     std::string toggle, toggleTip;
     bool toggleOn = false, toggleEnabled = true;

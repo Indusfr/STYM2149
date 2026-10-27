@@ -1,4 +1,4 @@
-// STYM2149 — register recorder (M6, B11, D-157): one frame per replay tick, registers of the chip at the start of
+// STYM2149 — register recorder: one frame per replay tick, registers of the chip at the start of
 // the frame, R13 retriggered, muted channels, timer effects, end of a take.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -217,7 +217,7 @@ TEST_CASE("Recorder: chosen chip, end of a take (room, mode), nothing in 16-chan
     CHECK(m.e.capturedFrames() == 5);
 }
 
-// STE DMA sound (D-162): a single channel, taken at its attack by the most recent DMA note and kept until its end;
+// STE DMA sound: a single channel, taken at its attack by the most recent DMA note and kept until its end;
 // the older note that still sounds does not come back to it. Muted track: its voice no longer counts.
 TEST_CASE("Recorder: STE DMA sound, channel taken by the most recent DMA note", "[engine][3ch][recorder][dma]") {
     Rig g(ymengine::VoiceMode::Authentic3);

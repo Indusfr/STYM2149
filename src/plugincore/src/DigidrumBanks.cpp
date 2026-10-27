@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: named Digidrum banks (D-154)
+// STYM2149 — plugincore: named Digidrum banks
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/DigidrumBanks.h"

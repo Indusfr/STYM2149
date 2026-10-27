@@ -1,5 +1,5 @@
 // STYM2149 — pitch of every generator: the note of the key or of the sequencer, whatever the generator (Indus,
-// 25/10/2026 17:39, D-426).
+// 25/10/2026 17:39).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -90,7 +90,7 @@ ymengine::TrackParams track(Generator g) {
 }
 
 // The SID Voice with a form of its wave, as the menu sets it from Base: 8 Steps, the Width half of them, the Sine and
-// the Bounce over their Period of 8 bars (D-411, D-413, D-426), Custom one cycle of a square drawn on 8 bars.
+// the Bounce over their Period of 8 bars, Custom one cycle of a square drawn on 8 bars.
 ymengine::TrackParams sid(SidForm form) {
     ymengine::TrackParams t = track(Generator::Sid);
     t.patch.sidForm = form;
@@ -105,7 +105,7 @@ constexpr VoiceMode kModes[] = {VoiceMode::Studio16, VoiceMode::Authentic3, Voic
 
 }  // namespace
 
-TEST_CASE("Pitch: Chip Voice, SID Voice in every form and Sync Buzzer play the note of the key (D-426)",
+TEST_CASE("Pitch: Chip Voice, SID Voice in every form and Sync Buzzer play the note of the key",
           "[engine][pitch][d426]") {
     struct Case {
         const char* name;
@@ -140,7 +140,7 @@ TEST_CASE("Pitch: Chip Voice, SID Voice in every form and Sync Buzzer play the n
                 }
 }
 
-TEST_CASE("Pitch: the SID ratio moves the note by its factor, 2 one octave higher (D-426)", "[engine][pitch][d426]") {
+TEST_CASE("Pitch: the SID ratio moves the note by its factor, 2 one octave higher", "[engine][pitch][d426]") {
     for (const VoiceMode mode : kModes)
         for (const double ratio : {0.5, 1.0, 2.0, 1.5}) {
             CAPTURE(int(mode), ratio);
@@ -152,7 +152,7 @@ TEST_CASE("Pitch: the SID ratio moves the note by its factor, 2 one octave highe
         }
 }
 
-TEST_CASE("Pitch: the Steps of a Sine hold its cycles, two cycles an octave higher (D-406, D-426)",
+TEST_CASE("Pitch: the Steps of a Sine hold its cycles, two cycles an octave higher",
           "[engine][pitch][d426]") {
     ymengine::TrackParams t = sid(SidForm::Sine);
     t.patch.toneOn = false;
@@ -163,7 +163,7 @@ TEST_CASE("Pitch: the Steps of a Sine hold its cycles, two cycles an octave high
     CHECK(std::fabs(semitones(play(VoiceMode::Studio16, TimerMode::Free, t, 60), ymengine::noteHz(60))) < 0.08);
 }
 
-TEST_CASE("Pitch: Digidrum and DMA transpose their sample from its root note (D-154, D-153)", "[engine][pitch][d426]") {
+TEST_CASE("Pitch: Digidrum and DMA transpose their sample from its root note", "[engine][pitch][d426]") {
     // Digidrum: a sine of 30 samples at a rate of 30 times C4, root C4, looped over whole cycles: the note itself.
     std::vector<uint8_t> nibbles(3000);
     for (size_t i = 0; i < nibbles.size(); ++i)
@@ -206,7 +206,7 @@ TEST_CASE("Pitch: Digidrum and DMA transpose their sample from its root note (D-
     }
 }
 
-TEST_CASE("Pitch: every generator follows the Tuning A4, samples included (D-429)", "[engine][pitch][d429]") {
+TEST_CASE("Pitch: every generator follows the Tuning A4, samples included", "[engine][pitch][d429]") {
     // At 2 MHz, A4 (440 Hz) gets the period 284: 125 000 / 284 = 440.14 Hz, the nearest the chip can play.
     CHECK(ymengine::tonePeriodFor(ymengine::noteHz(69), ymcore::clocks::kDefault) == 284);
     CHECK(ymengine::noteHz(69, 432) == 432.0);

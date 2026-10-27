@@ -1,9 +1,9 @@
 // STYM2149 — sequencer of the engine: end of a pattern without loop, walk of the Song (repeats, tempo of the blocks,
 // end without loop, jump to an entry), pattern switch, MIDI clock (Start, Stop, Continue, Song Position Pointer),
-// length changed during playback, countdowns of the tracks by deadline (D-133), track switched off during playback, Env
-// entries of the SRC row (D-277), rows of the steps of a held note (D-343, D-345), ARP Off on a held note (D-379), one
-// envelope per note of the ARP row (D-416), releases that the next notes leave on a polyphonic track (D-421), a note
-// held live before Play (D-431), the 1/32T resolution (D-433).
+// length changed during playback, countdowns of the tracks by deadline, track switched off during playback, Env
+// entries of the SRC row, rows of the steps of a held note, ARP Off on a held note, one
+// envelope per note of the ARP row, releases that the next notes leave on a polyphonic track, a note
+// held live before Play, the 1/32T resolution.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -328,9 +328,9 @@ TEST_CASE("Sequencer: MIDI clock, steps according to the resolution, Stop, SPP a
     CHECK(st[4].stepAbs == 11);
 }
 
-// D-422: 1/64, the eighth resolution, 16 steps per quarter note. On the MIDI clock a step lasts a pulse and a half:
-// every other step starts on the half pulse between two clocks, as the arpeggiator's 1/64 (D-289).
-TEST_CASE("Sequencer: 1/64 resolution, internal clock and MIDI clock in half pulses, SPP (D-422)", "[engine][seq]") {
+// 1/64, the eighth resolution, 16 steps per quarter note. On the MIDI clock a step lasts a pulse and a half:
+// every other step starts on the half pulse between two clocks, as the arpeggiator's 1/64.
+TEST_CASE("Sequencer: 1/64 resolution, internal clock and MIDI clock in half pulses, SPP", "[engine][seq]") {
     SECTION("internal clock: 1500 samples per step at 120 BPM") {
         Rig r;
         r.g.resolution = 7;
@@ -427,8 +427,8 @@ TEST_CASE("Sequencer: 1/64 resolution, internal clock and MIDI clock in half pul
     }
 }
 
-// D-433: 1/32T, the ninth resolution, 12 steps per quarter note. On the MIDI clock a step lasts two pulses.
-TEST_CASE("Sequencer: 1/32T resolution, internal clock, MIDI clock and SPP (D-433)", "[engine][seq]") {
+// 1/32T, the ninth resolution, 12 steps per quarter note. On the MIDI clock a step lasts two pulses.
+TEST_CASE("Sequencer: 1/32T resolution, internal clock, MIDI clock and SPP", "[engine][seq]") {
     SECTION("internal clock: 2000 samples per step at 120 BPM") {
         Rig r;
         r.g.resolution = 8;
@@ -513,8 +513,8 @@ TEST_CASE("Sequencer: swing and triplet resolutions", "[engine][seq]") {
     CHECK(std::fabs(double(st[2].sample) - 2 * base) <= 1);
 }
 
-// D-133: the countdowns of the tracks only run at their deadline. Render in blocks of one sample (tracks caught up
-// at the end of each block, so at each sample, as before D-133) and of 512: same log, same sound.
+// the countdowns of the tracks only run at their deadline. Render in blocks of one sample (tracks caught up
+// at the end of each block, so at each sample, as formerly) and of 512: same log, same sound.
 TEST_CASE("Sequencer: countdowns by deadline, same log and same sound in blocks of 1 and of 512 samples",
           "[engine][seq]") {
     SeqData data;
@@ -691,7 +691,7 @@ TEST_CASE("Sequencer: a track switched off releases its held, slid, chord, retri
         }
 }
 
-TEST_CASE("Sequencer: overlapping chord voices of one rank all sound to their end (D-281)", "[engine][seq]") {
+TEST_CASE("Sequencer: overlapping chord voices of one rank all sound to their end", "[engine][seq]") {
     // Indus's case (21/10/2026): A3 held from step 4 to 8, G3 from step 6 to 10 and F3 from step 8 to 12, the two
     // last written as voice 2 (the first free voice of the grid at their step).
     SeqData data;
@@ -728,7 +728,7 @@ TEST_CASE("Sequencer: overlapping chord voices of one rank all sound to their en
 
 TEST_CASE("Sequencer: the Env entries of the SRC row put the volume on the envelope, the others keep the track's",
           "[engine][seq]") {
-    // Sixth DAW test, item 79 (D-277): one note tied over four steps, SRC Tone+Env, Tone, Env, then the track's.
+    // Sixth DAW test, item 79: one note tied over four steps, SRC Tone+Env, Tone, Env, then the track's.
     for (const bool trackEnv : {false, true}) {
         CAPTURE(trackEnv);
         Rig r;
@@ -765,9 +765,9 @@ TEST_CASE("Sequencer: the Env entries of the SRC row put the volume on the envel
 }
 
 
-// Eleventh DAW test, items 134 and 136 (D-343, D-345): VOL, RTG, ARP and GAT act on each step that a held note
+// Eleventh DAW test, items 134 and 136: VOL, RTG, ARP and GAT act on each step that a held note
 // crosses, not only on its first step.
-TEST_CASE("Sequencer: VOL, RTG, ARP and GAT of the steps of a held note act at each step (D-343, D-345)",
+TEST_CASE("Sequencer: VOL, RTG, ARP and GAT of the steps of a held note act at each step",
           "[engine][seq]") {
     auto held = [](const std::array<uint8_t, 4>& vol) {
         auto l = std::make_shared<SeqLane>();
@@ -866,13 +866,13 @@ TEST_CASE("Sequencer: VOL, RTG, ARP and GAT of the steps of a held note act at e
         const std::vector<double> arp = attacks(r, 12000, 18000);
         CHECK(arp.size() >= 4);  // 40 Hz over a step of 1/8 s
         CHECK(std::any_of(arp.begin(), arp.end(), [&](double n) { return n != arp[0]; }));
-        CHECK(attacks(r, 18000, 24000).empty());  // ARP Off on step 3 (D-379)
+        CHECK(attacks(r, 18000, 24000).empty());  // ARP Off on step 3
     }
 }
 
-// Bug of 24/10/2026 (D-379): ARP On on the first step of a note held from step 4 to step 12, ARP Off on step 8. The
+// Bug of 24/10/2026: ARP On on the first step of a note held from step 4 to step 12, ARP Off on step 8. The
 // arpeggio stops on step 8 and the note goes on at its own pitch to its end, instead of arpeggiating to its end.
-TEST_CASE("Sequencer: ARP Off on a step of a held note stops its arpeggio there (D-379)", "[engine][seq]") {
+TEST_CASE("Sequencer: ARP Off on a step of a held note stops its arpeggio there", "[engine][seq]") {
     constexpr int16_t kF3 = 5;  // F of the track octave
     auto run = [&](bool off, VoiceMode mode) {
         auto r = std::make_unique<Rig>();
@@ -925,12 +925,11 @@ TEST_CASE("Sequencer: ARP Off on a step of a held note stops its arpeggio there 
     }
 }
 
-// Indus, 24/10/2026 20:33 (D-416): an arpeggio is one note per note of the sequencer, not one per step of the
+// Indus, 24/10/2026 20:33: an arpeggio is one note per note of the sequencer, not one per step of the
 // arpeggio: in Polyphonic as in Monophonic, the envelope of the note runs on through the steps of its ARP row, and the
 // next note of the sequencer starts it again from the attack; at the end of the note, the note walks on through the
 // arpeggio during its release (19:32).
-TEST_CASE("Sequencer: ARP row, one ADSR per note of the sequencer, running on through the steps of the arpeggio "
-          "(D-416)",
+TEST_CASE("Sequencer: ARP row, one ADSR per note of the sequencer, running on through the steps of the arpeggio ",
           "[engine][seq][arp]") {
     for (const bool mono : {false, true}) {
         CAPTURE(mono);
@@ -992,7 +991,7 @@ TEST_CASE("Sequencer: ARP row, one ADSR per note of the sequencer, running on th
     }
 }
 
-TEST_CASE("Sequencer: the next note does not cut the release of a note on a polyphonic track in 16 channels (D-421)",
+TEST_CASE("Sequencer: the next note does not cut the release of a note on a polyphonic track in 16 channels",
           "[engine][seq]") {
     // Indus's case (24/10/2026 22:41): C#4 held over steps 4 to 12, B3 over steps 13 and 14, ADSR 1000 ms, 1000 ms,
     // 0 %, 2000 ms. Polyphonic: C#4 goes on to its release on a chord voice of the track while B3 starts; Monophonic
@@ -1073,8 +1072,7 @@ TEST_CASE("Sequencer: the next note does not cut the release of a note on a poly
     }
 }
 
-TEST_CASE("Sequencer: a chord does not cut the release of the chord before while a voice of the track is silent "
-          "(D-421)",
+TEST_CASE("Sequencer: a chord does not cut the release of the chord before while a voice of the track is silent ",
           "[engine][seq]") {
     // C, E, G on step 1, then D, F, A on step 2, a release of one second: the six notes sound together on step 2,
     // the first chord in its release on the voices of the track that were silent.
@@ -1112,7 +1110,7 @@ TEST_CASE("Sequencer: a chord does not cut the release of the chord before while
     CHECK(notes(true) == std::vector<int>{48, 52, 55});
 }
 
-TEST_CASE("Sequencer: a note held live before Play goes on sounding in 16 channels, is cut and counted in 3 (D-431)",
+TEST_CASE("Sequencer: a note held live before Play goes on sounding in 16 channels, is cut and counted in 3",
           "[engine][seq]") {
     // Latch (Indus, 25/10/2026 19:41): a key held before Play sits on the voice of track 1, which the sequencer
     // reserves once it plays. Its first note took that voice and cut the held note, whose key stayed lit.

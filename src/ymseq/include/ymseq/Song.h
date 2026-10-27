@@ -6,7 +6,7 @@
 // cut/copy/paste, moving a block, own tempo. The selections are lists of indices (songSel), sorted and bounded as in
 // the prototype. No undo step here: the caller takes it (pushSongUndo) at the same moment as the prototype.
 //
-// Extended Song (M6, B12, D-158; maxYMiser's X18, TTrak's T1): special entries without a pattern, a silence (Rest) or
+// Extended Song (maxYMiser's X18, TTrak's T1): special entries without a pattern, a silence (Rest) or
 // a release of all the sequencer's notes followed by a silence (Note-off), with a length in steps; a backward jump
 // (Loop) that replays the entries before it; a restart point (restart) where the Song goes back to at its end when
 // Loop is on.
@@ -22,13 +22,13 @@ namespace stym::ymseq {
 inline constexpr int kSongBpmMin = 20, kSongBpmMax = 300;  // tempo of a block of its own (gemPrompt "Tempo...")
 inline constexpr std::array<int, 5> kSongRepeats = {1, 2, 4, 8, 16};  // menu Repeat x1 … x16
 inline constexpr int kSongRepeatMax = 65535;  // repeats of a block (the prototype had no limit)
-inline constexpr int kSongRestSteps = 16;     // length of a Rest or Note-off entry when created (D-158)
+inline constexpr int kSongRestSteps = 16;     // length of a Rest or Note-off entry when created
 inline constexpr int kSongLoopMax = 255;      // entries replayed by a jump (Loop)
 
-// Kind of an entry (D-158). Pattern: the prototype's.
+// Kind of an entry. Pattern: the prototype's.
 enum class SongKind : uint8_t { Pattern, Rest, NoteOff, Loop };
 
-// One block of the Song: the prototype's {pat, rep, bpm}, plus the kind, the argument and the restart mark (D-158).
+// One block of the Song: the prototype's {pat, rep, bpm}, plus the kind, the argument and the restart mark.
 struct SongEntry {
     int pat = 0;  // 0-31 (Pattern only)
     int rep = 1;  // at least 1; Loop: number of jumps before going on

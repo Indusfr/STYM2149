@@ -2,8 +2,8 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Reading and writing of the JSON files that the prototype writes and reads (Patches library, D-141; file formats of
-// M7). Objects keep the order of their keys, like JSON.stringify; writing follows JSON.stringify(value, null,
+// Reading and writing of the JSON files that the prototype writes and reads (Patches library, project
+// files). Objects keep the order of their keys, like JSON.stringify; writing follows JSON.stringify(value, null,
 // indent): shortest numbers that read back as the same value, integers without a fractional part, strings in UTF-8
 // with only the mandatory escapes.
 // An array that holds only numbers is kept compact (one double per element, without a Value each): a preset of the

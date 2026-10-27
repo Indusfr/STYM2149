@@ -1,4 +1,4 @@
-// STYM2149 — instrument sequences in the plugin state and the Patches library (M6, B2, D-148): TSEQ chunk written
+// STYM2149 — instrument sequences in the plugin state and the Patches library: TSEQ chunk written
 // only when used, STYM2149-specific keys in a patch, values brought back into their ranges.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).

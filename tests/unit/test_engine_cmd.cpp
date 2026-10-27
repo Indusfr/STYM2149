@@ -1,9 +1,9 @@
-// STYM2149 — effect commands of the CMD row of the sequencer (M6, B4, D-150): Sxx (ticks per row), Rxx (envelope
-// retrigger at tick xx), Zxx (silent), Txx (tempo, D-243), Vxx (vibrato, D-254); one of each kind on a row (D-330);
-// the effects of D-338: Axy, Bxy and Nxy slides, Dxx note delay, Cxx note cut, Exx envelope shape, Oxx DMA sample
-// offset, Fxx fine tune. Xyz and Pxy are retired (D-340, D-344). Twelfth DAW test: Lxx, Mxx and Jxx switches (items 142
-// to 144); the tempo in the BPM row of the pattern (item 150). Gxx volume glide set from the VOL row (D-393); Kxx and Qxx
-// curves of the Buzzer and Noise slides (D-394).
+// STYM2149 — effect commands of the CMD row of the sequencer: Sxx (ticks per row), Rxx (envelope
+// retrigger at tick xx), Zxx (silent), Txx (tempo), Vxx (vibrato); one of each kind on a row;
+// the step effects: Axy, Bxy and Nxy slides, Dxx note delay, Cxx note cut, Exx envelope shape, Oxx DMA sample
+// offset, Fxx fine tune. Xyz and Pxy are retired. Twelfth DAW test: Lxx, Mxx and Jxx switches (items 142
+// to 144); the tempo in the BPM row of the pattern (item 150). Gxx volume glide set from the VOL row; Kxx and Qxx
+// curves of the Buzzer and Noise slides.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -132,7 +132,7 @@ TEST_CASE("Commands: Sxx, the last track wins; ignored in BPM cadence", "[engine
     CHECK(std::none_of(b.log.begin(), b.log.end(), [](const auto& x) { return x.op == 'V'; }));
 }
 
-TEST_CASE("Commands: the BPM row sets the tempo from its step on in BPM cadence; below 32, no effect (D-243, item 150)",
+TEST_CASE("Commands: the BPM row sets the tempo from its step on in BPM cadence; below 32, no effect (item 150)",
           "[engine][seq][commands]") {
     Rig r;
     r.g.timing = SeqTiming::Bpm;
@@ -194,7 +194,7 @@ TEST_CASE("Commands: BPM row; a change of the song's tempo takes over; ignored i
     for (const double d : ln) CHECK(std::fabs(d - kTick * 6) < 1e-6);
 }
 
-TEST_CASE("Commands: BPM row in a Song; an entry with its own tempo starts again at it on each pass (D-243)",
+TEST_CASE("Commands: BPM row in a Song; an entry with its own tempo starts again at it on each pass",
           "[engine][seq][commands]") {
     Rig r;
     r.g.timing = SeqTiming::Bpm;
@@ -215,7 +215,7 @@ TEST_CASE("Commands: BPM row in a Song; an entry with its own tempo starts again
     }
 }
 
-TEST_CASE("Commands: Xyz and Pxy are retired, a lane that still holds them plays its note unchanged (D-340, D-344)",
+TEST_CASE("Commands: Xyz and Pxy are retired, a lane that still holds them plays its note unchanged",
           "[engine][seq][commands]") {
     Rig r;
     SeqLane& l = r.lane(0);
@@ -238,7 +238,7 @@ TEST_CASE("Commands: Xyz and Pxy are retired, a lane that still holds them plays
     CHECK(std::count_if(r.log.begin(), r.log.end(), [](const auto& x) { return x.op == 'X'; }) == 0);
 }
 
-TEST_CASE("Commands: several on a row play together, Axy and Sxx (tenth DAW test, item 122, D-330)",
+TEST_CASE("Commands: several on a row play together, Axy and Sxx (tenth DAW test, item 122)",
           "[engine][seq][commands]") {
     Rig r;
     SeqLane& l = r.lane(0);
@@ -316,7 +316,7 @@ size_t distinct(const std::vector<uint16_t>& v, int row) {
 }
 }  // namespace
 
-TEST_CASE("Commands: V00 holds the track's vibrato from its row on, Vxx brings it back, Play resets (D-254)",
+TEST_CASE("Commands: V00 holds the track's vibrato from its row on, Vxx brings it back, Play resets",
           "[engine][seq][commands]") {
     Rig plain;
     plain.e.setTrack(0, vibrato(false));  // Vibrato Off: the note's own period
@@ -450,7 +450,7 @@ uint64_t lastAttack(const Engine& e) {
 }
 }  // namespace
 
-TEST_CASE("Commands: Axy slides the 4-bit volume per tick until A00; a new note starts from its own volume (D-338)",
+TEST_CASE("Commands: Axy slides the 4-bit volume per tick until A00; a new note starts from its own volume",
           "[engine][seq][commands]") {
     Rig r;
     SeqLane& l = r.lane(0);
@@ -475,7 +475,7 @@ TEST_CASE("Commands: Axy slides the 4-bit volume per tick until A00; a new note 
     for (const double x : perTick(u, 6, [](const Engine::VoiceInfo& y) { return y.volume; })) CHECK(x <= 15);
 }
 
-TEST_CASE("Commands: Nxy slides the noise period, Bxy the envelope period (D-338)", "[engine][seq][commands]") {
+TEST_CASE("Commands: Nxy slides the noise period, Bxy the envelope period", "[engine][seq][commands]") {
     Rig r;
     TrackParams p;
     p.mix.enabled = true;
@@ -508,7 +508,7 @@ TEST_CASE("Commands: Nxy slides the noise period, Bxy the envelope period (D-338
     }
 }
 
-TEST_CASE("Commands: Dxx delays the notes of the row to tick xx; beyond the row, ignored (D-338)",
+TEST_CASE("Commands: Dxx delays the notes of the row to tick xx; beyond the row, ignored",
           "[engine][seq][commands]") {
     Rig r;
     SeqLane& l = r.lane(0);
@@ -528,7 +528,7 @@ TEST_CASE("Commands: Dxx delays the notes of the row to tick xx; beyond the row,
     }
 }
 
-TEST_CASE("Commands: Cxx cuts the notes of the row at tick xx, C00 at once (D-338)", "[engine][seq][commands]") {
+TEST_CASE("Commands: Cxx cuts the notes of the row at tick xx, C00 at once", "[engine][seq][commands]") {
     Rig r;
     SeqLane& l = r.lane(0);
     l.pat[0] = l.pat[2] = 0;
@@ -543,7 +543,7 @@ TEST_CASE("Commands: Cxx cuts the notes of the row at tick xx, C00 at once (D-33
     }
 }
 
-TEST_CASE("Commands: Exx sets R13 from its row on, held note and next notes; out of 8-15, ignored (D-338)",
+TEST_CASE("Commands: Exx sets R13 from its row on, held note and next notes; out of 8-15, ignored",
           "[engine][seq][commands]") {
     Rig r(VoiceMode::Authentic3);
     TrackParams p;
@@ -580,7 +580,7 @@ TEST_CASE("Commands: Exx sets R13 from its row on, held note and next notes; out
         if (x.reg == 13) CHECK(x.value == w[0].second);
 }
 
-TEST_CASE("Commands: Oxx starts the DMA samples of the row xx × 256 frames in; the loop resumes there (D-338)",
+TEST_CASE("Commands: Oxx starts the DMA samples of the row xx × 256 frames in; the loop resumes there",
           "[engine][seq][commands][dma]") {
     Rig r;
     r.g.ste = true;
@@ -619,7 +619,7 @@ TEST_CASE("Commands: Oxx starts the DMA samples of the row xx × 256 frames in; 
     CHECK_FALSE(dma().on);
 }
 
-TEST_CASE("Commands: Oxx counts from the Start of the DMA slot; End stops it (D-338, D-444)",
+TEST_CASE("Commands: Oxx counts from the Start of the DMA slot; End stops it",
           "[engine][seq][commands][dma]") {
     Rig r;
     r.g.ste = true;
@@ -661,7 +661,7 @@ TEST_CASE("Commands: Oxx counts from the Start of the DMA slot; End stops it (D-
     CHECK_FALSE(dma().on);
 }
 
-TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, held note included (D-338)",
+TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, held note included",
           "[engine][seq][commands]") {
     Rig plain;
     plain.lane(0).pat[0] = 0;
@@ -692,7 +692,7 @@ TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, he
     CHECK(r.e.voice(0).tonePeriod == tp);
 }
 
-TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, frame after frame (D-393)",
+TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, frame after frame",
           "[engine][seq][commands]") {
     // 16-channel: the accent goes down a straight line from VOL 15 to VOL 3 over the 6 ticks of row 0, then holds at
     // the level of row 1, which has no Gxx.
@@ -743,8 +743,7 @@ TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, 
     for (const double x : b) CHECK(x == 1);
 }
 
-TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to the next command, 16 channels only "
-          "(D-394)",
+TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to the next command, 16 channels only ",
           "[engine][seq][commands]") {
     // Envelope slide up over rows 0 and 1 (B00 at row 2), noise slide down: straight, then Exponential (slow start).
     const auto run = [](VoiceMode mode, int curve) {

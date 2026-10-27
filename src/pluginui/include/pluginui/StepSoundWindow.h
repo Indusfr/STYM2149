@@ -1,5 +1,5 @@
 // STYM2149 — pluginui: settings of the sound a step chooses, opened by a right click on a GEN, SRC or ENV cell of the
-// Step Sequencer (24/10/2026, D-392)
+// Step Sequencer (24/10/2026)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -70,8 +70,8 @@ private:
         double labelW = 0;        // labels of a column lined up
         bool ownDim = false;      // greyed by the cell, whatever the main window shows
         bool ownDimmed = false;
-        const SliderRow* alignTo = nullptr;  // its slider ends where that row's does (SID Voice, D-390)
-        std::function<bool()> showWith;  // shown only while it says so (D-408, D-411)
+        const SliderRow* alignTo = nullptr;  // its slider ends where that row's does (SID Voice)
+        std::function<bool()> showWith;  // shown only while it says so
     };
     struct ButtonItem {
         std::string id;

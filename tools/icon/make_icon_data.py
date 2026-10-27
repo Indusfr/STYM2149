@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# STYM2149 — application icon as pixels for the editor: src/pluginui/src/AppIcon.cpp from the 32 px drawing (D-235).
+# STYM2149 — application icon as pixels for the editor: src/pluginui/src/AppIcon.cpp from the 32 px drawing.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
 #
 # Usage: python3 tools/icon/make_icon_data.py [--check]
-# Reads packaging/icon/STYM2149-32.png (the icon chosen by Indus, D-218) and writes its 32 × 32 pixels as 0xAARRGGBB
+# Reads packaging/icon/STYM2149-32.png (the icon chosen by Indus) and writes its 32 × 32 pixels as 0xAARRGGBB
 # colours (alpha 0: transparent), which the Information box draws (Fuji > Information). With --check, nothing is
 # written and the exit status says whether the file is up to date. Standard library only.
 import os
@@ -15,7 +15,7 @@ from make_ico import ICON, read_png
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET = os.path.join(HERE, '..', '..', 'src', 'pluginui', 'src', 'AppIcon.cpp')
 
-HEADER = '''// STYM2149 — pluginui: the application icon (D-218) as pixels (file written by tools/icon/make_icon_data.py)
+HEADER = '''// STYM2149 — pluginui: the application icon as pixels (file written by tools/icon/make_icon_data.py)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

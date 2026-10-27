@@ -1,14 +1,14 @@
-// STYM2149 — pluginui: Digidrums editor (M6, B9, D-154): eight slots, name, waveform, loading, preview, rate, root
+// STYM2149 — pluginui: Digidrums editor: eight slots, name, waveform, loading, preview, rate, root
 // note, fine tune, part played (Start, End) and its sustain loop, 4-bit conversion, tools and named banks
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// A STYM2149 window (the prototype has only the slot buttons and the drawing in the track's frame; a maxYMiser feature,
-// Q6 of the M6 plan). Slot column: the eight slots (the chosen one is edited), name (16 characters), playback rate at
+// A STYM2149 window (the prototype has only the slot buttons and the drawing in the track's frame; a maxYMiser feature).
+// Slot column: the eight slots (the chosen one is edited), name (16 characters), playback rate at
 // the root note (2000 to 20000 Hz, presets 7800, 8000 and 11025 Hz), root note, fine tune (±100 cents). Sample column:
-// drawing of the 4-bit values (a click loads a file), Load, Play, Clear, the part played (Start, End, D-443) and its
+// drawing of the 4-bit values (a click loads a file), Load, Play, Clear, the part played (Start, End) and its
 // sustain loop (Loop), 4-bit conversion (Linear or YM levels) and tools on the 8-bit source (Normalize, Reverse, Fade
-// out, Sign, -3 dB, +3 dB; the same as the DMA window's, D-450). Banks: save the eight slots under a name, load one
+// out, Sign, -3 dB, +3 dB; the same as the DMA window's). Banks: save the eight slots under a name, load one
 // again, delete one (a library shared by every project, Host::digidrumLibrary). Loading a file or a bank cannot be
 // undone (like loading a Digidrum in the prototype); the other settings are each one undo step (one per gesture for a
 // slider).
@@ -50,7 +50,7 @@ public:
     // Edited slot (0-7, kept by the editor session).
     int slot() const noexcept;
     void selectSlot(int k);
-    // Slot previewed by the engine (EngineStatus::digiPreview): Play lit while the chosen slot loops (D-449).
+    // Slot previewed by the engine (EngineStatus::digiPreview): Play lit while the chosen slot loops.
     void refreshEngineStatus(const plugin::EngineStatus& t);
 
     // Banks: the library read again, a bank saved (same name: replaced), loaded again or deleted. Load and Delete
@@ -68,7 +68,7 @@ public:
     // Slider (tests): "digRate", "digRoot", "digFine", "digStart", "digEnd".
     const gemui::Slider* slider(std::string_view id) const noexcept;
     std::string valueText(std::string_view id) const;  // text to the right of a slider (same names)
-    bool playLit() const noexcept { return play_.on(); }  // a looping preview of the chosen slot plays (D-449)
+    bool playLit() const noexcept { return play_.on(); }  // a looping preview of the chosen slot plays
 
 private:
     void build();
@@ -80,7 +80,7 @@ private:
     // a slider already pushed (`armed` false).
     void edit(const std::function<void(plugin::DigidrumSlotState&)>& fn, bool push = true);
     // Source and values (conversion, tools, Clear): one step that keeps them; the values are computed again from the
-    // source (derived from the values for a slot from before M6), the loop brought back within the new length.
+    // source (derived from the values for an older slot), the loop brought back within the new length.
     void editBytes(const std::function<void(plugin::DigidrumSlotState&, std::vector<int8_t>&)>& fn);
     void pushUndo(bool bytes);
     // Slider bound to a setting: one step at the first movement of each gesture.
@@ -106,7 +106,7 @@ private:
     std::array<gemui::Button, ymengine::kDigidrumSlots> slots_;
     gemui::Label labName_{"Name", 14};
     gemui::Button name_;
-    // The values right of the sliders are typed too (sixth DAW test, item 66, D-264).
+    // The values right of the sliders are typed too (sixth DAW test, item 66).
     gemui::Label labRate_{"Rate", 14};
     gemui::ValueField ratev_;
     gemui::Slider rate_;
@@ -120,8 +120,8 @@ private:
     gemui::Button banksBtn_{"Banks"};
     // Set by the press on a slider, cleared by its first change, which pushes the gesture's undo step.
     bool rateArmed_ = false, rootArmed_ = false, fineArmed_ = false, startArmed_ = false, endArmed_ = false;
-    int previewing_ = -1;  // slot previewed by the engine, -1: none (D-449)
-    bool looping() const noexcept;  // the chosen slot's preview plays with Loop on: Play stops it (D-449)
+    int previewing_ = -1;  // slot previewed by the engine, -1: none
+    bool looping() const noexcept;  // the chosen slot's preview plays with Loop on: Play stops it
     void stopPreview();
 
     // Sample column.
@@ -137,7 +137,7 @@ private:
     gemui::Label labTools_{"Tools", 14};
     gemui::Button normalize_{"Normalize"}, reverse_{"Reverse"}, fade_{"Fade out"}, sign_{"Sign"},
         gainDown_{"-3 dB"}, gainUp_{"+3 dB"};
-    plugin::GainRun gainRun_;  // -3 dB and +3 dB in a row, from the source before them (D-453)
+    plugin::GainRun gainRun_;  // -3 dB and +3 dB in a row, from the source before them
     void gain(double db);
 };
 

@@ -1,9 +1,9 @@
-// STYM2149 — pluginui: presets of the Sync Buzzer settings (Presets menu of the GENERATOR frame, D-227, D-230)
+// STYM2149 — pluginui: presets of the Sync Buzzer settings (Presets menu of the GENERATOR frame)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Presets specific to STYM2149 (Y36: those of YM-Tracker are not carried over). A preset keeps the Sync Buzzer and its
-// envelope alone (fourth DAW test, item 32, D-230): it sets the shape (Shape R13), tunes the envelope to the note ×
+// envelope alone (fourth DAW test, item 32): it sets the shape (Shape R13), tunes the envelope to the note ×
 // N / D, sets YM Pad and puts the fine tune back to 0. Ratios that are not whole numbers give the "sync" timbre (the
 // timer cuts the sawtooth at the note); a whole ratio would only transpose it.
 #pragma once

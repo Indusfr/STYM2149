@@ -1,4 +1,4 @@
-// STYM2149 — timer waves in the plugin state and the Patches library (M6, B6, D-151): end of the TSEQ chunk,
+// STYM2149 — timer waves in the plugin state and the Patches library: end of the TSEQ chunk,
 // STYM2149 keys of a patch, values brought within their ranges.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -33,7 +33,7 @@ void waves(TrackPatch& p) {
     p.buzzLen = 3;
 }
 
-// The Sine form at phase 11 and period 5, the Square's width 3 (D-402, D-405, D-406, D-408, D-411).
+// The Sine form at phase 11 and period 5, the Square's width 3.
 void litSine(TrackPatch& t) {
     t.sidWave = {14, 14, 12, 12, 12, 12, 14, 14, 13, 11, 8, 3, 3, 8, 11, 13};
     t.sidWaveLen = 16;
@@ -88,7 +88,7 @@ TEST_CASE("Timer waves: end of the TSEQ chunk, written for a track that only has
         return size_t(0);
     }();
     REQUIRE(at > 0);
-    // Fields of B6, of B7 (buzzer, D-152) and after them (LFO D-257 and D-279, echo D-299, SID wave D-402 to D-411),
+    // Timer wave and buzzer fields, then after them (LFO, echo, SID wave),
     // at the end of the track.
     const size_t tail = 1 + ymengine::kSidWaveSteps + 1 + ymengine::kBuzzSteps + 1 + 1 + 1 + 8 + 1 + 21 + 1 + 5 + 5;
     auto u32 = [&](size_t i) { return uint32_t(b2[i]) | uint32_t(b2[i + 1]) << 8 | uint32_t(b2[i + 2]) << 16 | uint32_t(b2[i + 3]) << 24; };
@@ -110,7 +110,7 @@ TEST_CASE("Timer waves: end of the TSEQ chunk, written for a track that only has
     CHECK(r.state.extras.tracks[1].patch.sidWaveLen == ymengine::kSidSquareSteps);
     CHECK(r.state.extras.tracks[1].patch.buzzLen == 0);
 
-    // Out-of-range values: brought within theirs; Steps below 2, those by default (D-411).
+    // Out-of-range values: brought within theirs; Steps below 2, those by default.
     NonParamState n;
     TrackPatch& p = n.tracks[0].patch;
     p.sidWave[3] = 20;
@@ -186,7 +186,7 @@ TEST_CASE("Timer waves: STYM2149 keys of a patch, absent without a wave", "[time
 // The cases of the SID wave's forms are split in four: their states, about 60 KB each, would overflow the 1 MB stack
 // of MSVC in one test case.
 TEST_CASE("Timer waves: the form of the SID wave, the phase and period of its Sine, the Square's width, kept by the "
-          "state; Base, 8, 8 and 4 by default (D-402, D-405, D-406, D-408, D-411)",
+          "state; Base, 8, 8 and 4 by default",
           "[timerwave][state]") {
     PluginState st;
     TrackPatch& t = st.extras.tracks[2].patch;
@@ -226,8 +226,7 @@ TEST_CASE("Timer waves: the form of the SID wave, the phase and period of its Si
     CHECK(zero.state.extras.tracks[1].patch.sidWavePhase == 0);
 }
 
-TEST_CASE("Timer waves: the period and the square's width alone write the chunk, kept within their ranges (D-406, "
-          "D-408)",
+TEST_CASE("Timer waves: the period and the square's width alone write the chunk, kept within their ranges",
           "[timerwave][state]") {
     // The period alone, kept within 2 to 16.
     PluginState cycled;
@@ -253,7 +252,7 @@ TEST_CASE("Timer waves: the period and the square's width alone write the chunk,
 }
 
 TEST_CASE("Timer waves: an older TSEQ chunk reads its form from its Steps and Sine, a lit Sine's period 16 and the "
-          "phase 8 (D-402, D-405, D-406, D-408, D-411, D-414)",
+          "phase 8",
           "[timerwave][state]") {
     TrackPatch t;
     litSine(t);
@@ -263,10 +262,11 @@ TEST_CASE("Timer waves: an older TSEQ chunk reads its form from its Steps and Si
         st.extras.tracks[2].patch = t;
         bytes = encodeState(st);
     }
-    // A chunk written before D-411 ends one byte earlier: the lit Sine of its 16 Steps, drawn on the chip's levels
-    // then, is the Bounce form (D-414), the width (of the plain square then) back to its default; before D-408, two:
-    // the same; before D-406, three: its lit Sine was one cycle over the 16 bars, period 16; before D-405, four: the
-    // phase 8 too; before D-402, five: the bars drawn, Custom, the period by default (8), the wave kept.
+    // A chunk from before the form menu ends one byte earlier: the lit Sine of its 16 Steps, drawn on the chip's
+    // levels then, is the Bounce form, the width (of the plain square then) back to its default; from before the
+    // width, two: the same; before the period, three: its lit Sine was one cycle over the 16 bars, period 16;
+    // before the phase, four: the phase 8 too; before the drawn bars, five: the bars drawn, Custom, the period by
+    // default (8), the wave kept.
     for (const uint32_t n : {1u, 2u}) {
         CAPTURE(n);
         const DecodeResult before411 = olderChunk(bytes, n);
@@ -314,9 +314,9 @@ TEST_CASE("Timer waves: an older TSEQ chunk reads its form from its Steps and Si
 }
 
 TEST_CASE("Timer waves: the plain square of an older TSEQ chunk, half and half Base, of another width the Square of "
-          "16 Steps (D-408, D-411)",
+          "16 Steps",
           "[timerwave][state]") {
-    // Before D-411 the plain square wrote Steps 0 and its width in sixteenths of its period (D-408), 8 by default.
+    // Before the form menu the plain square wrote Steps 0 and its width in sixteenths of its period, 8 by default.
     // olderChunk shortens the first track of the chunk.
     PluginState st;
     TrackPatch& sq = st.extras.tracks[2].patch;
@@ -338,7 +338,7 @@ TEST_CASE("Timer waves: the plain square of an older TSEQ chunk, half and half B
 }
 
 TEST_CASE("Timer waves: the form of the SID wave, the phase and period of its Sine and the Square's width, kept by "
-          "the patches; older patches read as the state (D-402, D-405, D-406, D-408, D-411, D-414)",
+          "the patches; older patches read as the state",
           "[timerwave][patches]") {
     TrackPatch t;
     litSine(t);
@@ -378,7 +378,7 @@ TEST_CASE("Timer waves: the form of the SID wave, the phase and period of its Si
     CHECK(patchChange(twelve, s, 4).track.patch.sidForm == ymengine::SidForm::Base);
     CHECK(patchChange(twelve, s, 4).track.patch.sidWaveLen == 12);
 
-    // Older patches, without the form: the lit Sine, the Bounce (D-414), its period 16 when absent (before D-406); bars
+    // Older patches, without the form: the lit Sine, the Bounce, its period 16 when absent (before the period); bars
     // drawn, Custom; the plain square of another width than 8 sixteenths, the Square of 16 Steps; of 8, Base.
     auto older = [&](std::initializer_list<std::pair<const char*, double>> keys) {
         PatchEntry entry = plain;
@@ -406,7 +406,7 @@ TEST_CASE("Timer waves: the form of the SID wave, the phase and period of its Si
 }
 
 TEST_CASE("Timer waves: the Bounce form kept by the state and the patches, read as a Sine by an older version; a form "
-          "of a later version plays its bars, as Custom (D-414)",
+          "of a later version plays its bars, as Custom",
           "[timerwave][state][patches]") {
     PluginState st;
     TrackPatch& t = st.extras.tracks[5].patch;

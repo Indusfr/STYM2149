@@ -1,4 +1,4 @@
-// STYM2149 — MIDI learn (M6, A4, D-146): map of the learned controls, capture of the messages on the audio thread
+// STYM2149 — MIDI learn: map of the learned controls, capture of the messages on the audio thread
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

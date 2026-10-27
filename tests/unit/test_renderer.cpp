@@ -61,7 +61,7 @@ TEST_CASE("Write at cycle c applied before internal step ceil(c / 8)", "[timesta
 
 TEST_CASE("Channel levels at the last step of each sample (meters)", "[blocks]") {
     // Retro without DC removal: the output is the mixing table at the last internal step, so at the levels
-    // rendered with it. Channel A in tone at volume 15, B and C off at volume 0 (level 1, D-011).
+    // rendered with it. Channel A in tone at volume 15, B and C off at volume 0 (level 1).
     RenderConfig rc;
     rc.mode = OutputMode::Retro;
     rc.dc = DcFilter::None;
@@ -178,7 +178,7 @@ TEST_CASE("S10 determinism: two offline renders identical bit for bit", "[S10]")
            "identical bit for bit", all);
 }
 
-TEST_CASE("joinSilent: a stream that joins another = one fed silence until then (D-299)", "[blocks]") {
+TEST_CASE("joinSilent: a stream that joins another = one fed silence until then", "[blocks]") {
     for (OutputMode m : {OutputMode::Raw, OutputMode::RawBox, OutputMode::Retro}) {
         INFO(modeName(m));
         RenderConfig rc;

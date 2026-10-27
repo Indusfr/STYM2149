@@ -1,4 +1,4 @@
-// STYM2149 — GEM interface (M4): text placement, fallback font metrics, small fonts, tooltips, alerts, menus, PNG.
+// STYM2149 — GEM interface: text placement, fallback font metrics, small fonts, tooltips, alerts, menus, PNG.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -62,7 +62,7 @@ TEST_CASE("Text takes the glyph set of its quarter", "[gemui]") {
     CHECK(Font::size(16).shift[3] == 1);
 }
 
-TEST_CASE("8×16 glyphs keep their place in the EmuTOS cell: i, l and I centred (D-266)", "[gemui]") {
+TEST_CASE("8×16 glyphs keep their place in the EmuTOS cell: i, l and I centred", "[gemui]") {
     // At 16 px (outlines on the pixel grid), each glyph is the bitmap of bios/fnt_st_8x16.c, row r of the cell at
     // r - 13 from the baseline, in the same columns: the prototype's TrueType started the ink of each one at the
     // origin, i and l two columns to the left of their place, I one.
@@ -113,13 +113,13 @@ TEST_CASE("Fallback font metrics (arrows, check mark)", "[gemui]") {
     CHECK(Font::width("✓ Chip Voice", 14) == 85);
 }
 
-TEST_CASE("Note, bullet and em dash: glyphs of the Atari ST encoding (D-127)", "[gemui]") {
+TEST_CASE("Note, bullet and em dash: glyphs of the Atari ST encoding", "[gemui]") {
     // Characters of the prototype's fallback font, drawn with the GEM glyph: note 0x0B, middle dot 0xFA; no em dash
     // in the Atari ST encoding: hyphen.
     CHECK(Font::glyph(U'\u266A') == 103);
     CHECK(Font::glyph(U'\u2022') == 104);
     CHECK(Font::glyph(U'\u2014') == Font::glyph(U'-'));
-    // AZERTY and QWERTZ key legends of the keyboard drawing (D-131): codes 0x97, 0xFD, 0x99, 0x8E, 0x9A, 0x9E, 0xBA.
+    // AZERTY and QWERTZ key legends of the keyboard drawing: codes 0x97, 0xFD, 0x99, 0x8E, 0x9A, 0x9E, 0xBA.
     const char32_t latin[] = {U'\u00F9', U'\u00B2', U'\u00D6', U'\u00C4', U'\u00DC', U'\u00DF', U'\u00B4'};
     for (int i = 0; i < 7; ++i) CHECK(Font::glyph(latin[i]) == 105 + i);
     CHECK(Font::glyph(U'\u2026') == Font::glyph(U'?'));
@@ -135,7 +135,7 @@ TEST_CASE("Note, bullet and em dash: glyphs of the Atari ST encoding (D-127)", "
     CHECK(std::vector<uint8_t>(fontdata::k6x6[104], fontdata::k6x6[104] + 6) ==
           std::vector<uint8_t>{0x00, 0x00, 0x30, 0x30, 0x00, 0x00});
     // 8×16 at 16 px (outlines on the pixel grid): the note of bios/fnt_st_8x16.c, rows 2 to 10 of the cell (from 11
-    // to 3 px above the baseline), in its columns (D-266).
+    // to 3 px above the baseline), in its columns.
     int shift = 0;
     const uint16_t* note = Font::rows(16, 103, 0, &shift);
     REQUIRE(Font::size(16).top == -13);
@@ -144,7 +144,7 @@ TEST_CASE("Note, bullet and em dash: glyphs of the Atari ST encoding (D-127)", "
     for (int i = 0; i < 9; ++i) CHECK(note[2 + i] == want[i]);
 }
 
-TEST_CASE("Small texts: GEM 8×8 and 6×6 fonts (D-071)", "[gemui]") {
+TEST_CASE("Small texts: GEM 8×8 and 6×6 fonts", "[gemui]") {
     CHECK(Font::cell(16) == 0);
     CHECK(Font::cell(13) == 0);
     CHECK(Font::cell(12) == 8);
@@ -152,7 +152,7 @@ TEST_CASE("Small texts: GEM 8×8 and 6×6 fonts (D-071)", "[gemui]") {
     CHECK(Font::cell(16, Face::kSmall) == 6);
     CHECK(Font::cell(10, Face::kSmall) == 6);
     // Fixed advance in 8×8, arrows included (GEM glyphs, no fallback font); the line keeps the height of its size.
-    // In 6×6, the characters outside the GEM font advance as in the fallback font (D-127).
+    // In 6×6, the characters outside the GEM font advance as in the fallback font.
     CHECK(Font::width("←→=Channel", 12) == 80);
     CHECK(Font::width("R11 EPlo", 10, 0, Face::kSmall) == 48);
     CHECK(Font::width("(per channel)", 12, 1, Face::kSmall) == 13 * 7);
@@ -182,7 +182,7 @@ TEST_CASE("Small texts: GEM 8×8 and 6×6 fonts (D-071)", "[gemui]") {
     }
 }
 
-TEST_CASE("Tooltip: 8×8 font, lines wrapped at half of the desktop (D-072)", "[gemui]") {
+TEST_CASE("Tooltip: 8×8 font, lines wrapped at half of the desktop", "[gemui]") {
     Desktop d(1016, 944);
     Label root;
     root.setBox({0, 0, 1016, 944});
@@ -292,7 +292,7 @@ TEST_CASE("Alert: choice rows below the text, one option picked per row", "[gemu
     CHECK_FALSE(d.topModal());
 }
 
-TEST_CASE("Outline: non-zero winding, a polygon inside another a hole only if it turns the other way (D-404)",
+TEST_CASE("Outline: non-zero winding, a polygon inside another a hole only if it turns the other way",
           "[gemui]") {
     // A 10 × 10 square, a 4 × 4 square inside it turning the same way, then the other way.
     static const float same[] = {0, 0, 10, 0, 10, 10, 0, 10, 3, 3, 7, 3, 7, 7, 3, 7};
@@ -432,7 +432,7 @@ TEST_CASE("Value field: a shorter mask while typing ends the input instead of wr
     CHECK(g.f.editing());
 }
 
-TEST_CASE("Value field: the unit after the mask's digits stays in normal video under the pointer (D-438)", "[gemui]") {
+TEST_CASE("Value field: the unit after the mask's digits stays in normal video under the pointer", "[gemui]") {
     // A white window under a field of nine 8 px cells, "440.00 Hz".
     struct Paper : Widget {
         void paint(Painter& p) override { p.fill(bounds(), colors::kWhite); }
@@ -458,7 +458,7 @@ TEST_CASE("Value field: the unit after the mask's digits stays in normal video u
     f.setText("440");
     d.paint();
     for (int x = 100; x < 172; ++x) CHECK(reversed(x));
-    // Without a mask, the unit set for the field (Digidrums' rate and fine tune, D-451).
+    // Without a mask, the unit set for the field (Digidrums' rate and fine tune).
     f.setMask("");
     f.setUnit(" ct");
     f.setText("-12 ct");
@@ -553,7 +553,7 @@ TEST_CASE("Slider: a press ended by a modal box or by hiding ends the gesture an
     d.setRoot(nullptr);
 }
 
-TEST_CASE("Desktop: a menu opened over a modal box lies over it and takes the mouse and Esc first (D-394)", "[gemui]") {
+TEST_CASE("Desktop: a menu opened over a modal box lies over it and takes the mouse and Esc first", "[gemui]") {
     Desktop d(400, 300);
     Widget root;
     root.setBounds(d.bounds());

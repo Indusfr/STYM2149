@@ -1,5 +1,5 @@
 // STYM2149 — window of the settings a step's GEN, SRC or ENV cell brings into play, opened by a right click on the
-// cell (24/10/2026, D-392; before: the right button erased the cell)
+// cell (24/10/2026; before: the right button erased the cell)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -102,7 +102,7 @@ struct Fixture {
     StepSoundWindow& win() { return w.stepSoundWindow(); }
 };
 
-// Picks a form of the SID wave in the menu of the window's "waveForm" button (D-411).
+// Picks a form of the SID wave in the menu of the window's "waveForm" button.
 void pickForm(Fixture& f, const std::string& name) {
     const gemui::Button* b = f.win().button("waveForm");
     REQUIRE(b);
@@ -121,7 +121,7 @@ void pickForm(Fixture& f, const std::string& name) {
 
 }  // namespace
 
-TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, the cell kept (D-392)",
+TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, the cell kept",
           "[ui][seq][stepsound]") {
     Fixture f;
     f.h.track(plugin::Track::Generator) = float(Generator::Chip);
@@ -157,7 +157,7 @@ TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, t
     CHECK(win.field("ratiov")->onCommit("1.50"));
     CHECK(std::abs(f.h.track(plugin::Track::SidRatio) - 1.5f) < 1e-4f);
     // As in the main window: with Base, the plain square, the menu alone, neither the bars nor Steps (Indus,
-    // 24/10/2026 20:30, D-417), nor Width nor Period.
+    // 24/10/2026 20:30), nor Width nor Period.
     REQUIRE(win.rectOf("waveForm"));
     for (const char* id : {"stepWave", "waveSteps", "waveStepsv", "waveWidth", "wavePeriod"}) {
         INFO(id);
@@ -165,8 +165,8 @@ TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, t
     }
     const gemui::Rect frame = *win.rectOf("stepWin");
     // Square: the menu on the line of the SID wave's name, above the bars; Steps on the line of its label, under the
-    // bars (17:40 to 17:51, D-411, D-412), the window the same size; the width of the square right under Steps
-    // (D-408), the sliders lined up, the period hidden; its Steps work, 8 by default.
+    // bars (17:40 to 17:51), the window the same size; the width of the square right under Steps,
+    // the sliders lined up, the period hidden; its Steps work, 8 by default.
     pickForm(f, "Square");
     CHECK(f.h.patch().sidForm == ymengine::SidForm::Square);
     CHECK(win.button("waveForm")->text() == "Square");
@@ -204,7 +204,7 @@ TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, t
     CHECK(win.slider("waveWidth")->max() == 11);  // its range follows the main window's
     const gemui::Rect place = *win.rectOf("waveWidth");
     CHECK(*win.rectOf("stepWin") == frame);
-    // Sine: the period of the sine in its place (Indus, 24/10/2026 15:50 and 16:19, D-406), the window the same size.
+    // Sine: the period of the sine in its place (Indus, 24/10/2026 15:50 and 16:19), the window the same size.
     pickForm(f, "Sine");
     CHECK(f.h.patch().sidForm == ymengine::SidForm::Sine);
     CHECK_FALSE(win.rectOf("waveWidth"));
@@ -218,7 +218,7 @@ TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, t
     CHECK(f.h.patch().sidWave == ymengine::sineSidWave(3, 15, 8, 4));
     f.tick();
     CHECK(win.field("wavePeriodv")->text() == "4");
-    // Bounce: the period too (D-414), the sine of the levels at that period.
+    // Bounce: the period too, the sine of the levels at that period.
     pickForm(f, "Bounce");
     CHECK(f.h.patch().sidForm == ymengine::SidForm::Bounce);
     CHECK(f.h.patch().sidWave == ymengine::sineSidWave(3, 15, 8, 4, true));
@@ -270,7 +270,7 @@ TEST_CASE("Right click on a GEN cell: the GENERATOR settings of its generator, t
     CHECK(lane0(f.h).fx[2] == 2);
 }
 
-TEST_CASE("Right click on a SRC cell: the SOURCE settings, greyed when the cell's source does not use them (D-392)",
+TEST_CASE("Right click on a SRC cell: the SOURCE settings, greyed when the cell's source does not use them",
           "[ui][seq][stepsound]") {
     Fixture f;
     f.h.track(plugin::Track::Generator) = float(Generator::Chip);
@@ -307,7 +307,7 @@ TEST_CASE("Right click on a SRC cell: the SOURCE settings, greyed when the cell'
     CHECK(win.slider("level")->enabled());
 }
 
-TEST_CASE("Right click on an ENV cell: Env freq and EP of the track (D-392)", "[ui][seq][stepsound]") {
+TEST_CASE("Right click on an ENV cell: Env freq and EP of the track", "[ui][seq][stepsound]") {
     Fixture f;
     f.h.track(plugin::Track::Generator) = float(Generator::SyncBuzzer);  // the envelope plays: ENV row shown
     f.edit([](ymseq::Lane& l) { l.setCmd(2, ymengine::seqCmd(ymengine::SeqCmd::Shape, 10)); });
@@ -325,7 +325,7 @@ TEST_CASE("Right click on an ENV cell: Env freq and EP of the track (D-392)", "[
     CHECK(win.field("ep")->text().find("1234") != std::string::npos);
 }
 
-TEST_CASE("Step settings window: in front, its height fits its rows, closed with another track (D-392)",
+TEST_CASE("Step settings window: in front, its height fits its rows, closed with another track",
           "[ui][seq][stepsound]") {
     Fixture f;
     f.h.track(plugin::Track::Generator) = float(Generator::Chip);

@@ -95,7 +95,7 @@ CurveWindow::CurveWindow(MainWindow& main) : m_(main) {
 }
 
 void CurveWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&reset_, "curveReset"}, {&smooth_, "curveSmooth"}, {&invert_, "curveInvert"}})
         w->setId(id);
@@ -104,7 +104,7 @@ void CurveWindow::build() {
     reset_.setTip("Reset the custom curve to a straight line");
     smooth_.setTip("Smooth out a jagged curve");
     invert_.setTip("Turn the whole curve upside down: the slide runs from the target note back to the start");
-    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font (D-071).
+    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font.
     for (gemui::Label* l : {&hint_, &warn_, &foot_}) {
         l->setFace(gemui::Face::kSmall);
         l->setColor(colors::kHint);
@@ -126,7 +126,7 @@ void CurveWindow::wire() {
         });
     };
     invert_.onClick = [this] {
-        // The whole curve upside down (sixth DAW test, item 65, D-263): the prototype's point symmetry left the
+        // The whole curve upside down (sixth DAW test, item 65): the prototype's point symmetry left the
         // straight parts where they were, so only the drawn parts seemed to change.
         edit([](std::array<float, kN>& t) {
             for (float& v : t) v = 1 - v;
@@ -143,7 +143,7 @@ const std::array<float, CurveGrid::kPoints>& CurveWindow::table() const noexcept
 }
 
 // The curve is global non-automatable state: changed through the host (published to the audio thread), then read
-// back, which refreshes this window. No undo step (D-130).
+// back, which refreshes this window. No undo step.
 void CurveWindow::edit(const std::function<void(std::array<float, CurveGrid::kPoints>&)>& fn) {
     m_.host_.editExtras([&fn](plugin::NonParamState& s) { fn(s.global.slideTable); });
     m_.pullExtras();
@@ -157,7 +157,7 @@ void CurveWindow::show() {
 
 void CurveWindow::refresh() {
     // refreshCurve, refreshCurveWarn; also after a change of the state coming from elsewhere (preset, undo), which the
-    // prototype did not carry into an open window (D-130).
+    // prototype did not carry into an open window.
     if (!isOpen()) return;
     const auto& t = table();
     grid_.setTable(t);

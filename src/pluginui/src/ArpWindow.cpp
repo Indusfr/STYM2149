@@ -5,8 +5,8 @@
 // Behaviours taken from the prototype: handlers of #arpOn, #arpModeSel, #chordSel, #arpOcts, #arpGlideRate, #arpLand,
 // #arpRate, #arpLen, #arpgrid and #arpDivs, refreshArpGrid, markArpStep, the Arpeggiator part of refreshUI, setClkMode,
 // openArpWin, closeArpWin, the table keys of the keydown handler. Specific to STYM2149: the Sync button (Arp Sync,
-// sixth DAW test, D-256), Division in place of Rate when the arpeggio follows the tempo, in a menu button with 1/32T
-// and 1/64, without Tick with Sync (seventh DAW test, D-287 to D-290), on the row of the mode (eighth DAW test, D-295).
+// sixth DAW test), Division in place of Rate when the arpeggio follows the tempo, in a menu button with 1/32T
+// and 1/64, without Tick with Sync (seventh DAW test), on the row of the mode (eighth DAW test).
 #include "pluginui/ArpWindow.h"
 
 #include <algorithm>
@@ -34,8 +34,8 @@ namespace {
 constexpr std::array<const char*, 6> kArpModes = {"Up", "Down", "UpDn", "Order", "Random", "Table"};  // ARPMODES
 constexpr int kTableMode = int(ymengine::ArpMode::Table);
 
-// #arpDivs in a menu button (D-290): the choices of ArpDivision in musical order (kArpDivisionOrder); divisions of
-// the MIDI clock, or of the tempo with Sync (D-256), where Tick is not offered (D-287).
+// #arpDivs in a menu button: the choices of ArpDivision in musical order (kArpDivisionOrder); divisions of
+// the MIDI clock, or of the tempo with Sync, where Tick is not offered.
 constexpr const char* kDivisionTip = "Arpeggio step: a division of the tempo, or of the MIDI clock (Tick: one clock pulse)";
 constexpr const char* kSyncTip =
     "Sync to the tempo: one step per Division, at the host's tempo in a DAW, the sequencer's otherwise; "
@@ -51,7 +51,7 @@ constexpr std::array<const char*, 3> kOctaveTips = {
 constexpr double kSliderW = 129;  // input[type=range]: default width, counted in the content width
 // Gap between the items of a row, between the octave buttons, margin of a row, padding of .mixbody.
 constexpr double kGap = 8, kGroupGap = 6, kRowMargin = 6, kPad = 8;
-constexpr double kDivMargin = 8;  // between Sync and Division on the row of the mode (D-295)
+constexpr double kDivMargin = 8;  // between Sync and Division on the row of the mode
 
 std::optional<double> parseValue(const gemui::Slider& s, const std::string& txt) {
     size_t used = 0;
@@ -157,13 +157,13 @@ ArpWindow::ArpWindow(MainWindow& main) : m_(main) {
 }
 
 void ArpWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&on_, "arpOn"}, {&mode_, "arpModeSel"}, {&sync_, "arpSync"}, {&rate_, "arpRate"},
             {&track_, "arpGlideRate"}, {&land_, "arpLand"}, {&len_, "arpLen"}, {&chord_, "chordSel"}})
         w->setId(id);
     setTitle("ARPEGGIATOR");
-    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font (D-071).
+    // 12 px .hint: 6×6 font, at the width of the prototype's 12 px font.
     for (gemui::Label* l : {&hint_, &gridHint_}) {
         l->setFace(gemui::Face::kSmall);
         l->setColor(colors::kHint);
@@ -226,7 +226,7 @@ void ArpWindow::wire() {
     track_.onClick = [this] { editArp([](ymengine::TrackArp& a) { a.track = !a.track; }); };
     land_.onClick = [this] { editArp([](ymengine::TrackArp& a) { a.land = !a.land; }); };
     div_.onClick = [this] {
-        // sendClk: the musical order; Tick only on the MIDI clock (D-287), shown unchecked if a project kept it.
+        // sendClk: the musical order; Tick only on the MIDI clock, shown unchecked if a project kept it.
         const bool midi = m_.iv(Global::ArpClock) == 1;
         const int now = m_.iv(Global::ArpDivision);
         const plugin::ParamSpec& s = plugin::paramSpec(plugin::paramIndex(Global::ArpDivision));
@@ -292,7 +292,7 @@ bool ArpWindow::drum() const noexcept { return m_.drumTrack(); }
 bool ArpWindow::on() const noexcept { return m_.iv(Track::ArpOn) != 0 && !drum(); }
 const ymengine::TrackArp& ArpWindow::arp() const noexcept { return m_.extras_.tracks[size_t(m_.cur_)].arp; }
 
-// Undo (D-129): a press in this window arms a step of the focused track (MainWindow::pressed, armCur); pushCur pushes
+// Undo: a press in this window arms a step of the focused track (MainWindow::pressed, armCur); pushCur pushes
 // it after the first setting that changes the track, and the other settings of the same gesture add nothing.
 void ArpWindow::editArp(const std::function<void(ymengine::TrackArp&)>& fn) {
     const int t = m_.cur_;
@@ -369,7 +369,7 @@ bool ArpWindow::tableKey(const gemui::KeyEvent& e) {
     case gemui::Key::Down: dr = 1; break;
     case gemui::Key::Enter: {
         // The step under the cursor takes the row; the length grows up to it. One undo step (the prototype pushed the
-        // undo step before writing: the key could not be undone; D-129).
+        // undo step before writing: the key could not be undone).
         const int c = s.arpCur, off = ArpGrid::kRows - 1 - s.arpRow;
         m_.armCur();
         editArp([c, off](ymengine::TrackArp& a) {
@@ -394,7 +394,7 @@ void ArpWindow::layout() {
     const double x = ox + 14;  // .mixbody content (border 2, margin 4, padding 8)
     const bool body = on();
     const bool table = arp().mode == ymengine::ArpMode::Table;
-    // setClkMode: Division in place of Rate with the MIDI clock, and with Sync (D-256).
+    // setClkMode: Division in place of Rate with the MIDI clock, and with Sync.
     const bool divided = m_.iv(Global::ArpClock) == 1 || m_.iv(Global::ArpSync) == 1;
 
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labMode_, &mode_, &sync_}) w->setVisible(body);
@@ -421,7 +421,7 @@ void ArpWindow::layout() {
         return it;
     };
 
-    // Rate and Steps: one label column, so that their sliders start together (thirteenth DAW test, item 162, D-371).
+    // Rate and Steps: one label column, so that their sliders start together (thirteenth DAW test, item 162).
     const double sliderLabW = std::max(labRate_.naturalWidth(), labSteps_.naturalWidth());
     auto sliderLab = [sliderLabW](gemui::Label& l) { return FlexItem{&l, sliderLabW, 16}; };
 
@@ -430,7 +430,7 @@ void ArpWindow::layout() {
     const double rateValW = ratev_.naturalWidth() + hz_.naturalWidth();
     double contentW = on_.naturalWidth() + kGap + hint_.naturalWidth();
     if (body) {
-        // Division on the row of the mode (eighth DAW test, item 94, D-295), 8 px further from Sync.
+        // Division on the row of the mode (eighth DAW test, item 94), 8 px further from Sync.
         const double divW = divided ? kGap + kDivMargin + labDiv_.naturalWidth() + kGap + div_.naturalWidth() : 0;
         contentW = std::max(contentW, labMode_.naturalWidth() + kGap + mode_.naturalWidth() + kGap +
                                           sync_.naturalWidth() + divW);

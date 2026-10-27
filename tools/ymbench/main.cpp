@@ -40,8 +40,8 @@ void usage() {
                  "  --engines N     N independent engines rendered one after the other (1)\n"
                  "  --repeat N      repeated measurements, the fastest one is kept (5)\n"
                  "  --tracks        also renders the 16 track outputs and the 2 chip outputs\n"
-                 "  --delay         delay on (D-299), every track sent at 50 %%\n"
-                 "  --echo          echo of the notes on every track (D-299): 1/8, 3 repeats, drop of 3\n"
+                 "  --delay         delay on, every track sent at 50 %%\n"
+                 "  --echo          echo of the notes on every track: 1/8, 3 repeats, drop of 3\n"
                  "  --hash          hash (FNV-1a 64) of everything rendered in the last pass, counted in the load\n");
 }
 }  // namespace

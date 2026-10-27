@@ -245,7 +245,7 @@ void ScrollPane::mouseUp(const MouseEvent&) {
     if (Desktop* d = desktop()) d->cancel(repeat_);
 }
 
-// dx, dy are already in pixels (the editor converts the host's wheel units, D-118). Not taken when the pane has no
+// dx, dy are already in pixels (the editor converts the host's wheel units). Not taken when the pane has no
 // bar in that direction, so that the wheel goes on to the parents.
 bool ScrollPane::mouseWheel(const WheelEvent& e) {
     double dx = e.dx, dy = e.dy;
@@ -259,7 +259,7 @@ bool ScrollPane::mouseWheel(const WheelEvent& e) {
 // ------------------------------------------------------------------------------------------------ ScrollBar
 
 // A vertical Slider underneath (range, step, value, onChange and the gestures), so that MIDI learn keeps working on
-// it (D-294); only the drawing and the mouse are ScrollPane's.
+// it; only the drawing and the mouse are ScrollPane's.
 ScrollBar::ScrollBar() { setVertical(true); }
 
 ScrollBar::~ScrollBar() {

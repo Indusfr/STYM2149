@@ -1,4 +1,4 @@
-// STYM2149 — plugin: build identifier (D-211)
+// STYM2149 — plugin: build identifier
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

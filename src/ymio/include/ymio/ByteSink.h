@@ -1,4 +1,4 @@
-// STYM2149 — ymio: destination of a file written in pieces (WAV and stem exports, M7, A4)
+// STYM2149 — ymio: destination of a file written in pieces (WAV and stem exports)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

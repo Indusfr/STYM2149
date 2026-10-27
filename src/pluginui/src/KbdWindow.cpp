@@ -5,7 +5,7 @@
 // Behaviours taken from the prototype: TKL_ROWS, TKL_LABELS, TKL_OTHER, CODEMAP, LAYOUTS, NUMPAD, buildTkl,
 // buildTklNum, refreshKbdOct, kbdOctShift, refreshHeldBtn, retuneHeld, tklLight, tklNote, tklNotes, tklAllOff,
 // openKbdWin, #kbdClose, the numeric keypad and the playing part of the keydown and keyup handlers. Pads of a
-// percussion track (D-229): STYM2149.
+// percussion track: STYM2149.
 #include "pluginui/KbdWindow.h"
 
 #include <algorithm>
@@ -72,7 +72,7 @@ constexpr std::array<std::string_view, 18> kCodeMap = {"KeyA", "KeyW", "KeyS", "
                                                        "KeyK", "KeyO", "KeyL", "KeyP", "Semicolon", "Quote"};
 constexpr std::array<const char*, 18> kNN = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
                                              "A", "A#", "B", "C", "C#", "D", "D#", "E", "F"};
-// Percussion track (D-229): pads 1 to 8 on the middle row, from A to K (QWERTY positions), like the pads of the main
+// Percussion track: pads 1 to 8 on the middle row, from A to K (QWERTY positions), like the pads of the main
 // window from left to right.
 constexpr std::array<std::string_view, 8> kPadKeys = {"KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK"};
 
@@ -82,7 +82,7 @@ int padOf(std::string_view code) {
 }
 
 // TKL_LABELS: what is engraved on the key, per layout (QWERTY: the engraving of TKL_ROWS). AZERTY: KeyM carries ","
-// (the prototype wrote "M" there, which is on Semicolon: D-029, D-131).
+// (the prototype wrote "M" there, which is on Semicolon).
 struct Engraving {
     std::string_view code, label;
 };
@@ -357,7 +357,7 @@ void TklDrawing::paintKey(gemui::Painter& p, const Key& k) const {
     }
     if (!k.sub.empty()) {
         // In 6×6 (6 px per letter instead of 5.5), a role wider than the key is tightened by one pixel per letter
-        // rather than clipped (D-131).
+        // rather than clipped.
         const gemui::Face small = gemui::Face::kSmall;
         const double sp = Font::width(k.sub, 11, 0, small) > innerW ? -1 : 0;
         const Font::LineBox lb = Font::lineBox(k.sub, 11, small);
@@ -436,7 +436,7 @@ KbdWindow::KbdWindow(MainWindow& main) : m_(main) {
 }
 
 void KbdWindow::build() {
-    // Prototype ids of the sliders and buttons that MIDI learn can learn (D-146).
+    // Prototype ids of the sliders and buttons that MIDI learn can learn.
     for (const auto& [w, id] : std::initializer_list<std::pair<gemui::Widget*, const char*>>{
             {&octDn_, "kbdOctDn"}, {&octUp_, "kbdOctUp"}, {&heldSel_, "kbdHeldSel"}})
         w->setId(id);
@@ -445,7 +445,7 @@ void KbdWindow::build() {
     octDn_.setTip("Move the played range one octave down (key Z)");
     octUp_.setTip("Move the played range one octave up (key X)");
     octV_.setTip("Lowest octave played by the keys");
-    // 12 px .hint and 11 px legend: 6×6 font, at the widths of the prototype's font (D-071).
+    // 12 px .hint and 11 px legend: 6×6 font, at the widths of the prototype's font.
     range_.setFace(gemui::Face::kSmall);
     range_.setColor(colors::kHint);
     static constexpr std::array<const char*, 4> kLegend = {"note", "sharp", "octave", "transport & edit"};
@@ -497,7 +497,7 @@ void KbdWindow::wire() {
             m_.setBaseOctave(k.octave);  // buildKbd, buildTkl, retuneHeld
             return;
         }
-        if (k.pad >= 0) m_.pressPad(k.pad);  // percussion track (D-229)
+        if (k.pad >= 0) m_.pressPad(k.pad);  // percussion track
         else m_.press((m_.baseOct_ + 1) * 12 + k.offset, 118, false);  // a click plays at velocity 118, a key at 127
         tkl_.setDown(k.code, true);
     };
@@ -540,7 +540,7 @@ int KbdWindow::padSignature() const {
 }
 
 void KbdWindow::buildKeys() {
-    // buildTkl, buildTklNum: keys at the current octave and in the current layout (Auto: the system's, D-215).
+    // buildTkl, buildTklNum: keys at the current octave and in the current layout (Auto: the system's).
     const int oct = m_.baseOct_;
     const std::string lay = m_.keyLayout();
     const int drum = drumKind();
@@ -564,7 +564,7 @@ void KbdWindow::buildKeys() {
             const int idx = cm == kCodeMap.end() ? -1 : int(cm - kCodeMap.begin());
             const int pad = drum ? padOf(d.code) : -1;
             if (pad >= 0) {
-                // Percussion track (D-229): the pad and its sound; the other note keys have no role.
+                // Percussion track: the pad and its sound; the other note keys have no role.
                 const std::string n = std::to_string(pad + 1);
                 k.kind = TklDrawing::Kind::Note;
                 k.offset = idx;
@@ -655,7 +655,7 @@ void KbdWindow::refresh() {
     else
         range_.setText(noteName(lo, latin) + " to " + noteName(hi, latin) +
                        (hi > kPlayHi || lo < kPlayLo ? " (partly out of the chip range)" : ""));
-    // Percussion track (D-229): the pads do not depend on the octave.
+    // Percussion track: the pads do not depend on the octave.
     octDn_.setEnabled(!drum && oct > 0);
     octUp_.setEnabled(!drum && oct < 9);
     heldSel_.setEnabled(!drum);
@@ -678,7 +678,7 @@ void KbdWindow::refresh() {
 
 std::string KbdWindow::codeOf(int note) const {
     if (builtPads_ > 0) {
-        // Percussion track (D-229): the pad of the note, as the engine plays it (Chipdrum: the note in the octave,
+        // Percussion track: the pad of the note, as the engine plays it (Chipdrum: the note in the octave,
         // Digidrum: the slot of the pad that played it, otherwise the selected slot).
         const int pc = ((note % 12) + 12) % 12;
         int pad = pc % 8;
@@ -723,7 +723,7 @@ void KbdWindow::notePressed(int offset) {
     // is.
     if (!isOpen() || held_.count(offset)) return;
     if (drumKind()) {
-        // Percussion track (D-229): only the pad keys play, like the pads.
+        // Percussion track: only the pad keys play, like the pads.
         const int pad = padOf(kCodeMap[size_t(offset)]);
         if (pad < 0) return;
         held_[offset] = {MainWindow::kPadNote + pad, pad};
@@ -755,7 +755,7 @@ void KbdWindow::retune() {
     if (!m_.host_.session().kbdFollow) return;
     for (auto& [offset, h] : held_) {
         const int now = (m_.baseOct_ + 1) * 12 + offset;
-        if (h.pad >= 0 || now == h.note || now < kPlayLo || now > kPlayHi) continue;  // a pad stays (D-229)
+        if (h.pad >= 0 || now == h.note || now < kPlayLo || now > kPlayHi) continue;  // a pad stays
         m_.release(h.note);
         h.note = now;
         m_.press(now, 127, false);
@@ -795,7 +795,7 @@ void KbdWindow::layout() {
     const double letter = Font::size(11).adv64 / 64.0;
     for (size_t i = 0; i < legend_.size(); ++i) {
         gemui::Label& l = legend_[i];
-        if (!l.visible()) continue;  // percussion track: no sharp nor octave (D-229)
+        if (!l.visible()) continue;  // percussion track: no sharp nor octave
         swatch_[i].setBox({lx, ly, 11, 11});
         l.setBox({lx + 15 + letter, ly, l.naturalWidth(), 12});  // square, margin-right 4, space, text
         lx += 15 + letter * double(1 + Font::length(l.text())) + 14;
@@ -806,7 +806,7 @@ void KbdWindow::layout() {
     const double contentW = d.w;
     const double w = contentW + 2 * kPad + 12;
     const double h = ly + 12 + 6 + kPad + 6 - oy;
-    top_.setBox({ox + 6, oy + 32, w - 12, 2});  // before place(), which may move the window and its content (D-460)
+    top_.setBox({ox + 6, oy + 32, w - 12, 2});  // before place(), which may move the window and its content
     if (std::abs(h - box().h) > 0.01 || std::abs(w - box().w) > 0.01) place({ox, oy, w, h});
     repaint();
 }

@@ -50,7 +50,7 @@ public:
     // arrival: true and `message` filled while some are left (lit keys, recording into the sequencer, like press and
     // release in the prototype).
     virtual bool hostNote(std::array<uint8_t, 3>& message) = 0;
-    // MIDI learn (P462, D-146): learned CCs and notes, which the host keeps for the interface instead of the engine,
+    // MIDI learn: learned CCs and notes, which the host keeps for the interface instead of the engine,
     // and armed control (the next CC or the next note played is taken for it, once). The caught messages come back
     // through learnMidi, in order of arrival: true and `message` filled while some are left.
     virtual void setMidiCapture(const plugin::MidiKeys& keys, bool armed) = 0;
@@ -60,8 +60,8 @@ public:
     // sync), choice of a pattern (a; when stopped at once, when playing at the end of the loop), preview of a grid
     // note (a track, b note, c accent 0-127), jump to a Song entry (a, 0 to 65535), audition of a Chipdrum kit
     // instrument (a slot 0-7, Audition button of the Drum Kit window), preview of a DMA track sample (a slot 0-7, Play
-    // button of the DMA window, M6), preview of a Digidrum slot (a slot 0-7, Play button of the Digidrums editor, M6);
-    // for these two, b 1 stops the preview (D-449).
+    // button of the DMA window), preview of a Digidrum slot (a slot 0-7, Play button of the Digidrums editor);
+    // for these two, b 1 stops the preview.
     enum class SeqCommand : uint8_t { Play, Stop, Select, Preview, SongJump, DrumPreview, DmaPreview, DigiPreview };
     virtual void seqCommand(SeqCommand command, int a = 0, int b = 0, int c = 0) = 0;
 
@@ -82,14 +82,14 @@ public:
     virtual void openAudioSettings() = 0;
     // Opens the choice of an audio file for a Digidrum slot (asynchronous; the host converts the sample and stores it
     // in the non-automatable state: 4-bit values and 8-bit source at the slot's rate, name taken from the file, loop
-    // over the whole sample, D-154).
+    // over the whole sample).
     virtual void loadDigidrum(int slot) = 0;
-    // Opens the choice of a file for a slot of the DMA track (M6, D-153; asynchronous): audio file resampled at the
+    // Opens the choice of a file for a slot of the DMA track (asynchronous): audio file resampled at the
     // slot's rate, mono or stereo depending on its setting, or raw file (.raw, .spl, .sam) taken byte for byte. A host
     // without files (tests) does nothing.
     virtual void loadDmaSample(int /*slot*/) {}
 
-    // Register recorder (M6, B11, D-157): state (take armed or rolling, its chip and its frames), take kept with the
+    // Register recorder: state (take armed or rolling, its chip and its frames), take kept with the
     // project (frames, replay tick, chip), arming on a chip and stop, clearing of the kept take. A host without an
     // engine (tests) records nothing.
     struct Recorder {
@@ -106,10 +106,10 @@ public:
     virtual void armRecorder(int /*chip*/) {}
     virtual void disarmRecorder() {}
     virtual void clearRecording() {}
-    // Copy of the kept take (export of the Recorder window, B3); empty if there is none.
+    // Copy of the kept take (export of the Recorder window); empty if there is none.
     virtual plugin::RegisterTake recordedTake() const { return {}; }
 
-    // YM Player (M7, A2, D-169): tune read from File > Import > YM dump (YM dump or SNDH), played in place of the
+    // YM Player: tune read from File > Import > YM dump (YM dump or SNDH), played in place of the
     // engine output. loadYm returns the alert of a refused file (empty: loaded, stopped). A host without an engine
     // (tests) loads nothing.
     struct YmPlayer {
@@ -133,9 +133,9 @@ public:
     virtual std::string preference(std::string_view key, std::string_view fallback) const = 0;
     virtual void setPreference(std::string_view key, std::string_view value) = 0;
     // The user's language (ISO 639 code: "fr", "fr-FR"): language of the tooltips as long as the user has not chosen
-    // one (D-185).
+    // one.
     virtual std::string systemLanguage() const { return "en"; }
-    // Tooltip languages (D-283): the .po files of the user's Languages folder, next to the preferences file, then
+    // Tooltip languages: the .po files of the user's Languages folder, next to the preferences file, then
     // those installed with STYM2149 (French, German, Spanish, Portuguese, Italian), each folder by name. A host without
     // files has none: English only.
     struct TextFile {
@@ -150,12 +150,12 @@ public:
     // into it (template, read-me) and shows it in the system's file browser. False if the folder cannot be made.
     virtual bool openLanguagesFolder(const std::vector<TextFile>& /*files*/) { return false; }
     // Layout of the system keyboard, "qwerty", "azerty" or "qwertz": the one Auto plays and draws in Settings >
-    // Keyboard layout (D-215).
+    // Keyboard layout.
     virtual std::string keyboardLayout() const { return "qwerty"; }
-    // Settings > Renderer (Windows, D-420): whether the system offers a choice of how the window reaches the screen,
+    // Settings > Renderer (Windows): whether the system offers a choice of how the window reaches the screen,
     // the preference "renderer" being "software" (default) or "direct2d". None on macOS and Linux.
     virtual bool rendererChoice() const { return false; }
-    // Whole project replaced (File > Load > Preset, M7): parameter values and non-automatable state, like a state
+    // Whole project replaced (File > Load > Preset): parameter values and non-automatable state, like a state
     // read back (the current pattern becomes the engine's); the recorder's take is kept. By default: each parameter
     // changed by a gesture, then the non-automatable state replaced.
     virtual void loadProject(const plugin::ParamValues& values, const plugin::NonParamState& extras) {
@@ -167,11 +167,11 @@ public:
         }
         editExtras([&extras](plugin::NonParamState& s) { s = extras; });
     }
-    // Non-automatable state of a new project (File > New, D-225): the defaults, with the sequencer clock the plugin
+    // Non-automatable state of a new project (File > New): the defaults, with the sequencer clock the plugin
     // starts with (Host sync in a host, Free run in the standalone application).
     virtual plugin::NonParamState newExtras() const { return {}; }
 
-    // Files (M7): asynchronous native dialogs (STYM2149_SPEC.md §8: FileChooser, never from the audio thread), then
+    // Files: asynchronous native dialogs (STYM2149_SPEC.md §8: FileChooser, never from the audio thread), then
     // reading or writing of a whole file. Absolute paths in UTF-8. The callback comes on the message thread with the
     // chosen file, and not at all if the user cancels or if the editor is closed in the meantime. A host without files
     // (tests) opens nothing.
@@ -192,17 +192,17 @@ public:
     // abandoned if it is destroyed before. It can be filled from the export's worker thread. nullptr if the file
     // cannot be created.
     virtual std::unique_ptr<ymio::ByteSink> createFile(const std::string& /*path*/) { return nullptr; }
-    // Host sample rate ("Host" choice of the WAV dialog, D-164); 0 if unknown.
+    // Host sample rate ("Host" choice of the WAV dialog); 0 if unknown.
     virtual uint32_t hostSampleRate() const { return 0; }
 
-    // Patches library (D-141): JSON text of the file shared by every project, next to the preferences file (empty if
+    // Patches library: JSON text of the file shared by every project, next to the preferences file (empty if
     // it does not exist); writing replaces it.
     virtual std::string patchLibrary() const = 0;
     virtual void setPatchLibrary(const std::string& json) = 0;
-    // Digidrum banks (D-154): same principle, a separate file. A host without files (tests) has none.
+    // Digidrum banks: same principle, a separate file. A host without files (tests) has none.
     virtual std::string digidrumLibrary() const { return {}; }
     virtual void setDigidrumLibrary(const std::string& /*json*/) {}
-    // DMA banks (D-462): same principle, a third file.
+    // DMA banks: same principle, a third file.
     virtual std::string dmaLibrary() const { return {}; }
     virtual void setDmaLibrary(const std::string& /*json*/) {}
 };

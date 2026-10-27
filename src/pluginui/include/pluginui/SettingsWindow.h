@@ -1,22 +1,22 @@
 // STYM2149 — pluginui: Settings window, the settings of the sound engine, of MIDI and of the interface (Indus,
-// 25/10/2026 19:33, D-430)
+// 25/10/2026 19:33)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // A STYM2149 addition (the prototype has none), opened by Options > Settings. It gathers what the Options menu held in
 // submenus: Sound engine (Computer, Chip clock, Output chain, Resampling, STE bass and treble, Soft clip, Timer,
-// Quantize to VBL), with the Tuning of A4 (D-429) after the clock, its MIDI entries (MIDI routing, Velocity, Bend
-// range, Wheel depth), with the MIDI expression (D-432: the targets of the bend, the wheel and the aftertouch, MPE,
+// Quantize to VBL), with the Tuning of A4 after the clock, its MIDI entries (MIDI routing, Velocity, Bend
+// range, Wheel depth), with the MIDI expression (the targets of the bend, the wheel and the aftertouch, MPE,
 // its bend range and the target of its CC74), and Pixels, Renderer, Note names, Keyboard layout and Tooltips (On /
 // Off, Language and the Languages folder). Three frames side by side: SOUND ENGINE, MIDI and INTERFACE. Each setting
 // is a label and a menu button that shows its value; the menu lists the values with the current one checked, and
-// greys out those that do not apply, as the submenus did (D-206, D-207, D-237). Tuning A4 is a value typed in Hz.
-// Under the frames, Cancel, the default button with its bold border, and OK (Indus, 25/10/2026 21:50, D-435): a
+// greys out those that do not apply, as the submenus did. Tuning A4 is a value typed in Hz.
+// Under the frames, Cancel, the default button with its bold border, and OK (Indus, 25/10/2026 21:50): a
 // setting applies as soon as it is picked, so that it is heard; OK keeps the changes and closes the window, Cancel
 // puts back the settings changed in the window since it opened, then closes it, as the close box and Escape do.
 // When a setting then differs from its value at the opening, Cancel first asks in a GEM box whether the changes may
-// be lost (Indus, 26/10/2026 03:51, D-437). The VBL frequency left the Options menu for SOUND ENGINE, before Quantize
-// to VBL (Indus, 26/10/2026 04:03, D-441).
+// be lost (Indus, 26/10/2026 03:51). The VBL frequency left the Options menu for SOUND ENGINE, before Quantize
+// to VBL (Indus, 26/10/2026 04:03).
 #pragma once
 #include <array>
 #include <optional>
@@ -40,11 +40,11 @@ public:
 
     explicit SettingsWindow(MainWindow& main);
 
-    // Opens the window in front of the others; opened, it starts noting the settings it changes (D-435).
+    // Opens the window in front of the others; opened, it starts noting the settings it changes.
     void show();
     // OK: the changes kept, the window closed. Cancel (the close box and Escape too): the settings changed in the
     // window since it opened put back as they were, the window closed; a GEM box asks first when one of them differs
-    // from its value at the opening (D-437).
+    // from its value at the opening.
     void ok();
     void cancel();
     void requestClose() override { cancel(); }
@@ -96,9 +96,9 @@ private:
     // read again at each refresh).
     double buttonWidth(int row);
     void preferenceSet();  // after a preference is picked: the main window and this one shown again
-    // The entries of a row's menu, each pick noting first the value the row had (D-435).
+    // The entries of a row's menu, each pick noting first the value the row had.
     std::vector<gemui::MenuItem> notedItems(int row, int& checked);
-    // Value of a row before the window first changed it since it opened (D-435): its host parameters (index and
+    // Value of a row before the window first changed it since it opened: its host parameters (index and
     // plain value), or the text of its preference (the tooltip language included), or Quantize to VBL / Tooltips.
     struct Saved {
         std::vector<std::pair<int, float>> params;

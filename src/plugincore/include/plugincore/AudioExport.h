@@ -1,10 +1,10 @@
-// STYM2149 — plugincore: WAV and stem exports of the File menu (M7, A4, STYM2149_SPEC.md §8, D-163, D-164, D-171)
+// STYM2149 — plugincore: WAV and stem exports of the File menu (STYM2149_SPEC.md §8)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // exportWav, exportSongWav, exportStems and exportSongStems of the prototype: the current pattern (one pass) or the
-// Song (from its first entry to its end, D-163) rendered offline by a second instance of the engine (OfflineRender),
-// in the format chosen in the WAV dialog (D-164: 16-bit, 24-bit or 32-bit float, 44.1 to 192 kHz). Clean cut when
+// Song (from its first entry to its end) rendered offline by a second instance of the engine (OfflineRender),
+// in the format chosen in the WAV dialog (16-bit, 24-bit or 32-bit float, 44.1 to 192 kHz). Clean cut when
 // the sequencer stops, without a release tail, like the prototype; the resampling delay is compensated, so that the
 // file starts and ends with the music.
 // Stems: one isolated track per WAV, like isolate() of the prototype (only that track audible, even when muted, with
@@ -29,10 +29,10 @@
 
 namespace stym::plugin {
 
-// Rates offered by the WAV dialog (D-164), in addition to the host's.
+// Rates offered by the WAV dialog, in addition to the host's.
 inline constexpr std::array<uint32_t, 6> kWavRates = {44100, 48000, 88200, 96000, 176400, 192000};
 
-// The choice of the WAV dialog (D-164).
+// The choice of the WAV dialog.
 struct WavSettings {
     ymio::WavFormat format = ymio::WavFormat::Pcm16;  // wavBlobDv of the prototype: 16-bit
     uint32_t rate = 48000;                             // Hz; the exports raise a rate below 8000 Hz to 8000 Hz

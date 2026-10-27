@@ -1,10 +1,10 @@
-// STYM2149 — ymengine: STE DMA sample bank (M6, B8, D-153) and preview of a slot
+// STYM2149 — ymengine: STE DMA sample bank and preview of a slot
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Eight samples of signed bytes (mono, or stereo interleaved left then right) copied into fixed storage: the audio
 // thread allocates nothing. The DMA voices (Generator::Dma) read them; the preview of the DMA window plays their part,
-// once or in a loop (D-449), at the rate of the slot, at the pace of the host (byte held until the next one), outside
+// once or in a loop, at the rate of the slot, at the pace of the host (byte held until the next one), outside
 // the output chain like the preview of a Digidrum.
 #pragma once
 #include <algorithm>
@@ -23,7 +23,7 @@ namespace stym::ymengine::detail {
 class DmaBank {
 public:
     // A byte at ±128 is worth ±kScale, the peak of a YM channel alone at its loudest (index 31 of the table of one
-    // channel); ratio of the YM and DMA levels on the STE TO CONFIRM (D-153).
+    // channel); ratio of the YM and DMA levels on the STE TO CONFIRM.
     static constexpr double kScale = 0.5;
 
     void setParams(const DmaParams& p) noexcept {
@@ -54,11 +54,11 @@ public:
         return params_.slots[size_t(k)].stereo ? n / 2 : n;
     }
     const int8_t* data(int k) const noexcept { return data_[size_t(k & 7)].data(); }
-    // Frames played of slot k, from its Start to its End (D-444).
+    // Frames played of slot k, from its Start to its End.
     SampleSpan part(int k) const noexcept { return sampleSpan(slot(k).start, slot(k).end, frames(k)); }
 
-    // Preview: from Start to End (D-444), read again at each block; with the slot's Loop on, the part repeats until
-    // the preview is stopped or Loop goes off (D-449), otherwise it plays once. Only one at a time.
+    // Preview: from Start to End, read again at each block; with the slot's Loop on, the part repeats until
+    // the preview is stopped or Loop goes off, otherwise it plays once. Only one at a time.
     void preview(int k) noexcept {
         const SampleSpan p = part(k);
         if (p.size() == 0) return;
@@ -80,7 +80,7 @@ public:
         }
         const SampleSpan p = part(preview_);
         const int8_t* d = data_[size_t(preview_)].data();
-        // Frames of the sample per host sample: its rate, raised by its fine tune (D-452).
+        // Frames of the sample per host sample: its rate, raised by its fine tune.
         const double inc = kDmaRateHz[s.rate] * std::pow(2.0, s.cents / 1200) / hostRate;
         // A byte at ±128 is worth ±kScale × √½ (centred, constant-power panning), in the mix unit `scale`.
         const double k = kScale / 128.0 * 0.7071067811865476 * scale;
@@ -112,7 +112,7 @@ private:
     std::array<uint32_t, kDmaSlots> len_{};  // bytes of each slot
     int preview_ = -1;  // slot being previewed, -1: none
     double pos_ = 0;    // frame of the preview (fractional)
-    bool looping_ = false;  // the slot's Loop was on during the preview, which stops when Loop goes off (D-449)
+    bool looping_ = false;  // the slot's Loop was on during the preview, which stops when Loop goes off
 };
 
 }  // namespace stym::ymengine::detail

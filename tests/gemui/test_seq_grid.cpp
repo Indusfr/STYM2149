@@ -1,6 +1,6 @@
-// STYM2149 — gemui tests: Step Sequencer grid behaviours: preview of a written note (P153), first note arming the
-// track (P183), horizontal scroll above 64 steps (P294), Copy row / Paste row (P311), overview map (P313), the
-// cells below B0 (PLAY_LO, P314) and the greyed rows of a scale under Snap (D-280).
+// STYM2149 — gemui tests: Step Sequencer grid behaviours: preview of a written note, first note arming the
+// track, horizontal scroll above 64 steps, Copy row / Paste row, overview map, the
+// cells below B0 (PLAY_LO) and the greyed rows of a scale under Snap.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -78,7 +78,7 @@ std::vector<int> row(const ymseq::Lane& l, ymseq::Row r) {
 
 }  // namespace
 
-TEST_CASE("Preview of a written note: velocity 110, cut after 240 ms or by the next one (P153)", "[ui][seq][preview]") {
+TEST_CASE("Preview of a written note: velocity 110, cut after 240 ms or by the next one", "[ui][seq][preview]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.sequencer().show();
@@ -109,7 +109,7 @@ TEST_CASE("Preview of a written note: velocity 110, cut after 240 ms or by the n
     CHECK(h.takeCommands().empty());
 }
 
-TEST_CASE("Preview of a drum hit goes through the sequencer path (seqprev), not a note (P153)", "[ui][seq][preview]") {
+TEST_CASE("Preview of a drum hit goes through the sequencer path (seqprev), not a note", "[ui][seq][preview]") {
     UiHost h;
     h.p(0, Track::Generator) = float(int(ymengine::Generator::Chipdrum));
     pluginui::MainWindow w(h);
@@ -129,7 +129,7 @@ TEST_CASE("Preview of a drum hit goes through the sequencer path (seqprev), not 
     CHECK(h.take().empty());
 }
 
-TEST_CASE("First note written on a disabled track enables it (armChan, P183)", "[ui][seq]") {
+TEST_CASE("First note written on a disabled track enables it (armChan)", "[ui][seq]") {
     UiHost h;
     h.p(Global::FocusTrack) = 2;
     REQUIRE(h.p(1, Track::On) == 0.0f);
@@ -153,7 +153,7 @@ TEST_CASE("First note written on a disabled track enables it (armChan, P183)", "
     CHECK(h.p(1, Track::On) == 1.0f);
 }
 
-TEST_CASE("Horizontal scroll: shown above 64 steps, a-b readout, the grid follows (P294)", "[ui][seq][scroll]") {
+TEST_CASE("Horizontal scroll: shown above 64 steps, a-b readout, the grid follows", "[ui][seq][scroll]") {
     UiHost h;
     h.state.seq.cur().steps = 64;
     pluginui::MainWindow w(h);
@@ -166,7 +166,7 @@ TEST_CASE("Horizontal scroll: shown above 64 steps, a-b readout, the grid follow
     REQUIRE(sc);
     REQUIRE(w.rectOf("seqScrollv"));
     CHECK(scrollText(w) == "1-64");
-    // Right end of the track (inside its arrow, D-297): the last 64 steps.
+    // Right end of the track (inside its arrow): the last 64 steps.
     press(w, {sc->right() - 1 - gemui::Slider::kArrow, sc->y + sc->h / 2});
     CHECK(h.editor.viewStart == 64);
     CHECK(scrollText(w) == "65-128");
@@ -203,7 +203,7 @@ TEST_CASE("Horizontal scroll: shown above 64 steps, a-b readout, the grid follow
     CHECK(h.editor.viewStart == 0);
 }
 
-TEST_CASE("Notes scrolled by a bar at the right edge of the window, with arrows, as high as the grid (D-294, D-309)",
+TEST_CASE("Notes scrolled by a bar at the right edge of the window, with arrows, as high as the grid",
           "[ui][seq][scroll]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -213,7 +213,7 @@ TEST_CASE("Notes scrolled by a bar at the right edge of the window, with arrows,
     REQUIRE(bar);
     REQUIRE(g);
     // Against the frame on the right (6 px of border and margin), right of the grid, as high as the whole grid: step
-    // numbers, note rows and control rows (ninth DAW test, item 108, D-309).
+    // numbers, note rows and control rows (ninth DAW test, item 108).
     CHECK(bar->right() == win->right() - 6);
     CHECK(bar->w == gemui::ScrollPane::kBar);
     CHECK(bar->x > g->right());
@@ -248,7 +248,7 @@ TEST_CASE("Notes scrolled by a bar at the right edge of the window, with arrows,
     CHECK_FALSE(tr->enabled());
 }
 
-TEST_CASE("Row labels: Copy row and Paste row across tracks, same row only, one undo step (P311)", "[ui][seq][rows]") {
+TEST_CASE("Row labels: Copy row and Paste row across tracks, same row only, one undo step", "[ui][seq][rows]") {
     UiHost h;
     ymseq::Lane& a = h.state.seq.cur().edit(0);
     a.set(ymseq::Row::Vol, 2, 5);
@@ -296,7 +296,7 @@ TEST_CASE("Row labels: Copy row and Paste row across tracks, same row only, one 
     CHECK(h.state.seq.cur().lane(1) == bBefore);
 }
 
-TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on a 256-step scale (P313)",
+TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on a 256-step scale",
           "[ui][seq][overview]") {
     UiHost h;
     h.state.seq.cur().steps = 64;
@@ -309,9 +309,9 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     click(w, "seqOver");
     auto r = w.rectOf("overMap");
     REQUIRE(r);
-    // Its line alone under it: no legend (twelfth DAW test, item 151, D-360).
+    // Its line alone under it: no legend (twelfth DAW test, item 151).
     CHECK_FALSE(w.rectOf("seqHint"));
-    // Canvas as wide as the grid (38 + 64 × 18 px, D-458), 104 px high, in a 2 px frame.
+    // Canvas as wide as the grid (38 + 64 × 18 px), 104 px high, in a 2 px frame.
     CHECK(r->w == 1194);
     CHECK(r->h == 108);
     w.desktop().paint();
@@ -350,7 +350,7 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
 
     // Click and drag move the view: steps across, pitch up and down (the view centred on the pointer).
     const int top = w.sequencer().bounds().y;
-    setSteps(h, w, 256);  // the scroll row appears above the map (the window may move up, D-458)
+    setSteps(h, w, 256);  // the scroll row appears above the map (the window may move up)
     const auto r2 = w.rectOf("overMap");
     REQUIRE(r2);
     CHECK(r2->y - w.sequencer().bounds().y > r->y - top);
@@ -386,7 +386,7 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     CHECK(h.editor.viewStart == 0);
 }
 
-TEST_CASE("Overview map with a drum track: 26 px band, separator, the pitch of the view kept (P313)",
+TEST_CASE("Overview map with a drum track: 26 px band, separator, the pitch of the view kept",
           "[ui][seq][overview]") {
     UiHost h;
     h.p(2, Track::Generator) = float(int(ymengine::Generator::Chipdrum));
@@ -417,7 +417,7 @@ TEST_CASE("Overview map with a drum track: 26 px band, separator, the pitch of t
     CHECK(h.editor.viewAbsBase == base);
 }
 
-TEST_CASE("Below B0 (PLAY_LO): cells hatched, not-allowed pointer, a click writes nothing (P314)", "[ui][seq]") {
+TEST_CASE("Below B0 (PLAY_LO): cells hatched, not-allowed pointer, a click writes nothing", "[ui][seq]") {
     UiHost h;
     h.p(Global::FocusTrack) = 2;
     h.editor.viewAbsBase = 18;  // the slider stops at B0: only a view kept from elsewhere shows these rows
@@ -457,7 +457,7 @@ TEST_CASE("Below B0 (PLAY_LO): cells hatched, not-allowed pointer, a click write
     CHECK(h.p(1, Track::On) == 1.0f);
 }
 
-TEST_CASE("Snap: a press on a greyed row writes on the nearest degree, chord voices included (D-280)", "[ui][seq]") {
+TEST_CASE("Snap: a press on a greyed row writes on the nearest degree, chord voices included", "[ui][seq]") {
     UiHost h;
     h.state.global.scaleMask = ymseq::scaleMask(1);  // Major (Ionian), on C
     h.editor.snap = true;
@@ -498,7 +498,7 @@ TEST_CASE("Snap: a press on a greyed row writes on the nearest degree, chord voi
             }
 }
 
-// ---------------------------------------------------------------- piano roll editing (D-282)
+// ---------------------------------------------------------------- piano roll editing
 
 namespace {
 
@@ -569,7 +569,7 @@ TEST_CASE("Piano roll: a click removes a note even when another note follows it 
     CHECK(noteLen(lane(), 2) == 2);
 }
 
-TEST_CASE("Note length: the values that are not a whole number of steps are greyed, Step written instead (D-425)",
+TEST_CASE("Note length: the values that are not a whole number of steps are greyed, Step written instead",
           "[ui][seq][pianoroll]") {
     UiHost h;
     h.state.global.resolution = 3;  // 1/32
@@ -602,7 +602,7 @@ TEST_CASE("Note length: the values that are not a whole number of steps are grey
     CHECK(l[12] == "1/16. 1.5 steps");
     CHECK(l[14] == "1/4T 2.67 steps");
     CHECK(l[16] == "1/16T 0.67 step");
-    CHECK(l[17] == "1/32T 0.33 step");  // D-433
+    CHECK(l[17] == "1/32T 0.33 step");
     const std::vector<gemui::MenuItem>& it = topMenu(w)->items();
     for (size_t k : {size_t(0), size_t(2), size_t(6), size_t(10), size_t(11)}) CHECK(!it[k].disabled);
     for (size_t k : {size_t(7), size_t(8), size_t(12), size_t(14), size_t(15), size_t(16), size_t(17)})
@@ -626,7 +626,7 @@ TEST_CASE("Note length: the values that are not a whole number of steps are grey
     CHECK(noteLen(lane(), 4) == 3);
 }
 
-TEST_CASE("Piano roll: with the Move tool, a click on a note leaves it whole (D-293)", "[ui][seq][pianoroll]") {
+TEST_CASE("Piano roll: with the Move tool, a click on a note leaves it whole", "[ui][seq][pianoroll]") {
     UiHost h;
     ymseq::Lane& l = h.state.seq.cur().edit(0);
     putNote(l, 4, 5, 4);  // F3, steps 5-8: longer than the figure
@@ -984,7 +984,7 @@ TEST_CASE("Piano roll: dragging up or down inside one VOL cell follows the point
 TEST_CASE("Piano roll: in 3 channels, lengthening a note does not turn the next note into a silent voice",
           "[ui][seq][pianoroll]") {
     UiHost h;
-    h.p(Global::VoiceMode) = 1;  // Authentic 3ch: chord voices are not played (D-204)
+    h.p(Global::VoiceMode) = 1;  // Authentic 3ch: chord voices are not played
     ymseq::Lane& l = h.state.seq.cur().edit(0);
     putNote(l, 0, 0, 2);  // C3, steps 1-2
     putNote(l, 2, 4);     // E3, step 3
@@ -1046,7 +1046,7 @@ TEST_CASE("Piano roll: in 3 channels, the held part of a chord voice is greyed l
 
 // ---------------------------------------------------------------- twelfth DAW test
 
-TEST_CASE("Piano roll: the edge of a note stretches it with the Draw tool alone (item 141, D-381)",
+TEST_CASE("Piano roll: the edge of a note stretches it with the Draw tool alone (item 141)",
           "[ui][seq][pianoroll]") {
     for (const int tool : {0, 1}) {
         CAPTURE(tool);
@@ -1104,7 +1104,7 @@ TEST_CASE("Piano roll: the edge of a note stretches it with the Draw tool alone 
     CHECK(a.tie == b.tie);
 }
 
-TEST_CASE("Piano roll: with the Draw tool, a note held under the button shows the hand until the release (D-383)",
+TEST_CASE("Piano roll: with the Draw tool, a note held under the button shows the hand until the release",
           "[ui][seq][pianoroll]") {
     UiHost h;
     h.editor.tool = 1;

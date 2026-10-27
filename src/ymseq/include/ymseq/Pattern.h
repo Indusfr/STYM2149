@@ -9,13 +9,13 @@
 //   tie   tie (HLD); slide (SLD); afl (ARP); vol 0-15 (default 15); mix (SRC) 0-3; slt (SLT) 0-8;
 //   cut; fx (GEN) 0-4; gat (GAT) 0-100 %; pnr (PAN) 0 or v·10+101 (v from -10 to +10); rtg (RTG) 0-3;
 //   cnd (CND) 0-7; slc (CRV) 0-12; ton (TON) -12..+12
-//   ins (INS, M6) 0 = the track's sound, 1-32 = project instrument (D-147)
-//   cmd (CMD, M6) effect commands of the line, one row per kind (Xyz, Sxx, Rxx, Zxx, Txx, Vxx, D-330; Axy, Pxy, Dxx,
-//       Cxx, Bxy, Nxy, Exx, Oxx, Fxx, D-338: a step can hold one of each), letter × 256 + xx (ymengine::seqCmd,
-//       D-150); 0 = none. The letter counts as its index in ymengine::kSeqCmdLetters (1 = X to 21 = Q), not as
-//       its character code. Xyz and Pxy are retired (D-340, D-344: their rows stay empty); Vxx, Txx, Exx, Dxx and
-//       Cxx are edited in rows of their own (VIB, BPM, ENV, DLY, CUT; D-341, D-342, D-347 to D-349), Gxx with VOL
-//       (D-393), Kxx and Qxx with the Bxy and Nxy of the Commands box (D-394)
+//   ins (INS) 0 = the track's sound, 1-32 = project instrument
+//   cmd (CMD) effect commands of the line, one row per kind (Xyz, Sxx, Rxx, Zxx, Txx, Vxx; Axy, Pxy, Dxx,
+//       Cxx, Bxy, Nxy, Exx, Oxx, Fxx, a step can hold one of each), letter × 256 + xx (ymengine::seqCmd);
+//       0 = none. The letter counts as its index in ymengine::kSeqCmdLetters (1 = X to 21 = Q), not as
+//       its character code. Xyz and Pxy are retired (their rows stay empty); Vxx, Txx, Exx, Dxx and
+//       Cxx are edited in rows of their own (VIB, BPM, ENV, DLY, CUT), Gxx with VOL,
+//       Kxx and Qxx with the Bxy and Nxy of the Commands box
 //   pat2-pat6, oct2-oct6, dur2-dur6: chord voices 2 to 6 (duration in steps, 0 = one step)
 // Empty tracks are not stored: a shared track (shared_ptr<const Lane>) is only copied when it is modified, which
 // makes undo snapshots and publishing to the audio thread cheap. The rows are those of ymengine::SeqLane (what the
@@ -41,10 +41,10 @@ inline constexpr int kPanCenter = 101;   // pnr = v·10 + 101
 static_assert(kSteps == ymengine::kSeqSteps && kExtraVoices == ymengine::kSeqChordVoices &&
               kPatterns == ymengine::kSeqPatterns && kTracks == ymengine::kTracks);
 
-// Rows per step (stable identifiers: order of LANEKEYS, then the rows of M6; used by the state and the
+// Rows per step (stable identifiers: order of LANEKEYS, then the later rows; used by the state and the
 // clipboards).
-// The twenty-one CMD rows follow the kinds of ymengine::SeqCmd, Arp to NoiseCurve (D-330, D-338; twelfth DAW test,
-// items 142 to 144; D-393, D-394). Afl, the ARP flags of the prototype, is read from older states and files only, and
+// The twenty-one CMD rows follow the kinds of ymengine::SeqCmd, Arp to NoiseCurve (twelfth DAW test,
+// items 142 to 144). Afl, the ARP flags of the prototype, is read from older states and files only, and
 // turned into Jxx (migrateArpFlags).
 enum class Row : uint8_t {
     Pat, Tie, Slide, Afl, Vol, Mix, Slt, Cut, Fx, Oct, Gat, Pnr, Rtg, Cnd, Slc, Ton, Ins,
@@ -63,10 +63,9 @@ inline constexpr ymengine::SeqCmd cmdKind(Row r) noexcept {
 static_assert(int(Row::CmdNoiseCurve) - int(Row::CmdArp) + 1 == ymengine::kSeqCmdKinds &&
               int(Row::CmdNoiseCurve) + 1 == kRowCount);
 // The CMD row on screen: the kinds of the Commands box together, Row::CmdArp (retired) standing for them in the block
-// and row operations; the rows of Vxx, Txx, Exx, Dxx and Cxx are rows of their own (VIB, BPM, ENV, DLY, CUT; D-341,
-// D-342, D-347 to D-349).
+// and row operations; the rows of Vxx, Txx, Exx, Dxx and Cxx are rows of their own (VIB, BPM, ENV, DLY, CUT).
 inline constexpr bool isCmdBoxRow(Row r) noexcept { return isCmdRow(r) && !ymengine::seqCmdOwnRow(cmdKind(r)); }
-// The ENV row shows Exx and Rxx (twelfth DAW test, item 146), the VOL row the volume and its Gxx (D-393): their block
+// The ENV row shows Exx and Rxx (twelfth DAW test, item 146), the VOL row the volume and its Gxx: their block
 // and row operations carry the two.
 inline constexpr Row rowPartner(Row r) noexcept {
     return r == Row::CmdShape ? Row::CmdRetrig : r == Row::Vol ? Row::CmdVolGlide : r;
@@ -80,8 +79,8 @@ struct Lane : ymengine::SeqLane {
     bool operator==(const Lane&) const = default;
 
     // Value of a row (pat, oct and ton signed; cmd from 0 to ymengine::kSeqCmdMax; the others from 0 to 255) and its
-    // empty value. A command written in a CMD row goes to the row of its kind (a command read from a state or a file
-    // made before D-330, when one row held every kind); 0 or a command of kind None empties the row.
+    // empty value. A command written in a CMD row goes to the row of its kind (a command read from an older state or
+    // file, when one row held every kind); 0 or a command of kind None empties the row.
     int get(Row r, int s) const noexcept;
     void set(Row r, int s, int v) noexcept;
     static int emptyValue(Row r) noexcept { return r == Row::Pat ? -1 : r == Row::Vol ? 15 : 0; }
@@ -129,7 +128,7 @@ struct Pattern {
 // Turns the ARP flags of a track (Afl, armed step by step before the twelfth DAW test, item 144) into Jxx switches: J01
 // where a run of flags starts, J00 at the step after it and at step 0 when it is not flagged, so that each loop starts
 // as before. Such a J00 waits for the end of a note tied from the run or from the end of the loop, whose arpeggio the
-// flags left running (J00 stops it, D-379). The flags are emptied. False if there was none.
+// flags left running (J00 stops it). The flags are emptied. False if there was none.
 bool migrateArpFlags(ymengine::SeqLane& l);
 // The other way, for the files of the prototype: the track with its Jxx written as ARP flags when the flags give them
 // back exactly (migrateArpFlags), so that the prototype plays them; otherwise the track as it is.

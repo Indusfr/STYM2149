@@ -28,7 +28,7 @@ struct EuclidFigure {
 EuclidFigure euclidFigure(int steps, int pulses, int rotate, int accents);
 
 // What the generator writes: a pitch (melodic track), an instrument (Chipdrum) or a slot (Digidrum, 0 = the track's
-// own, EditContext::digidrumSlot; 1-8 = slot). D-103: the slot becomes the row played (the prototype wrote row 0 and
+// own, EditContext::digidrumSlot; 1-8 = slot). the slot becomes the row played (the prototype wrote row 0 and
 // the slot in SLT, which playback ignores); SLT is still written as in the prototype.
 enum class EuclidTarget { Melodic, Chipdrum, Digidrum };
 

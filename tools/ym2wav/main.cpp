@@ -169,7 +169,7 @@ int main(int argc, char** argv) {
                 ym.author.c_str());
     std::printf("%llu samples at %u Hz, latency %u, clipped: %llu\n", (unsigned long long)total, rc.hostRate,
                 renderer.latencySamples(), (unsigned long long)clipped);
-    std::printf("timer effects: %llu frames, %llu interrupts, %llu Sinus-SID frames not played (D-045)\n",
+    std::printf("timer effects: %llu frames, %llu interrupts, %llu Sinus-SID frames not played\n",
                 (unsigned long long)player.effectFrames(), (unsigned long long)player.timerInterrupts(),
                 (unsigned long long)player.ignoredEffectFrames());
     return 0;

@@ -18,7 +18,7 @@
 
 namespace stym::ymcore {
 
-// From the chip (clk/8) to the host rate (D-014). The board filters are in BoardConfig.
+// From the chip (clk/8) to the host rate. The board filters are in BoardConfig.
 enum class OutputMode : uint8_t {
     Raw,     // chip output, resampled without aliasing (Kaiser sinc). Default.
     RawBox,  // original decimation of AtariAudio: average of the internal steps of each sample (bit for bit)
@@ -26,10 +26,10 @@ enum class OutputMode : uint8_t {
 };
 
 // Removal of the DC component (the chip output is unipolar), Raw chain only: the ST and STE chains have the
-// high-pass of their output coupling (D-047).
+// high-pass of their output coupling.
 enum class DcFilter : uint8_t {
     None,
-    MovingAverage,  // moving average over 2 048 output samples, like AtariAudio dcAdjust (D-035)
+    MovingAverage,  // moving average over 2 048 output samples, like AtariAudio dcAdjust
 };
 
 // Everything prepare() needs. Changing a field means a new prepare() (allocation), except the STE bass and treble
@@ -95,7 +95,7 @@ private:
             nextDueTick_ = queue_.empty() ? UINT64_MAX : dueTick(queue_.front().cycle);
         }
     }
-    // First internal step k with 8k >= cycle (D-037).
+    // First internal step k with 8k >= cycle.
     static uint64_t dueTick(uint64_t cycle) noexcept { return (cycle + 7) >> 3; }
     // DC removal: integer version of the RawBox and Retro modes (AtariAudio's), floating-point version of Raw.
     int16_t dcAdjust(int16_t v) noexcept;
@@ -127,7 +127,7 @@ private:
     uint32_t dcPos_ = 0;
     int32_t dcSum_ = 0;
     int64_t dcSumFixed_ = 0;
-    // ST and STE chains (D-047): C10 at the internal step, the rest at the host rate.
+    // ST and STE chains: C10 at the internal step, the rest at the host rate.
     AsymmetricRc c10_;
     FirstOrder highPass_, bass_, treble_;
 };

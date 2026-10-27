@@ -1,4 +1,4 @@
-// STYM2149 — Instruments window and INS row of the Step Sequencer (M6, B1, D-147): opening (Edit menu, Ctrl+T, menu
+// STYM2149 — Instruments window and INS row of the Step Sequencer: opening (Edit menu, Ctrl+T, menu
 // of the INS row), storing a track's sound, loading into the focused track (one undo step), menu of a slot (Rename,
 // Save to Patches, Load from Patches, Clear), INS row and its menu, session.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
@@ -151,7 +151,7 @@ TEST_CASE("Instruments: Edit menu, Ctrl+T, empty slots", "[ui][instruments]") {
     CHECK_FALSE(w.rectOf("insWin"));
 
     // Edit menu: first entry below the rule added after those of the prototype (Samples follows it since Sequences
-    // went into the Modulation window, D-241).
+    // went into the Modulation window).
     w.openMenu(2);
     const std::vector<std::string> edit = labels(w);
     const size_t at = size_t(std::find(edit.begin(), edit.end(), "Instruments") - edit.begin());
@@ -307,8 +307,7 @@ TEST_CASE("INS row: visible with an instrument, step menu, percussion", "[ui][in
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
-    // Without an instrument: no INS row; GEN starts the rows of the sound, under TUN (thirteenth DAW test, item 166,
-    // D-375).
+    // Without an instrument: no INS row; GEN starts the rows of the sound, under TUN (thirteenth DAW test, item 166).
     CHECK(g.laneRect(0, SeqLane::Ins).w == 0);
     const gemui::Rect first = g.laneRect(0, SeqLane::Fx);
 

@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: sample of the STE DMA track (M6, B8, D-153)
+// STYM2149 — plugincore: sample of the STE DMA track
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/DmaSample.h"

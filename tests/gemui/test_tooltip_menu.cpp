@@ -1,6 +1,6 @@
-// STYM2149 — Tooltips and their language, in the Settings window since D-430 (Options > Tooltips before, its Language
-// submenu after a separator, sixth DAW test, item 67, D-265): English, built in, then the languages of the PO files,
-// installed or the user's (seventh DAW test, item 82, D-283), and the Languages folder button.
+// STYM2149 — Tooltips and their language, in the Settings window (Options > Tooltips before, its Language
+// submenu after a separator, sixth DAW test, item 67): English, built in, then the languages of the PO files,
+// installed or the user's (seventh DAW test, item 82), and the Languages folder button.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -17,7 +17,7 @@
 using namespace stym;
 using namespace stym::ui_testing;
 
-TEST_CASE("Settings: Tooltips On or Off, then their Language, out of the Options menu (D-265, D-430)", "[ui][tips]") {
+TEST_CASE("Settings: Tooltips On or Off, then their Language, out of the Options menu", "[ui][tips]") {
     UiHost h;
     h.languages = gemshot::installedLanguages();
     h.prefs["tipLanguage"] = "de";
@@ -83,7 +83,7 @@ const char* const kDutch = "\xEF\xBB\xBF# Dutch tooltips\r\n"
                            "msgid \"Say \\\"hi\\\"\"\r\n"
                            "msgstr \"Zeg \\\"hoi\\\"\"\r\n";
 
-// Settings > Language: its menu opened by a click, which reads the language files again (D-283), then closed.
+// Settings > Language: its menu opened by a click, which reads the language files again, then closed.
 struct LanguageMenu {
     std::vector<std::string> labels;
     int checked;
@@ -114,7 +114,7 @@ pluginui::TipFile installed(const std::string& name) {
 
 }  // namespace
 
-TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines, escapes and fuzzy entries (D-283)",
+TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines, escapes and fuzzy entries",
           "[ui][tips]") {
     using pluginui::parseTipFile;
     const auto nl = parseTipFile(kDutch, "whatever");
@@ -150,8 +150,7 @@ TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines,
     CHECK(pluginui::TipBook().translate("Track 3") == "Track 3");  // English: nothing to translate
 }
 
-TEST_CASE("Tooltip language files: the five installed languages hold every English line, the template none "
-          "(D-283)",
+TEST_CASE("Tooltip language files: the five installed languages hold every English line, the template none ",
           "[ui][tips]") {
     // The PO files of languages/: one entry per line of the catalogue, in its order, each translated.
     const std::vector<std::pair<std::string, std::string>> expected{
@@ -189,7 +188,7 @@ TEST_CASE("Tooltip language files: the five installed languages hold every Engli
 }
 
 TEST_CASE("Settings > Language: English alone without files; the installed languages, the user's files over them, "
-          "the folder opened (D-283, D-430)",
+          "the folder opened",
           "[ui][tips]") {
     {
         // No language file (the plugin not installed): English, and nothing to translate.
@@ -241,7 +240,7 @@ TEST_CASE("Settings > Language: English alone without files; the installed langu
     CHECK(h.folderFiles[1].name == "template.pot");
 }
 
-TEST_CASE("Settings > Language: a chosen language kept, a regional system language (D-185, D-283, D-430)",
+TEST_CASE("Settings > Language: a chosen language kept, a regional system language",
           "[ui][tips]") {
     {
         UiHost h;
@@ -276,8 +275,7 @@ TEST_CASE("Settings > Language: a chosen language kept, a regional system langua
     }
 }
 
-TEST_CASE("Tooltip languages: the ADSR tips name each setting in English in parentheses (ninth DAW test, item 106, "
-          "D-307)",
+TEST_CASE("Tooltip languages: the ADSR tips name each setting in English in parentheses (ninth DAW test, item 106)",
           "[ui][tips]") {
     // The sliders show A, D, S and R only: a translated tip names the setting in its language, then in English.
     const std::pair<const char*, const char*> tips[] = {

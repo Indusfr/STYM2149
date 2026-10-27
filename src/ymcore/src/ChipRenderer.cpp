@@ -85,7 +85,7 @@ uint64_t ChipRenderer::cycleAtSample(uint64_t sample) const noexcept {
 }
 
 // Subtracts the mean of the last 2 048 outputs (this one included) from the output; the sum is kept up to date by
-// removing the value that leaves the ring and adding the one that enters it (D-035).
+// removing the value that leaves the ring and adding the one that enters it.
 int16_t ChipRenderer::dcAdjust(int16_t v) noexcept {
     dcSum_ -= dcBuf_[dcPos_];
     dcSum_ += v;
@@ -112,7 +112,7 @@ void ChipRenderer::render(float* out, uint32_t n, uint16_t* levels) noexcept {
     switch (config_.mode) {
     case OutputMode::Raw:
         // Runs the chip as far as the resampler needs for its next output (the writes are applied just before the
-        // step they are due at), then pulls that output. The board chains replace the DC filter (D-047).
+        // step they are due at), then pulls that output. The board chains replace the DC filter.
         for (uint32_t i = 0; i < n; ++i) {
             const uint64_t need = resampler_.inputNeeded();
             while (ticks_ < need) {

@@ -1,4 +1,4 @@
-// STYM2149 — pluginui tests: SHORTCUTS help window (M8, D-189)
+// STYM2149 — pluginui tests: SHORTCUTS help window
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -106,7 +106,7 @@ TEST_CASE("Help window: ^/ and ^? open it, Esc and its close box close it", "[ui
     CHECK_FALSE(help.isOpen());
 }
 
-TEST_CASE("Tab: the open windows come to the front in turn, Shift+Tab sends the front one back (D-389)",
+TEST_CASE("Tab: the open windows come to the front in turn, Shift+Tab sends the front one back",
           "[ui][help]") {
     FileHost h;
     MainWindow w(h);
@@ -173,7 +173,7 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
                                             "Transport and edit", "Writing notes", "Sequencer rows",
                                             "Sequencer view", "Song window",    "Mouse"};
     // Rows of the prototype's HELP; STYM2149 adds one row at the end of Writing notes, and ^D leaves File (the demo
-    // pattern) for the end of Generator (the DMA generator, D-301).
+    // pattern) for the end of Generator (the DMA generator).
     const std::vector<size_t> rows = {8, 6, 2, 8, 9, 7, 6, 8, 9};
     for (size_t i = 0; i < proto.size(); ++i) {
         CAPTURE(i);
@@ -185,9 +185,9 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
     CHECK(sections[1].rows.back().text == "DMA (STE)");
     CHECK(sections[9].title == "More keys");
     CHECK(sections[9].rows.front().key == "^T");
-    CHECK(sections[9].rows[1].key == "^F");  // Effects (D-313)
+    CHECK(sections[9].rows[1].key == "^F");  // Effects
     CHECK(sections[9].rows[1].text == "Effects");
-    CHECK(sections[9].rows.back().key == "^N");  // File > New (D-225)
+    CHECK(sections[9].rows.back().key == "^N");  // File > New
 
     FileHost h;
     MainWindow w(h);
@@ -198,9 +198,9 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
     CHECK(headings(l) == titles);
     // Positions measured in Chromium 141 with the same list (scrollHeight 2182, 522 px wide inside the scroll bar):
     // heading tops, first column 160 px or the longest key plus 10 px, second column wrapped at spaces. The row of
-    // File > New, added since at the end of More keys (D-225), adds one 18 px row; ^L Sequences, gone with its window
-    // (D-241), takes one away; ^D, moved from File to Generator (D-301), moves the heading of File down one row; ^F
-    // Effects (D-313) adds one, Tab (D-389) one more.
+    // File > New, added since at the end of More keys, adds one 18 px row; ^L Sequences, gone with its window,
+    // takes one away; ^D, moved from File to Generator, moves the heading of File down one row; ^F
+    // Effects adds one, Tab one more.
     CHECK(l.width == 522);
     CHECK(l.height == 2182 + 18 - 18 + 18 + 18);
     std::vector<double> tops;

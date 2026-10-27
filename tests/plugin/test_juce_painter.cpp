@@ -1,4 +1,4 @@
-// STYM2149 — plugin: GEM drawing with juce::Graphics at the screen's resolution (D-201)
+// STYM2149 — plugin: GEM drawing with juce::Graphics at the screen's resolution
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -53,7 +53,7 @@ uint32_t argb(const juce::Image& image, int x, int y) { return image.getPixelAt(
 
 }  // namespace
 
-TEST_CASE("JucePainter: at a whole scale, the framebuffer in blocks of d × d screen pixels (D-201)", "[jucepainter]") {
+TEST_CASE("JucePainter: at a whole scale, the framebuffer in blocks of d × d screen pixels", "[jucepainter]") {
     gemui::Surface s(kW, kH, colors::kBlack);
     gemui::Painter fb(s);
     scene(fb);
@@ -141,8 +141,7 @@ TEST_CASE("JucePainter: at 1.25 and 0.625, every occurrence of a glyph alike, bo
     }
 }
 
-TEST_CASE("JucePainter: sharp pixels, letters and icons without anti-aliasing at any scale (tenth DAW test, item 123, "
-          "D-331)",
+TEST_CASE("JucePainter: sharp pixels, letters and icons without anti-aliasing at any scale (tenth DAW test, item 123)",
           "[jucepainter]") {
     static const uint8_t bits[] = {0x18, 0x3C, 0x7E, 0xFF};
     for (const double d : {1.25, 0.625, 1.75}) {
@@ -187,7 +186,7 @@ TEST_CASE("JucePainter: sharp pixels, letters and icons without anti-aliasing at
 }
 
 TEST_CASE("JucePainter: the Atari logo, its pixels at 1, its outline filled at other scales, without anti-aliasing "
-          "in sharp pixels (24/10/2026, D-404)",
+          "in sharp pixels (24/10/2026)",
           "[jucepainter]") {
     const gemui::Bitmap& f = pluginui::icons::kFuji;
     REQUIRE(f.outline);
@@ -235,7 +234,7 @@ TEST_CASE("JucePainter: the Atari logo, its pixels at 1, its outline filled at o
                 CHECK(differ == 0);
                 CHECK(grey == 0);
             } else if (sharp) {
-                // Sharp pixels (D-331): black or white, black where the pixel's centre lies inside.
+                // Sharp pixels: black or white, black where the pixel's centre lies inside.
                 CHECK(grey == 0);
                 CHECK(centres == 0);
             } else {
@@ -267,7 +266,7 @@ TEST_CASE("JucePainter: nothing written outside the limit", "[jucepainter]") {
     CHECK_FALSE(outside);
 }
 
-TEST_CASE("JucePainter: an oblique line is smoothed at any scale, a straight one stays in pixels (D-214)",
+TEST_CASE("JucePainter: an oblique line is smoothed at any scale, a straight one stays in pixels",
           "[jucepainter]") {
     for (const double d : {1.0, 1.25, 2.0}) {
         INFO("d = " << d);
