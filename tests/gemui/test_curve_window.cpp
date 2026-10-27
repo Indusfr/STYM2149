@@ -77,13 +77,13 @@ void click(MainWindow& w, const std::string& id) {
 }
 
 // Entry `index` of the curve menu opened below cell `cell`: 13 entries of 20 px and 4 separators of 8 px (before
-// entries 4, 7, 9 and 12) inside a 2 px border, 6 px below the cell, or above if it does not fit.
+// entries 4, 7, 9 and 12) inside a 2 px border on the cell's bottom rule, or above it if it does not fit (D-396).
 void pickCurve(MainWindow& w, const gemui::Rect& cell, int index) {
     REQUIRE(w.desktop().hasPopups());
     constexpr std::array<int, 4> seps = {4, 7, 9, 12};
     const int h = 4 + 13 * 20 + 4 * 8;
-    int top = cell.bottom() + 6;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, cell.y - h - 2);
+    int top = cell.bottom() - 2;
+    if (top + h > MainWindow::kHeight - 4) top = std::max(4, cell.y - h + 2);
     int y = top + 2;
     for (int k = 0; k < index; ++k) y += 20;
     for (int s : seps)
@@ -119,6 +119,8 @@ TEST_CASE("Slide Curve: the Custom entry of the CRV row opens the window; Escape
     CHECK_FALSE(w.slideCurve().isOpen());
     CHECK_FALSE(w.rectOf("curveWin"));
 
+    h.editExtras([](plugin::NonParamState& s) { s.seq.cur().edit(0).slide[0] = 1; });  // the CRV row (D-387)
+    w.tick(0);
     w.sequencer().show();
     const gemui::Rect cell = w.sequencer().grid().laneRect(0, SeqLane::Slc);
     REQUIRE(cell.w > 0);

@@ -18,10 +18,11 @@ namespace {
 enum QType : uint8_t {
     qNoteOn, qNoteOff, qBend, qWheel, qAllOff, qManOff, qClock, qStart, qContinue, qStop, qSongPos,
     qSeqPlay, qSeqStop, qSeqSelect, qSeqPreview, qSeqSongJump, qDrumPreview,
-    qDmaPreview,   // preview of a DMA slot (D-153)
-    qDigiPreview,  // preview of a Digidrum slot (D-154)
+    qDmaPreview,   // preview of a DMA slot (D-153); value 1: stop it (D-449)
+    qDigiPreview,  // preview of a Digidrum slot (D-154); value 1: stop it (D-449)
     qProgram,      // Program Change (D-156)
-    qYmPlay        // start of the YM Player (ymplay): manual play and sequencer released
+    qYmPlay,       // start of the YM Player (ymplay): manual play and sequencer released
+    qPressure, qNotePressure, qMpeBend, qMpePressure, qMpeSlide  // MIDI expression (D-432)
 };
 
 // Key on 29 bits: clock, chain and resampling on 2 bits each, then the frequency of the Custom clock on 23 bits
@@ -52,7 +53,11 @@ bool isMixField(int f) noexcept {
     case Track::Pan:
     case Track::Mute:
     case Track::Solo:
-    case Track::Send: return true;
+    case Track::Send:
+    case Track::LevelR:
+    case Track::MuteR:
+    case Track::SoloR:
+    case Track::Link: return true;
     default: return false;
     }
 }
@@ -66,12 +71,17 @@ bool isEngineGlobal(int g) noexcept {
     case Global::Resampling:
     case Global::SteBass:
     case Global::SteTreble:
-    case Global::BendRange:
-    case Global::WheelDepth:
+    case Global::Mpe:           // MPE: read by the driver (D-432)
+    case Global::MpeBendRange:
     case Global::Gate:  // global gate: carried by the tracks (trackGate)
     case Global::GateAll: return false;
     default: return true;
     }
+}
+
+// MPE (D-432): in 16 ch only, where every note has its own channel of the chip.
+bool mpeOn(const ParamValues& v) noexcept {
+    return value(v, Global::Mpe) >= 0.5f && voiceMode(v) == VoiceMode::Studio16;
 }
 
 // The same outputs from sample `at` of the block on, for a render segment that starts there.
@@ -126,7 +136,7 @@ std::unique_ptr<Driver::EngineSlot> Driver::build(const ConfigKey& key, const Pa
     e.setKit(snap.state.kit);
     for (int i = 0; i < kDigidrumSlots; ++i) {
         e.setUserSample(i, snap.state.digidrums[size_t(i)]);
-        e.setDigidrumSlot(i, snap.state.digiSlots[size_t(i)].play);
+        e.setDigidrumSlot(i, digidrumEngineSlot(snap.state.digiSlots[size_t(i)]));
     }
     e.setDma(snap.state.dma);
     for (int i = 0; i < kDmaSlots; ++i) e.setDmaSample(i, snap.state.dmaSamples[size_t(i)]);
@@ -177,6 +187,7 @@ void Driver::prepare(const Setup& setup, const ParamValues& values, const Snapsh
     fadeLeft_ = 0;
     bend_.fill(0);
     wheel_.fill(0);
+    press_.fill(0);
     program_.fill(0);
     qHead_ = qTail_ = 0;
     appliedValid_ = false;
@@ -342,7 +353,8 @@ void Driver::applySnapshotData() noexcept {
             s.engine.setUserSample(i, snapshot_->state.digidrums[size_t(i)]);
             s.sampleVersion[size_t(i)] = snapshot_->sampleVersion[size_t(i)];
         }
-    for (int i = 0; i < kDigidrumSlots; ++i) s.engine.setDigidrumSlot(i, snapshot_->state.digiSlots[size_t(i)].play);
+    for (int i = 0; i < kDigidrumSlots; ++i)
+        s.engine.setDigidrumSlot(i, digidrumEngineSlot(snapshot_->state.digiSlots[size_t(i)]));
     s.engine.setDma(snapshot_->state.dma);
     for (int i = 0; i < kDmaSlots; ++i)
         if (s.dmaVersion[size_t(i)] != snapshot_->dmaVersion[size_t(i)]) {
@@ -489,12 +501,14 @@ void Driver::carrySequencer(const Engine::SeqStatus& seq) noexcept {
     if (seq.playing) slot_->engine.seqPlay(0);
 }
 
-// A new engine starts from rest: the pitch bend, mod wheel and Program Change received so far are sent to it again.
+// A new engine starts from rest: the pitch bend, mod wheel, channel pressure and Program Change received so far are
+// sent to it again.
 void Driver::replayControllers() noexcept {
     Engine& e = slot_->engine;
     for (int t = 0; t < kTracks; ++t) {
         if (bend_[size_t(t)] != 0) e.pitchBend(0, bend_[size_t(t)], t);
         if (wheel_[size_t(t)] != 0) e.modWheel(0, wheel_[size_t(t)], t);
+        if (press_[size_t(t)] != 0) e.channelPressure(0, press_[size_t(t)], t);
         if (program_[size_t(t)] != 0) e.programChange(0, program_[size_t(t)], t);
     }
 }
@@ -546,10 +560,15 @@ void Driver::renderTo(const Outputs& out, uint32_t to) noexcept {
         const Queued& q = queue_[qHead_++];
         const uint32_t rel = q.at - pos_;
         switch (q.type) {
-        case qNoteOn: e.noteOn(rel, q.a, q.b, q.track); break;
-        case qNoteOff: e.noteOff(rel, q.a, q.track); break;
+        case qNoteOn: e.noteOn(rel, q.a, q.b, q.track, int(q.value)); break;  // value: MPE channel (D-432)
+        case qNoteOff: e.noteOff(rel, q.a, q.track, int(q.value)); break;
         case qBend: e.pitchBend(rel, q.value, q.track); break;
         case qWheel: e.modWheel(rel, q.value, q.track); break;
+        case qPressure: e.channelPressure(rel, q.value, q.track); break;
+        case qNotePressure: e.notePressure(rel, q.a, q.value, q.track); break;
+        case qMpeBend: e.mpeBend(rel, q.a, q.value); break;
+        case qMpePressure: e.mpePressure(rel, q.a, q.value); break;
+        case qMpeSlide: e.mpeSlide(rel, q.a, q.value); break;
         case qAllOff: e.allNotesOff(rel); break;
         case qManOff: e.releaseManual(rel); break;
         case qClock: e.midiClock(rel); break;
@@ -563,8 +582,8 @@ void Driver::renderTo(const Outputs& out, uint32_t to) noexcept {
         case qSeqPreview: e.seqPreview(rel, q.track, q.a, q.value); break;
         case qSeqSongJump: e.seqSongJump(rel, int(q.value)); break;
         case qDrumPreview: e.drumPreview(rel, q.a); break;
-        case qDigiPreview: e.digidrumPreview(rel, q.a); break;
-        case qDmaPreview: e.dmaPreview(rel, q.a); break;
+        case qDigiPreview: q.value > 0 ? e.digidrumStopPreview(rel) : e.digidrumPreview(rel, q.a); break;
+        case qDmaPreview: q.value > 0 ? e.dmaStopPreview(rel) : e.dmaPreview(rel, q.a); break;
         case qProgram: e.programChange(rel, q.a, q.track); break;
         case qYmPlay: e.releaseForPlayer(rel); break;
         default: break;
@@ -606,14 +625,14 @@ void Driver::setParam(ParamValues& values, int index, float v, ParamListener* li
 // sample `at` (render cut there). True when a parameter changed.
 bool Driver::controlChange(ParamValues& values, int cc, int v, int channel, uint32_t at, const Outputs& out,
                            ParamListener* listener) noexcept {
-    const bool perChannel = midiRouting(values) == MidiRouting::PerChannel;
+    const bool perChannel = midiRouting(values) == MidiRouting::PerChannel && !mpeOn(values);
     const int track = perChannel ? channel : -1;
     switch (cc) {
-    case 1: {  // mod wheel: vibrato (D-061)
-        const double cents = double(v) / 127.0 * double(value(values, Global::WheelDepth));
-        queue(at, qWheel, track, 0, 0, cents);
+    case 1: {  // mod wheel: vibrato (D-061) or the Wheel target (D-432)
+        const double amount = double(v) / 127.0;
+        queue(at, qWheel, track, 0, 0, amount);
         for (int t = 0; t < kTracks; ++t)
-            if (track < 0 || t == track) wheel_[size_t(t)] = cents;
+            if (track < 0 || t == track) wheel_[size_t(t)] = amount;
         return false;
     }
     case 120:
@@ -622,8 +641,9 @@ bool Driver::controlChange(ParamValues& values, int cc, int v, int channel, uint
     case 121:
         queue(at, qBend, track, 0, 0, 0);
         queue(at, qWheel, track, 0, 0, 0);
+        queue(at, qPressure, track, 0, 0, 0);
         for (int t = 0; t < kTracks; ++t)
-            if (track < 0 || t == track) bend_[size_t(t)] = wheel_[size_t(t)] = 0;
+            if (track < 0 || t == track) bend_[size_t(t)] = wheel_[size_t(t)] = press_[size_t(t)] = 0;
         return false;
     default: break;
     }
@@ -683,8 +703,12 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
         return;
     case UiCommand::SeqSongJump: queue(at, qSeqSongJump, -1, 0, 0, double(e.data[0] | e.data[1] << 8)); return;
     case UiCommand::DrumPreview: queue(at, qDrumPreview, -1, std::min<int>(e.data[0], kDrumSlots - 1), 0, 0); return;
-    case UiCommand::DmaPreview: queue(at, qDmaPreview, -1, std::min<int>(e.data[0], kDmaSlots - 1), 0, 0); return;
-    case UiCommand::DigiPreview: queue(at, qDigiPreview, -1, std::min<int>(e.data[0], kDigidrumSlots - 1), 0, 0); return;
+    case UiCommand::DmaPreview:
+        queue(at, qDmaPreview, -1, std::min<int>(e.data[0], kDmaSlots - 1), 0, e.data[1] ? 1 : 0);
+        return;
+    case UiCommand::DigiPreview:
+        queue(at, qDigiPreview, -1, std::min<int>(e.data[0], kDigidrumSlots - 1), 0, e.data[1] ? 1 : 0);
+        return;
     }
     if (e.size == 0) return;
     const uint8_t st = e.data[0];
@@ -703,7 +727,12 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     const int ch = st & 0x0f;
     const int d1 = e.size > 1 ? e.data[1] & 0x7f : 0;
     const int d2 = e.size > 2 ? e.data[2] & 0x7f : 0;
-    const int track = !e.screen && midiRouting(values) == MidiRouting::PerChannel ? ch : -1;
+    // MPE (D-432): channels 2 to 16 (members) play a note each, with its own bend, pressure and CC74; channel 1 (the
+    // master) and the other messages act on all the notes. The notes go where the keyboard plays (focused track or
+    // Layer), per channel routing aside.
+    const bool mpe = !e.screen && mpeOn(values);
+    const int member = mpe ? ch : 0;
+    const int track = !e.screen && !mpe && midiRouting(values) == MidiRouting::PerChannel ? ch : -1;
     if (e.screen && (st & 0xf0) == 0xb0) {
         if (d1 == 120) queue(at, qManOff, -1, 0, 0, 0);
         else if (d1 == 123) queue(at, qAllOff, -1, 0, 0, 0);
@@ -713,19 +742,25 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     case 0x90:
         if (e.size < 3) return;
         if (d2 == 0) {
-            queue(at, qNoteOff, track, d1, 0, 0);
+            queue(at, qNoteOff, track, d1, 0, member);
         } else if (action_ == Action::None) {  // during a transition fade, the notes are ignored
-            queue(at, qNoteOn, track, d1, d2, 0);
+            queue(at, qNoteOn, track, d1, d2, member);
         }
         return;
     case 0x80:
         if (e.size < 3) return;
-        queue(at, qNoteOff, track, d1, 0, 0);
+        queue(at, qNoteOff, track, d1, 0, member);
         return;
     case 0xe0: {
-        // Pitch bend: 14 bits (LSB first) centred on 8192, ± Bend Range semitones; kept for a new engine.
+        // Pitch bend: 14 bits (LSB first) centred on 8192, ± Bend Range semitones; kept for a new engine. That of an
+        // MPE member, ± MPE Bend Range, bends its notes.
         if (e.size < 3) return;
-        const double semis = double((d2 << 7 | d1) - 8192) / 8192.0 * double(value(values, Global::BendRange));
+        const double bent = double((d2 << 7 | d1) - 8192) / 8192.0;
+        if (member) {
+            queue(at, qMpeBend, -1, member, 0, bent * double(value(values, Global::MpeBendRange)));
+            return;
+        }
+        const double semis = bent * double(value(values, Global::BendRange));
         queue(at, qBend, track, 0, 0, semis);
         for (int t = 0; t < kTracks; ++t)
             if (track < 0 || t == track) bend_[size_t(t)] = semis;
@@ -733,7 +768,34 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     }
     case 0xb0:
         if (e.size < 3) return;
+        if (member && d1 == 74) {  // slide of the notes of a member
+            queue(at, qMpeSlide, -1, member, 0, double(d2) / 127.0);
+            return;
+        }
+        if (member && d1 == 121) {  // Reset All Controllers of a member: its bend, pressure and slide
+            queue(at, qMpeBend, -1, member, 0, 0);
+            queue(at, qMpePressure, -1, member, 0, 0);
+            queue(at, qMpeSlide, -1, member, 0, 0.5);
+            return;
+        }
         controlChange(values, d1, d2, ch, at, out, listener);
+        return;
+    case 0xd0: {
+        // Channel pressure (D-432): that of the tracks, kept for a new engine; that of an MPE member, of its notes.
+        if (e.size < 2) return;
+        const double amount = double(d1) / 127.0;
+        if (member) {
+            queue(at, qMpePressure, -1, member, 0, amount);
+            return;
+        }
+        queue(at, qPressure, track, 0, 0, amount);
+        for (int t = 0; t < kTracks; ++t)
+            if (track < 0 || t == track) press_[size_t(t)] = amount;
+        return;
+    }
+    case 0xa0:  // polyphonic pressure (D-432): of one note (an MPE member has its channel pressure)
+        if (e.size < 3 || member) return;
+        queue(at, qNotePressure, track, d1, 0, double(d2) / 127.0);
         return;
     case 0xc0: {
         // Program Change n (D-156): instrument n (1 to 32) on the channel's track (per-channel routing), the focused
@@ -748,8 +810,7 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
             if (to < 0 || t == to) program_[size_t(t)] = uint8_t(d1);
         return;
     }
-    default:  // pressure: ignored
-        return;
+    default: return;
     }
 }
 

@@ -261,6 +261,10 @@ int main() {
                         g.irqJitterCpuCycles = tm == ymengine::TimerMode::Mfp ? 16 : 0;
                         g.arpClock = pass % 4 == 3 ? ymengine::ArpClock::MidiClock : ymengine::ArpClock::Hz;
                         g.velocity = ymengine::VelocityMode(pass % 3);
+                        g.bendTarget = ymengine::BendTarget(pass % 3);  // MIDI expression (D-432)
+                        g.wheelTarget = ymengine::ExpressTarget(pass % 5);
+                        g.aftertouch = ymengine::ExpressTarget((pass + 2) % 5);
+                        g.mpeSlide = ymengine::SlideTarget(pass % 3);
                         e.setGlobal(g);
                         ++pass;
                         for (int b = 0; b < 200; ++b) {
@@ -269,11 +273,16 @@ int main() {
                                 const uint32_t off = next() % n;
                                 const int note = 36 + int(next() % 48);
                                 const int track = (k & 1) ? int(next() % 17) - 1 : -1;  // -1: keyboard playing
-                                if (next() % 3) e.noteOn(off, note, 1 + int(next() % 127), track);
-                                else e.noteOff(off, note, track);
+                                const int ch = int(next() % 4);  // MPE member channel (0: none)
+                                if (next() % 3) e.noteOn(off, note, 1 + int(next() % 127), track, ch);
+                                else e.noteOff(off, note, track, ch);
                             }
                             if (b % 7 == 0) e.pitchBend(next() % n, double(int(next() % 9) - 4) * 0.5, int(next() % 17) - 1);
-                            if (b % 9 == 0) e.modWheel(next() % n, double(next() % 200), int(next() % 17) - 1);
+                            if (b % 9 == 0) e.modWheel(next() % n, double(next() % 128) / 127, int(next() % 17) - 1);
+                            if (b % 19 == 0)
+                                e.channelPressure(next() % n, double(next() % 128) / 127, int(next() % 17) - 1);
+                            if (b % 23 == 0) e.mpeBend(next() % n, int(next() % 16), double(int(next() % 97) - 48));
+                            if (b % 29 == 0) e.mpeSlide(next() % n, int(next() % 16), double(next() % 128) / 127);
                             if (b % 17 == 0) e.setBoardTone(int(next() % 25) - 12, int(next() % 25) - 12);
                             if (b % 11 == 0) e.setTrackMix(next() % n, int(next() % 16), tracks[next() % 16].mix);
                             if (b % 13 == 0) e.midiClock(next() % n);

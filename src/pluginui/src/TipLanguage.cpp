@@ -362,9 +362,9 @@ std::vector<std::pair<std::string, std::string>> tipFolderFiles(std::string_view
     std::string readme =
         "STYM2149 tooltip languages (D-283)\n"
         "\n"
-        "Each .po file of this folder adds a language to Options > Tooltips > Language, or\n"
-        "corrects one of those installed with STYM2149. English is built in. The menu reads the\n"
-        "folder each time it opens.\n"
+        "Each .po file of this folder adds a language to the Language menu of Options > Settings,\n"
+        "or corrects one of those installed with STYM2149. English is built in. The menu reads\n"
+        "the folder each time it opens.\n"
         "\n"
         "The languages installed with STYM2149 (French, German, Spanish, Portuguese, Italian) are\n"
         "PO files of the same kind, in a folder of the computer";

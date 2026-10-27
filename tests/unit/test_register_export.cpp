@@ -214,6 +214,26 @@ TEST_CASE("Register exports: files and alert notes", "[regexport]") {
     CHECK_FALSE(none->error.empty());
 }
 
+// A Digidrum plays from Start to End (D-443): the YM6 carries that part, which its player plays from the beginning.
+TEST_CASE("Register exports: a Digidrum carries the part from Start to End (D-443)", "[regexport][digidrum]") {
+    Project pr;
+    param(pr.v, 3, Track::On) = 1;  // Digidrum track of the chip
+    note(pr.x.seq.cur().edit(3), 0, 60);
+    std::vector<uint8_t> drum(400);
+    for (size_t i = 0; i < drum.size(); ++i) drum[i] = uint8_t(i % 16);
+    for (size_t k = 0; k < pr.x.digidrums.size(); ++k) {
+        pr.x.digidrums[k] = drum;
+        pr.x.digiSlots[k].play.start = 100;
+        pr.x.digiSlots[k].play.end = 300;
+    }
+    const auto ym6 = exportSongRegisters(RegisterFormat::Ym6, pr.v, pr.x, RegisterFileOptions{});
+    REQUIRE(ym6);
+    const ymio::YmParseResult y = ymio::parseYm(ym6->bytes);
+    REQUIRE(y.file);
+    REQUIRE_FALSE(y.file->digidrums.empty());
+    CHECK(y.file->digidrums[0] == std::vector<uint8_t>(drum.begin() + 100, drum.begin() + 300));
+}
+
 TEST_CASE("Register exports: recorder take", "[regexport]") {
     Project pr;
     RegisterTake t;

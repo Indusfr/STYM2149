@@ -50,8 +50,8 @@ enum class UiCommand : uint8_t {
     SeqPreview,  // preview of a grid note: data[0] track, data[1] note, data[2] accent (0-127)
     SeqSongJump, // jump to a Song entry: data[0] | data[1] << 8
     DrumPreview, // audition of an instrument of the Chipdrum kit (Audition): data[0] slot (0-7)
-    DmaPreview,  // preview of a slot of the DMA bank (M6, D-153): data[0] slot (0-7)
-    DigiPreview, // preview of a Digidrum slot (editor, M6, D-154): data[0] slot (0-7)
+    DmaPreview,  // preview of a slot of the DMA bank (M6, D-153): data[0] slot (0-7), data[1] 1: stop (D-449)
+    DigiPreview, // preview of a Digidrum slot (editor, M6, D-154): data[0] slot (0-7), data[1] 1: stop (D-449)
 };
 
 // One event of a block, given to process() in time order: a host MIDI message, a note or CC from the editor
@@ -237,7 +237,7 @@ private:
     uint32_t pos_ = 0;                   // start of the current render segment in the block
     ConfigKey wantKey_{};                // configuration wanted by the parameters
     uint32_t requestSerial_ = 0;         // + 1 each time wantKey_ changes (high half of request_)
-    std::array<double, kTracks> bend_{}, wheel_{};  // to replay on a new engine
+    std::array<double, kTracks> bend_{}, wheel_{}, press_{};  // to replay on a new engine
     std::array<uint8_t, kTracks> program_{};        // Program Change of each track (D-156), replayed likewise
     uint64_t swaps_ = 0;
     // Render outside real time in this block, and the value the global settings were last applied with (the

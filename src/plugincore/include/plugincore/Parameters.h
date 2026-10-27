@@ -65,6 +65,15 @@ enum class Global : uint8_t {
     DelayHiCut,     // low-pass of each repeat, 500-20000 Hz
     DelayLevel,     // level of the echoes, 0-100 %
     DelayPingPong,  // echoes alternately left and right (stereo outputs)
+    A4Hz,           // frequency of A4, from which every note is tuned (Tuning A4, D-429)
+    // MIDI expression (D-432): what the bend, the wheel and the aftertouch drive; MPE in 16 ch (lower zone: channel 1
+    // the master, 2 to 16 a note each), with the bend range of its notes and what their CC74 drives.
+    BendTarget,     // Pitch / Volume / Envelope
+    WheelTarget,    // Off / Vibrato / Volume / Envelope / LFO
+    Aftertouch,     // the targets of the wheel, for the channel and polyphonic pressure
+    Mpe,
+    MpeBendRange,   // semitones
+    MpeSlide,       // Volume / Envelope / Vibrato
     Count
 };
 
@@ -80,8 +89,26 @@ enum class Track : uint8_t {
     Gate,  // length of a one-step note, 5-95 % of the step (Gate slider of the prototype, CH[].gate) (M5)
     VibOn,  // vibrato On/Off (sixth DAW test, D-254)
     Send,   // send to the delay, 0-100 %, after the fader and the pan (eighth DAW test, D-299)
+    // Right side of a stereo DMA sample (D-459): its fader (without Link), mute and solo; Link: Level for both sides.
+    LevelR, MuteR, SoloR, Link,
     Count
 };
+
+// Settings of the Mixer alone (pan, mute, solo, send, the right side of a stereo DMA sample): neither in patches nor in
+// the undo step of a channel, not copied with a track. The Level is the track's (patches, Copy).
+constexpr bool mixerOnly(Track f) noexcept {
+    switch (f) {
+    case Track::Pan:
+    case Track::Mute:
+    case Track::Solo:
+    case Track::Send:
+    case Track::LevelR:
+    case Track::MuteR:
+    case Track::SoloR:
+    case Track::Link: return true;
+    default: return false;
+    }
+}
 
 // Custom chip clock (D-237): the YM Player's range (D-169); the default is the 2 MHz entry it replaces.
 inline constexpr int kCustomClockMinHz = 100'000, kCustomClockMaxHz = 8'000'000, kCustomClockDefaultHz = 2'000'000;

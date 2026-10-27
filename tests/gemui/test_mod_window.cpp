@@ -121,8 +121,8 @@ void pick(MainWindow& w, const std::string& anchor, int entries, int index) {
     REQUIRE(r);
     REQUIRE(w.desktop().hasPopups());
     const int h = 4 + 20 * entries;
-    int top = r->bottom() + 6;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h - 2);
+    int top = r->bottom() - 2;
+    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h + 2);
     press(w, {r->x + 20, top + 2 + 20 * index + 10});
     CHECK_FALSE(w.desktop().hasPopups());
 }

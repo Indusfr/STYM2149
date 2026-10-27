@@ -307,17 +307,19 @@ TEST_CASE("INS row: visible with an instrument, step menu, percussion", "[ui][in
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
-    // Without an instrument: no INS row; CMD is the first control row (shown by default, ninth DAW test, item 117).
+    // Without an instrument: no INS row; GEN starts the rows of the sound, under TUN (thirteenth DAW test, item 166,
+    // D-375).
     CHECK(g.laneRect(0, SeqLane::Ins).w == 0);
-    const gemui::Rect first = g.laneRect(0, SeqLane::Cmd);
+    const gemui::Rect first = g.laneRect(0, SeqLane::Fx);
 
     h.editExtras([&](plugin::NonParamState& s) { s.instruments[0] = plugin::captureInstrument("Lead", h.values, s, 0); });
     w.tick(0);
     const gemui::Rect cell = g.laneRect(2, SeqLane::Ins);
     REQUIRE(cell.w > 0);
-    CHECK(cell.y == first.y);  // before CMD and SRC
-    CHECK(g.laneRect(0, SeqLane::Cmd).y > cell.y);
+    CHECK(cell.y == first.y);  // before GEN and SRC
+    CHECK(g.laneRect(0, SeqLane::Fx).y > cell.y);
     CHECK(g.laneRect(0, SeqLane::Mix).y > cell.y);
+    CHECK(g.laneRect(0, SeqLane::Tun).y < cell.y);
 
     // Step menu: Channel (checked), the instrument, Instruments...
     press(w, centre(cell));

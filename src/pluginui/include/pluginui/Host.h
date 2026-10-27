@@ -60,7 +60,8 @@ public:
     // sync), choice of a pattern (a; when stopped at once, when playing at the end of the loop), preview of a grid
     // note (a track, b note, c accent 0-127), jump to a Song entry (a, 0 to 65535), audition of a Chipdrum kit
     // instrument (a slot 0-7, Audition button of the Drum Kit window), preview of a DMA track sample (a slot 0-7, Play
-    // button of the DMA window, M6), preview of a Digidrum slot (a slot 0-7, Play button of the Digidrums editor, M6).
+    // button of the DMA window, M6), preview of a Digidrum slot (a slot 0-7, Play button of the Digidrums editor, M6);
+    // for these two, b 1 stops the preview (D-449).
     enum class SeqCommand : uint8_t { Play, Stop, Select, Preview, SongJump, DrumPreview, DmaPreview, DigiPreview };
     virtual void seqCommand(SeqCommand command, int a = 0, int b = 0, int c = 0) = 0;
 
@@ -145,12 +146,15 @@ public:
     virtual std::vector<TextFile> languageFiles() const { return {}; }
     // Folder of the languages installed with STYM2149, as the read-me of the user's folder names it (empty: unknown).
     virtual std::string installedLanguagesFolder() const { return {}; }
-    // Options > Tooltips > Language > Languages folder: creates the user's folder if needed, writes the given files
+    // Settings > Languages folder: creates the user's folder if needed, writes the given files
     // into it (template, read-me) and shows it in the system's file browser. False if the folder cannot be made.
     virtual bool openLanguagesFolder(const std::vector<TextFile>& /*files*/) { return false; }
-    // Layout of the system keyboard, "qwerty", "azerty" or "qwertz": the one Auto plays and draws in Options >
+    // Layout of the system keyboard, "qwerty", "azerty" or "qwertz": the one Auto plays and draws in Settings >
     // Keyboard layout (D-215).
     virtual std::string keyboardLayout() const { return "qwerty"; }
+    // Settings > Renderer (Windows, D-420): whether the system offers a choice of how the window reaches the screen,
+    // the preference "renderer" being "software" (default) or "direct2d". None on macOS and Linux.
+    virtual bool rendererChoice() const { return false; }
     // Whole project replaced (File > Load > Preset, M7): parameter values and non-automatable state, like a state
     // read back (the current pattern becomes the engine's); the recorder's take is kept. By default: each parameter
     // changed by a gesture, then the non-automatable state replaced.
@@ -198,6 +202,9 @@ public:
     // Digidrum banks (D-154): same principle, a separate file. A host without files (tests) has none.
     virtual std::string digidrumLibrary() const { return {}; }
     virtual void setDigidrumLibrary(const std::string& /*json*/) {}
+    // DMA banks (D-462): same principle, a third file.
+    virtual std::string dmaLibrary() const { return {}; }
+    virtual void setDmaLibrary(const std::string& /*json*/) {}
 };
 
 }  // namespace stym::pluginui

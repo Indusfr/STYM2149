@@ -8,6 +8,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -26,10 +27,22 @@ struct Tile {
     Color at(int x, int y) const noexcept { return px[size_t(y * w + x)]; }
 };
 
-// Monochrome image: rows of (w + 7) / 8 bytes, bit 7 = column 0.
+// Vector outline of a bitmap (24/10/2026, D-404): closed polygons in the bitmap's pixels, filled with the non-zero
+// winding rule.
+struct Outline {
+    std::span<const float> xy;       // x, y of each vertex, polygon after polygon
+    std::span<const uint16_t> ends;  // for each polygon, the index of the vertex after its last
+
+    bool inside(double x, double y) const noexcept;
+};
+
+// Monochrome image: rows of (w + 7) / 8 bytes, bit 7 = column 0. With an outline, the bits are its raster at scale 1
+// (a pixel lit when its centre lies inside), and a painter at another scale may fill the outline instead of enlarging
+// the pixels (the Atari logo of the menu bar, D-404).
 struct Bitmap {
     int w = 0, h = 0;
     const uint8_t* bits = nullptr;
+    const Outline* outline = nullptr;
 
     bool at(int x, int y) const noexcept { return bits[size_t(y * ((w + 7) / 8) + x / 8)] & (0x80 >> (x % 8)); }
 };

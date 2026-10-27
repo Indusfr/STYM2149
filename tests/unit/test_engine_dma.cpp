@@ -166,6 +166,35 @@ TEST_CASE("DMA: STE rates and pitch to the semitone", "[engine][dma]") {
     }
 }
 
+TEST_CASE("DMA: Fine raises the slot by up to 100 cents, notes and preview (Indus, 26/10/2026, D-452)",
+          "[engine][dma]") {
+    for (const double cents : {50.0, -100.0, 500.0}) {
+        CAPTURE(cents);
+        const double c = std::clamp(cents, -100.0, 100.0);  // ±100 cents at most
+        Rig g;
+        g.dmaTrack(0);
+        DmaParams p = params();
+        p.slots[0].cents = cents;
+        g.e.setDma(p);
+        g.e.setDmaSample(0, sine(4096, 32));  // 32 frames per period
+        g.e.noteOn(0, 60, 127, 0);            // the root note
+        g.run(2400);
+        const auto v = g.playing();
+        REQUIRE(v.size() == 1);
+        CHECK(std::fabs(v[0].step - std::pow(2.0, c / 1200)) < 1e-9);
+        g.e.noteOff(0, 60, 0);
+        g.run(480);
+        // The preview plays the slot at its rate, raised the same way.
+        g.e.dmaPreview(0, 0);
+        g.run(2400);
+        g.clear();
+        g.run(12000, true);
+        const double want = ymengine::kDmaRateHz[2] / 32 * std::pow(2.0, c / 1200);
+        CHECK(std::fabs(peakHz(g.outL, want * 0.9, want * 1.1) / want - 1) < 0.005);
+        g.e.dmaStopPreview(0);
+    }
+}
+
 TEST_CASE("DMA: only with the STE machine, whatever the output chain", "[engine][dma]") {
     for (const bool ste : {false, true}) {
         CAPTURE(ste);
@@ -210,6 +239,49 @@ TEST_CASE("DMA: loop, sample played to the end, end of the sample", "[engine][dm
     g.clear();
     g.run(480, true);
     CHECK(rms(g.outL) > 0.01);
+}
+
+TEST_CASE("DMA: Start and End bound the part played, with or without loop (D-444)", "[engine][dma]") {
+    // Frames 200 to 599 of 1 000: the voice starts at Start and stops at End (400 frames at 25 033 Hz ≈ 16 ms).
+    DmaParams p = params(2, false, false);
+    p.slots[0].start = 200;
+    p.slots[0].end = 600;
+    Rig g;
+    g.dmaTrack(0);
+    g.e.setDma(p);
+    g.e.setDmaSample(0, sine(1000, 50));
+    g.e.noteOn(0, 60, 127, 0);
+    g.run(48);
+    REQUIRE(g.playing().size() == 1);
+    CHECK(g.playing()[0].position >= 200);
+    CHECK(g.playing()[0].position < 260);
+    g.run(960);
+    CHECK(g.playing().empty());
+
+    // Looped: from End back to Start while the note is held.
+    p.slots[0].loop = true;
+    g.e.setDma(p);
+    g.e.noteOn(0, 60, 127, 0);
+    for (int k = 0; k < 20; ++k) {
+        g.run(480);
+        CAPTURE(k);
+        REQUIRE(g.playing().size() == 1);
+        CHECK(g.playing()[0].position >= 200);
+        CHECK(g.playing()[0].position < 600);
+    }
+
+    // End 0: to the end of the sample (frame 700 after 20 ms, stopped at 1 000).
+    Rig h;
+    h.dmaTrack(0);
+    p.slots[0] = {2, false, 60, false, 200, 0};
+    h.e.setDma(p);
+    h.e.setDmaSample(0, sine(1000, 50));
+    h.e.noteOn(0, 60, 127, 0);
+    h.run(960);
+    REQUIRE(h.playing().size() == 1);
+    CHECK(h.playing()[0].position > 650);
+    h.run(960);
+    CHECK(h.playing().empty());
 }
 
 TEST_CASE("DMA: slot of the track, or the one of its rank", "[engine][dma]") {
@@ -540,12 +612,12 @@ TEST_CASE("DMA: pitch bend of the track", "[engine][dma]") {
     CHECK(std::fabs(g.playing()[0].step - std::pow(2.0, 2 / 12.0)) < 1e-6);
 }
 
-TEST_CASE("DMA: preview of a slot, whatever the machine", "[engine][dma]") {
+TEST_CASE("DMA: preview of a slot from Start to End, whatever the machine", "[engine][dma]") {
     for (const bool ste : {false, true}) {
         CAPTURE(ste);
         Rig g(VoiceMode::Authentic3, ste);
-        g.e.setDma(params(2, false, true));
-        g.e.setDmaSample(0, sine(2500, 32));  // 0.1 s, loop ignored
+        g.e.setDma(params(2, false, false));
+        g.e.setDmaSample(0, sine(2500, 32));  // 0.1 s, once (Loop off)
         g.e.dmaPreview(0, 0);
         g.run(480, true);
         CHECK(g.e.dmaPreviewSlot() == 0);
@@ -562,5 +634,213 @@ TEST_CASE("DMA: preview of a slot, whatever the machine", "[engine][dma]") {
         g.e.dmaStopPreview(0);
         g.run(48);
         CHECK(g.e.dmaPreviewSlot() == -1);
+        // From Start to End (D-444): 500 frames, 20 ms.
+        DmaParams p = params(2, false, false);
+        p.slots[0].start = 2000;
+        g.e.setDma(p);
+        g.e.dmaPreview(0, 0);
+        g.run(480);
+        CHECK(g.e.dmaPreviewSlot() == 0);
+        g.run(960);
+        CHECK(g.e.dmaPreviewSlot() == -1);
     }
+}
+
+TEST_CASE("DMA: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026, D-449)",
+          "[engine][dma]") {
+    Rig g(VoiceMode::Studio16, true);
+    DmaParams p = params(2, false, true);
+    p.slots[0].start = 2000;  // part of 500 frames, 20 ms
+    g.e.setDma(p);
+    g.e.setDmaSample(0, sine(2500, 32));
+    // Ten times the part later, it still sounds; stopped, it falls silent.
+    g.e.dmaPreview(0, 0);
+    g.run(9600);
+    CHECK(g.e.dmaPreviewSlot() == 0);
+    g.run(480, true);
+    CHECK(rms(g.outL) > 0.01);
+    g.e.dmaStopPreview(0);
+    g.run(48);
+    CHECK(g.e.dmaPreviewSlot() == -1);
+    g.outL.clear();
+    g.run(480, true);
+    CHECK(rms(g.outL) < 1e-6);
+    // Loop switched off while it loops: the preview stops at once.
+    g.e.dmaPreview(0, 0);
+    g.run(4800);
+    REQUIRE(g.e.dmaPreviewSlot() == 0);
+    p.slots[0].loop = false;
+    g.e.setDma(p);
+    g.run(48);
+    CHECK(g.e.dmaPreviewSlot() == -1);
+    // Started with Loop off, it plays once; Loop switched on while it plays makes it loop.
+    g.e.dmaPreview(0, 0);
+    g.run(48);
+    p.slots[0].loop = true;
+    g.e.setDma(p);
+    g.run(9600);
+    CHECK(g.e.dmaPreviewSlot() == 0);
+    g.e.allNotesOff(0);
+    g.run(48);
+    CHECK(g.e.dmaPreviewSlot() == -1);
+}
+
+TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of each side (Indus, 26/10/2026, D-457)",
+          "[engine][dma][mixer]") {
+    // Left side silent, right side a sine: left = scope − side stays at zero, right = scope + side carries the sine.
+    // 16 channels (track 1) and Authentic 3ch with the STE (track 5, the first DMA track).
+    for (const auto& [mode, track] : {std::pair{VoiceMode::Studio16, 1}, std::pair{VoiceMode::Authentic3, 4}}) {
+        CAPTURE(int(mode));
+        for (const bool stereo : {true, false}) {
+            CAPTURE(stereo);
+            Rig g(mode);
+            g.dmaTrack(track, 0);
+            g.e.setDma(params(2, stereo));
+            g.e.setDmaSample(0, sine(4096, 32, stereo, true));
+            g.e.noteOn(0, 60, 127, track);
+            Engine::TrackMeters m;
+            g.run(2400);
+            g.e.takeMeters(m);
+            g.run(2400);  // 50 ms: the 128 points of the oscilloscope all written while the sample plays
+            g.e.takeMeters(m);
+            const size_t t = size_t(track);
+            float right = 0;
+            for (int j = 0; j < Engine::kScopePoints; ++j) {
+                const float s = m.scope[t][size_t(j)], d = m.side[t][size_t(j)];
+                if (stereo) {
+                    CHECK(std::abs(s - d) < 1e-6f);
+                } else {
+                    CHECK(d == 0.0f);
+                }
+                right = std::max(right, s + d);
+            }
+            CHECK(m.peakR[t] > 0.1f);
+            CHECK(right > m.peakR[t] * 0.5f);
+            CHECK(right <= m.peakR[t] + 1e-6f);
+            if (stereo) {
+                CHECK(m.peak[t] == 0.0f);
+            } else {
+                CHECK(m.peak[t] == m.peakR[t]);
+            }
+            // No other track has a side.
+            for (int o = 0; o < ymengine::kTracks; ++o)
+                if (o != track)
+                    CHECK(std::all_of(m.side[size_t(o)].begin(), m.side[size_t(o)].end(),
+                                      [](float v) { return v == 0.0f; }));
+            // The note stops (after its release): the side goes back to an exact zero.
+            g.e.allNotesOff(0);
+            g.run(9600);
+            g.e.takeMeters(m);
+            g.run(2400);
+            g.e.takeMeters(m);
+            CHECK(std::all_of(m.side[t].begin(), m.side[t].end(), [](float v) { return v == 0.0f; }));
+            CHECK(m.peak[t] == 0.0f);
+            CHECK(m.peakR[t] == 0.0f);
+        }
+    }
+}
+
+TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and solo (Indus, 26/10/2026, D-459)",
+          "[engine][dma][mixer]") {
+    // Track A plays a stereo sample (both sides the same sine), centred; track B a mono sample, hard left. 16 channels
+    // (tracks 1 and 2) and Authentic 3ch with the STE (tracks 5 and 6, DMA tracks).
+    for (const auto& [mode, a] : {std::pair{VoiceMode::Studio16, 0}, std::pair{VoiceMode::Authentic3, 4}}) {
+        CAPTURE(int(mode));
+        auto play = [mode, a](bool stereo, auto setMix, bool withB) {
+            Rig g(mode);
+            g.dmaTrack(a, 0);
+            g.dmaTrack(a + 1, 1, -1);
+            DmaParams d = params(2, stereo);
+            d.slots[1] = {2, false, 60, true};
+            g.e.setDma(d);
+            g.e.setDmaSample(0, sine(4096, 32, stereo));
+            g.e.setDmaSample(1, sine(4096, 40));
+            ymengine::TrackParams p = g.e.track(a);
+            setMix(p.mix);
+            g.e.setTrack(a, p);
+            g.e.noteOn(0, 60, 127, a);
+            if (withB) g.e.noteOn(0, 60, 127, a + 1);
+            g.run(2400);
+            g.run(9600, true);
+            Engine::TrackMeters m;
+            g.e.takeMeters(m);
+            return std::tuple{rms(g.outL), rms(g.outR), m.peak[size_t(a)], m.peakR[size_t(a)]};
+        };
+        // Linked (the default): levelR is not used, both sides at the level.
+        const auto [l, r, pl, pr] = play(true, [](ymengine::TrackMix& m) { m.levelR = 0.25; }, false);
+        CHECK(l > 0.01);
+        CHECK(std::fabs(r / l - 1) < 0.01);
+        CHECK(std::fabs(pr / pl - 1) < 0.01);
+        // Unlinked: the right side at its own level, its meter too.
+        const auto [ul, ur, upl, upr] = play(true,
+                                             [](ymengine::TrackMix& m) {
+                                                 m.link = false;
+                                                 m.levelR = 0.5;
+                                             },
+                                             false);
+        CHECK(std::fabs(ul / l - 1) < 0.01);
+        CHECK(std::fabs(ur / r - 0.5) < 0.02);
+        CHECK(std::fabs(upr / upl - 0.5) < 0.02);
+        // Mute of either side.
+        const auto [ml, mr, mpl, mpr] = play(true, [](ymengine::TrackMix& m) { m.muteR = true; }, false);
+        CHECK(ml > 0.01);
+        CHECK(mr == 0);
+        CHECK(mpl > 0.1f);
+        CHECK(mpr == 0.0f);
+        const auto [nl, nr, npl, npr] = play(true, [](ymengine::TrackMix& m) { m.mute = true; }, false);
+        CHECK(nl == 0);
+        CHECK(nr > 0.01);
+        CHECK(npl == 0.0f);
+        CHECK(npr > 0.1f);
+        // Solo of the right side: the left side and track B (hard left) fall silent.
+        const auto [bl, br, bpl, bpr] = play(true, [](ymengine::TrackMix&) {}, true);
+        CHECK(bl > l * 1.2);
+        const auto [sl, sr, spl, spr] = play(true, [](ymengine::TrackMix& m) { m.soloR = true; }, true);
+        CHECK(sl == 0);
+        CHECK(std::fabs(sr / r - 1) < 0.01);
+        (void)bpl, (void)bpr, (void)spl, (void)spr;
+        // A mono sample: the right side's settings do nothing, its solo either.
+        auto right = [](ymengine::TrackMix& m) {
+            m.link = false;
+            m.levelR = 0;
+            m.muteR = true;
+            m.soloR = true;
+        };
+        const auto [ol, orr, opl, opr] = play(false, right, true);
+        const auto [rl, rr, rpl, rpr] = play(false, [](ymengine::TrackMix&) {}, true);
+        CHECK(ol > 0.01);
+        CHECK(std::fabs(ol / rl - 1) < 1e-6);
+        CHECK(std::fabs(orr / rr - 1) < 1e-6);
+        CHECK(opr == opl);
+        (void)rpl, (void)rpr;
+    }
+}
+
+TEST_CASE("DMA: the right side's mixer applies live, and when the sample becomes stereo (D-459)",
+          "[engine][dma][mixer]") {
+    Rig g;
+    g.dmaTrack(0, 0);
+    g.e.setDma(params(2, true));
+    g.e.setDmaSample(0, sine(4096, 32, true));
+    g.e.noteOn(0, 60, 127, 0);
+    g.run(2400);
+    ymengine::TrackMix m = g.e.track(0).mix;
+    m.link = false;
+    m.levelR = 0;
+    g.e.setTrackMix(0, 0, m);
+    g.run(4800);  // the tail of the STE chain's filters
+    g.run(4800, true);
+    CHECK(rms(g.outL) > 0.01);
+    CHECK(rms(g.outR) < rms(g.outL) * 1e-4);
+    CHECK(g.e.trackStereo(0));
+    // The same settings with a mono slot: the right side follows the left one.
+    g.e.setDma(params(2, false));
+    CHECK_FALSE(g.e.trackStereo(0));
+    g.e.setDmaSample(0, sine(4096, 32));
+    g.e.noteOn(0, 60, 127, 0);
+    g.clear();
+    g.run(480);
+    g.run(4800, true);
+    CHECK(rms(g.outR) > 0.01);
+    CHECK(std::fabs(rms(g.outR) / rms(g.outL) - 1) < 0.01);
 }

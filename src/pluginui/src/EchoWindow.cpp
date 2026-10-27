@@ -105,19 +105,20 @@ void EchoWindow::build() {
     cut_.setTip("Hi cut: each echo loses the treble above this frequency");
     level_.setRange(0, 100, 1);
     level_.setTip("Level of the echoes in the mix");
-    // Typed values: the field's width in characters (its longest text) and its input mask (one 9 per digit).
+    // Typed values: the field's width in characters (its longest text) and its input mask (one 9 per digit); a unit
+    // after the digits stays out of the reverse video under the pointer and shows while typing (D-464).
     repv_.setMinChars(1);
     repv_.setMask("9");
     dropv_.setMinChars(2);
     dropv_.setMask("99");
     timev_.setMinChars(7);  // "2000 ms"
-    timev_.setMask("9999");
+    timev_.setMask("9999 ms");
     fbv_.setMinChars(4);  // "90 %"
-    fbv_.setMask("99");
+    fbv_.setMask("99 %");
     cutv_.setMinChars(8);  // "20000 Hz"
-    cutv_.setMask("99999");
+    cutv_.setMask("99999 Hz");
     levelv_.setMinChars(5);  // "100 %"
-    levelv_.setMask("999");
+    levelv_.setMask("999 %");
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{
              &labEcho_, &on_,      &labDiv_, &div_,    &labTo_,   &to_,      &labRep_,   &rep_,  &repv_,
              &labDrop_, &drop_,    &dropv_,  &sep_,    &labDelay_, &delayOn_, &ping_,    &sync_, &labDelDiv_,

@@ -58,6 +58,9 @@ public:
         std::array<uint8_t, kSteps> volume{};  // 0 to 15
         int length = 8;                        // steps played; the others are drawn faded
         int curStep = 0, curRow = kSpan;  // keyboard cursor (row 0 at the top = +12)
+        // Why the NSE row moves nothing on this track (a DMA track, D-463), empty when it applies: the row is drawn
+        // faded, takes no click, and its tooltip gives the reason.
+        std::string noiseOff;
         bool operator==(const State&) const = default;
     };
     void setState(const State& s);
@@ -129,6 +132,7 @@ private:
     void wire();
     void layout();
     bool drum() const noexcept;
+    bool dma() const noexcept;   // a DMA track: what moves no sample is greyed (Indus, 26/10/2026, D-463)
     bool live() const noexcept;  // On state shown (Off on a percussion track)
     const ymengine::TrackPatch& patch() const noexcept;
     // Changes the focused track's table in the state, one undo step of the track.

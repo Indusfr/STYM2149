@@ -80,8 +80,8 @@ constexpr std::array<const char*, kSeqLanes> kLaneHelp = {
     "TON: tune this step by semitones",
     "INS: play this note with a project instrument (Instruments window, Ctrl+T)",
     "CMD: commands of this step, click to set them (ticks per line, sync mark, slides); MUL: several",
-    "SRC: tone, noise or both on this step; the Env entries put its volume on the envelope",
-    "GEN: use another generator on this step only",
+    "SRC: tone, noise or both on this step; the Env entries put its volume on the envelope. Right click: its settings",
+    "GEN: use another generator on this step only. Right click: its settings",
     "ARP: switch the arpeggiator of the track on or off from this step",
     "HLD: do not retrigger the drum while it still rings",
     "CUT: stop the sound on this step",
@@ -94,7 +94,8 @@ constexpr std::array<const char*, kSeqLanes> kLaneHelp = {
     "VOL: accent. Drag to draw, right click for a slider",
     "VIB: switch the vibrato of the track on or off from this step",
     "BPM: tempo of every track from this step on, until the next BPM",
-    "ENV: hardware envelope shape of the track from this step on; R: the envelope restarts",
+    "ENV: hardware envelope shape of the track from this step on; R: the envelope restarts. Right click: its "
+    "settings",
     "DLY: the notes of this step start at this tick of the line",
     "CUT: the notes of this step stop at this tick of the line",
     "LFO: switch the LFO of the track on or off from this step",
@@ -380,7 +381,7 @@ void SeqGrid::refresh() {
     show(SeqLane::Mix, !drum_);
     show(SeqLane::Fx, !drum_);
     show(SeqLane::Slide, !drum_);
-    show(SeqLane::Slc, !drum_);
+    show(SeqLane::Slc, w_.crvShown());
     show(SeqLane::Afl, w_.arpShown());
     show(SeqLane::Tie, ndrum);
     show(SeqLane::Slt, false);
@@ -510,6 +511,9 @@ void SeqGrid::refresh() {
         lc(SeqLane::Slide).on = lane.slide[A];
         lc(SeqLane::Cut).on = lane.cut[A];
         vol_[size_t(c)] = std::clamp<int>(lane.vol[A], 0, 15);
+        volTo_[size_t(c)] = lane.cmdAt(ymengine::SeqCmd::VolGlide, int(A))
+                                ? std::clamp<int>(lane.vol[a + 1 < effLen ? A + 1 : 0], 0, 15)
+                                : -1;
         static const std::array<const char*, 8> mixT = {"-", "T", "N", "TN", "E", "TE", "NE", "TNE"};  // D-277
         static const std::array<const char*, 5> fxT = {"-", "CV", "SID", "SB", "CD"};
         static const std::array<const char*, 4> rtgT = {"-", "2", "3", "4"};
@@ -555,10 +559,6 @@ void SeqGrid::refresh() {
                 lc(SeqLane::Tun).text = ct > 0 ? "+" + std::to_string(ct) : std::to_string(ct);
             } else lc(SeqLane::Tun).text = "-";
         }
-        // Values that cannot act there: greyed and crossed (twelfth DAW test, item 145, D-354).
-        for (const SeqLane r : {SeqLane::Afl, SeqLane::Vib, SeqLane::Lfo, SeqLane::Mod, SeqLane::Env, SeqLane::Smp,
-                                SeqLane::Tun, SeqLane::Dly, SeqLane::Slc, SeqLane::Bpm})
-            lc(r).nope = laneShown_[size_t(r)] && !w_.cantAct(r, a).empty();
         lc(SeqLane::Gat).text = lane.gat[A] ? std::to_string(lane.gat[A]) : "-";
         // PAN: 0 = the channel's pan, otherwise v·10 + 101 (v from -10 to +10); C for both 0 and the centre, else
         // L1-L10 or R1-R10.
@@ -568,6 +568,17 @@ void SeqGrid::refresh() {
                 ? "C"
                 : std::string(pnv < ymseq::kPanCenter ? "L" : "R") +
                       std::to_string(std::max(1, int(std::lround(std::abs(pnv - ymseq::kPanCenter) / 10.0))));
+        // Values that cannot act there: greyed and crossed (twelfth DAW test, item 145, D-354); empty cells where
+        // nothing written could act, from the sound of the step, crossed too in the length of the track (thirteenth,
+        // item 165, D-374).
+        for (const SeqLane r : {SeqLane::Mix, SeqLane::Fx, SeqLane::Ins, SeqLane::Env, SeqLane::Smp, SeqLane::Gat,
+                                SeqLane::Rtg, SeqLane::Cnd, SeqLane::Oct, SeqLane::Ton, SeqLane::Afl, SeqLane::Vib,
+                                SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun, SeqLane::Dly, SeqLane::Slc, SeqLane::Bpm}) {
+            if (!laneShown_[size_t(r)] || w_.cantAct(r, a).empty()) continue;
+            const bool empty = lc(r).text == "-";
+            lc(r).nope = !empty || !dead;
+            lc(r).blocked = lc(r).nope && empty;
+        }
     }
     repaint();
     if (w_.ses().overview) w_.overMap_.repaint();  // the overview follows the grid (refreshOverview)
@@ -787,12 +798,22 @@ void SeqGrid::paintLaneCell(Painter& p, const Rect& r, SeqLane lane, int col, bo
     const LaneCell& c = lanes_[size_t(lane)][size_t(col)];
     if (lane == SeqLane::Vol) {
         // .volbar: white background (green while playing), 11 px bar from the bottom, 8 px value at the top, or in
-        // white inside the bar when it goes above 70 %.
-        const int v = vol_[size_t(col)];
+        // white inside the bar when it goes above 70 %. A step that slides (Gxx, D-393) draws a ramp from its volume to
+        // that of the next step, its value inside when the whole ramp goes above 70 %.
+        const int v = vol_[size_t(col)], to = volTo_[size_t(col)];
         p.fill(r, play ? colors::kGreen : colors::kWhite);
-        const int bh = int(std::ceil(r.h * v / 15.0 - 0.5));  // v/15 of the cell, to the nearest pixel (halves down)
-        p.fill({r.x + 3, r.bottom() - bh, 11, bh}, play ? kVolPlayBar : colors::kBlack);
-        const bool low = v * 100 > 70 * 15;
+        const Color bar = play ? kVolPlayBar : colors::kBlack;
+        auto barH = [&](double x) { return int(std::ceil(r.h * x / 15.0 - 0.5)); };  // to the nearest pixel, halves down
+        if (to < 0) {
+            const int bh = barH(v);
+            p.fill({r.x + 3, r.bottom() - bh, 11, bh}, bar);
+        } else {
+            for (int k = 0; k < 11; ++k) {
+                const int bh = barH(v + (to - v) * (k + 0.5) / 11);
+                p.fill({r.x + 3 + k, r.bottom() - bh, 1, bh}, bar);
+            }
+        }
+        const bool low = std::min(v, to < 0 ? v : to) * 100 > 70 * 15;
         const std::string t = std::to_string(v);
         const int base = low ? baselineIn(r.bottom() - 1 - 8, 8, 8) : baselineIn(r.y + 1, 8, 8);
         smallText(p, t, r.x, r.w, base, low ? colors::kWhite : colors::kBlack);
@@ -840,6 +861,8 @@ gemui::Pointer SeqGrid::pointerAt(gemui::Point pt) const noexcept {
                          : tool == 5 ? Pointer::Cell
                          : tool == 0 ? Pointer::Move
                                      : Pointer::Arrow;
+    // Draw tool, a note held under the button: it can be dragged, so the hand until the release (24/10/2026, D-383).
+    if (moving_ && tool == 1) return Pointer::Hand;
     const Hit h = hitAt(pt);
     if (drawing_ && h.cell()) return Pointer::Pencil;  // #seqgrid.drawing .cell
     switch (h.kind) {
@@ -875,8 +898,15 @@ std::string SeqGrid::tipAt(gemui::Point pt) const {
         return std::string(h.lane == SeqLane::Tie ? "HLD: do not retrigger the drum while it still rings\n" : "") +
                "Right click: copy / paste this row across tracks";
     case Hit::Kind::Lane: {
-        if (h.lane == SeqLane::Vol) return "Volume " + std::to_string(vol_[size_t(h.col)]);
+        if (h.lane == SeqLane::Vol) {
+            const int to = volTo_[size_t(h.col)];
+            return "Volume " + std::to_string(vol_[size_t(h.col)]) +
+                   (to >= 0 ? ", slides to " + std::to_string(to) : std::string()) +
+                   "\nRight click: a slider and the Slide to the next step";
+        }
         const LaneCell& c = lanes_[size_t(h.lane)][size_t(h.col)];
+        if (c.blocked)  // why nothing can act there (item 165)
+            return std::string(kLaneHelp[size_t(h.lane)]) + "\n" + w_.cantAct(h.lane, w_.absCol(h.col));
         if (c.nope)  // what is written, and why it cannot act (item 145)
             return std::string(kLaneHelp[size_t(h.lane)]) + "\n" + c.text + ": " +
                    w_.cantAct(h.lane, w_.absCol(h.col));
@@ -897,7 +927,8 @@ bool SeqGrid::mouseWheel(const gemui::WheelEvent& e) {
 
 std::optional<SeqGrid::Edge> SeqGrid::edgeAt(const Hit& h, gemui::Point p) const {
     const int tool = w_.ses().tool;
-    if (h.kind != Hit::Kind::Note || drum_ || alt_ || (tool != 0 && tool != 1)) return std::nullopt;
+    // The Draw tool alone (bug of 24/10/2026, D-381): with the Move tool, the edge moves the note as its middle does.
+    if (h.kind != Hit::Kind::Note || drum_ || alt_ || tool != 1) return std::nullopt;
     const int c = w_.absCol(h.col);
     ymseq::Lane copy = w_.lane();
     const ymseq::LaneEditor ed(copy, w_.context());
@@ -1005,7 +1036,7 @@ void SeqGrid::resetFlag(SeqLane lane, int c) {
             l.clearBoxCmds(c);
         else {
             l.set(row, c, lane == SeqLane::Vol ? 15 : 0);
-            l.set(ymseq::envPartner(row), c, ymseq::Lane::emptyValue(ymseq::envPartner(row)));
+            l.set(ymseq::rowPartner(row), c, ymseq::Lane::emptyValue(ymseq::rowPartner(row)));
         }
         return true;
     });
@@ -1020,6 +1051,7 @@ void SeqGrid::press(const Hit& h, const gemui::MouseEvent& e) {
         w_.openVol(h.r, c);
         return;
     }
+    if (right && h.kind == Hit::Kind::Lane && selA_ < 0 && w_.openStepSound(h.lane, c)) return;  // D-392
     if (right && selA_ >= 0 && c >= blockLo() && c <= blockHi()) return;  // block menu on release
     if (right && rect_ && h.kind == Hit::Kind::Note) {
         // Deviation (D-282): the box menu on release, the box kept (the right button drew a new one-cell box over
@@ -1114,6 +1146,7 @@ void SeqGrid::pressLane(const Hit& h, int c, const gemui::MouseEvent& e) {
     EditorSession& s = w_.ses();
     s.curStep = c;
     const SeqLane lane = h.lane;
+    if (lanes_[size_t(lane)][size_t(h.col)].blocked) return;  // nothing written there could act (item 165)
     if (lane == SeqLane::Vol) {  // left click: drawing by dragging
         const int v = volAt(h.r, e.pos.y);
         w_.editLane([&](ymseq::LaneEditor&, ymseq::Lane& l) {
@@ -1943,7 +1976,7 @@ void SeqGrid::blockMenu(const Hit& h, int c) {
         m.label = "Note length";
         m.sub = w_.figItems();
         m.subMarks = true;
-        m.subCur = w_.ses().figure;
+        m.subCur = w_.inputFigure();
         items.push_back(std::move(m));
     }
     {
@@ -1994,7 +2027,7 @@ void SeqGrid::laneLabelMenu(const Hit& h) {
             else
                 for (int s = 0; s < ymseq::kSteps; ++s) {
                     l.set(row, s, src.get(row, s));
-                    l.set(ymseq::envPartner(row), s, src.get(ymseq::envPartner(row), s));  // ENV: Exx and Rxx
+                    l.set(ymseq::rowPartner(row), s, src.get(ymseq::rowPartner(row), s));  // ENV: Exx and Rxx
                 }
             return true;
         });

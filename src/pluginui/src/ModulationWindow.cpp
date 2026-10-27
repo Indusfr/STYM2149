@@ -112,11 +112,19 @@ void OrnGrid::paint(gemui::Painter& p) {
     p.fill({r.x, r.y + kSepY + 2, kWidth, 3}, colors::kBlack);
     p.fill({r.x, r.y + kSep2Y + 2, kWidth, 3}, colors::kBlack);
 
-    label("NSE", r.y + kNseY, 9);
+    // A greyed NSE row (D-463): its label and its cells faded like the steps beyond the length.
+    const bool noiseOff = !st_.noiseOff.empty();
+    if (noiseOff) {
+        const double tw = Font::width("NSE", 9, 0, Face::kSmall);
+        p.textAt("NSE", r.x + kLabelW - 2 - tw, baselineIn(r.y + kNseY, 9, 9), 9,
+                 gemui::mix(ink, colors::kWhite, kDeadAlpha), 0, Face::kSmall);
+    } else {
+        label("NSE", r.y + kNseY, 9);
+    }
     label("VOL", r.y + kVolY, 9);
     for (int c = 0; c < kSteps; ++c) {
         const bool dead = c >= st_.length;
-        cell(noiseRect(c), st_.noise[size_t(c)] ? colors::kBlack : colors::kWhite, dead);
+        cell(noiseRect(c), st_.noise[size_t(c)] ? colors::kBlack : colors::kWhite, dead || noiseOff);
 
         const Rect vr = volumeRect(c);
         cell(vr, colors::kWhite, dead);
@@ -166,7 +174,7 @@ int OrnGrid::levelAt(int step, double y) const noexcept {
 void OrnGrid::mouseDown(const gemui::MouseEvent& e) {
     int c = 0, row = 0;
     const Part part = partAt(e.pos, &c, &row);
-    if (part == Part::None) return;
+    if (part == Part::None || (part == Part::Noise && !st_.noiseOff.empty())) return;
     if (e.button == gemui::MouseButton::Right) {
         // contextmenu of a VOL cell: precise setting with a slider; the keyboard cursor moves to the step.
         if (part != Part::Volume) return;
@@ -227,7 +235,9 @@ void OrnGrid::mouseUp(const gemui::MouseEvent&) {
 
 gemui::Pointer OrnGrid::pointerAt(gemui::Point p) const noexcept {
     int c = 0, row = 0;
-    return partAt(p, &c, &row) == Part::None ? gemui::Pointer::Arrow : gemui::Pointer::Hand;
+    const Part part = partAt(p, &c, &row);
+    const bool off = part == Part::None || (part == Part::Noise && !st_.noiseOff.empty());
+    return off ? gemui::Pointer::Arrow : gemui::Pointer::Hand;
 }
 
 std::string OrnGrid::tipAt(gemui::Point p) const {
@@ -239,7 +249,9 @@ std::string OrnGrid::tipAt(gemui::Point p) const {
                                            : signedSemis(semi) + " semitone" + (std::abs(semi) > 1 ? "s" : "");
         return "Step " + std::to_string(c + 1) + ": " + what + ". Drag to draw the pitch table.";
     }
-    case Part::Noise: return "NSE step " + std::to_string(c + 1) + ": add noise on this tick";
+    case Part::Noise:
+        if (!st_.noiseOff.empty()) return st_.noiseOff;
+        return "NSE step " + std::to_string(c + 1) + ": add noise on this tick";
     case Part::Volume:
         return "VOL step " + std::to_string(c + 1) +
                ": 4-bit level on this tick. Drag up or down to draw, right click for a slider.";
@@ -355,6 +367,7 @@ void ModulationWindow::wire() {
 // ------------------------------------------------------------------------------------------- state
 
 bool ModulationWindow::drum() const noexcept { return m_.drumTrack(); }
+bool ModulationWindow::dma() const noexcept { return m_.generator() == int(ymengine::Generator::Dma); }
 bool ModulationWindow::live() const noexcept { return patch().ornamentOn && !drum(); }
 const ymengine::TrackPatch& ModulationWindow::patch() const noexcept {
     return m_.extras_.tracks[size_t(m_.cur_)].patch;
@@ -416,6 +429,7 @@ void ModulationWindow::refreshGrid() {
     st.length = p.ornamentLength;
     st.curStep = s.ornCur;
     st.curRow = s.ornRow;
+    if (dma()) st.noiseOff = "NSE: a DMA track plays a sample, without noise";
     grid_.setState(st);
 }
 
@@ -451,6 +465,7 @@ bool ModulationWindow::tableKey(const gemui::KeyEvent& e) {
         // KeyN: the physical key when the host gives it, otherwise the character.
         const int code = e.code ? e.code : (e.ch < 128 ? std::toupper(int(e.ch)) : 0);
         if (code != 'N' || e.mods.ctrl || e.mods.alt) return false;
+        if (dma()) return true;  // no noise on a DMA track: the NSE row is greyed (D-463)
         const int c = s.ornCur;
         editPatch([c](ymengine::TrackPatch& p) { p.ornamentNoise[size_t(c)] = p.ornamentNoise[size_t(c)] ? 0 : 1; });
         return true;
@@ -510,14 +525,10 @@ void ModulationWindow::layout() {
     bottom = lfo_.layout(x, bottom, contentW, kPad);
 
     // Window: content, padding of 8, border and margin of .gwin (6 on each side). Grown past the bottom of the
-    // desktop (moved low, then switched on): raised to fit.
+    // desktop (moved low, then switched on): raised to fit by place() (D-460).
     const double w = contentW + 2 * kPad + 12;
     const double h = bottom + kPad + 6 - oy;
-    if (std::abs(h - box().h) > 0.01 || std::abs(w - box().w) > 0.01) {
-        place({ox, oy, w, h});
-        const double over = oy + h - MainWindow::kHeight;
-        if (over > 0) moveBy(0, -int(std::ceil(std::min(over, oy))));
-    }
+    if (std::abs(h - box().h) > 0.01 || std::abs(w - box().w) > 0.01) place({ox, oy, w, h});
     repaint();
 }
 

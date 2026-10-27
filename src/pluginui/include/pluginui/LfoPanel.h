@@ -57,6 +57,7 @@ public:
     static std::string rateText(double hz);
     static std::string divisionText(int division);
     static std::string depthText(ymengine::LfoTarget target, double depth);
+    static std::string depthUnit(ymengine::LfoTarget target);  // "", "c" or "%" (out of the reverse video, D-464)
     // Typed division ("1/8T", any case) or -1.
     static int divisionOf(std::string_view text);
     // Why a target moves nothing on the focused track (its generator, its source, the mode), empty if it applies

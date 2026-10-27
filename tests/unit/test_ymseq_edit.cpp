@@ -211,7 +211,8 @@ TEST_CASE("Prototype: sequencer track edits", "[proto][ymseq]") {
             ctx.drum = f[3] == "1";
             ctx.mono = f[4] == "1";
             ctx.threeVoice = f[5] == "1";
-            ctx.figure = std::stoi(f[6]);
+            const int fig = std::stoi(f[6]);
+            ctx.figure = fig >= 7 ? fig + 1 : fig;  // the prototype has no 1/64, which comes after 1/32 (D-422)
             ctx.resolution = std::stoi(f[7]);
             ctx.chord = std::stoi(f[8]);
             ctx.scale = std::stoi(f[9]);

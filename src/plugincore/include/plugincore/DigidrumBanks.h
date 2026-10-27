@@ -8,6 +8,7 @@
 //   {"kind": "digidrumlib", "version": 1, "banks": [{"name": ..., "slots": [{"name", "rate", "root", "cents",
 //    "loop", "loopStart", "loopEnd", "convert" ("linear" or "ym"), "data" (one hexadecimal digit per 4-bit value),
 //    "source" (signed bytes in base64)}, ...]}, ...]}
+// "loopStart" and "loopEnd" keep their names from before D-443: they hold the slot's Start and End, the part played.
 // Tolerant reading: missing keys at their default, values brought back into their ranges, unknown characters ignored.
 #pragma once
 #include <array>

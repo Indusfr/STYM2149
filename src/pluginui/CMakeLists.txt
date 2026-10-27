@@ -8,6 +8,7 @@ add_library(stym_pluginui STATIC
   src/CurveWindow.cpp
   src/DeskIcons.cpp
   src/EchoWindow.cpp
+  src/StepSoundWindow.cpp
   src/HelpWindow.cpp
   src/IconData.cpp
   src/KbdWindow.cpp
@@ -23,11 +24,13 @@ add_library(stym_pluginui STATIC
   src/DigidrumWindow.cpp
   src/DmaWindow.cpp
   src/FileMenu.cpp
+  src/FujiData.cpp
   src/RecorderWindow.cpp
   src/ScopeWindow.cpp
   src/SeqGrid.cpp
   src/SeqPopups.cpp
   src/SeqWindow.cpp
+  src/SettingsWindow.cpp
   src/SongWindow.cpp
   src/TipCatalog.cpp
   src/TipLanguage.cpp

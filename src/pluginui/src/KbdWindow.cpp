@@ -806,8 +806,8 @@ void KbdWindow::layout() {
     const double contentW = d.w;
     const double w = contentW + 2 * kPad + 12;
     const double h = ly + 12 + 6 + kPad + 6 - oy;
+    top_.setBox({ox + 6, oy + 32, w - 12, 2});  // before place(), which may move the window and its content (D-460)
     if (std::abs(h - box().h) > 0.01 || std::abs(w - box().w) > 0.01) place({ox, oy, w, h});
-    top_.setBox({ox + 6, oy + 32, w - 12, 2});
     repaint();
 }
 

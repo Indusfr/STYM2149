@@ -68,8 +68,8 @@ TEST_CASE("Help window: ^/ and ^? open it, Esc and its close box close it", "[ui
     REQUIRE(help.isOpen());
     CHECK_FALSE(w.desktop().hasModal());
     CHECK(help.titleBar().title() == "SHORTCUTS");
-    CHECK(w.rectOf("helpWin") == Rect{120, 70, 560, 699});
-    CHECK(w.rectOf("helpBody") == Rect{126, 102, 548, 661});
+    CHECK(w.rectOf("helpWin") == Rect{120, 70, 560, 727});
+    CHECK(w.rectOf("helpBody") == Rect{126, 102, 548, 689});
     CHECK(help.body().hasVertical());
     CHECK_FALSE(help.body().hasHorizontal());
     CHECK(gemui::FloatWindow::topmost(w, true) == &help);
@@ -104,6 +104,50 @@ TEST_CASE("Help window: ^/ and ^? open it, Esc and its close box close it", "[ui
     const Rect bar = help.titleBar().bounds();
     press(w, {bar.x + 10, bar.y + 10});
     CHECK_FALSE(help.isOpen());
+}
+
+TEST_CASE("Tab: the open windows come to the front in turn, Shift+Tab sends the front one back (D-389)",
+          "[ui][help]") {
+    FileHost h;
+    MainWindow w(h);
+    auto tab = [&w](bool shift) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Tab;
+        e.mods.shift = shift;
+        return w.desktop().keyDown(e);
+    };
+    // The open windows from the back to the front: the main window takes its turn with the floating ones.
+    auto order = [&w] {
+        std::vector<const gemui::Widget*> v;
+        for (const gemui::Widget* c : w.children())
+            if (c->visible() && (c == &w.mainFrame() || dynamic_cast<const gemui::FloatWindow*>(c))) v.push_back(c);
+        return v;
+    };
+    const gemui::Widget* main = &w.mainFrame();
+    const gemui::Widget* mix = &w.mixer();
+    const gemui::Widget* help = &w.help();
+
+    // The main window alone: the key goes to the host.
+    CHECK_FALSE(tab(false));
+    w.mixer().show();
+    CHECK(ctrlKey(w, U'/', '/'));
+    REQUIRE(order() == std::vector{main, mix, help});
+    CHECK(tab(false));
+    CHECK(order() == std::vector{mix, help, main});
+    CHECK(tab(false));
+    CHECK(order() == std::vector{help, main, mix});
+    CHECK(tab(false));
+    CHECK(order() == std::vector{main, mix, help});
+    CHECK(tab(true));
+    CHECK(order() == std::vector{help, main, mix});
+    CHECK(gemui::FloatWindow::topmost(w) == &w.mixer());
+
+    // An open menu closes first, then the windows turn.
+    w.openMenu(1);
+    REQUIRE(w.desktop().hasPopups());
+    CHECK(tab(false));
+    CHECK_FALSE(w.desktop().hasPopups());
+    CHECK(order() == std::vector{main, mix, help});
 }
 
 TEST_CASE("Help window: Fuji menu entry Shortcuts ^?", "[ui][help]") {
@@ -156,9 +200,9 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
     // heading tops, first column 160 px or the longest key plus 10 px, second column wrapped at spaces. The row of
     // File > New, added since at the end of More keys (D-225), adds one 18 px row; ^L Sequences, gone with its window
     // (D-241), takes one away; ^D, moved from File to Generator (D-301), moves the heading of File down one row; ^F
-    // Effects (D-313) adds one.
+    // Effects (D-313) adds one, Tab (D-389) one more.
     CHECK(l.width == 522);
-    CHECK(l.height == 2182 + 18 - 18 + 18);
+    CHECK(l.height == 2182 + 18 - 18 + 18 + 18);
     std::vector<double> tops;
     for (const HelpWindow::Line& line : l.lines)
         if (line.heading) tops.push_back(line.y);
@@ -182,7 +226,7 @@ TEST_CASE("Help window: scrolled by its bar, reopened where it was left with its
         HelpWindow& help = w.help();
         help.show();
         gemui::ScrollPane& body = help.body();
-        CHECK(body.maxScroll() == gemui::Point{0, 2182 + 18 - 18 + 18 - 661});
+        CHECK(body.maxScroll() == gemui::Point{0, 2182 + 18 - 18 + 18 + 18 - 689});
         // Down arrow at the bottom of the bar: 40 px.
         const Rect down = body.partRect(gemui::ScrollPane::Part::Down);
         press(w, {down.x + 13, down.y + 13});
@@ -196,15 +240,15 @@ TEST_CASE("Help window: scrolled by its bar, reopened where it was left with its
         w.desktop().mouseDown({bar.x + 200, bar.y + 10}, gemui::MouseButton::Left, {});
         w.desktop().mouseDrag({bar.x + 240, bar.y + 30}, {});
         w.desktop().mouseUp({bar.x + 240, bar.y + 30}, {});
-        CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 699});
-        CHECK(w.rectOf("helpBody") == Rect{166, 122, 548, 661});
+        CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 727});
+        CHECK(w.rectOf("helpBody") == Rect{166, 122, 548, 689});
         pressKey(w, gemui::Key::Escape);
         help.show();
-        CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 699});
+        CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 727});
         CHECK(body.scroll().y == 140);
     }
     // A new editor (the plugin keeps the session): the window reopens at its place.
     MainWindow w(h);
     CHECK(w.help().isOpen());
-    CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 699});
+    CHECK(w.rectOf("helpWin") == Rect{160, 90, 560, 727});
 }

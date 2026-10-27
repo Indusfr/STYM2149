@@ -547,13 +547,13 @@ TEST_CASE("3-channel: SID effect with the MFP timer or continuous", "[engine][3c
         sid.patch.sidRatio = 1.5;
         sid.patch.sidMinVolume = 3;
         rig.e.setTrack(0, sid);
-        rig.e.noteOn(0, 57, 127);  // 220 Hz × 1.5 = 330 Hz
+        rig.e.noteOn(0, 57, 127);  // 220 Hz × 1.5 = 330 Hz, two interrupts per period: 660 Hz (D-426)
         rig.run(4800);
         const auto info = rig.e.voice(0);
-        REQUIRE(info.timerHz == ymengine::noteHz(57) * 1.5);
+        REQUIRE(info.timerHz == ymengine::noteHz(57) * 1.5 * 2);
         const double hz = info.timerActualHz;
-        if (mode == ymengine::TimerMode::Mfp) REQUIRE(hz == ymengine::mfpQuantize(330).hz());
-        else REQUIRE(std::fabs(hz - 330) < 1e-9);
+        if (mode == ymengine::TimerMode::Mfp) REQUIRE(hz == ymengine::mfpQuantize(660).hz());
+        else REQUIRE(std::fabs(hz - 660) < 1e-9);
         const Log r8 = rig.writes(8);
         REQUIRE(r8.size() >= 33);
         for (size_t i = 0; i < r8.size(); ++i) REQUIRE(r8[i].value == (i % 2 ? 3 : 13));
@@ -570,7 +570,7 @@ TEST_CASE("Timer: mode frozen at the attack, changing it only affects the follow
     rig.e.setTrack(0, sid);
     rig.e.noteOn(0, 57, 127);
     rig.run(2400);
-    const double mfpHz = ymengine::mfpQuantize(ymengine::noteHz(57)).hz();
+    const double mfpHz = ymengine::mfpQuantize(2 * ymengine::noteHz(57)).hz();  // two interrupts per period (D-426)
     REQUIRE(rig.e.voice(0).timerActualHz == mfpHz);
     rig.global([](auto& g) { g.timer = ymengine::TimerMode::Free; });
     rig.run(2400);
@@ -587,7 +587,7 @@ TEST_CASE("Timer: mode frozen at the attack, changing it only affects the follow
         return -1;
     }();
     REQUIRE(v >= 0);
-    REQUIRE(std::fabs(rig.e.voice(v).timerActualHz - ymengine::noteHz(60)) < 1e-9);
+    REQUIRE(std::fabs(rig.e.voice(v).timerActualHz - 2 * ymengine::noteHz(60)) < 1e-9);
 }
 
 TEST_CASE("16-channel: smooth ADSR, stages and sustain level", "[engine][adsr]") {
@@ -709,34 +709,160 @@ TEST_CASE("16-channel: pitch bend on the sounding voices", "[engine]") {
     REQUIRE(rig.e.voice(0).note == 69);
 }
 
-TEST_CASE("Arpeggio: the last note keeps cycling during the release", "[engine][arp]") {
+// One note whose envelope runs on from step to step: Monophonic in 16 channels, any track in 3 channels (D-416).
+TEST_CASE("Arpeggio: Monophonic or 3 channels, the last note keeps cycling during the release", "[engine][arp]") {
+    for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {
+        CAPTURE(int(mode));
+        Rig rig(mode);
+        auto t = track();
+        t.arp.on = true;
+        t.arp.mode = ymengine::ArpMode::Up;
+        t.arp.octaves = 2;
+        t.arp.rateHz = 48000.0 / 1024;
+        t.patch.releaseMs = 200;
+        t.patch.mono = mode == ymengine::VoiceMode::Studio16;
+        rig.e.setTrack(0, t);
+        rig.e.noteOn(0, 60, 100);
+        rig.run(1024);
+        const int v = [&] {
+            for (int i = 0; i < Engine::kVoices; ++i)
+                if (rig.e.voice(i).on && !rig.e.voice(i).fading) return i;
+            return -1;
+        }();
+        REQUIRE(v >= 0);
+        REQUIRE(rig.e.voice(v).note == 60);
+        rig.e.noteOff(0, 60);
+        rig.run(1024);  // release: same voice, next pitch, without a new attack
+        REQUIRE(rig.e.voice(v).on);
+        REQUIRE(rig.e.voice(v).adsrStage == 4);
+        REQUIRE(rig.e.voice(v).note == 72);
+        rig.run(1024);
+        REQUIRE(rig.e.voice(v).note == 60);
+        REQUIRE(rig.e.activeVoices() == 1);
+        rig.run(48000);
+        REQUIRE(rig.e.activeVoices() == 0);
+    }
+}
+
+// One note per key pressed, not per step (Indus, 24/10/2026 20:33, D-416): its envelope runs on through the steps
+// of the arpeggio, a key pressed starts it again from the attack, the note before cut.
+TEST_CASE("Arpeggio: Monophonic or 3 channels, one ADSR per key pressed, running on through the steps",
+          "[engine][arp]") {
+    for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {
+        CAPTURE(int(mode));
+        Rig rig(mode);
+        auto t = track();
+        t.arp.on = true;
+        t.arp.mode = ymengine::ArpMode::Up;
+        t.arp.octaves = 2;
+        t.arp.rateHz = 48000.0 / 1024;  // one step every 1 024 samples, on the last sample of each block
+        t.patch.attackMs = 10;
+        t.patch.sustainPct = 100;
+        t.patch.releaseMs = 200;
+        t.patch.mono = mode == ymengine::VoiceMode::Studio16;
+        rig.e.setTrack(0, t);
+        auto sounding = [&] {
+            std::vector<int> on;
+            for (int i = 0; i < Engine::kVoices; ++i)
+                if (rig.e.voice(i).on && !rig.e.voice(i).fading) on.push_back(i);
+            return on;
+        };
+        rig.e.noteOn(0, 60, 100);
+        rig.run(2048);  // two steps: the second one carries on the envelope of the first
+        std::vector<int> on = sounding();
+        REQUIRE(on.size() == 1);
+        CHECK(rig.e.voice(on[0]).note == 72);
+        CHECK(rig.e.voice(on[0]).adsrStage != 1);
+        CHECK(rig.e.voice(on[0]).adsrNow > 0.9);
+        rig.e.noteOn(0, 64, 100);  // a key pressed: a new note, from the attack
+        rig.run(1024);
+        on = sounding();
+        REQUIRE(on.size() == 1);
+        CHECK(rig.e.voice(on[0]).note == 60);
+        CHECK(rig.e.voice(on[0]).adsrStage == 1);
+        CHECK(rig.e.voice(on[0]).adsrNow < 0.05);
+        rig.run(1024);
+        on = sounding();
+        REQUIRE(on.size() == 1);
+        CHECK(rig.e.voice(on[0]).note == 64);
+        CHECK(rig.e.voice(on[0]).adsrStage != 1);
+        CHECK(rig.e.voice(on[0]).adsrNow > 0.9);
+    }
+}
+
+TEST_CASE("Arpeggio: Polyphonic in 16 channels, one ADSR per key pressed, the note before in its release; keys up, "
+          "the last note keeps cycling during its release (Indus, 24/10/2026 19:14, 19:32 and 20:33, D-416)",
+          "[engine][arp]") {
     Rig rig(ymengine::VoiceMode::Studio16);
     auto t = track();
     t.arp.on = true;
     t.arp.mode = ymengine::ArpMode::Up;
     t.arp.octaves = 2;
-    t.arp.rateHz = 48000.0 / 1024;
+    t.arp.rateHz = 48000.0 / 1024;  // one step every 1 024 samples, on the last sample of each block
+    t.patch.attackMs = 10;
+    t.patch.sustainPct = 100;
     t.patch.releaseMs = 200;
+    REQUIRE_FALSE(t.patch.mono);  // Polyphonic: the default Voicing
     rig.e.setTrack(0, t);
+    auto sounding = [&] {
+        std::vector<int> on;
+        for (int i = 0; i < Engine::kVoices; ++i)
+            if (rig.e.voice(i).on && !rig.e.voice(i).fading) on.push_back(i);
+        std::sort(on.begin(), on.end(), [&](int a, int b) { return rig.e.voice(a).age < rig.e.voice(b).age; });
+        return on;
+    };
     rig.e.noteOn(0, 60, 100);
     rig.run(1024);
-    const int v = [&] {
-        for (int i = 0; i < Engine::kVoices; ++i)
-            if (rig.e.voice(i).on && !rig.e.voice(i).fading) return i;
-        return -1;
-    }();
-    REQUIRE(v >= 0);
-    REQUIRE(rig.e.voice(v).note == 60);
-    rig.e.noteOff(0, 60);
-    rig.run(1024);  // release: same voice, next pitch, without a new attack
-    REQUIRE(rig.e.voice(v).on);
-    REQUIRE(rig.e.voice(v).adsrStage == 4);
-    REQUIRE(rig.e.voice(v).note == 72);
+    std::vector<int> on = sounding();
+    REQUIRE(on.size() == 1);
+    CHECK(rig.e.voice(on[0]).note == 60);
+    // The steps of one key: one note, its envelope running on, the step before cut.
+    for (const int note : {72, 60}) {
+        rig.run(1024);
+        on = sounding();
+        REQUIRE(on.size() == 1);
+        CHECK(rig.e.voice(on[0]).note == note);
+        CHECK(rig.e.voice(on[0]).adsrStage != 1);
+        CHECK(rig.e.voice(on[0]).adsrNow > 0.9);
+    }
+    // A key pressed: a new note from the attack, the one before in its release.
+    const int before = on[0];
+    rig.e.noteOn(0, 64, 100);
     rig.run(1024);
-    REQUIRE(rig.e.voice(v).note == 60);
-    REQUIRE(rig.e.activeVoices() == 1);
+    on = sounding();
+    REQUIRE(on.size() == 2);
+    CHECK(on[0] == before);
+    CHECK(rig.e.voice(before).adsrStage == 4);
+    CHECK(rig.e.voice(before).note == 60);
+    const int last = on[1];
+    CHECK(rig.e.voice(last).note == 60);
+    CHECK(rig.e.voice(last).adsrStage == 1);
+    CHECK(rig.e.voice(last).adsrNow < 0.05);
+    rig.run(1024);  // its next step carries its envelope on
+    on = sounding();
+    REQUIRE(on.size() == 2);
+    CHECK(on[0] == before);
+    CHECK(rig.e.voice(on[1]).note == 64);
+    CHECK(rig.e.voice(on[1]).adsrStage != 1);
+    CHECK(rig.e.voice(on[1]).adsrNow > 0.9);
+    // Keys up: no new attack; the last note walks on through the arpeggio during its release, the one before ends
+    // its own at its pitch.
+    const int newest = on[1];
+    rig.e.noteOff(0, 60);
+    rig.e.noteOff(0, 64);
+    rig.run(1024);
+    on = sounding();
+    REQUIRE(on.size() == 2);
+    CHECK(on[1] == newest);
+    CHECK(rig.e.voice(before).note == 60);
+    CHECK(rig.e.voice(newest).note == 64);  // the last key, alone in the arpeggio: 64, then 76
+    for (int v : on) CHECK(rig.e.voice(v).adsrStage == 4);
+    rig.run(1024);
+    CHECK(sounding().size() == 2);
+    CHECK(rig.e.voice(newest).note == 76);
+    CHECK(rig.e.voice(before).note == 60);
     rig.run(48000);
-    REQUIRE(rig.e.activeVoices() == 0);
+    CHECK(rig.e.activeVoices() == 0);
 }
 
 // Per-channel routing: the held key belongs to the channel that pressed it; a track focused in between (tab click,

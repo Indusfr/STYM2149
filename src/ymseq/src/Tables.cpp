@@ -94,15 +94,15 @@ int snapTransposed(int absNote, int semis, int s, int root, bool snap) noexcept 
 
 const std::array<Figure, kFigureCount> kFigures = {{
     {"Step", 0},
-    {"1/1", 4}, {"1/2", 2}, {"1/4", 1}, {"1/8", 0.5}, {"1/16", 0.25}, {"1/32", 0.125},
+    {"1/1", 4}, {"1/2", 2}, {"1/4", 1}, {"1/8", 0.5}, {"1/16", 0.25}, {"1/32", 0.125}, {"1/64", 0.0625},
     {"1/4.", 1.5}, {"1/8.", 0.75}, {"1/16.", 0.375},
-    {"1/4T", 2.0 / 3}, {"1/8T", 1.0 / 3}, {"1/16T", 1.0 / 6},
+    {"1/4T", 2.0 / 3}, {"1/8T", 1.0 / 3}, {"1/16T", 1.0 / 6}, {"1/32T", 1.0 / 12},
 }};
 
 const std::array<Resolution, kResolutionCount> kResolutions = {{
     {"1/4  quarter", "1/4", 1}, {"1/8  eighth", "1/8", 2}, {"1/16  sixteenth", "1/16", 4},
     {"1/32  thirty-second", "1/32", 8}, {"1/4T  triplet", "1/4T", 1.5}, {"1/8T  triplet", "1/8T", 3},
-    {"1/16T triplet", "1/16T", 6},
+    {"1/16T triplet", "1/16T", 6}, {"1/64  sixty-fourth", "1/64", 16}, {"1/32T triplet", "1/32T", 12},
 }};
 
 const std::array<Signature, kSignatureCount> kSignatures = {{
@@ -119,6 +119,16 @@ int figureSteps(int figure, int resolution) noexcept {
     const double beats = kFigures[size_t(std::clamp(figure, 0, kFigureCount - 1))].beats;
     if (beats == 0) return 1;
     return std::max(1, int(jsRound(beats * reso(resolution).stepsPerBeat)));
+}
+
+double figureStepsExact(int figure, int resolution) noexcept {
+    const double beats = kFigures[size_t(std::clamp(figure, 0, kFigureCount - 1))].beats;
+    return beats == 0 ? 1 : beats * reso(resolution).stepsPerBeat;
+}
+
+bool figureFits(int figure, int resolution) noexcept {
+    const double n = figureStepsExact(figure, resolution);  // 2/3 × 1.5 is not exactly 1 in binary
+    return n > 0.999999 && std::abs(n - std::round(n)) < 1e-6;
 }
 
 int beatSteps(int signature, int resolution) noexcept {

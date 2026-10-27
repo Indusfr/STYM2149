@@ -129,7 +129,7 @@ L'application autonome fonctionne comme le plugin. Différences :
 - Options > Audio/MIDI settings ouvre les réglages des périphériques audio et MIDI.
 - L'indicateur MIDI de la barre de menus affiche « no inputs », le nom de l'entrée ou « n inputs ».
 - Le séquenceur tourne sur sa propre horloge (Free run) : Space, ou le bouton Play, le lance et l'arrête, et le curseur BPM règle sa vitesse.
-- File > Quit (Ctrl+Q) ferme l'application après une confirmation.
+- File > Quit (Ctrl+Q) ferme l'application après une confirmation ; la case de fermeture de la fenêtre du système (et Alt+F4 sous Windows) pose la même question. Quitter depuis le menu de l'application sous macOS, ou à la fin de la session, enregistre et quitte sans demander.
 
 ### 2.5 Enregistrer votre travail
 
@@ -144,13 +144,13 @@ L'application autonome fonctionne comme le plugin. Différences :
 
 ### 3.1 Le bureau GEM
 
-La fenêtre est un bureau GEM de 1 272 × 944 pixels logiques, dessiné à la résolution de votre écran : à 100 % il mesure 795 × 590 pixels (les 5/8 du bureau), à 160 % 1 272 × 944, à 200 % 1 590 × 1 180, multipliés par l'échelle d'affichage du système. Quand un pixel du bureau tombe sur un nombre entier de pixels de l'écran, le dessin est exact au pixel près. Sinon Options > Pixels décide : **Sharp** place chaque pixel des lettres et des icônes sur des pixels entiers de l'écran, net mais certains un peu plus larges que d'autres ; **Smooth** (par défaut) les dessine avec anticrénelage, comme un navigateur montre le prototype. Si les cadres et les traits sont flous eux aussi, pas seulement les lettres, c'est l'hôte qui étire la fenêtre du plugin : cherchez dans ses réglages la mise à l'échelle de l'affichage des plugins. Pour changer la taille, redimensionnez la fenêtre du plugin dans l'hôte (ou la fenêtre de l'application autonome), de 50 à 200 % ; les proportions restent fixes et la taille atteinte est mémorisée. Il n'y a pas de menu de zoom. Si vous n'avez jamais redimensionné la fenêtre, STYM2149 choisit une taille d'après votre écran principal (50 %, 75 %, 100 % ou 125 %).
+La fenêtre est un bureau GEM de 1 344 × 984 pixels logiques, dessiné à la résolution de votre écran : à 100 % il mesure 840 × 615 pixels (les 5/8 du bureau), à 160 % 1 344 × 984, à 200 % 1 680 × 1 230, multipliés par l'échelle d'affichage du système. Quand un pixel du bureau tombe sur un nombre entier de pixels de l'écran, le dessin est exact au pixel près. Sinon le réglage Pixels (Options > Settings, section 3.12) décide : **Sharp** place chaque pixel des lettres et des icônes sur des pixels entiers de l'écran, net mais certains un peu plus larges que d'autres ; **Smooth** (par défaut) les dessine avec anticrénelage, comme un navigateur montre le prototype. Si les cadres et les traits sont flous eux aussi, pas seulement les lettres, c'est l'hôte qui étire la fenêtre du plugin : cherchez dans ses réglages la mise à l'échelle de l'affichage des plugins. Pour changer la taille, redimensionnez la fenêtre du plugin dans l'hôte (ou la fenêtre de l'application autonome), de 50 à 200 % ; les proportions restent fixes et la taille atteinte est mémorisée. Il n'y a pas de menu de zoom. Si vous n'avez jamais redimensionné la fenêtre, STYM2149 choisit une taille d'après votre écran principal (50 %, 75 %, 100 % ou 125 %).
 
-La barre de menus court en haut du bureau, comme sur un bureau GEM (section 3.2) ; la fenêtre principale commence sous elle, et aucune fenêtre ne passe au-dessus. Les icônes des disquettes A et B se trouvent côte à côte en haut à gauche du bureau, celle de la corbeille en bas à droite, nommées dans la langue des infobulles. Elles sont seulement décoratives : un clic ou un double-clic ne fait rien ; maintenez le bouton sur l'une d'elles pour faire glisser son contour pointillé ailleurs (sa place est une préférence, section 9).
+La barre de menus court en haut du bureau, comme sur un bureau GEM (section 3.2) ; la fenêtre principale commence sous elle, et aucune fenêtre ne passe au-dessus. Les icônes des disquettes A et B se trouvent côte à côte en haut à gauche du bureau, celle de la corbeille en bas à droite, nommées dans la langue des infobulles et avec les images du bureau d'EmuTOS : une disquette 3,5 pouces portant la lettre du lecteur sur son étiquette, une poubelle. Un clic sur la corbeille est File > New, avec sa confirmation ; A et B sont seulement décoratives, un clic ou un double-clic sur elles ne fait rien. Maintenez le bouton sur une icône pour faire glisser son contour pointillé ailleurs : comme sur un bureau GEM, il saute de case en case d'une grille invisible de la taille des icônes, et une icône ne se pose pas sur la case d'une autre (sa place est une préférence, section 9).
 
-Les fenêtres flottantes s'ouvrent par-dessus la fenêtre principale. Faites glisser une fenêtre par sa barre de titre (la fenêtre principale aussi : une partie de sa barre de titre reste toujours sur le bureau, et elle garde sa place tant que l'instance du plugin vit) ; fermez-la avec la case de sa barre de titre ou avec Esc (Esc ferme la fenêtre au premier plan, sauf les fenêtres Computer Keyboard et Slide Curve). La plupart des fenêtres affichent le nom de la piste courante dans leur titre et suivent la piste courante.
+Les fenêtres flottantes s'ouvrent par-dessus la fenêtre principale. Faites glisser une fenêtre par sa barre de titre (la fenêtre principale aussi, qui garde sa place tant que l'instance du plugin vit) ; aucune fenêtre ne dépasse les bords du bureau, et celle qui grandit près de son bord droit ou bas, ou s'ouvre à une place gardée sur un bureau plus grand, revient à l'intérieur ; fermez-la avec la case de sa barre de titre ou avec Esc (Esc ferme la fenêtre au premier plan, sauf les fenêtres Computer Keyboard et Slide Curve). La plupart des fenêtres affichent le nom de la piste courante dans leur titre et suivent la piste courante. **Tab** passe la fenêtre du fond au premier plan, de sorte que les fenêtres ouvertes viennent devant tour à tour (la fenêtre principale prend son tour) ; Shift+Tab va dans l'autre sens. Un menu ouvert depuis un bouton se pose sur le filet du bas du bouton, sans espace, comme les menus GEM.
 
-Les infobulles apparaissent quand vous laissez le pointeur sur une commande. Options > Tooltips les active ou les désactive ; Options > Tooltips > Language choisit leur langue (section 9). Les menus et les libellés sont toujours en anglais.
+Les infobulles apparaissent quand vous laissez le pointeur sur une commande. Les réglages Tooltips et Language d'Options > Settings les activent ou les désactivent et choisissent leur langue (sections 3.12 et 9). Les menus et les libellés sont toujours en anglais.
 
 Les curseurs se font glisser à la souris. Vous pouvez cliquer dans la valeur à côté de chaque curseur et y taper une valeur (des soulignés marquent ses positions libres) ; appuyez sur Enter pour l'appliquer, sur Esc pour la laisser telle quelle. Une valeur hors limites est ramenée au bout du curseur. Une note (note de base, note fixe des séquences) se tape par son nom, dans l'une ou l'autre notation (`C#4`, `Sol3`), ou par son numéro de note MIDI. Un curseur horizontal (sauf les panoramiques du Mixer) a une flèche à chaque bout : un clic change la valeur d'un pas, et recommence tant que vous maintenez le bouton.
 
@@ -163,7 +163,7 @@ Les boîtes de dialogue gardent le clavier tant qu'elles sont ouvertes. Une conf
 | Menu Atari (Fuji) | **Information** (icône, version, numéro de build et crédits ; Entrée la ferme) ; **Shortcuts** (^?) : la fenêtre SHORTCUTS, une liste déroulante de tous les raccourcis |
 | **File** | New (^N) ; Load, Save, Save as (chacun : Preset, Pattern, Song, Drum kit) ; Import (YM dump, MIDI file, XM module) ; Export pattern (MIDI, WAV, Stems (ZIP)) ; Export song (VBL dump, YM3, YM6, SNDH, MIDI, WAV, Stems (ZIP)) ; Recorder ; Demo pattern ; Quit (^Q, application autonome seulement) |
 | **Edit** | Step Sequencer (^E), Arpeggiator (^B), Mixer (^M), Song (^G), Modulation (^R), Effects (^F), Patches (^P), Drum kit (^K) ; Cut (^X), Copy (^C), Paste (^V) ; Undo (^Z), Redo (^Y) ; Instruments (^T), Samples (Digidrums, DMA (STE)) |
-| **Options** | Audio/MIDI settings (application autonome seulement) ; MIDI learn / Stop MIDI learn ; Clear MIDI map ; VBL frequency ; Keyboard layout ; Note names ; Pixels (Sharp, Smooth) ; Oscilloscope (On, Off) ; Tooltips (On, Off, Language) ; Sound engine |
+| **Options** | Audio/MIDI settings (application autonome seulement) ; MIDI learn / Stop MIDI learn ; Clear MIDI map ; Oscilloscope (On, Off) ; Register monitor (On, Off) ; Note monitor (On, Off) ; Settings... (la fenêtre SETTINGS, section 3.12) |
 
 Les entrées grisées expliquent pourquoi dans leur infobulle. Arpeggiator et Modulation sont grisés sur les pistes de percussion (Digidrum, Chipdrum). Drum kit (et Ctrl+K) ne sert qu'aux pistes Chipdrum. Samples > DMA (STE) est grisé avec Computer ST. L'onde SID et les pas du Sync Buzzer se règlent dans le cadre GENERATOR (section 3.8). Les exports de registres (VBL dump, YM3, YM6, SNDH) sont grisés sauf si le mode de voix est Authentic 3ch. Edit > Cut et Copy agissent sur la sélection du séquenceur, ou sur la note sous le curseur du séquenceur.
 
@@ -187,11 +187,13 @@ Seize onglets sélectionnent la **piste courante**, celle qu'éditent les pannea
 | Commande | Valeurs | Effet |
 |---|---|---|
 | Source | Tone, Noise, Tone+Noise, Env, Tone+Env, Noise+Env, Tone+Noise+Env | Onde carrée, bruit, les deux ou aucun, avec le volume 4 bits ou l'enveloppe matérielle : une entrée avec « Env » règle aussi Mode sur Envelope, les autres sur Vol 4-bit. **Env** seul joue la forme d'onde de l'enveloppe elle-même, à sa fréquence (cadre ENVELOPE), sans suivre la note ; pour un buzzer qui suit la note, prenez le générateur Sync Buzzer. En Authentic 3ch, ce sont les réglages mêmes de la puce (R7 et bit 4 de R8 à R10) ; la puce n'a qu'une enveloppe, donc les pistes en Env partagent sa forme et sa période |
-| Voicing | Polyphonic, Monophonic | Polyphonic : accords jusqu'à 6 voix. Monophonic : une note à la fois ; une nouvelle touche tenue glisse vers la nouvelle note au lieu de la redéclencher. Indisponible en Authentic 3ch (une voix par canal) |
+| Voicing | Polyphonic, Monophonic | Polyphonic : accords jusqu'à 6 voix ; une note poursuit son release pendant que les suivantes jouent, au clavier et à l'arpégiateur (4.2) comme dans le Step Sequencer (6 voix par piste, le release le plus ancien cédant la place). Monophonic : une note à la fois ; une nouvelle touche tenue glisse vers la nouvelle note au lieu de la redéclencher. Indisponible en Authentic 3ch (une voix par canal) |
 | Noise period | 1 à 31 | Une valeur basse est brillante, une valeur haute gronde. En Authentic 3ch, la puce n'a qu'un générateur de bruit : la valeur s'applique à toutes les pistes |
 | Volume | 0 à 15 | Le volume 4 bits de la puce |
 | Mode | Vol 4-bit, Envelope | Volume 4 bits fixe, ou volume piloté par l'enveloppe matérielle ; Source suit (Tone devient Tone+Env, etc.). Vol 4-bit sur Env seul rallume aussi l'onde carrée |
 | Level | 0 à 100 | Niveau du canal dans le mixage (en Authentic 3ch, le niveau vient du volume 4 bits) |
+
+Sur une piste DMA, Digidrum ou Chipdrum, Source, Noise period, Volume et Mode sont grisés, ainsi que tout le cadre ENVELOPE : ces pistes jouent leur propre son (un sample, ou les trames du Drum Kit), sans l'onde carrée, le bruit, le volume fixe ni l'enveloppe matérielle de ce cadre. Voicing et Level agissent toujours.
 
 ### 3.5 ENVELOPE (per channel ; « shared » en Authentic 3ch)
 
@@ -213,14 +215,16 @@ Quand **Tuning** est activé dans le cadre GENERATOR d'une piste Sync Buzzer, le
 
 | Commande | Mode Smooth | Mode Chip |
 |---|---|---|
-| A (Attack, attaque) | 0 à 1 000 ms | Ticks VBL (0 à 64) |
-| D (Decay, déclin) | 0 à 1 000 ms | Ticks VBL |
+| A (Attack, attaque) | 0 à 2 000 ms | Ticks VBL (0 à 100) |
+| D (Decay, déclin) | 0 à 2 000 ms | Ticks VBL (0 à 100) |
 | S (Sustain, maintien) | 0 à 100 % | Niveau 4 bits (0 à 15) |
-| R (Release, relâchement) | 0 à 2 000 ms | Ticks VBL |
+| R (Release, relâchement) | 0 à 2 000 ms | Ticks VBL (0 à 100) |
+
+À 50 Hz, les 100 ticks de A, D et R en mode Chip sont les 2 000 ms de Smooth.
 
 Les curseurs affichent les initiales ; leurs infobulles nomment chaque réglage (dans une infobulle traduite, suivi de son nom anglais entre parenthèses : « Attaque (Attack) »).
 
-**Mode** : Smooth donne une courbe continue (un gain audio) ; Chip écrit des paliers de volume 4 bits au rythme VBL, comme le font les players de l'Atari. En Authentic 3ch, Chip est imposé (sauf sur les pistes DMA). Avec le générateur Sync Buzzer en mode Chip, le niveau vient de l'enveloppe matérielle, et les pistes de percussion jouent chaque coup jusqu'au bout : l'ADSR n'y a aucun effet, et les cadres ADSR et ADSR ENVELOPE sont grisés. Le cadre **ADSR ENVELOPE** dessine la courbe et suit la voix qui joue.
+**Mode** : Smooth donne une courbe continue (un gain audio) ; Chip écrit des paliers de volume 4 bits au rythme VBL, comme le font les players de l'Atari. En Authentic 3ch, Chip est imposé (sauf sur les pistes DMA). Avec le générateur Sync Buzzer en mode Chip, le niveau vient de l'enveloppe matérielle, et les pistes de percussion jouent chaque coup jusqu'au bout : l'ADSR n'y a aucun effet, et les cadres ADSR et ADSR ENVELOPE sont grisés. Le cadre **ADSR ENVELOPE** dessine la courbe et montre un point pour chaque note qui sonne sur la piste : en Polyphonic, une note encore dans son release garde son point pendant que les suivantes ont le leur. En Monophonic, et sur toutes les pistes des modes 3 canaux, il n'y a qu'un point, celui de la note la plus récente. Une note relâchée avant son sustain descend du niveau atteint : son point continue sur la ligne du decay jusqu'au niveau du sustain, puis suit la ligne du release. Avec un sustain à 0 %, il descend la ligne du decay jusqu'au bout, où la note s'arrête.
 
 ### 3.8 GENERATOR (per channel)
 
@@ -229,8 +233,8 @@ Les curseurs affichent les initiales ; leurs infobulles nomment chaque réglage 
 | Générateur | Touche | Ce qu'il fait |
 |---|---|---|
 | Chip Voice | Ctrl+V | La voix YM simple : carré, bruit, enveloppe |
-| SID Voice | Ctrl+S | Effet de timer qui fait basculer le volume entre le volume de la note et un volume bas (son « SID » de l'Atari). **Timer ratio** 0,25 à 8,00 × ; **SID min vol** 0 à 15. En dessous, la **SID wave** : 1 à 16 volumes joués un par interruption du timer, mis à l'échelle par le volume de la note ; le timer tourne Steps/2 fois plus vite, donc la hauteur ne change pas. **Steps** tout à gauche donne l'onde carrée simple, que **Square** rétablit ; **Sine** charge 8 volumes qui suivent une sinusoïde. Faites glisser ou utilisez la molette de la souris sur les barres ; un clic droit ouvre le curseur de la barre (un clic droit sur le curseur la remet à 0) |
-| Sync Buzzer | Ctrl+U | Effet de timer qui relance l'enveloppe matérielle à la fréquence de la note. Le choisir règle EP à 32 si EP était au-dessus de 3 200. **Tuning** On ou Off : la période d'enveloppe suit la note, et l'enveloppe joue la note × **N** / **D** (1 à 16 chacun) plus **Fine** (−100 à +100 cents). **YM Pad** : le son tourne à la période 0 sous l'enveloppe, environ −6 dB. **Presets** règlent la forme, l'accord et YM Pad en un clic, la piste restant un Sync Buzzer : Saw, Triangle, Third, Fifth, Seventh, Tenth, Tri fifth, Soft saw. En dessous, les **Sync Buzzer steps** : 0 à 8 formes d'enveloppe (R13) écrites tour à tour à chaque relance (**Steps** à 0 : la forme de la piste à chaque fois). Chaque bouton montre sa forme, ou « Trk » pour la forme de la piste : cliquez-le pour choisir une forme, faites un clic droit pour le remettre à la forme de la piste. Ces réglages n'agissent que tant que la piste joue un Sync Buzzer |
+| SID Voice | Ctrl+S | Effet de timer qui fait basculer le volume entre le volume de la note et un volume bas (son « SID » de l'Atari). **Timer ratio** 0,25 à 8,00 × (1 joue la note, 2 une octave au-dessus) ; **SID min vol** 0 à 15. En dessous, la **SID wave**, sa forme choisie dans le menu après son nom : **Base**, l'onde carrée simple, sans réglage : ses barres et Steps sont cachés, le menu seul dans leur cadre ; **Square**, un carré de Steps pas, le volume de la note sur les **Width** premiers (1 à Steps - 1, moitié-moitié par défaut), SID min vol sur le reste ; **Sine**, une sinusoïde de **Period** barres (2 à 16, 8 par défaut) répétée le long des 16 barres, aucune à 0 (une sinusoïde des volumes, tels que les barres les montrent ; le niveau de la puce, logarithmique, la rend plus brillante qu'une sinusoïde pure) ; **Bounce**, la même avec Period, mais une sinusoïde du niveau de la puce, qui sonne comme une sinusoïde pure et que les barres montrent comme un rebond, plat en haut et pointu en bas ; **Custom**, les barres dessinées à la souris. Les barres de Square montrent le carré joué et ne répondent pas à la souris. Chaque forme garde les réglages et les barres des autres. **Steps** (2 à 16, 8 par défaut), sous les barres, son libellé devant son curseur, règle le nombre de barres jouées, une par interruption du timer, mises à l'échelle par le volume de la note : le timer tourne Steps/2 fois plus vite, donc la hauteur ne change pas ; les barres au-delà restent grisées et ne sont pas jouées. Les Steps jouent une période de la note, donc la hauteur suit les cycles qu'ils contiennent : Period 8 avec 16 Steps sonne une octave au-dessus, 8 Steps à la hauteur de la note. Juste sous Steps, à la même place, Period avec Sine ou Bounce et Width avec Square, les trois curseurs alignés. Sine ou Bounce depuis Base règle autant de Steps que leur Period, un cycle qui joue la note ; Custom depuis Base ou Square, ses barres jamais dessinées, part du carré joué. Avec Sine ou Bounce, une barre déplacée décale la sinusoïde le long des barres jusqu'à la place qui amène cette barre au plus près du volume demandé, sans en changer les volumes (un cran de molette va au volume suivant que la sinusoïde peut donner à la barre) ; Custom libère les barres telles quelles. Faites glisser ou utilisez la molette de la souris sur les barres ; un clic droit ouvre le curseur de la barre (un clic droit sur le curseur la remet à 0) |
+| Sync Buzzer | Ctrl+U | Effet de timer qui relance l'enveloppe matérielle à la fréquence de la note. Le choisir règle EP à 32 si EP était au-dessus de 3 200. **Tuning** On ou Off : la période d'enveloppe suit la note, et l'enveloppe joue la note × **N** / **D** (1 à 16 chacun) plus **Fine** (−100 à +100 cents). **YM Pad** : le son tourne à la période 0 sous l'enveloppe, environ −6 dB. **Presets** règlent la forme, l'accord et YM Pad en un clic, la piste restant un Sync Buzzer : Saw, Triangle, Third, Fifth, Seventh, Tenth, Tri fifth, Soft saw. En dessous, les **Sync Buzzer steps** : 0 à 8 formes d'enveloppe (R13) écrites tour à tour à chaque relance (**Steps** à 0 : la forme de la piste à chaque fois). Le timer tourne autant de fois plus vite qu'il y a de pas, pour qu'ils tiennent tous dans une période de la note et que la piste garde la hauteur de la note. Chaque bouton montre sa forme, ou « Trk » pour la forme de la piste : cliquez-le pour choisir une forme, faites un clic droit pour le remettre à la forme de la piste. Ces réglages n'agissent que tant que la piste joue un Sync Buzzer |
 | Chipdrum | Ctrl+C | Percussions synthétisées : les huit instruments du Drum Kit (bouton **Drum Kit**, nom du kit affiché) |
 | Digidrum | Ctrl+I | Échantillons 4 bits joués par un timer à travers une voix de la puce. **Slot** 1 à 8 ; **ST channel** A, B ou C (Authentic 3ch : la voix qu'emprunte la piste Digidrum) ; **Digidrum samples**, sous les emplacements 5 à 8, ouvre la fenêtre Digidrums pour charger et modifier les échantillons ; la forme d'onde de l'emplacement en dessous |
 | DMA | Ctrl+D | Le son DMA du STE (Computer STE seulement). **Sample** 1 à 8 ; **DMA samples**, sous les échantillons 5 à 8, ouvre la fenêtre DMA ; la forme d'onde de l'échantillon en dessous |
@@ -241,18 +245,18 @@ En Authentic 3ch et en Dual chip, les rôles des pistes sont fixes : la quatriè
 
 | Commande | Effet |
 |---|---|
-| Voices | 16 ch, Authentic 3ch, Dual chip 2x3ch (son menu contient aussi le choix Computer). Le changer arrête toutes les notes |
-| Computer | **ST** (le YM seul) ou **STE** (le YM plus le son DMA) |
+| Voices | 16 ch, Authentic 3ch, Dual chip 2x3ch. Le changer arrête toutes les notes |
+| Computer | Un menu : **ST** (le YM seul) ou **STE** (le YM plus le son DMA) |
 | Clock | Horloge des arpégiateurs et du Step Sequencer : **Internal** (vitesse d'arpège en Hz ; le séquenceur suit l'hôte dans un DAW, son propre tempo dans l'application autonome) ou **MIDI ext** (les deux suivent l'horloge MIDI : pas d'arpège à la division choisie, séquenceur lancé par MIDI Start, voir 5.9). Avec MIDI ext, un état affiche « waiting for clock... », puis SYNC ou STOP |
 | Master | Niveau de sortie, 0 à 100 (70 par défaut) |
 | Voices (LED) | Une LED par voix, allumée tant qu'elle sonne |
-| Note | Période de son et fréquence de la dernière note jouée (« TP=n -> f Hz ») |
+| Note | Période de son et fréquence de la dernière note jouée (« TP=n -> f Hz »), tant qu'une voix sonne ; « - » dès que toutes les notes sont finies, release comprise, comme au lancement. Options > Note monitor > Off masque la ligne (une préférence) ; rien ne bouge |
 
 ### 3.10 Boutons de fenêtres, oscilloscope et moniteur de registres
 
 Les boutons **Mixer** (Ctrl+M), **Arpeggiator** (Ctrl+B), **Modulation** (Ctrl+R), **Effects** (Ctrl+F), **Step Sequencer** (Ctrl+E) et **Patches** (Ctrl+P) ouvrent leurs fenêtres. La rangée de boutons est centrée dans la fenêtre.
 
-L'**oscilloscope** affiche la forme d'onde de sortie ; Options > Oscilloscope > Off le masque (une préférence), et ce qui se trouve dessous remonte, la fenêtre raccourcissant de 100 pixels. Le **moniteur de registres** affiche les registres YM R0 à R13 en hexadécimal et, à droite, la piste courante et son générateur (CHIP VOICE, SID VOICE, SYNC BUZZER, DIGIDRUM, CHIPDRUM ou DMA ; ou « INS nn » quand un Program Change a sélectionné un instrument), avec « 3CH AUTH (shared env+noise) » ou « 16CH ». Pendant que le YM Player joue, il affiche « YM PLAYER ».
+L'**oscilloscope** affiche la forme d'onde de sortie ; Options > Oscilloscope > Off le masque (une préférence), et ce qui se trouve dessous remonte, la fenêtre raccourcissant de 100 pixels. Le **moniteur de registres** affiche les registres YM R0 à R13 en hexadécimal et, à droite, la piste courante et son générateur (CHIP VOICE, SID VOICE, SYNC BUZZER, DIGIDRUM, CHIPDRUM ou DMA ; ou « INS nn » quand un Program Change a sélectionné un instrument), avec « 3CH AUTH (shared env+noise) » ou « 16CH ». Pendant que le YM Player joue, il affiche « YM PLAYER ». Options > Register monitor > Off le masque (une préférence), comme l'oscilloscope : le clavier ou les pads et leurs boutons remontent, la fenêtre raccourcissant de 50 pixels.
 
 ### 3.11 Clavier à l'écran et pads
 
@@ -264,26 +268,43 @@ L'**oscilloscope** affiche la forme d'onde de sortie ; Options > Oscilloscope > 
 - **Computer keyboard** : ouvre la fenêtre Computer Keyboard (section 4.6). Le clavier de votre ordinateur ne joue des notes (ou les pads, sur une piste de percussion) que tant que cette fenêtre est ouverte.
 - La ligne d'aide sous le clavier rappelle les touches principales : Space = Play/Stop, 1-8 = Pattern, Shift+1-4 = Bank, ←→ = Channel, M = Metro, Ctrl+Z/Y = Undo/Redo, Esc = Panic.
 
-### 3.12 Options > Sound engine
+### 3.12 Fenêtre Settings
 
-Ces réglages sont enregistrés avec le projet ; tous sauf Quantize to VBL sont aussi des paramètres d'hôte (la fréquence de l'horloge Custom est un paramètre que l'hôte ne peut pas automatiser).
+Options > **Settings...** ouvre la fenêtre SETTINGS. Chaque réglage est un libellé et un bouton qui affiche sa valeur : cliquez sur le bouton pour la liste des valeurs, la valeur courante cochée. Une valeur qui ne s'applique pas est grisée, et son infobulle dit pourquoi. La fenêtre garde sa place, et elle est de nouveau ouverte à la prochaine ouverture de l'éditeur si vous l'avez laissée ouverte.
+
+Un changement s'applique tout de suite, pour que vous l'entendiez. **OK** garde les changements et ferme la fenêtre. **Cancel**, le bouton par défaut (contour gras, pressé aussi par Entrée), remet chaque réglage changé depuis l'ouverture de la fenêtre à la valeur qu'il avait avant, puis ferme la fenêtre ; la case de fermeture et Échap font de même. Quand un réglage diffère de sa valeur à l'ouverture, une boîte demande d'abord « Discard the changes? » : son Cancel, le choix par défaut (Entrée, Échap), garde la fenêtre ouverte avec les changements, OK les annule et la ferme. Un réglage changé puis remis à sa valeur ne demande rien. Fermer l'éditeur garde les changements.
+
+**SOUND ENGINE** (cadre de gauche). Ces réglages sont enregistrés avec le projet ; tous sauf Quantize to VBL sont aussi des paramètres d'hôte (la fréquence de l'horloge Custom et Tuning A4 sont des paramètres que l'hôte ne peut pas automatiser).
 
 | Réglage | Valeurs | Remarques |
 |---|---|---|
 | Computer | ST, STE | Comme dans le cadre SYSTEM |
-| Chip clock | Custom (par défaut, 2.0000 MHz), Atari ST 2.0053 MHz (PAL), ZX Spectrum 1.7734 MHz, Amstrad CPC 1 MHz | **Custom** (l'entrée affiche sa fréquence) ouvre une boîte où vous tapez la fréquence en MHz, de 0.1000 à 8.0000 (quatre décimales au plus ; une virgule est lue comme un point). Elle ne s'applique qu'en 16 ch : en Authentic 3ch et Dual chip, l'entrée est grisée et la puce tourne à 2 MHz. ZX Spectrum et Amstrad CPC sont grisés en Authentic 3ch. Ne change que la fréquence de la puce ; le ZX Spectrum et l'Amstrad CPC ne sont pas émulés. La valeur Atari ST (machine PAL) vient de sources d'émulateurs : **À CONFIRMER** sur le matériel |
-| Output chain | Raw (par défaut), ST, STE | Raw : la puce seule. ST : le filtre analogique de la carte de l'Atari ST. STE : la sortie du STE avec réglages de graves et d'aigus. Valeurs des composants des filtres : **À CONFIRMER** sur le matériel |
+| Chip clock | Custom (par défaut, 2.0000 MHz), Atari ST 2.0053 MHz (PAL), ZX Spectrum 1.7734 MHz, Amstrad CPC 1 MHz | Le bouton affiche l'horloge utilisée. La première entrée, **Custom** avec sa fréquence, ouvre une boîte où vous tapez la fréquence en MHz, de 0.1000 à 8.0000 (quatre décimales au plus ; une virgule est lue comme un point). Elle ne s'applique qu'en 16 ch : en Authentic 3ch et Dual chip, l'entrée est grisée et la puce tourne à 2 MHz. ZX Spectrum et Amstrad CPC sont grisés en Authentic 3ch. Ne change que la fréquence de la puce ; le ZX Spectrum et l'Amstrad CPC ne sont pas émulés. La valeur Atari ST (machine PAL) vient de sources d'émulateurs : **À CONFIRMER** sur le matériel |
+| Tuning A4 | 350.00 à 480.00 Hz (440.00 Hz par défaut) | La fréquence du La 4 (A4, note MIDI 69), d'où toutes les notes sont accordées : Chip Voice, SID Voice, Sync Buzzer, les glissandos, et les samples Digidrum et DMA ; les sons Chipdrum gardent leur hauteur. Cliquez sur la valeur et tapez-la en Hz, deux décimales au plus (une virgule est lue comme un point) ; une valeur hors limites est ramenée à 350 ou 480 Hz. La puce ne joue que des périodes entières, donc une note sonne à la période la plus proche : à 2 MHz, le La 4 à 440 Hz reçoit la période 284, qui joue 440,14 Hz |
+| Output chain | Raw (par défaut), ST, STE | Raw : la puce seule. ST : le filtre analogique de la carte de l'Atari ST. STE : la sortie du STE avec réglages de graves et d'aigus ; grisée avec Computer ST. Valeurs des composants des filtres : **À CONFIRMER** sur le matériel |
 | Resampling | Sinc (par défaut), Box (AtariAudio), Retro | La façon dont la fréquence interne de la puce est ramenée à la fréquence de l'hôte. Box et Retro se rabattent sur Sinc quand la fréquence de l'hôte dépasse clk/8 (par exemple 176,4 ou 192 kHz avec l'horloge de l'Amstrad CPC) |
-| STE bass, STE treble | −12 à +12 dB, par pas de 2 dB | Chaîne de sortie STE seulement |
+| STE bass, STE treble | −12 à +12 dB, par pas de 2 dB | Chaîne de sortie STE seulement ; grisés avec Computer ST |
 | Soft clip | On (par défaut), Off | Une saturation tanh sur la sortie |
-| Timer | MFP (par défaut), Free | Effets de timer quantifiés par le MFP 68901 de l'Atari, ou continus |
+| Timer | MFP (par défaut), Free | Effets de timer quantifiés par le MFP 68901 de l'Atari, ou continus. Free est grisé en Authentic 3ch |
+| VBL frequency | 50 Hz (PAL, par défaut), 60 Hz (NTSC), 70 Hz (Monochrome), 100 Hz, 200 Hz | Le tick de replay : il cadence l'ADSR Chip, les tables Modulation, le cadencement Ticks du séquenceur et les exports de registres. Il était avant dans le menu Options |
 | Quantize to VBL | Off (par défaut), On | Les notes, les événements MIDI, les pas du séquenceur et les arpèges ne prennent effet qu'au début de chaque trame de replay (fréquence VBL), comme les jouerait une routine de replay Atari ; le tempo ne dérive pas |
+
+**MIDI** (cadre du milieu). Enregistrés avec le projet, et paramètres d'hôte (non automatisables).
+
+| Réglage | Valeurs | Remarques |
+|---|---|---|
 | MIDI routing | Omni, Layer, Per channel | Section 7.1 |
 | Velocity | Accent, Vol 4-bit, Off | Section 7.2 |
+| Bend | Pitch (par défaut), Volume, Envelope | Ce que pilote le pitch bend, section 7.2 |
 | Bend range | 0 à 24 demi-tons (2 par défaut) | |
-| Wheel depth | 0 à 200 cents (menu par pas de 25 ; 50 par défaut) | |
+| Wheel | Off, Vibrato (par défaut), Volume, Envelope, LFO | Ce que pilote la molette de modulation, section 7.2 |
+| Wheel depth | 0 à 200 cents (menu par pas de 25 ; 50 par défaut) | Le vibrato de la molette, de l'aftertouch et du slide MPE à leur maximum |
+| Aftertouch | Off, Vibrato (par défaut), Volume, Envelope, LFO | Ce que pilote la pression des touches, section 7.2 |
+| MPE | Off (par défaut), On | 16 ch seulement, section 7.2 |
+| MPE bend range | 0 à 96 demi-tons (menu : 1, 2, 3, 4, 5, 7, 12, puis par 12 ; 48 par défaut) | Grisé tant que MPE est sur Off |
+| MPE slide (CC74) | Volume (par défaut), Envelope, Vibrato | Grisé tant que MPE est sur Off |
 
-**VBL frequency** (menu Options) : 50 Hz (PAL), 60 Hz (NTSC), 70 Hz (Monochrome), 100 Hz, 200 Hz. C'est le tick de replay : il cadence l'ADSR Chip, les tables Modulation, le cadencement Ticks du séquenceur et les exports de registres.
+**INTERFACE** (cadre de droite). Vos préférences, communes à toutes les instances de STYM2149 (section 9) : Pixels (section 3.1), Renderer (Windows seulement, grisé ailleurs), Note names, Keyboard layout (section 4.6), Tooltips (On, Off), Language, et le bouton **Languages folder...**.
 
 ---
 
@@ -311,16 +332,18 @@ Une tranche par piste (en Authentic 3ch : A, B, C et Digi, huit tranches avec de
 - le nom de la piste (cliquez dessus pour rendre cette piste courante) ;
 - un mini-oscilloscope (cliquez dessus pour ouvrir une fenêtre **Scope** plus grande pour cette piste) ;
 - un fader vertical, 0 à 100 ; pour les voix de la puce en Authentic 3ch et Dual chip, dont le niveau est le volume 4 bits, le fader est ce **Volume** du cadre SOURCE, de 0 à 15, et bouge avec lui (grisé sur un Sync Buzzer, qui n'a pas de volume fixe) ;
-- un indicateur de niveau ;
+- un indicateur de niveau. Une piste DMA qui joue un sample stéréo a deux oscilloscopes dans le cadre, gauche puis droite (un clic sur l'un ou l'autre ouvre le Scope), et deux indicateurs de niveau, gauche et droite ;
 - un curseur de panoramique, −100 à +100 (un double-clic le centre ; absent pour les voix de la puce en Authentic 3ch, puisque le ST est mono) ;
 - en 16 voies, un curseur **Send**, 0 à 100 % : la part de la piste, après son fader et son panoramique, envoyée au delay (section 4.8) ; comme le panoramique, Paste settings ne le copie pas. Les modes 3 voies n'ont pas de rangée Send, le delay étant un effet 16 voies ;
 - **M** (muet) et **S** (solo).
 
+Une piste DMA qui joue un sample stéréo en a deux de chaque : deux faders, chacun avec son indicateur et sa valeur, celui du côté gauche puis celui du côté droit, un **M** et un **S** sous chacun, et un bouton **Link** sur une rangée en dessous (la fenêtre grandit de cette rangée). Lié (par défaut), chaque fader règle le Volume de la piste et les deux bougent ensemble ; délié, le fader de droite est le niveau propre du côté droit (paramètre d'hôte Level R), qui part du Volume. Les M et S de chaque côté sont indépendants, liés ou non : coupez le côté gauche seul, ou isolez le côté droit seul (paramètres d'hôte Mute R, Solo R et Link). Ces réglages appartiennent au Mixer, comme Send : un patch, Paste settings et les fichiers de preset les laissent de côté. Sur un sample mono, ils ne font rien et ne s'affichent pas.
+
 Après un trait vertical, le fader **Master** est le niveau principal, le même que Master dans le cadre SYSTEM. Quand la sortie est stéréo (16 voies, et Authentic 3ch avec le STE), Master a deux faders, **L** et **R**, un curseur de balance sur la rangée des panoramiques (un double clic le centre) et un bouton **Link** sur la rangée de M. Lié (par défaut), chaque fader règle les deux côtés ; délié, chaque fader règle son côté (paramètres d'hôte Master et Master 2). La balance baisse seulement le côté opposé. En Dual chip 2x3ch, les deux faders sont **1** et **2**, un par puce, avec Link et sans balance : délié, Master règle la puce 1 et Master 2 la puce 2 ; les pistes DMA du STE suivent Master. En Authentic 3ch avec le ST, la sortie est mono et Master n'a qu'un fader.
 
-Sous chaque fader, panoramique, Send et Master, sa valeur s'affiche en petits chiffres, nommée sous un panoramique ou un Send (« Pan +25 », « Send 50 » ; panoramiques et balance signés, + vers la droite). Un clic droit sur l'un de ces curseurs ouvre un menu : **Value...** pour taper un nombre dans sa plage, **Reset** pour revenir à sa valeur par défaut.
+Sous chaque fader, panoramique, Send et Master, sa valeur s'affiche en petits chiffres, nommée sous un panoramique ou un Send (« Pan +25 », « Send 50 » ; panoramiques et balance signés, + vers la droite). Un clic droit sur l'un de ces curseurs ouvre un menu : **Value...** pour taper un nombre dans sa plage, **Reset** pour revenir à sa valeur par défaut. Un clic sur la valeur elle-même la fait taper sur place : taper le nombre, Enter valide, Escape annule (sous un panoramique ou un Send, seul le nombre se tape).
 
-Indicateurs de sortie : Out L et Out R, ou un seul Out en Authentic 3ch sans le STE. Chaque déplacement d'un fader, d'un panoramique ou d'un Send, chaque valeur tapée ou remise par défaut, et chaque clic sur M ou S, constitue une étape d'annulation (les faders Master, la balance et Link, comme le Master du cadre SYSTEM, n'en ont pas).
+Indicateurs de sortie : Out L et Out R, ou un seul Out en Authentic 3ch sans le STE. Chaque déplacement d'un fader, d'un panoramique ou d'un Send, chaque valeur tapée ou remise par défaut, et chaque clic sur M, S ou le Link d'une piste, constitue une étape d'annulation (les faders Master, la balance et Link, comme le Master du cadre SYSTEM, n'en ont pas).
 
 ### 4.2 Arpeggiator
 
@@ -341,6 +364,8 @@ L'arpège de la piste courante (indisponible sur les pistes de percussion).
 | Grid | Mode Table : 16 pas × décalages de +0 à +24 demi-tons, appliqués à la dernière note jouée |
 
 Avec la fenêtre au premier plan et l'arpégiateur activé, les touches fléchées déplacent le curseur de la table et Enter écrit le pas.
+
+Les touches tenues sont arpégées comme une note par touche enfoncée (ou par note MIDI), pas une par pas : l'enveloppe de cette note continue à travers les pas de l'arpège, et son point sur la courbe de l'ADSR ENVELOPE avec elle ; chaque touche enfoncée lance une nouvelle note depuis l'attaque. En 16 voies avec un **Voicing** Polyphonic, la note précédente passe alors dans son release pendant que la nouvelle joue : avec un Release long, elles se chevauchent, chacune avec son point sur la courbe. Avec Monophonic, et sur toutes les pistes des modes 3 canaux, la note précédente est coupée. Touches relâchées, la dernière note continue de parcourir l'arpège pendant son release, les précédentes finissant le leur à leur hauteur. Dans le Step Sequencer, chaque note du motif est de même une seule note de l'arpège (ligne ARP, 5.5). La table de Modulation, le vibrato et le LFO continuent d'un pas de l'arpège au suivant.
 
 ### 4.3 Modulation
 
@@ -375,8 +400,10 @@ Un clic droit efface une cellule MIX, GEN ou FIX. Le curseur qu'ouvre un clic dr
 - **Fix** : la note fixe (0 à 127). **Detune** : −100 à +100 cents. **Analog** : décalage de hauteur aléatoire tiré à chaque note, jusqu'à 50 cents.
 - **Hard sync** : relance le carré (16 ch) et le timer aussi sur les notes liées et glissées.
 - **Link** : l'instrument qui prend le relais quand une table Hold se termine.
-- **Pitch matrix** : quelles cibles (Sq : le carré, Tm : le timer de SID et de Sync Buzzer, Bz : la période d'enveloppe des buzzers) sont modifiées par chaque source (Table pitch, Slides, Vibrato).
+- **Pitch matrix** : quelles cibles (Sq : le carré, Tm : le timer de SID et de Sync Buzzer et la hauteur d'un sample DMA, Bz : la période d'enveloppe des buzzers) sont modifiées par chaque source (Table pitch, Slides, Vibrato).
 - **Vibrato table** : décalages de période Min et Max, Cycles (1 à 15), Ramp (0 à 64 pas) ; **Write PER** l'écrit dans la ligne PER.
+
+Sur une piste DMA, la hauteur de table, PER, FIX, les glissés et le vibrato modifient le sample par la colonne Tm, et VOL règle son niveau. Ce qui ne modifie rien d'un sample est grisé, son infobulle disant pourquoi : les lignes NSE, NP, MIX et GEN, Hard sync et les colonnes Sq et Bz de la matrice de hauteur. Leurs valeurs sont gardées pour un autre générateur.
 
 **LFO** (sous les réglages) : une onde lente qui fait varier un réglage du son de la piste, relancée à chaque note ou libre (Retrig) ; elle continue sur les notes d'un arpège et dans un instrument chaîné. Il ne change que les valeurs écrites dans les registres du YM, il joue donc aussi en Authentic 3ch et dans les exports de registres. Indisponible sur les pistes de percussion.
 
@@ -415,7 +442,7 @@ Joue la piste courante depuis le clavier de votre ordinateur. **La frappe ne jou
 
 Sur une piste de percussion (Chipdrum, Digidrum), les touches de la rangée du milieu, A S D F G H J K par position, jouent les 8 pads comme les pads de la fenêtre principale (un pad Digidrum sélectionne aussi son emplacement). Le dessin nomme chaque pad (Kick à Tom 2, ou Slot 1 à Slot 8) ; les autres touches, les boutons d'octave et Held notes n'y font rien.
 
-- Touches, par position sur un clavier QWERTY : A W S E D F T G Y H U J K O L P ; ' jouent de C jusqu'à F de l'octave suivante. Choisissez votre clavier dans Options > Keyboard layout (Auto, QWERTY, AZERTY, QWERTZ ; Auto suit la disposition de votre système, et vaut QWERTY pour toute autre disposition) pour que STYM2149 fasse correspondre à ces positions les caractères que tapent vos touches.
+- Touches, par position sur un clavier QWERTY : A W S E D F T G Y H U J K O L P ; ' jouent de C jusqu'à F de l'octave suivante. Choisissez votre clavier avec Keyboard layout dans Options > Settings (Auto, QWERTY, AZERTY, QWERTZ ; Auto suit la disposition de votre système, et vaut QWERTY pour toute autre disposition) pour que STYM2149 fasse correspondre à ces positions les caractères que tapent vos touches.
 - **Oct -** / **Oct +** (touches Z et X) : octave 0 à 9. Les chiffres 0 à 9 du pavé numérique choisissent directement l'octave.
 - **Held notes** : **Keep** (une note tenue garde sa hauteur quand vous changez d'octave) ou **Follow** (elle saute à la nouvelle octave).
 - Le dessin montre quelles touches jouent, lesquelles changent d'octave, lesquelles sont des raccourcis, et la plage jouée. Vous pouvez aussi cliquer sur les touches dessinées.
@@ -468,16 +495,16 @@ Les échos s'ajoutent avant le Master ; les sorties de pistes ne les portent pas
 
 ### 5.2 La fenêtre Step Sequencer
 
-Le titre affiche « STEP SEQUENCER - nom de la piste [générateur] ». La fenêtre contient :
+Le titre affiche « STEP SEQUENCER - nom de la piste [générateur] ». La fenêtre s'ouvre près du bord gauche du bureau ; quand ses lignes la rendent plus haute que le bureau, elle remonte pour que son bas reste visible, jamais au-dessus de la barre de menus. La fenêtre contient :
 
 - **Outils** : Move, Draw (par défaut), Erase, Split, Join, Select ; **Copy**, **Cut**, **Paste**.
 - **Step** (saisie pas à pas : une note que vous jouez est écrite au curseur, qui avance ensuite), **Clear** (efface la piste courante après une confirmation), **Euclid** (générateur euclidien, 5.7), **<** et **>** (font tourner la piste), **-1** / **+1** (transposent d'un demi-ton), **Oct-** / **Oct+** (transposent d'une octave), **Follow** (la vue suit la tête de lecture), **Len =** (longueur de la piste, 5.7), **Song** (ouvre la fenêtre Song).
 - **Steps** (1 à 256), **BPM** (60 à 240, Free run seulement ; une commande `Txx` change le tempo pendant la lecture, 5.5), **Gate** (5 à 95 %) et **All** (un même gate pour toutes les pistes), **Swing** (50 à 75 % : 50 est droit, 66 un shuffle de triolets).
 - **Scale** : tonique, gamme (Off et 25 gammes, des modes Major et Minor jusqu'à Blues, Whole tone et Chromatic) et **Snap** (les notes sont forcées dans la gamme : une note ou une voix d'accord posée sur une ligne grisée va au degré le plus proche). Les lignes hors de la gamme sont grisées.
 - **Signature** (2/4 à 7/4, 5/8 à 12/8 : les accents et le métronome la suivent), **Resolution** (valeur d'un pas, et le cadencement Ticks, 5.8).
-- **Note length** (figure écrite quand vous placez une note : Step, 1/1 à 1/32, valeurs pointées et de triolet), **Chord** (Off ou l'un des 39 accords, ajouté au-dessus de la note que vous placez), **Voicing** (Polyphonic ou Monophonic).
+- **Note length** (figure écrite quand vous placez une note, dessinée sur son bouton : Step, long d'un pas, dessiné comme la note de la Resolution ; 1/1 à 1/64, valeurs pointées et triolets de 1/4T à 1/32T ; les valeurs qui ne font pas un nombre entier de pas de la Resolution sont grisées, avec leur longueur non arrondie, et une valeur choisie avant qui ne tombe plus juste écrit un pas tant que la Resolution ne lui convient pas), **Chord** (Off ou l'un des 39 accords, ajouté au-dessus de la note que vous placez), **Voicing** (Polyphonic ou Monophonic).
 - **Ghost** (affiche les autres canaux derrière la grille ; activé par défaut) et **Overview** (une bande avec une ligne par canal ; dessous, seule la ligne « Whole pattern » remplace la légende de la grille).
-- La **grille** : 13 lignes de notes (une octave et une note) et 64 pas visibles, avec une barre de défilement au bord droit de la fenêtre, aussi haute que toute la grille, pour faire défiler les notes de B0 à C9 (une flèche : un demi-ton ; un clic sur la barre à côté du curseur : une octave ; la molette de la souris au-dessus de la grille : un demi-ton) et une barre de défilement pour les motifs de plus de 64 pas. Sous les lignes de notes se trouvent les lignes de contrôle (5.4).
+- La **grille** : 13 lignes de notes (une octave et une note) et 64 pas visibles, séparés par des lignes de 2 pixels, avec une barre de défilement au bord droit de la fenêtre, aussi haute que toute la grille, pour faire défiler les notes de B0 à C9 (une flèche : un demi-ton ; un clic sur la barre à côté du curseur : une octave ; la molette de la souris au-dessus de la grille : un demi-ton) et une barre de défilement pour les motifs de plus de 64 pas. Sous les lignes de notes se trouvent les lignes de contrôle (5.4).
 - Le **transport** : Play/Stop, Rec, Loop, Play from start, entrée de morceau précédente et suivante, Metronome (un clic sur chaque temps, une cloche sur le premier temps de la mesure ; il s'entend, mais l'oscilloscope et les indicateurs de sortie du Mixer ne le dessinent pas ; un clic droit ouvre son volume, de 0 à 100 %, gardé avec le projet) ; puis les banques et les motifs.
 
 Sur les pistes de percussion, les lignes de notes deviennent les huit instruments (Chipdrum : Kick, Snr, Clap, Hat, OHat, CHat, Tom1, Tom2 ; Digidrum : Sl 1 à Sl 8) et les coups durent un pas.
@@ -488,14 +515,14 @@ Avec l'outil Draw :
 
 - **Cliquez** sur une cellule vide pour écrire une note (avec la Note length et le Chord choisis). Faites glisser vers la droite sur la même ligne pour l'allonger ; faites glisser ailleurs pour écrire d'autres notes.
 - **Cliquez sur une note** pour la supprimer (si sa longueur est la Note length courante) ou pour lui donner la Note length courante.
-- **Faites glisser une note** pour la déplacer ; une note d'une sélection (cadre ou Shift+clic) déplace toute la sélection. Faites glisser son **bord gauche ou droit** (la partie extérieure de son premier ou de son dernier pas, où le pointeur devient une double flèche) pour la redimensionner.
+- **Faites glisser une note** pour la déplacer ; une note d'une sélection (cadre ou Shift+clic) déplace toute la sélection. Tant que le bouton reste appuyé sur une note qui peut bouger, le pointeur est une main ; il redevient le crayon quand vous le relâchez. Faites glisser son **bord gauche ou droit** (la partie extérieure de son premier ou de son dernier pas, où le pointeur devient une double flèche) pour la redimensionner.
 - Sur une piste polyphonique, cliquez sur une autre ligne d'un pas qui a déjà une note pour ajouter une voix d'accord (jusqu'à 6 voix par pas) ; cliquez sur une voix d'accord pour la supprimer.
 - **Alt+clic** sur une note la scinde à ce pas.
 - **Shift+clic** sur une note l'ajoute à une sélection multiple (ou l'en retire) ; **Shift+glisser** sur des cellules vides trace un cadre de sélection. Sur les lignes de contrôle (et sur les pistes de percussion), Shift+clic sélectionne un bloc de pas.
 - **Clic droit** sur une note : Copy, Cut, Paste here, Longer ], Shorter [, Split here `\`, Join with next J, Length, Delete. Clic droit sur une cellule vide quand une note est dans le presse-papiers : Paste note here.
 - **Glisser avec le bouton droit** trace un cadre de sélection ; un clic droit dessus donne Copy, Cut, Paste, Clear, Deselect. Un clic droit sur un bloc de pas sélectionné donne Copy block, Cut block, Paste block, Clear block, Deselect, Note length, Channel, Rename channel....
 
-Les autres outils : **Move** déplace des notes ou une sélection, et redimensionne une note par son bord comme Draw (un clic sans glisser place seulement le curseur) ; **Erase** supprime les notes sur lesquelles vous cliquez ou passez en glissant ; **Split** scinde en deux la note cliquée à ce pas ; **Join** fusionne la note cliquée avec la suivante sur la même ligne ; **Select** trace un cadre de sélection.
+Les autres outils : **Move** déplace des notes ou une sélection, par leur bord aussi, car seul Draw redimensionne une note (un clic sans glisser place seulement le curseur) ; **Erase** supprime les notes sur lesquelles vous cliquez ou passez en glissant ; **Split** scinde en deux la note cliquée à ce pas ; **Join** fusionne la note cliquée avec la suivante sur la même ligne ; **Select** trace un cadre de sélection.
 
 Quand le Step Sequencer est ouvert, le clavier édite aussi : les flèches déplacent le curseur (la vue défile quand vous sortez par le haut ou par le bas), Enter écrit ou supprime une note au curseur, Delete efface le pas. Avec la fenêtre au premier plan et une note sous le curseur : `]` l'allonge, `[` la raccourcit, `\` la scinde au curseur, J la joint à la note suivante, Ctrl+C / Ctrl+X la copient ou la coupent, Ctrl+V colle au curseur. Avec un cadre de sélection : les flèches le déplacent (Shift+↑/↓ d'une octave), Delete l'efface, Esc le désélectionne, Ctrl+C / X / V.
 
@@ -503,48 +530,50 @@ Chaque geste constitue une étape d'annulation (Ctrl+Z, Ctrl+Y).
 
 ### 5.4 Lignes de contrôle
 
-Sous les lignes de notes, des lignes de contrôle règlent des options par pas. Les lignes affichées dépendent de la piste :
+Sous les lignes de notes, des lignes de contrôle règlent des options par pas, dans l'ordre de ce qu'elles font à la note : sa hauteur, son son (GEN décide de ce que peuvent SRC, ENV et SMP), ses modulations, son glissé, son placement dans le pas, les autres commandes, sa place dans le mixage. Les lignes affichées dépendent de la piste :
 
 | Ligne | Affichée sur | Valeurs | Effet |
 |---|---|---|---|
 | OCT | Percussion | −3 à +3 | Accorde la percussion par octaves |
 | TON | Percussion | −12 à +12 | Accorde la percussion par demi-tons |
+| TUN | Mélodique | −99 à +99 | Accord de la piste en cents à partir de ce pas (`Fxx`, 5.5) |
 | INS | Mélodique, quand le projet a des instruments | Channel, $01 à $20 | Joue la note avec un instrument du projet (6.1) |
-| CMD | Affichée par défaut (menu Resolution > Step command rows la masque), et dès qu'une commande de sa boîte est écrite | TIK, SYN, VSL, BSL, NSL ; MUL pour plusieurs | Commandes de pas (5.5) |
-| SRC | Mélodique | Channel, Tone, Noise, Tone+Noise, Env, Tone+Env, Noise+Env, Tone+Noise+Env | Onde carrée, bruit ou les deux sur ce pas. Tone, Noise et Tone+Noise gardent le mode de volume de la piste ; les entrées Env mettent le volume sur l'enveloppe (Env seul : ni carré ni bruit) |
 | GEN | Mélodique | Channel, Chip Voice, SID Voice, Sync Buzzer | Un autre générateur sur ce pas seulement |
+| SRC | Mélodique | Channel, Tone, Noise, Tone+Noise, Env, Tone+Env, Noise+Env, Tone+Noise+Env | Onde carrée, bruit ou les deux sur ce pas. Tone, Noise et Tone+Noise gardent le mode de volume de la piste ; les entrées Env mettent le volume sur l'enveloppe (Env seul : ni carré ni bruit) |
 | ENV | Mélodique, quand l'enveloppe joue : source Env, générateur Sync Buzzer, une entrée Env dans SRC ou Sync Buzzer dans GEN | No change, formes 8 à F ; Restart : None, At once, At tick | Forme de l'enveloppe matérielle de la piste à partir de ce pas (`Exx`), et relance de l'enveloppe à un tick de la ligne (`Rxx`) ; la cellule affiche la forme et R (5.5) |
+| SMP | Pistes DMA | 0 à 255 | Le sample DMA de ce pas démarre d'autant de pas de 256 trames après son Start (`Oxx`, 5.5) |
 | ARP | Mélodique, quand l'arpégiateur de la piste est activé | No change, On, Off | Allume ou éteint l'arpégiateur de la piste à partir de ce pas (`Jxx`, 5.5) |
 | VIB | Mélodique, avec Vibrato sur On dans le cadre VIBRATO | No change, On, Off | Allume ou éteint le vibrato de la piste à partir de ce pas (`Vxx`, 5.5) |
 | LFO | Mélodique, avec le LFO de la piste allumé (fenêtre Modulation) | No change, On, Off | Allume ou éteint le LFO de la piste à partir de ce pas (`Lxx`, 5.5) |
 | MOD | Mélodique, avec la table de modulation de la piste allumée (fenêtre Modulation) | No change, On, Off | Allume ou éteint la table de modulation de la piste à partir de ce pas (`Mxx`, 5.5) |
-| TUN | Mélodique | −99 à +99 | Accord de la piste en cents à partir de ce pas (`Fxx`, 5.5) |
-| HLD | Chipdrum | on/off | Ne redéclenche pas la percussion tant qu'elle résonne encore |
 | SLD | Mélodique | on/off | Glisse de cette note jusqu'à la suivante |
-| CRV | Mélodique | Linear, Exponential, Logarithmic, S-curve, Stepped, Sawtooth, Wobble, Chromatic, Scale-locked, Overshoot, Bounce, Random walk, Custom | Forme du glissando ; réglez-la là où commence un glissé, ou en cours de glissé pour la changer. Custom ouvre la fenêtre Slide Curve |
-| GAT | Mélodique | Channel, ou 0 à 100 % | Longueur de la note sur ce pas, en proportion du pas |
-| DLY | Toutes | 1 à 255 | Les notes de ce pas partent à ce tick de la ligne (`Dxx`, 5.5) |
-| CUT | Toutes | 0 à 255 | Les notes de ce pas s'arrêtent à ce tick de la ligne (`Cxx`, 5.5) |
-| SMP | Pistes DMA | 0 à 255 | Le sample DMA de ce pas démarre d'autant de pas de 256 trames plus loin (`Oxx`, 5.5) |
-| PAN | 16 ch, et pistes DMA | Center, −10 à +10 | Position stéréo de ce pas |
-| RTG | Toutes | 1 à 4 | Répète le coup 2, 3 ou 4 fois à l'intérieur du pas |
+| CRV | Mélodique, tant qu'une case SLD est allumée (ou qu'une courbe est écrite) | Linear, Exponential, Logarithmic, S-curve, Stepped, Sawtooth, Wobble, Chromatic, Scale-locked, Overshoot, Bounce, Random walk, Custom | Forme du glissando ; réglez-la là où commence un glissé, ou en cours de glissé pour la changer. Custom ouvre la fenêtre Slide Curve |
 | CND | Toutes | Always, 1:2, 2:2, 1:4, 4:4, 25%, 50%, 75% | Ne joue le pas qu'au 1er ou au 2e de chaque groupe de 2 passages, au 1er ou au 4e de chaque groupe de 4, ou avec cette probabilité |
-| VOL | Toutes | 0 à 15 | Accent (niveau 4 bits). Faites glisser pour dessiner ; clic droit pour un curseur (clic droit dessus : retour à 15 ; clic sur sa valeur pour en taper une) |
+| DLY | Toutes | 1 à 255 | Les notes de ce pas partent à ce tick de la ligne (`Dxx`, 5.5) |
+| RTG | Toutes | 1 à 4 | Répète le coup 2, 3 ou 4 fois à l'intérieur du pas |
+| GAT | Mélodique | Channel, ou 0 à 100 % | Longueur de la note sur ce pas, en proportion du pas |
+| HLD | Chipdrum | on/off | Ne redéclenche pas la percussion tant qu'elle résonne encore |
+| CUT | Toutes | 0 à 255 | Les notes de ce pas s'arrêtent à ce tick de la ligne (`Cxx`, 5.5) |
+| CMD | Affichée par défaut (menu Resolution > Step command rows la masque), et dès qu'une commande de sa boîte est écrite | TIK, SYN, VSL, BSL, NSL ; MUL pour plusieurs | Commandes de pas (5.5) |
+| PAN | 16 ch, et pistes DMA | Center, −10 à +10 | Position stéréo de ce pas |
+| VOL | Toutes | 0 à 15 | Accent (niveau 4 bits). Faites glisser pour dessiner ; clic droit pour un curseur (clic droit dessus : retour à 15 ; clic sur sa valeur pour en taper une) et son bouton **Slide** : le niveau glisse vers le VOL du pas suivant (`Gxx`, 5.5), dessiné en rampe |
 | BPM | Application autonome, sous VOL après un séparateur | 32 à 255 | Tempo de toutes les pistes à partir de ce pas : une seule ligne pour tout le motif, la même sur chaque piste (`Txx`, 5.5) |
 
-ENV, VIB, LFO, MOD, TUN, DLY, CUT, SMP et BPM sont affichées avec la ligne CMD (Resolution > Step command rows), chacune aussi tant qu'une de ses valeurs est écrite ; ARP est affichée dès que l'arpégiateur de la piste est allumé.
+ENV, VIB, LFO, MOD, TUN, DLY, CUT, SMP et BPM sont affichées avec la ligne CMD (Resolution > Step command rows), chacune aussi tant qu'une de ses valeurs est écrite ; ARP est affichée dès que l'arpégiateur de la piste est allumé. ARP, VIB, LFO et MOD disparaissent tant que l'arpégiateur, le vibrato, le LFO ou la table de modulation de la piste est éteint, et reviennent avec leurs valeurs quand il est rallumé.
 
-Une valeur écrite là où elle ne peut pas agir est grisée et barrée d'une croix, et son infobulle dit pourquoi : l'arpégiateur, le vibrato ou la table de modulation de la piste éteint, son LFO éteint ou sans profondeur, une piste de percussion (ARP, VIB, LFO, MOD, TUN), aucune enveloppe ne joue (ENV), pas une piste DMA ou aucune note ne part sur ce pas (SMP, DLY), aucun glissé ne joue (CRV), cadencement Ticks ou horloge externe (BPM). Elle reste modifiable et effaçable.
+Une valeur écrite là où elle ne peut pas agir est grisée et barrée d'une croix, et son infobulle dit pourquoi : le LFO de la piste sans profondeur (LFO), une piste de percussion (TUN), aucune enveloppe ne joue (ENV), pas une piste DMA ou aucune note ne part sur ce pas (SMP, DLY), aucun glissé ne joue (CRV), cadencement Ticks ou horloge externe (BPM). Elle reste modifiable et effaçable.
+
+Une case où rien ne pourrait agir à cause du son de son pas est barrée même vide, et un clic n'y ouvre rien ; son infobulle dit pourquoi. Ce son est le générateur de la note (GEN, sinon son instrument, sinon la piste) : ENV sous une SID Voice, qui écrit ses propres volumes ; SRC sous un Sync Buzzer ; SRC et ENV sous le DMA ou un son de percussion ; SMP hors des notes DMA ; GEN sur les pistes DMA d'Authentic 3ch et de Dual chip, et sur une note DMA ou de percussion tenue ; INS et CND sur une note tenue, INS sur la note qu'atteint un glissé (il garde l'instrument de la note d'où il part) ; GAT et RTG pendant un glissé ; GAT sur un pas après lequel la note continue (seul le GAT de son dernier pas agit). Sur un pas où aucune note ne sonne, une case vide reste ouverte, puisqu'une note peut y être écrite plus tard ; une valeur déjà écrite y est barrée.
 
 Une note dessinée sur plusieurs pas est tenue : SRC, GEN, CRV, PAN, VOL, RTG et ARP agissent sur chacun de ses pas. VOL règle son niveau pas par pas ; RTG la refrappe depuis le début de son pas ; ARP y lance ou reprend l'arpège (RTG attend tant que l'arpège joue, et pendant un glissé seul VOL agit). GAT agit sur le dernier pas de la note, où il la relâche ; OCT, TON, INS, CND et SLD appartiennent à son premier pas.
 
-Cliquez sur une ligne on/off pour l'activer ou la désactiver (faites glisser pour peindre). Cliquez sur une ligne de valeurs pour ouvrir son menu ; GAT, PAN, BPM, TUN, DLY, CUT et SMP ouvrent une petite boîte ; CMD ouvre la boîte des commandes du pas. Faites un clic droit sur une cellule de contrôle pour la réinitialiser (faites glisser pour en réinitialiser davantage). Faites un clic droit sur le libellé d'une ligne pour **Copy row** / **Paste row**, qui copie une ligne entière d'une piste à une autre (sauf BPM, que toutes les pistes partagent).
+Cliquez sur une ligne on/off pour l'activer ou la désactiver (faites glisser pour peindre). Cliquez sur une ligne de valeurs pour ouvrir son menu ; GAT, PAN, BPM, TUN, DLY, CUT et SMP ouvrent une petite boîte (PAN affiche 0 au centre) ; CMD ouvre la boîte des commandes du pas. Faites un clic droit sur une cellule de contrôle pour la réinitialiser (faites glisser pour en réinitialiser davantage), sauf une case GEN, SRC ou ENV qui porte une valeur : son clic droit ouvre une fenêtre avec les réglages de la piste courante que la case met en jeu, qui agissent comme les mêmes commandes de la fenêtre principale. GEN : ceux de SID Voice (Timer ratio, SID min vol, la SID wave, le menu de ses formes, ses Steps, Period avec Sine ou Bounce, Width avec Square, disposés comme dans la fenêtre principale) ou de Sync Buzzer (Tuning, N, D, Fine, YM Pad, Presets, les pas) ; Chip Voice n'en a pas. SRC : Noise period et Volume, grisés quand la source de la case ne les utilise pas, et Level. ENV : Env freq et EP. Une seule fenêtre s'ouvre à la fois, celle de la dernière case cliquée. Faites un clic droit sur le libellé d'une ligne pour **Copy row** / **Paste row**, qui copie une ligne entière d'une piste à une autre (sauf BPM, que toutes les pistes partagent).
 
 ### 5.5 Commandes de pas (CMD et les lignes de commandes)
 
 La ligne CMD et les lignes propres des commandes (ENV, VIB, LFO, MOD, TUN, DLY, CUT, SMP, BPM) sont affichées par défaut ; Resolution > Step command rows > Off les masque (une préférence) tant qu'aucune de leurs valeurs n'est écrite. ARP est affichée avec l'arpégiateur. Un pas porte jusqu'à quinze commandes par piste, une de chaque sorte, qui jouent ensemble, et le tempo du motif. La cellule CMD affiche le nom court de la commande de sa boîte (TIK, SYN, VSL, BSL, NSL), ou MUL quand il y en a plusieurs ; BPM, TUN, DLY, CUT et SMP affichent leur nombre, ENV la forme (8 à F) et R pour une relance, ARP, VIB, LFO et MOD On ou Off.
 
-Cliquez sur une cellule CMD pour ouvrir la boîte **Commands** : une ligne par commande, dans l'ordre Ticks per Line, Sync Mark, Volume Slide, Buzzer Slide, Noise Slide, chacune avec sa valeur et un bouton **On**/**Off**. Les trois glissés ont deux curseurs (montée x et descente y) et un champ tapé en hexadécimal (`0F` : descendre de 15) ; les autres ont un curseur et un champ tapé en décimal. Choisir une valeur met sa ligne sur On. **OK** écrit toutes les lignes dans le pas ; **Cancel**, le bouton par défaut (Entrée, Échap), ferme sans le changer. Une commande absente du pas propose une valeur de départ : les ticks par ligne du morceau, marque 1, volume descendant d'un quart de pas par tick (`01`), les autres glissés montant d'une unité (`10`). Un clic droit sur une cellule CMD efface les commandes de sa boîte.
+Cliquez sur une cellule CMD pour ouvrir la boîte **Commands** : une ligne par commande, dans l'ordre Ticks per Line, Sync Mark, Volume Slide, Buzzer Slide, Noise Slide, chacune avec sa valeur et un bouton **On**/**Off**. Un glissé a une vitesse de 0 à 15 (0 l'arrête) et un bouton pour son sens, **Up** ou **Down** (écrit `x0` ou `0y`). En 16 voies, le bouton des Buzzer et Noise Slides ouvre un menu : Up, Down et un sous-menu **Curve** avec les 13 formes de la ligne CRV ; le bouton affiche le sens et le nom court de la forme (Down EXP). Une forme autre que Linear (`Kxx`, `Qxx`) fait suivre cette forme au glissé, de son pas jusqu'à la commande suivante de son type (jusqu'à la fin de la piste s'il n'y en a pas), en couvrant ce que sa vitesse couvre en ligne droite ; Linear garde la vitesse par trame. Les autres commandes ont un curseur et un champ tapé en décimal. Un glissé n'est dans la boîte que s'il peut faire bouger une note entre son pas et la commande suivante de son type, la piste bouclant : Buzzer Slide une note dont on entend l'enveloppe (source ou entrée SRC Env, Sync Buzzer) ; Noise Slide une note dont on entend le bruit (Source ou SRC avec bruit, Chip Voice ou SID Voice) ; le Volume Slide, que le Slide d'une case VOL remplace, seulement là où un projet plus ancien en a écrit un. Chaque note a le générateur de sa case GEN, sinon de son instrument, sinon de la piste, et la source de sa case SRC, sinon de son instrument ou de la piste ; sa table de modulation compte aussi, et un pas vide compte comme la note qu'on pourrait y écrire. Aucun glissé sur une piste de percussion. Un glissé écrit sur le pas reste dans la boîte, pour pouvoir l'éteindre. Choisir une valeur met sa ligne sur On. **OK** écrit toutes les lignes dans le pas ; **Cancel**, le bouton par défaut (Entrée, Échap), ferme sans le changer. Une commande absente du pas propose une valeur de départ : les ticks par ligne du morceau, marque 1, volume descendant d'un quart de pas par tick (`01`), les autres glissés montant d'une unité (`10`). Un clic droit sur une cellule CMD efface les commandes de sa boîte.
 
 Les autres commandes ont leur propre ligne. **ARP**, **VIB**, **LFO** et **MOD** : un menu, No change, On (`J01`, `V01`, `L01`, `M01`) ou Off (`J00`, `V00`, `L00`, `M00`). **BPM** (application autonome seulement, puisqu'en plugin le DAW règle le tempo ; un tempo écrit reste dans le projet) : une boîte avec un curseur de 32 à 255, qui part du champ BPM ; la ligne appartient au motif, donc un tempo écrit sur une piste apparaît sur toutes. **ENV** (quand l'enveloppe joue) : un menu des formes 8 à F avec leur dessin, et un sous-menu **Restart** : None, At once (tick 0) ou At tick..., qui ouvre une boîte sur les ticks d'une ligne. **DLY** et **CUT** : une boîte avec un curseur sur les ticks d'une ligne au tempo courant, à partir de 1 pour DLY et de 0 pour CUT ; un tick plus grand, jusqu'à 255, peut être tapé et reste ignoré tant que la ligne est plus courte. **TUN** : une boîte en cents, de −99 à +99. **SMP** (pistes DMA) : une boîte de 0 à 255, par pas de 256 trames. **None** dans une boîte, et No change dans un menu, retirent la commande du pas ; un clic droit sur la cellule aussi (sur ENV, la forme et la relance).
 
@@ -553,25 +582,28 @@ Les autres commandes ont leur propre ligne. **ARP**, **VIB**, **LFO** et **MOD**
 | `Sxx` (Ticks per Line) | Ticks par ligne à partir de cette ligne (cadencement Ticks seulement ; 1 à 31). Ignoré en cadencement BPM et en Host sync |
 | `Txx` (ligne BPM) | Tempo de toutes les pistes à partir de cette ligne, de 32 à 255 BPM (une valeur plus petite tapée devient 32), une seule ligne pour le motif. Cadencement BPM avec l'horloge propre du séquenceur (Free run) et dans les exports ; ignoré en cadencement Ticks, en Host sync et en MIDI ext. Un projet ou un fichier d'une version précédente qui avait un tempo sur plusieurs pistes d'une même ligne garde le dernier. Le tempo tient jusqu'au `Txx` suivant : Play repart du champ BPM, une entrée de Song qui a son propre tempo repart de celui-ci à chaque passage, et toucher au champ BPM reprend la main |
 | `Vxx` (ligne VIB) | Vibrato de la piste à partir de cette ligne : Off (`V00`) le suspend, On (`V01`) le rétablit (le vibrato du cadre VIBRATO ; la molette de modulation ajoute toujours le sien). Tient jusqu'au `Vxx` suivant ; Play et Stop rendent à la piste son vibrato. Avec Vibrato sur Off dans le cadre, `Vxx` ne rétablit rien |
-| `Jxx` (ligne ARP) | Arpégiateur de la piste à partir de cette ligne : On (`J01`) le fait jouer sur les notes du motif, Off (`J00`) l'arrête. Tient jusqu'au `Jxx` suivant. Chaque motif commence avec l'arpégiateur éteint, comme Play ; lancée au milieu d'un motif, la piste prend le dernier `Jxx` avant ce pas. Avec l'arpégiateur sur Off dans sa fenêtre, `J01` ne fait rien. Les pas ARP d'une version précédente deviennent des `J01` et `J00` et jouent pareil |
+| `Jxx` (ligne ARP) | Arpégiateur de la piste à partir de cette ligne : On (`J01`) le fait jouer sur les notes du motif, Off (`J00`) l'arrête, aussi sur un pas d'une note tenue, qui continue sans arpège. Tient jusqu'au `Jxx` suivant. Chaque motif commence avec l'arpégiateur éteint, comme Play ; lancée au milieu d'un motif, la piste prend le dernier `Jxx` avant ce pas. Avec l'arpégiateur sur Off dans sa fenêtre, `J01` ne fait rien. Les pas ARP d'une version précédente deviennent des `J01` et `J00` et jouent pareil |
 | `Lxx` (ligne LFO) | LFO de la piste (fenêtre Modulation) à partir de cette ligne : Off (`L00`) le suspend, On (`L01`) le rétablit. Tient jusqu'au `Lxx` suivant ; chaque motif commence avec le LFO tel que réglé dans la fenêtre |
 | `Mxx` (ligne MOD) | Table de modulation de la piste (fenêtre Modulation) à partir de cette ligne : Off (`M00`) la suspend, On (`M01`) la rétablit. Tient jusqu'au `Mxx` suivant ; chaque motif commence avec la table telle que réglée dans la fenêtre |
 | `Rxx` (ligne ENV, Restart) | Relance l'enveloppe matérielle (réécrit R13) au tick xx de la ligne (0 à 255), sans redéclencher la note. En Authentic 3ch, seulement si la piste pilote l'enveloppe partagée |
 | `Zxx` (Sync Mark) | Synchro de démo ; ne joue rien. Dans un export SNDH, la routine écrit xx (0 à 255) dans son octet de synchro à la trame de la ligne (plusieurs pistes sur une même ligne : la dernière l'emporte). Une démo trouve cet octet à l'adresse que la routine d'init SNDH renvoie dans le registre A0 ; il vaut 0 après l'init. L'endroit où maxYMiser garde son propre octet de synchro est **À CONFIRMER** |
-| `Axy` (Volume Slide) | Le volume des notes monte de x ou descend de y quarts de pas (sur les 16 niveaux) par tick de replay, à partir du deuxième tick d'une note ; si les deux sont réglés, il bouge de x − y. Tient jusqu'au `Axy` suivant : `A00` l'arrête. Chaque nouvelle note repart de son propre volume. Sans effet sur un volume piloté par l'enveloppe |
+| `Gxx` (ligne VOL, Slide) | Le niveau du pas glisse trame après trame, en ligne droite, de son VOL au VOL du pas suivant : l'accent en 16 voies et sur les pistes DMA, le volume 4 bits dans les modes 3 voies (dans les registres exportés). Pas sur les pistes de percussion |
+| `Axy` (Volume Slide, projets plus anciens) | Le volume des notes monte de x ou descend de y quarts de pas (sur les 16 niveaux) par tick de replay, à partir du deuxième tick d'une note ; si les deux sont réglés, il bouge de x − y. Tient jusqu'au `Axy` suivant : `A00` l'arrête. Chaque nouvelle note repart de son propre volume. Sans effet sur un volume piloté par l'enveloppe. Le Slide d'une case VOL le remplace ; la boîte le montre là où un projet en a un |
 | `Dxx` (ligne DLY) | Les notes de ce pas partent au tick xx de la ligne ; le reste de la ligne fait leur durée. Un tick au-delà de la ligne est ignoré (les notes partent à l'heure) |
 | `Cxx` (ligne CUT) | Les notes de la piste s'arrêtent au tick xx de la ligne (`C00` : tout de suite, la note de ce pas ne sonne pas). Un tick au-delà de la ligne est ignoré. Cette ligne seulement |
 | `Bxy` (Buzzer Slide) | La période de l'enveloppe matérielle (R11-R12) glisse : montée x (période plus courte, plus aigu) ou descente y en seizièmes de demi-ton par tick de replay. Tient jusqu'à `B00` ; chaque nouvelle note repart de sa propre période. Fait plier les basses Sync Buzzer et d'enveloppe |
+| `Kxx` (Buzzer Slide, Curve) | 16 voies : la forme du `Bxy` du pas (1 à 12 : les formes de la ligne CRV après Linear). Le glissé la suit jusqu'au `Bxy` suivant de la piste ; les modes 3 voies l'ignorent |
 | `Nxy` (Noise Slide) | La période de bruit (R6) glisse : montée x (période plus courte, bruit plus aigu) ou descente y en quarts de pas par tick de replay, entre 1 et 31. Tient jusqu'à `N00` ; chaque nouvelle note repart de son propre bruit |
+| `Qxx` (Noise Slide, Curve) | 16 voies : la forme du `Nxy` du pas, comme `Kxx` |
 | `Exx` (ligne ENV) | Forme R13 de l'enveloppe matérielle de la piste à partir de cette ligne, de 8 à 15 (les formes du menu Shape R13) ; une note tenue la prend tout de suite, ce qui relance l'enveloppe. Tient jusqu'au `Exx` suivant ; Play repart de la forme du son. Les autres valeurs sont ignorées |
-| `Oxx` (ligne SMP) | Les samples DMA de ce pas démarrent à la trame xx × 256 du slot (machine STE). Un départ au-delà de la fin du sample donne le silence ; un sample en boucle reboucle sur ce départ, comme le STE recharge son adresse de début de trame. Cette ligne seulement. La granularité exacte de l'adresse sur le STE est **À CONFIRMER** |
+| `Oxx` (ligne SMP) | Les samples DMA de ce pas démarrent xx × 256 trames après le Start du slot (machine STE). Un départ à End ou au-delà donne le silence ; un sample en boucle reboucle sur ce départ, comme le STE recharge son adresse de début de trame. Cette ligne seulement. La granularité exacte de l'adresse sur le STE est **À CONFIRMER** |
 | `Fxx` (ligne TUN) | Accord de la piste à partir de cette ligne, xx − 100 cents (de −99 à +99 dans la boîte ; ±100 d'un fichier précédent s'affiche ±99 et joue tel qu'écrit) ; une note tenue suit. Tient jusqu'au `Fxx` suivant ; Play repart de 0 |
 
 Les commandes appartiennent à la ligne, pas à la note : supprimer ou déplacer une note les laisse en place. L'arpège `Xyz` et le glissé de hauteur `Pxy` sont retirés, les lignes ARP et SLD faisant leur travail ; un fichier qui en contient se charge sans eux.
 
 ### 5.6 Arpèges, glissés et gate
 
-- **Arpèges** : l'arpégiateur de la piste (4.2) joue sur les notes du motif à partir d'un pas dont la ligne ARP est sur On jusqu'à un pas dont la ligne ARP est sur Off (chaque motif commence avec lui éteint), et sur les notes que vous jouez en direct. Sur un pas d'une note tenue, ARP On lance ou reprend l'arpège.
+- **Arpèges** : l'arpégiateur de la piste (4.2) joue sur les notes du motif à partir d'un pas dont la ligne ARP est sur On jusqu'à un pas dont la ligne ARP est sur Off (chaque motif commence avec lui éteint), et sur les notes que vous jouez en direct. Sur un pas d'une note tenue, ARP On lance ou reprend l'arpège. Comme au clavier (4.2), chaque note du motif est une seule note de l'arpège : son enveloppe continue à travers les pas de l'arpège, la note suivante du motif la relance depuis l'attaque ; à la fin de la note, elle continue de parcourir l'arpège pendant son release.
 - **Glissés** : SLD sur une note glisse vers la note suivante ; CRV règle la forme (Custom utilise la fenêtre Slide Curve). Les options Track et Land de l'Arpeggiator ajustent les arpèges pendant les glissandos. La matrice de hauteur de la fenêtre Modulation décide ce que les glissés font bouger (carré, timer, enveloppe).
 - **Gate** : le curseur Gate règle la longueur des notes en proportion du pas pour la piste courante ; avec **All**, un même gate s'applique à toutes les pistes. La ligne GAT le remplace pas par pas.
 
@@ -583,8 +615,10 @@ Les commandes appartiennent à la ligne, pas à la note : supprimer ou déplacer
 
 ### 5.8 Cadencement
 
-- **Cadencement BPM** (par défaut) : le menu Resolution règle la valeur d'un pas : 1/4, 1/8, 1/16 (par défaut), 1/32, 1/4T, 1/8T, 1/16T. Swing décale un pas sur deux.
+- **Cadencement BPM** (par défaut) : le menu Resolution règle la valeur d'un pas : 1/4, 1/8, 1/16 (par défaut), 1/32, 1/64, 1/4T, 1/8T, 1/16T, 1/32T. Swing décale un pas sur deux. En 1/32T, un pas dure deux impulsions de l'horloge MIDI. En 1/64, un pas dure une impulsion et demie de l'horloge MIDI : avec Clock MIDI ext, un pas sur deux commence entre deux impulsions, à la moitié de la durée mesurée d'une impulsion ; avec Quantize to VBL, les pas tombent sur les trames de replay (à 120 BPM et 50 Hz, un pas de 1/64 dure 31 ms, une ou deux trames).
 - **Cadencement Ticks** (Resolution > Ticks: Speed ticks per line) : chaque ligne dure **Speed** ticks de replay (1 à 31, à la fréquence VBL) plus le **Groove** (jusqu'à 16 valeurs, 0 à 15 ticks ajoutés aux lignes successives), comme dans les trackers. En Free run, le champ BPM affiche « ticks » et le tempo qui en résulte ; Swing est remplacé par le groove. En Host sync, les lignes suivent les temps de l'hôte selon la résolution.
+
+Choisir une autre résolution alors que les motifs contiennent des notes ouvre une boîte qui demande si les notes la suivent. **Fit** place chaque note sur le pas de la nouvelle grille le plus proche de son instant (un demi-pas s'arrondit au pas suivant) et met à l'échelle sa longueur, les valeurs de pas écrites sur elle, les accords, la longueur des motifs, la ligne BPM, les longueurs propres des pistes et les silences du Song ; quand deux notes d'une ligne tombent sur le même pas, la première reste. Fit s'annule en une étape. **Keep** laisse chaque note sur son pas, qui dure désormais la nouvelle valeur. **Cancel**, par défaut (Entrée et Échap), garde la résolution. Sans notes, ou avec la même résolution, aucune boîte ne s'ouvre.
 
 ### 5.9 Horloges et synchronisation sur l'hôte
 
@@ -659,13 +693,14 @@ Les notes G# à B jouent à nouveau Kick à Hat. **Audition** fait entendre la p
 
 Huit emplacements d'échantillons 4 bits joués par le timer d'une piste Digidrum, à leur fréquence à partir de leur note de référence. Dans le séquenceur, la ligne sur laquelle vous écrivez choisit l'emplacement ; en MIDI, c'est le réglage Slot de la piste.
 
-- **Slot** 1 à 8 (clic : le jouer et le sélectionner). **Name** (16 caractères).
+- **Slot** 1 à 8 (clic : le jouer et le sélectionner). **Name** (16 caractères, pris du fichier chargé ; cliquez pour le taper). Le nom ouvre la ligne de texte au-dessus de la forme d'onde, ici et dans le cadre GENERATOR, et suit le numéro de l'emplacement dans les infobulles.
 - **Rate** 2 000 à 20 000 Hz à la note de référence (préréglages 7800, 8000, 11025). La changer conserve les valeurs, donc la hauteur change ; un fichier se charge à cette fréquence.
 - **Root** (la note qui joue l'emplacement à sa fréquence) et **Fine** (−100 à +100 cents).
-- **Load...** (ou clic sur la forme d'onde) : un fichier audio (WAV, AIFF, FLAC, Ogg Vorbis), premier canal seulement, rééchantillonné à la fréquence, 3 secondes au plus. **Play** joue l'emplacement une fois à travers la table de volume de la puce. **Clear** vide l'emplacement.
-- **Loop** avec **Start** et **End** : boucle tant que la note est tenue, puis joue jusqu'à la fin.
+- **Load...** (ou clic sur la forme d'onde) : un fichier audio (WAV, AIFF, FLAC, Ogg Vorbis), premier canal seulement, rééchantillonné à la fréquence, 3 secondes au plus. **Play** joue l'emplacement une fois, de Start à End, à travers la table de volume de la puce ; avec Loop, il répète cette partie jusqu'à un nouveau clic sur Play ou Loop ou la fermeture de la fenêtre, Play restant allumé pendant ce temps. **Clear** vide l'emplacement.
+- **Start** et **End** : la partie de l'échantillon jouée (End est la valeur qui suit la dernière jouée), avec ou sans Loop ; charger un fichier les règle sur l'échantillon entier. La forme d'onde grise ce qui est en dehors. Les exports YM6 et SNDH écrivent cette partie.
+- **Loop** : répète Start à End tant que la note est tenue, puis joue jusqu'à End.
 - **4-bit** : **Linear** ou **YM levels** (valeurs calées sur les niveaux de sortie mesurés de la puce, pour que l'échantillon garde sa forme). La source 8 bits est conservée, vous pouvez donc refaire la conversion.
-- **Tools** sur la source 8 bits : Normalize, Reverse, Fade out, −3 dB, +3 dB.
+- **Tools** sur la source 8 bits : Normalize, Reverse, Fade out, **Sign** (inverse le bit de poids fort de chaque octet : signé ↔ non signé), −3 dB, +3 dB. Reverse retourne aussi Start et End, pour que la partie jouée soit le même son lu à l'envers. −3 dB juste après un +3 dB qui a écrêté rend les crêtes écrêtées : les pas qui se suivent sont calculés à partir des valeurs d'avant le premier.
 - **Banks** : enregistrer les 8 emplacements en banque nommée, charger ou supprimer une banque. La bibliothèque de banques (`Digidrums.json`) est partagée par tous les projets.
 
 Charger un fichier ou une banque ne peut pas être annulé ; les autres réglages le peuvent.
@@ -674,15 +709,19 @@ Charger un fichier ou une banque ne peut pas être annulé ; les autres réglage
 
 Le son DMA du STE joue huit échantillons 8 bits signés de 32 KB chacun. Il demande Computer STE : avec Computer ST l'entrée du menu est grisée, et une fenêtre restée ouverte l'indique et propose **Use STE**. Avec STE, les pistes DMA (Authentic 3ch, Dual chip) ou les pistes de type DMA (16 ch) jouent ces échantillons, chaque piste choisissant son échantillon dans le cadre GENERATOR.
 
-- **Sample** 1 à 8 ; la forme d'onde (cliquez dessus pour charger).
-- **Load...** : un fichier audio (rééchantillonné à la fréquence) ou des octets 8 bits bruts (`.raw`, `.spl`, `.sam`). **Play**, **Clear**.
-- **Rate** : 6.3k, 12.5k, 25k, 50k (6 258, 12 517, 25 033, 50 066 Hz). La changer conserve les octets, donc la hauteur change.
-- **Format** : **Mono** (un octet par trame ; un fichier stéréo est mixé en mono) ou **Stereo** (octets entrelacés gauche, droite ; 16 KB par côté au plus).
-- **Loop** : boucle tant que la note est tenue ; sinon l'échantillon joue jusqu'à sa fin.
-- **Root** : la note qui joue l'échantillon à sa fréquence.
-- **Tools** : **Sign** (inverse le bit de poids fort de chaque octet : signé ↔ non signé), −3 dB, +3 dB.
+La fenêtre est organisée comme celle des Digidrums : l'emplacement à gauche, son échantillon à droite.
 
-Charger un fichier ne peut pas être annulé.
+- **Slot** 1 à 8. **Name** (16 caractères, pris du fichier chargé ou, après un import XM, du sample ou de son instrument ; cliquez pour le taper). Le nom ouvre la ligne de texte au-dessus de la forme d'onde, ici et dans le cadre GENERATOR, et suit le numéro du sample dans les infobulles et dans le texte du cadre GENERATOR.
+- **Rate** : 6.3k, 12.5k, 25k, 50k (6 258, 12 517, 25 033, 50 066 Hz). La changer conserve les octets, donc la hauteur et la durée changent, comme sur le STE. Avec **Resample** allumé (sous Rate ; une préférence, éteinte par défaut), une nouvelle fréquence rééchantillonne le sample à la place : il garde sa durée et sa hauteur, Start et End restent aux mêmes instants, 32 KB au plus ; une étape d'annulation.
+- **Root** : la note qui joue l'échantillon à sa fréquence, et **Fine** (−100 à +100 cents), qui accorde le sample à partir d'elle, aperçu et export SNDH compris.
+- **Load...** (ou clic sur la forme d'onde) : un fichier audio (rééchantillonné à la fréquence) ou des octets 8 bits bruts (`.raw`, `.spl`, `.sam`). **Play** joue le sample une fois de Start à End ; avec Loop, il répète cette partie jusqu'à un nouveau clic sur Play ou Loop ou la fermeture de la fenêtre, Play restant allumé pendant ce temps. **Clear** vide l'emplacement : sample, nom, Start et End.
+- **Start** et **End** (en trames) : la partie du sample jouée, avec ou sans Loop (End est la trame qui suit la dernière jouée) ; charger un fichier les règle sur le sample entier. La forme d'onde grise ce qui est en dehors. L'export SNDH écrit le sample jusqu'à End.
+- **Loop** : répète Start à End tant que la note est tenue ; sinon la partie joue une fois, jusqu'à End.
+- **Format** : **Mono** (un octet par trame ; un fichier stéréo est mixé en mono) ou **Stereo** (octets entrelacés gauche, droite ; 16 KB par côté au plus). La forme d'onde d'un sample stéréo montre ses deux canaux, marqués **L** et **R** en haut à droite.
+- **Tools** : Normalize, Reverse, Fade out, **Sign** (inverse le bit de poids fort de chaque octet : signé ↔ non signé), −3 dB, +3 dB, comme dans la fenêtre Digidrums. Avec un sample stéréo, **L** et **R** choisissent les canaux traités (les deux allumés par défaut, au moins un) ; Normalize sur les deux canaux les monte d'un même gain, en gardant leur balance.
+- **Banks** (sous Fine) : enregistrer les 8 samples (réglages, octets et noms) en banque nommée, charger ou supprimer une banque. La bibliothèque de banques (`DMA.json`) est partagée par tous les projets.
+
+Charger un fichier ou une banque ne peut pas être annulé.
 
 ---
 
@@ -690,7 +729,7 @@ Charger un fichier ne peut pas être annulé.
 
 ### 7.1 Routage
 
-Options > Sound engine > MIDI routing :
+MIDI routing, dans le cadre MIDI d'Options > Settings :
 
 | Routage | Les notes reçues jouent |
 |---|---|
@@ -700,11 +739,15 @@ Options > Sound engine > MIDI routing :
 
 Le clavier à l'écran joue toujours la piste courante. Le canal d'une piste DMA ne va qu'à cette piste, quel que soit le routage.
 
-### 7.2 Vélocité, pitch bend et molette de modulation
+### 7.2 Vélocité, pitch bend, molette de modulation, aftertouch et MPE
+
+Ces réglages sont dans le cadre MIDI d'Options > Settings (section 3.12). Les percussions (Chipdrum, Digidrum) ignorent la molette, l'aftertouch et le slide MPE.
 
 - **Velocity** : **Accent** (par défaut : un gain audio en 16 ch, le volume 4 bits en Authentic 3ch), **Vol 4-bit** (le volume 4 bits dans tous les modes) ou **Off**.
-- **Pitch bend** : ± Bend range (0 à 24 demi-tons, 2 par défaut).
-- **Molette de modulation** (CC 1) : vibrato, jusqu'à Wheel depth (0 à 200 cents, 50 par défaut).
+- **Pitch bend** : ± Bend range (0 à 24 demi-tons, 2 par défaut). **Bend** choisit ce qu'il pilote : **Pitch** (par défaut), **Volume** (le centre laisse le volume 4 bits tel quel ; le haut le monte vers 15, le bas le descend vers 0) ou **Envelope** (la fréquence d'enveloppe bouge des demi-tons du bend, la note ne bouge pas : un balayage du timbre en Sync Buzzer et avec les sources Env).
+- **Molette de modulation** (CC 1) : **Wheel** choisit ce qu'elle pilote, de rien en bas à tout en haut : **Vibrato** (par défaut, jusqu'à Wheel depth, 0 à 200 cents, 50 par défaut), **Volume** (le volume 4 bits monté vers 15), **Envelope** (la fréquence d'enveloppe, jusqu'à une octave plus haut), **LFO** (la profondeur du LFO de la piste : rien en bas, la profondeur réglée dans la fenêtre Modulation en haut) ou **Off**.
+- **Aftertouch** : la pression des touches, de tout le canal (channel pressure) ou de chaque note (aftertouch polyphonique) ; une note prend la plus forte des deux. **Aftertouch** offre les mêmes choix que Wheel (Vibrato par défaut). Quand la molette et l'aftertouch pilotent la même chose, la plus forte des deux joue.
+- **MPE** (16 ch seulement) : avec MPE sur On, le canal 1 joue comme d'habitude et ses contrôleurs agissent sur toutes les notes, tandis que les canaux 2 à 16 jouent chacun leur note, que leur pitch bend (± **MPE bend range**, 48 demi-tons par défaut), leur pression (le choix Aftertouch) et leur CC 74 (**MPE slide**) bougent seule. MPE slide pilote le **Volume** (par défaut : 64 laisse le volume 4 bits tel quel, 127 donne 15, 0 donne 0), l'**Envelope** (une octave dans chaque sens) ou le **Vibrato** (de 64 jusqu'à Wheel depth à 127). Les notes vont à la piste courante (ou à toutes les pistes en Layer) ; le routage Per channel ne s'applique pas.
 
 ### 7.3 Contrôleurs
 
@@ -712,13 +755,13 @@ Les contrôleurs agissent sur la piste courante (ou, en routage Per channel, sur
 
 | CC | Effet |
 |---|---|
-| 1 | Profondeur du vibrato (molette de modulation) |
+| 1 | Molette de modulation (Wheel : vibrato par défaut) |
 | 7 | Niveau Master |
 | 70 | Tone on/off (≥ 64 = on) |
 | 71 | Noise on/off |
 | 72 | Période de bruit |
 | 73 | Mode de volume (Vol 4-bit / Envelope) |
-| 74 | Période d'enveloppe |
+| 74 | Période d'enveloppe (avec MPE sur On, sur les canaux 2 à 16 : le slide MPE de leur note) |
 | 75 | Forme d'enveloppe |
 | 76 | Générateur (les cinq premiers types) |
 | 77 | Timer ratio |
@@ -729,9 +772,9 @@ Les contrôleurs agissent sur la piste courante (ou, en routage Per channel, sur
 | 83 | Tempo libre (60 à 240) |
 | 84 | Piste courante |
 | 120, 123 | All notes off |
-| 121 | Remise à zéro du pitch bend et de la modulation |
+| 121 | Remise à zéro du pitch bend, de la modulation et de la pression du canal (avec MPE sur On, sur les canaux 2 à 16 : leur bend, leur pression et leur slide) |
 
-Un contrôleur appris avec MIDI learn (7.6) a priorité sur ce tableau. Les SysEx et l'aftertouch sont ignorés.
+Un contrôleur appris avec MIDI learn (7.6) a priorité sur ce tableau. Les SysEx sont ignorés ; l'aftertouch est à la section 7.2.
 
 ### 7.4 Program Change
 
@@ -755,7 +798,7 @@ La table MIDI est une préférence partagée par toutes les instances et tous le
 
 ### 7.7 Automation de l'hôte et paramètres
 
-STYM2149 expose 483 paramètres d'hôte : 35 paramètres globaux (Master, Voice Mode, Chip Clock, Output Chain, Resampling, STE Bass, STE Treble, VBL Rate, Soft Clip, Timer, Focus Track, MIDI Routing, Velocity, Bend Range, Wheel Depth, Arp Clock, Arp Division, Free Tempo, Swing, Gate, Gate All, Computer, Chip Clock Hz, Arp Sync, Master 2, Master Pan, Master Link, Delay On, Delay Sync, Delay Division, Delay Time, Delay Feedback, Delay Hi Cut, Delay Level, Delay Ping-Pong) et 28 par piste, nommés « T1 Level », « T2 Env Period », etc. (On, Level, Pan, Mute, Solo, Tone, Noise, Noise Period, Volume, Vol Mode, Env Period, Env Shape, Generator, Timer Ratio, SID Min Vol, Vibrato Depth, Vibrato Rate, Attack, Decay, Sustain, Release, ADSR Mode, Voicing, Arp On, Arp Rate, Gate, Vibrato On, Send). Les six réglages MIDI (MIDI Routing, Velocity, Bend Range, Wheel Depth, Arp Clock, Arp Division) et Chip Clock Hz (la fréquence de l'horloge Custom) ne sont pas automatisables.
+STYM2149 expose 554 paramètres d'hôte : 42 paramètres globaux (Master, Voice Mode, Chip Clock, Output Chain, Resampling, STE Bass, STE Treble, VBL Rate, Soft Clip, Timer, Focus Track, MIDI Routing, Velocity, Bend Range, Wheel Depth, Arp Clock, Arp Division, Free Tempo, Swing, Gate, Gate All, Computer, Chip Clock Hz, Arp Sync, Master 2, Master Pan, Master Link, Delay On, Delay Sync, Delay Division, Delay Time, Delay Feedback, Delay Hi Cut, Delay Level, Delay Ping-Pong, Tuning A4, Bend Target, Wheel Target, Aftertouch, MPE, MPE Bend Range, MPE Slide) et 32 par piste, nommés « T1 Level », « T2 Env Period », etc. (On, Level, Pan, Mute, Solo, Tone, Noise, Noise Period, Volume, Vol Mode, Env Period, Env Shape, Generator, Timer Ratio, SID Min Vol, Vibrato Depth, Vibrato Rate, Attack, Decay, Sustain, Release, ADSR Mode, Voicing, Arp On, Arp Rate, Gate, Vibrato On, Send, Level R, Mute R, Solo R, Link). Les douze réglages MIDI (MIDI Routing, Velocity, Bend Range, Wheel Depth, Arp Clock, Arp Division, Bend Target, Wheel Target, Aftertouch, MPE, MPE Bend Range, MPE Slide), Chip Clock Hz (la fréquence de l'horloge Custom) et Tuning A4 ne sont pas automatisables.
 
 Les motifs, le morceau, les instruments, les séquences, le kit et les échantillons ne sont pas des paramètres : ils sont enregistrés dans l'état du projet.
 
@@ -807,7 +850,7 @@ Les boîtes de dialogue de fichiers sont celles de votre système. Elles s'ouvre
 
 - Les exports de morceau demandent des entrées dans le morceau (« Song is empty. Add entries first. »). Les exports tournent en arrière-plan ; un seul à la fois.
 - Les exports audio sont calculés hors ligne : ils s'arrêtent exactement quand le séquenceur s'arrête, sans queue de relâchement, et sont coupés à une heure de musique (ou à la limite de 4 GB du WAV et du ZIP).
-- Les **exports de registres** (VBL, YM3, YM6, SNDH) demandent **Authentic 3ch** (une puce, trois voix). Ils capturent ce que vous entendez, une trame par tick de replay. Après l'export, un message liste ce que le fichier ne reproduit pas, par exemple : effets de timer figés (VBL, YM3), players YM3 qui supposent 2 MHz et 50 Hz, périodes recalculées pour 2 MHz (SNDH), son DMA absent (formats qui ne l'ont pas).
+- Les **exports de registres** (VBL, YM3, YM6, SNDH) demandent **Authentic 3ch** (une puce, trois voix). Ils capturent ce que vous entendez, une trame par tick de replay. Après l'export, un message liste ce que le fichier ne reproduit pas, par exemple : effets de timer figés (VBL, YM3), players YM3 qui supposent 2 MHz et 50 Hz, périodes recalculées pour 2 MHz (SNDH), son DMA absent (formats qui ne l'ont pas). Une SID wave autre que Base (Square, Sine, Bounce, Custom) entre dans le fichier comme l'onde carrée simple, à la hauteur de la note.
 - Le Recorder (4.4) exporte sa prise en YM6, SNDH ou VBL dump.
 
 ### 8.4 Conformité à la puce
@@ -823,12 +866,15 @@ Les préférences sont à vous, pas à un projet : toutes les instances de STYM2
 | Préférence | Se règle avec |
 |---|---|
 | Taille de la fenêtre | En redimensionnant la fenêtre |
-| Infobulles | Options > Tooltips (On, Off) |
-| Langue des infobulles | Options > Tooltips > Language : English, intégré, puis les langues des fichiers PO par nom (Deutsch, Español, Français, Italiano, Português avec les installeurs). Par défaut, la langue de votre système si le menu l'a, sinon l'anglais. Les installeurs mettent les cinq langues dans un dossier de l'ordinateur (`C:\ProgramData\STYM2149\Languages` sous Windows, `~/.local/share/STYM2149/Languages` sous Linux, `/Library/Application Support/STYM2149/Languages` sous macOS, où on les copie à la main tant qu'il n'y a pas d'installeur macOS) ; un plugin copié sans elles n'affiche que l'anglais. Votre propre dossier Languages, à côté du fichier de préférences (`%APPDATA%\STYM2149\Languages`, `~/Library/Application Support/STYM2149/Languages`, `~/.config/STYM2149/Languages`), contient un fichier PO de gettext par langue (`nl.po`), fait avec un éditeur de texte ou un outil de traduction comme Poedit ; le menu relit les deux dossiers à chaque ouverture. **Languages folder...** écrit un modèle avec toutes les lignes anglaises et un README dans votre dossier, puis l'ouvre. Un de vos fichiers au nom d'une langue installée (`fr.po`) corrige ses lignes. Les traductions attendent encore une relecture par des locuteurs natifs (**À CONFIRMER**) |
-| Disposition du clavier | Options > Keyboard layout : Auto (detect), QWERTY, AZERTY, QWERTZ. Auto suit la disposition de votre système (Windows, Linux ; macOS **À CONFIRMER**) |
-| Noms des notes | Options > Note names : English (C D E) ou Latin (Do Re Mi) |
-| Pixels | Options > Pixels : Smooth (par défaut) ou Sharp (section 3.1) |
+| Infobulles | Options > Settings > Tooltips (On, Off) |
+| Langue des infobulles | Options > Settings > Language : English, intégré, puis les langues des fichiers PO par nom (Deutsch, Español, Français, Italiano, Português avec les installeurs). Par défaut, la langue de votre système si le menu l'a, sinon l'anglais. Les installeurs mettent les cinq langues dans un dossier de l'ordinateur (`C:\ProgramData\STYM2149\Languages` sous Windows, `~/.local/share/STYM2149/Languages` sous Linux, `/Library/Application Support/STYM2149/Languages` sous macOS, où on les copie à la main tant qu'il n'y a pas d'installeur macOS) ; un plugin copié sans elles n'affiche que l'anglais. Votre propre dossier Languages, à côté du fichier de préférences (`%APPDATA%\STYM2149\Languages`, `~/Library/Application Support/STYM2149/Languages`, `~/.config/STYM2149/Languages`), contient un fichier PO de gettext par langue (`nl.po`), fait avec un éditeur de texte ou un outil de traduction comme Poedit ; le menu relit les deux dossiers à chaque ouverture. **Languages folder...**, sous Language, écrit un modèle avec toutes les lignes anglaises et un README dans votre dossier, puis l'ouvre. Un de vos fichiers au nom d'une langue installée (`fr.po`) corrige ses lignes. Les traductions attendent encore une relecture par des locuteurs natifs (**À CONFIRMER**) |
+| Disposition du clavier | Options > Settings > Keyboard layout : Auto (detect), QWERTY, AZERTY, QWERTZ. Auto suit la disposition de votre système (Windows, Linux ; macOS **À CONFIRMER**) |
+| Noms des notes | Options > Settings > Note names : English (C D E) ou Latin (Do Re Mi) |
+| Renderer | Options > Settings > Renderer (Windows seulement, grisé ailleurs) : Software (par défaut) ou Direct2D, la façon dont la fenêtre arrive à l'écran. Software ne recopie que ce qui change ; avec Direct2D, une copie de la fenêtre pouvait clignoter quelques secondes en haut à droite du bureau Windows |
+| Pixels | Options > Settings > Pixels : Smooth (par défaut) ou Sharp (section 3.1) |
 | Oscilloscope | Options > Oscilloscope : On (par défaut) ou Off (section 3.10) |
+| Register monitor | Options > Register monitor : On (par défaut) ou Off (section 3.10) |
+| Note monitor | Options > Note monitor : On (par défaut) ou Off, la ligne Note du cadre SYSTEM (section 3.9) |
 | Table MIDI learn | Options > MIDI learn, Clear MIDI map |
 | Lignes de commandes | Step Sequencer > Resolution > Step command rows : On (par défaut) ou Off (CMD, ENV, VIB, LFO, MOD, TUN, DLY, CUT, SMP, BPM) |
 | Icônes du bureau | Leurs places sur le bureau, en les faisant glisser (section 3.1) |
@@ -843,7 +889,7 @@ Les préférences sont à vous, pas à un projet : toutes les instances de STYM2
 | Linux | `~/.config/STYM2149/Preferences.settings` |
 | macOS (à partir de 1.0.0) | `~/Library/Application Support/STYM2149/Preferences.settings` |
 
-La bibliothèque Patches (`Patches.json`) et les banques Digidrum (`Digidrums.json`) sont stockées à côté. Les versions antérieures à 0.9.0 nommaient ce fichier `STYM2149.settings` ; le premier démarrage de la 0.9.0 en recopie vos préférences.
+La bibliothèque Patches (`Patches.json`), les banques Digidrum (`Digidrums.json`) et les banques DMA (`DMA.json`) sont stockées à côté. Les versions antérieures à 0.9.0 nommaient ce fichier `STYM2149.settings` ; le premier démarrage de la 0.9.0 en recopie vos préférences.
 
 L'application autonome garde ses périphériques audio et MIDI et votre dernière session dans un fichier à part, `STYM2149.settings` : dans `%APPDATA%\STYM2149` sous Windows, `~/.config` sous Linux, `~/Library/Application Support` sous macOS. Quand vous quittez (File > Quit ou la case de fermeture de la fenêtre), elle y enregistre la session et la rouvre au démarrage suivant.
 
@@ -861,6 +907,7 @@ Les raccourcis fonctionnent tant que la fenêtre de STYM2149 a le focus clavier.
 |---|---|
 | Space | Play / Stop (Free run ; en Host sync, c'est le transport de l'hôte qui décide) |
 | Esc | Fermer le menu ouvert ; sinon fermer la fenêtre au premier plan ; sinon arrêter toutes les notes (panique) |
+| Tab / Shift+Tab | Passer la fenêtre ouverte suivante / précédente au premier plan (avec une seule fenêtre ouverte, la touche va à l'hôte) |
 | 1 à 8 | Motif de la banque courante |
 | Shift+1 à Shift+4 | Banque A à D |
 | ← / → | Piste précédente / suivante (avec le Step Sequencer ouvert : déplacer le curseur de la grille ; Shift+← / → change toujours de piste) |
@@ -916,10 +963,13 @@ La répétition des touches (touche maintenue) ne fonctionne que pour les flèch
 | Piano | Clic, glisser / clic droit | Jouer / choisir la piste jouée |
 | Panoramique du Mixer | Double-clic | Centrer |
 | Fader, panoramique, Master du Mixer | Clic droit | Value... (taper la valeur), Reset |
+| Valeur du Mixer (sous un fader, un panoramique, un Send, un Master) | Clic, frappe, Enter | Taper la valeur sur place |
 | Mini-oscilloscope du Mixer | Clic | Ouvrir le Scope de la piste |
 | Grille du Step Sequencer | Voir 5.3 et 5.4 | Écrire, déplacer, redimensionner, sélectionner, menus |
 | Grille du Step Sequencer | Molette de la souris | Faire défiler d'un demi-ton |
 | Libellé d'une ligne de contrôle | Clic droit | Copy row / Paste row |
+| Case GEN, SRC, ENV qui porte une valeur | Clic droit | Les réglages de la piste qu'elle met en jeu (5.4) |
+| Case VOL | Clic droit | Curseur et Slide vers le pas suivant |
 | Entrée du morceau | Clic, Shift+clic, glisser, clic droit | Sélectionner, sélection multiple, déplacer, menu de l'entrée |
 | Grilles Arpeggiator, Modulation | Clic, glisser | Dessiner |
 | Cellule VOL, PER, NP de Modulation | Clic droit | Curseur précis (clic droit dessus : retour à 15 ou 0) |
@@ -984,7 +1034,7 @@ STYM2149 s'appuie sur :
 | Musashi | Karl Stenerud | MIT | Émulateur 68000 utilisé pour jouer les fichiers SNDH |
 | Décompresseur ICE 2.4 | Hans Wessels | Domaine public | Fichiers SNDH compressés |
 | pylzh | Hirofumi Ukawa | Apache-2.0 | Décompression LHA des fichiers YM |
-| Polices système d'EmuTOS | L'équipe EmuTOS | GPL v2 ou ultérieure | Polices GEM de l'interface |
+| Polices système et icônes du bureau d'EmuTOS | L'équipe EmuTOS | GPL (les polices : v2 ou ultérieure) | Polices GEM de l'interface ; icônes de disquette et de corbeille du bureau |
 | JUCE 8 | Raw Material Software | AGPLv3 | Framework du plugin, audio, MIDI |
 | zlib, libpng, libjpeg, HarfBuzz, SheenBidi, FLAC, Ogg Vorbis | (via JUCE) | Licences permissives | Compilés dans le plugin par JUCE |
 | VST3 SDK, CLAP, clap-helpers, clap-juce-extensions, LV2, ASIO SDK | Steinberg, free-audio, projet LV2 | Voir leurs textes | Formats de plugin et pilotes audio Windows |

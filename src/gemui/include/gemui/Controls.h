@@ -255,15 +255,28 @@ public:
     // Minimum width in characters (min-width in ch) and left padding in characters (#susv).
     void setMinChars(int n);
     void setPadChars(int n);
-    // Input mask: '9' marks a digit position, '.' the decimal point; the other characters are shown as they are.
+    // Input mask: '9' marks a digit position, '.' the decimal point; the other characters are shown as they are, a
+    // unit after the last digit ("999.99 Hz") staying in place while the value is typed.
     // A different mask while the value is being typed cancels the input (laid out for the old mask's positions).
     void setMask(std::string mask);
     // Without a mask: the input starts from the whole text (a note name such as C#4), not from its first number.
     void setWholeText(bool w) { wholeText_ = w; }
+    // Without a mask: unit that ends the text (" Hz", " ct") and is not typed; like a mask's, the pointer leaves it in
+    // normal video (Indus, 26/10/2026 15:25, D-451; every unit of the interface, 26/10/2026 20:41-20:44, D-464).
+    void setUnit(std::string u);
+    const std::string& unit() const noexcept { return unit_; }
+    // Font of a small value (Font.h): the Mixer's, in the 6×6 font (D-300).
+    void setFace(Face f);
+    // Value centred in the field, without the dashes (the Mixer's, under their slider, D-415): reverse video over
+    // the field on hover, the input centred too.
+    void setCentered(bool c);
     void setEditable(bool e);
     // .val.dis: 30 % opacity, no input.
     void setDim(bool d);
     bool editing() const noexcept { return editing_; }
+    // What the field shows: while it is typed into, the input (with a mask, the mask with the digits typed and "_"
+    // at the free positions); otherwise its text.
+    std::string shownText() const;
 
     double naturalWidth() const noexcept;
 
@@ -299,8 +312,10 @@ private:
     std::string text_;
     int px_ = 16;
     int minChars_ = 0, padChars_ = 0;
-    std::string mask_;
+    std::string mask_, unit_;
     bool wholeText_ = false;
+    Face face_ = Face::kSystem;
+    bool centered_ = false;
     bool editable_ = true, dim_ = false, hover_ = false;
 
     // Input in progress.
@@ -381,8 +396,9 @@ public:
 };
 
 // .titlebar: 26 px (2 px bottom rule included); 24 px close box on the left and full-screen box on the right (GEM
-// glyphs E005 and E007), hatched central area (2×2 squares on a 4×4 grid), title centred on a white background
-// (12 px padding). Pointers of the prototype: hand on the close box, move on a movable bar.
+// glyphs E005 and E007 of the 8×8 font, square, at twice their size: D-418, D-424), hatched central area (2×2
+// squares on a 4×4 grid), title centred on a white background (12 px padding). Pointers of the prototype: hand on the
+// close box, move on a movable bar.
 class TitleBar : public Widget {
 public:
     static constexpr int kHeight = 26;
@@ -420,16 +436,20 @@ private:
 };
 
 // The prototype's .gwin: floating window, WindowFrame's frame and a title bar with a close box only, moved by its bar
-// (left and top edges never negative, mkWinDrag; the top edge never above Desktop::workTop either, D-302). Hidden
-// when created; open() shows it in front of the other windows, where it was left.
+// (left and top edges never negative, mkWinDrag; the top edge never above Desktop::workTop either, D-302). It never
+// overflows the right and bottom edges of the desktop either (D-460): moved, placed or opened, it stays inside.
+// Hidden when created; open() shows it in front of the other windows, where it was left.
 class FloatWindow : public WindowFrame {
 public:
     FloatWindow();
 
     TitleBar& titleBar() noexcept { return bar_; }
     void setTitle(std::string t) { bar_.setTitle(std::move(t)); }
-    // Position and size, frame included; the title bar follows.
+    // Position and size, frame included; the title bar follows. Moved, with its content, to stay on the desktop.
     void place(const Box& b);
+    // Moves the window, with its content, so that it is on the desktop (D-460): right and bottom edges inside it; the
+    // left edge never negative and the top never above the work area win for a window larger than the desktop.
+    void keepOnDesktop();
     // Top-left corner of the content: inside the frame, below the title bar.
     Point contentOrigin() const noexcept {
         return {bounds().x + kInset, bounds().y + kInset + TitleBar::kHeight};
@@ -437,6 +457,8 @@ public:
 
     void open();
     void close();  // hides the window then calls onClose
+    // Closed by the user (its close box, Escape): close(), unless the window asks first (Settings, D-437).
+    virtual void requestClose() { close(); }
     bool isOpen() const noexcept { return visible(); }
     std::function<void()> onClose;
     // Escape closes the frontmost open window that accepts it (the prototype's CLOSERS: neither the curve nor the
@@ -448,6 +470,8 @@ public:
     static FloatWindow* topmost(const Widget& parent, bool escapeOnly = false) noexcept;
 
 private:
+    Point onDesktop(int x, int y) const noexcept;  // top-left corner (x, y) brought inside the desktop
+
     TitleBar bar_;
     Point grab_;  // pointer offset in the window when its bar was grabbed
 };
@@ -461,14 +485,28 @@ public:
     static constexpr int kW = 72, kPicture = 32, kNameH = 8, kH = kPicture + kNameH;
 
     void setPicture(const Bitmap* data, const Bitmap* mask) noexcept;
-    // Character drawn in the picture (0: none) in the 8×8 font, its cell's top-left corner at (x, y) of the picture.
+    // Character drawn in the picture (0: none) in the AES's SMALL font (6×6), as gr_gicon draws ib_char, its cell's
+    // top-left corner at (x, y) of the picture (D-419).
     void setLetter(char c, int x, int y) noexcept;
     void setName(std::string name);
     const std::string& name() const noexcept { return name_; }
     // Area the icon stays in (the desktop below the menu bar).
     void setLimits(const Rect& r) noexcept { limits_ = r; }
+    // Invisible grid of cells of the icon's size, from `origin`, as on a GEM desktop: the icon lands in the nearest cell
+    // inside limits(), and its outline moves from cell to cell.
+    void setGrid(Point origin) noexcept {
+        grid_ = origin;
+        gridOn_ = true;
+    }
+    // Top-left corner of the cell nearest to `topLeft` (inside limits()); `topLeft` itself, kept inside limits(),
+    // without a grid.
+    Point snapped(Point topLeft) const noexcept;
     // Top-left corner after a drag (the icon is already there).
     std::function<void(Point)> onMoved;
+    // A drop place may be refused (another icon's cell): the icon stays where it was.
+    std::function<bool(Point)> canLand;
+    // A press released without a move.
+    std::function<void()> onClick;
 
     bool dragging() const noexcept { return drag_; }
     // Outline being dragged: where the icon would land.
@@ -495,7 +533,9 @@ private:
     std::string name_;
     Rect limits_;
     Point grab_, at_;  // pointer in the icon at the press; landing place of the drag
-    bool pressed_ = false, drag_ = false;
+    Point grid_, pressAt_;
+    bool gridOn_ = false;
+    bool pressed_ = false, drag_ = false, wandered_ = false;
 };
 
 }  // namespace stym::gemui

@@ -13,23 +13,67 @@ namespace stym::ymengine {
 namespace {
 constexpr double kPi = 3.141592653589793;
 double jsRound(double x) noexcept { return std::floor(x + 0.5); }  // JavaScript Math.round (half-way towards +∞)
+
+// Sine at bar k of the SID wave for a cycle of n bars, sampled half a step after the middle so that no bar falls on a
+// trough (24/10/2026, D-395, D-406).
+double sidSine(int k, int n) noexcept { return std::sin(2 * kPi * (k + 0.5) / n); }
+
+// Output level of volume v on channel A alone (5-bit level 2v + 1, D-011; B and C at volume 0).
+double sidLevel(int v) noexcept { return double(ymcore::tables::kMixTable[(2 * v + 1) | (1 << 5) | (1 << 10)]); }
+
+// The volume whose level is nearest `want` (the lower one on a tie): the Bounce (D-414).
+uint8_t nearestVolume(double want) noexcept {
+    int best = 0;
+    for (int v = 1; v < 16; ++v)
+        if (std::fabs(sidLevel(v) - want) < std::fabs(sidLevel(best) - want)) best = v;
+    return uint8_t(best);
+}
 }  // namespace
 
-double noteHz(double note) noexcept { return 440.0 * std::pow(2.0, (note - 69) / 12); }
+double noteHz(double note, double a4) noexcept { return a4 * std::pow(2.0, (note - 69) / 12); }
 
-std::array<uint8_t, 8> sineSidWave() noexcept {
-    // Output level of volume v on channel A alone (5-bit level 2v + 1, D-011; B and C at volume 0).
-    auto amp = [](int v) { return double(ymcore::tables::kMixTable[(2 * v + 1) | (1 << 5) | (1 << 10)]); };
-    const double lo = amp(0), hi = amp(15);
-    std::array<uint8_t, 8> out{};
-    for (int k = 0; k < 8; ++k) {
-        const double want = lo + (hi - lo) * (1 + std::sin(2 * kPi * k / 8)) / 2;
-        int best = 0;
-        for (int v = 1; v < 16; ++v)
-            if (std::fabs(amp(v) - want) < std::fabs(amp(best) - want)) best = v;
-        out[size_t(k)] = uint8_t(best);
+std::array<uint8_t, kSidWaveSteps> sineSidWave(int low, int high, int phase, int period, bool bounce) noexcept {
+    const int lo = std::clamp(low, 0, 15), hi = std::clamp(high, 0, 15);
+    const int n = std::clamp(period, kSidWavePeriodMin, kSidWaveSteps), shift = phase - kSidWavePhase;
+    // The highest and lowest samples of a cycle at `high` and `low`.
+    double top = -1, bottom = 1;
+    for (int k = 0; k < n; ++k) top = std::max(top, sidSine(k, n)), bottom = std::min(bottom, sidSine(k, n));
+    std::array<uint8_t, kSidWaveSteps> out{};
+    for (int k = 0; k < kSidWaveSteps; ++k) {
+        const double u = std::clamp((sidSine(k - shift, n) - bottom) / (top - bottom), 0.0, 1.0);
+        if (bounce) {  // on the scale of the chip's levels (D-414)
+            out[size_t(k)] = nearestVolume(sidLevel(lo) + (sidLevel(hi) - sidLevel(lo)) * u);
+            continue;
+        }
+        // On the scale of the volumes, as the bars draw it (D-410); a hair up, so that a sample on the middle of an odd
+        // period rounds the same way with every sine of the libraries.
+        out[size_t(k)] = uint8_t(jsRound(lo + (hi - lo) * u + 1e-9));
     }
     return out;
+}
+
+std::array<uint8_t, kSidWaveSteps> sineSidWaveAt(const std::array<uint8_t, kSidWaveSteps>& wave, int phase, int period,
+                                                 bool bounce) noexcept {
+    const auto [mn, mx] = std::minmax_element(wave.begin(), wave.end());
+    const int low = std::min<int>(*mn, 14);
+    return sineSidWave(low, std::max<int>(*mx, low + 1), phase, period, bounce);
+}
+
+int sineSidWavePhase(const std::array<uint8_t, kSidWaveSteps>& wave, int phase, int period, int step, int volume,
+                     bool bounce) noexcept {
+    phase = (phase % kSidWaveSteps + kSidWaveSteps) % kSidWaveSteps;
+    step = std::clamp(step, 0, kSidWaveSteps - 1);
+    volume = std::clamp(volume, 0, 15);
+    // The present phase first, then one bar either way (the left one first), two bars, and so on: a tie keeps the
+    // nearest.
+    auto gap = [&](int c) { return std::abs(int(sineSidWaveAt(wave, c, period, bounce)[size_t(step)]) - volume); };
+    int best = phase, least = gap(phase);
+    for (int d = 1; d <= kSidWaveSteps / 2; ++d)
+        for (const int c : {phase - d, phase + d}) {
+            const int at = (c + kSidWaveSteps) % kSidWaveSteps;
+            if (const int g = gap(at); g < least) best = at, least = g;
+        }
+    return best;
 }
 
 int envelopeRamps(int shape) noexcept {
@@ -111,10 +155,10 @@ double slideShape(double t, SlideCurve curve, uint32_t seed, std::span<const flo
     return t;
 }
 
-double slideQuantize(double hz, SlideCurve curve, uint16_t scaleMask, uint8_t scaleRoot) noexcept {
+double slideQuantize(double hz, SlideCurve curve, uint16_t scaleMask, uint8_t scaleRoot, double a4) noexcept {
     if (curve != SlideCurve::Chromatic && curve != SlideCurve::ScaleLocked) return hz;
     if (!(hz > 0)) return hz;
-    int n = int(jsRound(69 + 12 * std::log2(hz / 440)));  // nearest MIDI note
+    int n = int(jsRound(69 + 12 * std::log2(hz / a4)));  // nearest MIDI note
     // Scale-locked: the nearest degree of the scale, below first at the same distance (6 semitones at most).
     if (curve == SlideCurve::ScaleLocked && scaleMask) {
         auto in = [&](int k) { return (scaleMask >> ((((k - int(scaleRoot)) % 12) + 12) % 12)) & 1; };
@@ -129,7 +173,7 @@ double slideQuantize(double hz, SlideCurve curve, uint16_t scaleMask, uint8_t sc
             }
         }
     }
-    return 440.0 * std::pow(2.0, (n - 69) / 12.0);
+    return a4 * std::pow(2.0, (n - 69) / 12.0);
 }
 
 const std::array<Chord, 39> kChords = {{
@@ -174,17 +218,18 @@ const std::array<Chord, 39> kChords = {{
     {"Double octave", {0, 12, 24}, 3},
 }};
 
-uint16_t tablePeriod(const TrackPatch& p, int note, int step, ymcore::MasterClock clock) noexcept {
+uint16_t tablePeriod(const TrackPatch& p, int note, int step, ymcore::MasterClock clock, double a4) noexcept {
     // Same operations as the engine (vblEvent, matrixPitch): period of the note (or of the fixed note), scaled by
     // the semitones of the table, rounded, then the PER offset.
     const double detune = std::clamp(p.detuneCents, -double(kDetuneMaxCents), double(kDetuneMaxCents)) / 100;
-    const double tpNote = tonePeriodFor(noteHz(double(note) + detune), clock);
+    const double tpNote = tonePeriodFor(noteHz(double(note) + detune, a4), clock);
     const bool drum = p.generator == Generator::Digidrum || p.generator == Generator::Chipdrum;
     if (!p.ornamentOn || p.ornamentLength == 0 || drum) return uint16_t(tpNote);
     const size_t s = size_t(std::clamp(step, 0, std::min<int>(p.ornamentLength, kOrnamentSteps) - 1));
     if (!(p.pitchMatrix & pitchBit(PitchSource::Table, PitchTarget::Square))) return uint16_t(tpNote);
     const bool fix = p.rows.fix[s] != 0;
-    const double tp0 = fix ? tonePeriodFor(noteHz(double(std::min<int>(p.fixedNote, 127)) + detune), clock) : tpNote;
+    const double tp0 =
+        fix ? tonePeriodFor(noteHz(double(std::min<int>(p.fixedNote, 127)) + detune, a4), clock) : tpNote;
     const double tp = std::floor(tp0 * std::pow(2.0, -double(p.ornamentPitch[s]) / 12) + 0.5) + p.rows.period[s];
     return uint16_t(std::clamp(tp, 1.0, 4095.0));
 }

@@ -3,16 +3,18 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Eight samples of signed bytes (mono, or stereo interleaved left then right) copied into fixed storage: the audio
-// thread allocates nothing. The DMA voices (Generator::Dma) read them; the preview of the DMA window plays them once,
-// at the rate of the slot, at the pace of the host (byte held until the next one), outside the output chain like the
-// preview of a Digidrum.
+// thread allocates nothing. The DMA voices (Generator::Dma) read them; the preview of the DMA window plays their part,
+// once or in a loop (D-449), at the rate of the slot, at the pace of the host (byte held until the next one), outside
+// the output chain like the preview of a Digidrum.
 #pragma once
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <span>
 
 #include "ymengine/Dma.h"
+#include "ymengine/Params.h"
 
 namespace stym::ymengine::detail {
 
@@ -29,6 +31,7 @@ public:
         for (auto& s : params_.slots) {
             s.rate = uint8_t(std::min<int>(s.rate, kDmaRates - 1));
             s.root = uint8_t(std::min<int>(s.root, 127));
+            s.cents = std::isfinite(s.cents) ? std::clamp(s.cents, -kDmaCentsMax, kDmaCentsMax) : 0.0;
         }
     }
     const DmaParams& params() const noexcept { return params_; }
@@ -51,12 +54,17 @@ public:
         return params_.slots[size_t(k)].stereo ? n / 2 : n;
     }
     const int8_t* data(int k) const noexcept { return data_[size_t(k & 7)].data(); }
+    // Frames played of slot k, from its Start to its End (D-444).
+    SampleSpan part(int k) const noexcept { return sampleSpan(slot(k).start, slot(k).end, frames(k)); }
 
-    // Preview: once, loop ignored; only one at a time.
+    // Preview: from Start to End (D-444), read again at each block; with the slot's Loop on, the part repeats until
+    // the preview is stopped or Loop goes off (D-449), otherwise it plays once. Only one at a time.
     void preview(int k) noexcept {
-        if (frames(k) == 0) return;
+        const SampleSpan p = part(k);
+        if (p.size() == 0) return;
         preview_ = k;
-        pos_ = 0;
+        pos_ = p.start;
+        looping_ = slot(k).loop;
     }
     void stopPreview() noexcept { preview_ = -1; }
     int previewSlot() const noexcept { return preview_; }
@@ -65,14 +73,24 @@ public:
     void mixPreview(float* l, float* r, uint32_t n, double hostRate, double scale) noexcept {
         if (preview_ < 0) return;
         const DmaSlot& s = params_.slots[size_t(preview_)];
-        const uint32_t frames = this->frames(preview_);
+        if (s.loop) looping_ = true;
+        else if (looping_) {
+            preview_ = -1;
+            return;
+        }
+        const SampleSpan p = part(preview_);
         const int8_t* d = data_[size_t(preview_)].data();
-        const double inc = kDmaRateHz[s.rate] / hostRate;  // frames of the sample per host sample
+        // Frames of the sample per host sample: its rate, raised by its fine tune (D-452).
+        const double inc = kDmaRateHz[s.rate] * std::pow(2.0, s.cents / 1200) / hostRate;
         // A byte at ±128 is worth ±kScale × √½ (centred, constant-power panning), in the mix unit `scale`.
         const double k = kScale / 128.0 * 0.7071067811865476 * scale;
         for (uint32_t i = 0; i < n; ++i) {
-            const uint32_t f = uint32_t(pos_);
-            if (f >= frames) {
+            auto f = uint32_t(pos_);
+            if (f >= p.end && s.loop && p.size()) {
+                pos_ = p.start + std::fmod(pos_ - p.end, double(p.size()));
+                f = uint32_t(pos_);
+            }
+            if (f >= p.end) {
                 preview_ = -1;
                 return;
             }
@@ -94,6 +112,7 @@ private:
     std::array<uint32_t, kDmaSlots> len_{};  // bytes of each slot
     int preview_ = -1;  // slot being previewed, -1: none
     double pos_ = 0;    // frame of the preview (fractional)
+    bool looping_ = false;  // the slot's Loop was on during the preview, which stops when Loop goes off (D-449)
 };
 
 }  // namespace stym::ymengine::detail

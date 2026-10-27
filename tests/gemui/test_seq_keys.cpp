@@ -191,7 +191,9 @@ TEST_CASE("Overview button: shows and hides the overview row (P356)", "[ui][seq]
     click(w, "seqOver");
     CHECK_FALSE(h.editor.overview);
     CHECK_FALSE(w.rectOf("overMap"));
-    CHECK(w.rectOf("seqWin") == win);
+    // As high as before; moved up if the overview took it past the bottom of the desktop (D-458), it stays there.
+    CHECK(w.rectOf("seqWin")->h == win->h);
+    CHECK(w.rectOf("seqWin")->y <= win->y);
 }
 
 TEST_CASE("Follow: the view pages with the play head when on, stays when off (P411)", "[ui][seq][follow]") {

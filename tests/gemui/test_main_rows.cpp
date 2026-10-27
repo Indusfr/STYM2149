@@ -55,6 +55,17 @@ TEST_CASE("Main window: the sliders of VIBRATO, SOURCE and ADSR as wide as their
         CHECK(boundsOf(w, id).x == atk.x);
         CHECK(boundsOf(w, id).w == atk.w);
     }
+    // In Chip mode too, with the 3 digits of the 100 ticks (D-428) and the 2 of Sustain.
+    h.p(0, plugin::Track::AdsrMode) = 1;
+    w.tick(0);
+    const gemui::Rect chipAtk = boundsOf(w, "atk");
+    for (const char* id : ids) {
+        CAPTURE(id);
+        CHECK(boundsOf(w, id).x == chipAtk.x);
+        CHECK(boundsOf(w, id).w == chipAtk.w);
+    }
+    h.p(0, plugin::Track::AdsrMode) = 0;
+    w.tick(0);
     const gemui::Rect rows = *w.rectOf("adsrRows");
     CHECK(atk.x - rows.x <= 8 + 8);  // the initial and the gap only
     CHECK(atk.w >= 130);  // the initials leave the sliders most of the row

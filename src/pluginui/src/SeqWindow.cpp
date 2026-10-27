@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <numeric>
 #include <set>
 
 #include "gemui/Alert.h"
@@ -119,7 +120,7 @@ ymseq::Row laneRow(SeqLane l) noexcept {
     case SeqLane::Vol: return Row::Vol;
     case SeqLane::Vib: return Row::CmdVibrato;
     case SeqLane::Bpm: return Row::CmdTempo;  // the BPM row of the pattern; the tracks no longer hold Txx (item 150)
-    case SeqLane::Env: return Row::CmdShape;  // with Rxx (envPartner)
+    case SeqLane::Env: return Row::CmdShape;  // with Rxx (rowPartner)
     case SeqLane::Dly: return Row::CmdDelay;
     case SeqLane::NoteCut: return Row::CmdCut;
     case SeqLane::Lfo: return Row::CmdLfo;
@@ -400,7 +401,8 @@ void SeqWindow::wire() {
         popup(sig_, std::move(items), signature());
     };
     reso_.onClick = [this] { resolutionMenu(); };
-    fig_.onClick = [this] { popup(fig_, figItems(), ses().figure); };
+    fig_.onClick = [this] { popup(fig_, figItems(), inputFigure()); };
+    fig_.setPadding(2, 6);  // the 16 px figure in the height of a 14 px text (D-382)
     chord_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = -1; i < int(ymengine::kChords.size()); ++i) {
@@ -531,23 +533,24 @@ bool SeqWindow::envPlays() const {
         if (l.mix[size_t(s)] >= ymengine::kSeqMixEnv || l.fx[size_t(s)] == 3) return true;  // GEN 3: Sync Buzzer
     return false;
 }
-// The rows of the switches and of the envelope: with the preference where they can act, and wherever a value of
-// theirs is written (crossed if it cannot act, item 145).
+// The rows of the switches: while the vibrato, LFO, modulation table or arpeggiator of the track is on, with the
+// preference or a value of theirs written; off, the row goes and keeps its values (D-380). The row of the envelope:
+// with the preference where it can act, and wherever a value of its own is written (crossed if it cannot act, item
+// 145).
 bool SeqWindow::vibShown() const {
     using ymengine::SeqCmd;
-    return !drum() && ((m_.iv(Track::VibOn) != 0 && cmdPreference()) || written(SeqCmd::Vibrato));
+    return !drum() && m_.iv(Track::VibOn) != 0 && (cmdPreference() || written(SeqCmd::Vibrato));
 }
 bool SeqWindow::lfoShown() const {
-    const ymengine::TrackLfo& lfo = st().tracks[size_t(cur())].patch.lfo;
-    return !drum() && ((lfo.on && cmdPreference()) || written(ymengine::SeqCmd::Lfo));
+    return !drum() && st().tracks[size_t(cur())].patch.lfo.on && (cmdPreference() || written(ymengine::SeqCmd::Lfo));
 }
 bool SeqWindow::modShown() const {
-    return !drum() &&
-           ((st().tracks[size_t(cur())].patch.ornamentOn && cmdPreference()) || written(ymengine::SeqCmd::Mod));
+    return !drum() && st().tracks[size_t(cur())].patch.ornamentOn &&
+           (cmdPreference() || written(ymengine::SeqCmd::Mod));
 }
 bool SeqWindow::arpShown() const {
     // The ARP row of the prototype, without the preference.
-    return !drum() && (arpOn() || written(ymengine::SeqCmd::Arpeggiator));
+    return !drum() && arpOn();
 }
 bool SeqWindow::envShown() const {
     using ymengine::SeqCmd;
@@ -557,6 +560,14 @@ bool SeqWindow::smpShown() const {
     return (generator() == int(Generator::Dma) && cmdPreference()) || written(ymengine::SeqCmd::Offset);
 }
 bool SeqWindow::tunShown() const { return (!drum() && cmdPreference()) || written(ymengine::SeqCmd::Fine); }
+bool SeqWindow::crvShown() const {
+    // The curve of a slide, where a note slides (bugs of 24/10, D-387); a curve still written keeps the row so that it
+    // can be cleared (crossed, item 145).
+    if (drum()) return false;
+    const ymseq::Lane& l = lane();
+    return std::any_of(l.slide.begin(), l.slide.end(), [](auto v) { return v != 0; }) ||
+           std::any_of(l.slc.begin(), l.slc.end(), [](auto v) { return v != 0; });
+}
 bool SeqWindow::bpmShown() const {
     // The BPM row of the pattern (item 150), in the standalone application (D-342).
     if (!m_.host_.standalone()) return false;
@@ -564,45 +575,218 @@ bool SeqWindow::bpmShown() const {
     const auto& bpm = proj().cur().bpm;
     return std::any_of(bpm.begin(), bpm.end(), [](uint8_t v) { return v != 0; });
 }
+SeqWindow::StepSound SeqWindow::stepSound(int s) const {
+    // The track played from its first step as laneStep does it (Sequencer.cpp), without CND draws or commands. A root
+    // attacks with the generator of its GEN row, otherwise that of its instrument (INS; in 3 ch a Digidrum instrument
+    // leaves the track's), otherwise the track's; a DMA track of the 3-channel mode always plays DMA, and DMA falls
+    // back to the sound of the track without the STE (laneGen, setupVoice). A root reached by a slide does not
+    // attack. A step without a root holds the note while its TIE (or SLD, when the note slides) goes on; there, a
+    // GEN step changes a Chip Voice, SID Voice or Sync Buzzer note into another of the three (liveFx).
+    const ymseq::Lane& l = lane();
+    const int own = generator();
+    const auto& bank = st().instruments;
+    const auto insAt = [&](size_t k) {  // the instrument a note attacking there plays
+        return l.ins[k] > 0 && size_t(l.ins[k]) <= bank.size() && bank[size_t(l.ins[k] - 1)].used ? int(l.ins[k]) : 0;
+    };
+    const auto attackGen = [&](size_t k) {
+        int g = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))] : -1;
+        if (g < 0 && insAt(k)) {
+            const Generator x = bank[size_t(l.ins[k] - 1)].patch.generator;
+            if (!(mode3() && x == Generator::Digidrum)) g = int(x);
+        }
+        if (g < 0) g = own;
+        if (m_.dmaTrack(cur())) return int(Generator::Dma);
+        if (g == int(Generator::Dma) && (mode3() || !m_.ste()))
+            return own == int(Generator::Dma) ? int(Generator::Chip) : own;
+        return g;
+    };
+    const auto isDrum = [](int g) { return g == int(Generator::Digidrum) || g == int(Generator::Chipdrum); };
+    const auto liveFx = [&](int g, size_t k) {
+        const int eff = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))] : -1;
+        return eff < 0 || eff == int(Generator::Chipdrum) || isDrum(g) || g == int(Generator::Dma) ? g : eff;
+    };
+    const auto chordAt = [&](size_t k) {
+        return std::any_of(l.vpat.begin(), l.vpat.end(), [k](const auto& v) { return v[k] >= 0; });
+    };
+    StepSound out;
+    const int last = std::clamp(s, 0, ymseq::kSteps - 1);
+    if (drum()) {  // hits: no instrument, no GEN, no hold
+        out.gen = own;
+        out.attack = l.pat[size_t(last)] >= 0 || chordAt(size_t(last));
+        return out;
+    }
+    bool sounding = false, slidePend = false, tiedHold = false;
+    int gen = own, ins = 0;
+    for (int k = 0; k <= last; ++k) {
+        const size_t K = size_t(k);
+        out = StepSound{};
+        if (l.pat[K] < 0) {
+            if (sounding && ((slidePend && (l.slide[K] || l.tie[K])) || (tiedHold && l.tie[K]))) {
+                gen = liveFx(gen, K);
+                out.held = true;
+                out.slid = slidePend;
+            } else {
+                sounding = slidePend = tiedHold = false;
+                gen = attackGen(K);  // the sound a note written there would have
+                ins = insAt(K);
+            }
+        } else {
+            if (sounding && slidePend) {
+                gen = liveFx(gen, K);
+                out.slideTarget = true;
+            } else {
+                gen = attackGen(K);
+                ins = insAt(K);
+            }
+            sounding = true;
+            slidePend = l.slide[K] != 0;
+            tiedHold = l.slide[K] || l.tie[K];
+        }
+        out.gen = gen;
+        out.ins = ins;
+        out.attack = (l.pat[K] >= 0 && !out.slideTarget) || chordAt(K);
+    }
+    // A root that starts or that a slide reaches goes on with its TIE or SLD (no gate); a held note goes on while
+    // the next step is tied to it (heldStep), the track looping.
+    const size_t L = size_t(last), next = size_t((last + 1) % std::max(1, length()));
+    if (l.pat[L] >= 0) out.continues = l.slide[L] || l.tie[L];
+    else if (out.held) out.continues = l.tie[next] && l.pat[next] < 0;
+    return out;
+}
+
+bool SeqWindow::slideActs(ymengine::SeqCmd kind, int s) const {
+    // Thirteenth DAW test, bugs of 24/10 (D-386): a slide runs from its step until the next command of its kind, the
+    // track looping (laneLineCmds); it can act if it moves a note of that span. Each step has the generator of its
+    // note (GEN, INS, track: stepSound) and its source: its SRC cell, otherwise that of the instrument or of the track
+    // (applyMix, applyMixDef); the Modulation table of the sound can change both on its steps (NOI, MIX and GEN rows,
+    // rowsAt). A rest step counts as the note that would be written there. The drums do not slide (slideFrame); Axy
+    // moves the 4-bit volume (also SID's) and the DMA gain, Bxy the envelope that is heard, Nxy the noise.
+    using ymengine::SeqCmd;
+    if (drum()) return false;
+    const ymseq::Lane& l = lane();
+    const auto& bank = st().instruments;
+    struct Table {  // what the steps of a Modulation table can switch on
+        bool noise = false, env = false, fixed = false, sid = false, buzzer = false;
+    };
+    const auto table = [](const ymengine::TrackPatch& p) {
+        Table t;
+        if (!p.ornamentOn) return t;
+        for (int i = 0; i < std::min<int>(p.ornamentLength, ymengine::kOrnamentSteps); ++i) {
+            const size_t I = size_t(i);
+            t.noise = t.noise || p.ornamentNoise[I];
+            if (const int m = p.rows.mix[I]) {
+                const int mode = std::min(int(m), ymengine::kChannelModes) - 1;
+                t.noise = t.noise || (mode & 2);
+                (mode & 4 ? t.env : t.fixed) = true;
+            }
+            t.sid = t.sid || p.rows.gen[I] == uint8_t(ymengine::SeqGen::Sid);
+            t.buzzer = t.buzzer || p.rows.gen[I] == uint8_t(ymengine::SeqGen::SyncBuzzer);
+        }
+        return t;
+    };
+    const int n = std::max(1, length());
+    for (int j = 0; j < n; ++j) {
+        const int k = (std::clamp(s, 0, n - 1) + j) % n;
+        if (j && l.cmdAt(kind, k)) break;  // the next command of its kind takes over
+        const StepSound snd = stepSound(k);
+        const auto g = Generator(snd.gen);
+        const ymengine::TrackPatch& p = snd.ins ? bank[size_t(snd.ins - 1)].patch : st().tracks[size_t(cur())].patch;
+        bool noise = snd.ins ? p.noiseOn : m_.iv(Track::Noise) != 0;
+        bool env = snd.ins ? p.envelopeVolume : m_.iv(Track::VolMode) == 1;
+        if (const int m = l.mix[size_t(k)]) {
+            noise = ((m >= ymengine::kSeqMixEnv ? m - ymengine::kSeqMixEnv : m) & 2) != 0;
+            env = env || m >= ymengine::kSeqMixEnv;
+        }
+        const bool chip = g == Generator::Chip, sid = g == Generator::Sid, sb = g == Generator::SyncBuzzer;
+        const Table t = chip || sid || sb ? table(p) : Table{};
+        bool acts = false;
+        switch (kind) {
+        case SeqCmd::VolSlide: acts = g == Generator::Dma || sid || (chip && !env) || t.sid || t.fixed; break;
+        case SeqCmd::EnvSlide: acts = sb || (chip && env) || t.buzzer || ((chip || sb) && t.env); break;
+        case SeqCmd::NoiseSlide: acts = ((chip || sid) && noise) || t.noise; break;
+        default: return true;
+        }
+        if (acts) return true;
+    }
+    return false;
+}
+
+std::string SeqWindow::stepBlocks(SeqLane row, int s) const {
+    // Thirteenth DAW test, item 165 (D-374): what the sound of the step forbids, so that an empty cell is crossed too
+    // (GEN on SID Voice: ENV crossed below it). The rows of the drums are hidden there.
+    if (drum()) return {};
+    const StepSound k = stepSound(s);
+    const bool dma = k.gen == int(Generator::Dma), sid = k.gen == int(Generator::Sid),
+               sb = k.gen == int(Generator::SyncBuzzer),
+               perc = k.gen == int(Generator::Chipdrum) || k.gen == int(Generator::Digidrum);
+    static constexpr const char* kDma = "A DMA note plays its sample: no square, no noise, no envelope";
+    static constexpr const char* kPerc = "A drum hit plays its own sound: no source, no envelope";
+    const bool through = k.held || k.slideTarget;  // no new attack on this step
+    switch (row) {
+    case SeqLane::Mix:  // applyMix leaves them alone
+        if (sb) return "Sync Buzzer plays the hardware envelope alone: no square, no noise, no fixed volume";
+        if (dma) return kDma;
+        return perc ? kPerc : "";
+    case SeqLane::Fx:
+        if (m_.dmaTrack(cur())) return "In 3 ch mode, the DMA tracks play the DMA sound";
+        return through && (dma || perc) ? "A held DMA or drum note keeps its sound: GEN acts on the notes that start"
+                                        : "";
+    case SeqLane::Env:  // a SID Voice writes its own volumes; DMA and the drums have no envelope
+        if (sid) return "A SID Voice writes its own volumes: the envelope is not used";
+        if (dma) return kDma;
+        return perc ? kPerc : "";
+    case SeqLane::Smp:  // the offset of the DMA attacks of the row
+        if (!dma) return "Not a DMA note: there is no sample to start further in";
+        return through ? "No note starts on this step" : "";
+    case SeqLane::Ins:  // ties, slides and the note a slide reaches keep the instrument of the sounding note
+        if (k.held) return "A held note keeps the instrument it started with";
+        return k.slideTarget ? "A slide keeps the instrument of the note it starts from" : "";
+    case SeqLane::Cnd: return k.held ? "No note starts on this step" : "";  // the roots that start only
+    case SeqLane::Gat:  // offIn: a tied or sliding note goes on; heldStep: only on the last step of the hold
+        if (k.slid) return "During a slide, only VOL acts";
+        return k.continues ? "The note goes on after this step: only the GAT of its last step acts" : "";
+    case SeqLane::Rtg: return k.slid ? "During a slide, only VOL acts" : "";
+    default: return {};
+    }
+}
+
 std::string SeqWindow::cantAct(SeqLane row, int s) const {
     // Twelfth DAW test, item 145: a value written where it cannot act. The rows that stay hidden where they cannot
-    // act (drums) show it all the same once a value is written.
+    // act (drums) show it all the same once a value is written, but those of the switches. Thirteenth, item 165: first
+    // what the sound of the step forbids, written or not.
     using ymengine::SeqCmd;
+    if (std::string why = stepBlocks(row, s); !why.empty()) return why;
     const ymseq::Lane& l = lane();
     const size_t S = size_t(s);
     const auto onTrack = [&](SeqCmd k) { return l.cmdAt(k, s) != 0; };
     const bool starts = l.pat[S] >= 0 || std::any_of(l.vpat.begin(), l.vpat.end(), [S](const auto& v) {
                             return v[S] >= 0;
                         });
+    const auto noNote = [&](bool written) {  // a value on a step where no note starts or sounds
+        if (!written || starts) return "";
+        const StepSound k = stepSound(s);
+        return k.held ? "" : "No note on this step";
+    };
     switch (row) {
-    case SeqLane::Afl:
-        if (!onTrack(SeqCmd::Arpeggiator)) return {};
-        if (drum()) return "A drum track has no arpeggiator";
-        return arpOn() ? "" : "The arpeggiator of this track is off (Arpeggiator window)";
-    case SeqLane::Vib:
-        if (!onTrack(SeqCmd::Vibrato)) return {};
-        if (drum()) return "A drum track has no vibrato";
-        return m_.iv(Track::VibOn) ? "" : "The vibrato of this track is off (VIBRATO frame)";
-    case SeqLane::Lfo: {
-        if (!onTrack(SeqCmd::Lfo)) return {};
-        if (drum()) return "A drum track has no LFO";
-        const ymengine::TrackLfo& lfo = st().tracks[size_t(cur())].patch.lfo;
-        return lfo.on && lfo.depth > 0 ? "" : "The LFO of this track is off (Modulation window)";
-    }
-    case SeqLane::Mod:
-        if (!onTrack(SeqCmd::Mod)) return {};
-        if (drum()) return "A drum track has no modulation table";
-        return st().tracks[size_t(cur())].patch.ornamentOn ? ""
-                                                           : "The modulation table of this track is off (Modulation "
-                                                             "window)";
+    case SeqLane::Mix: return noNote(l.mix[S] != 0);
+    case SeqLane::Fx: return noNote(l.fx[S] != 0);
+    case SeqLane::Gat: return noNote(l.gat[S] != 0);
+    case SeqLane::Rtg: return noNote(l.rtg[S] != 0);
+    case SeqLane::Ins: return l.ins[S] && !starts ? "No note starts on this step" : "";
+    case SeqLane::Cnd: return l.cnd[S] && l.pat[S] < 0 && !starts ? "No note starts on this step" : "";
+    case SeqLane::Oct:  // drums: the tuning of the hit
+        return drum() && l.oct[S] && !starts ? "No note starts on this step" : "";
+    case SeqLane::Ton: return drum() && l.ton[S] && !starts ? "No note starts on this step" : "";
+    // ARP, VIB and MOD show only where their switch acts (vibShown to arpShown); the LFO can be on without depth.
+    case SeqLane::Lfo:
+        return onTrack(SeqCmd::Lfo) && st().tracks[size_t(cur())].patch.lfo.depth <= 0
+                   ? "The LFO of this track is off (Modulation window)"
+                   : "";
     case SeqLane::Env:
         if (!onTrack(SeqCmd::Shape) && !onTrack(SeqCmd::Retrig)) return {};
         return envPlays() ? "" : "The envelope does not play on this track (Source Env, Sync Buzzer, an Env entry of "
                                  "SRC or Sync Buzzer in GEN)";
-    case SeqLane::Smp:
-        if (!onTrack(SeqCmd::Offset)) return {};
-        if (generator() != int(Generator::Dma)) return "Not a DMA track: there is no sample to start further in";
-        return starts ? "" : "No note starts on this step";
+    case SeqLane::Smp: return onTrack(SeqCmd::Offset) && !starts ? "No note starts on this step" : "";
     case SeqLane::Tun:
         return onTrack(SeqCmd::Fine) && drum() ? "A drum track keeps its tuning (OCT and TON rows)" : "";
     case SeqLane::Dly:
@@ -654,7 +838,11 @@ int SeqWindow::resolution() const noexcept {
 int SeqWindow::viewSemi() const noexcept { return drum() ? 0 : ses().viewAbsBase - (trackOct() + 1) * 12; }
 int SeqWindow::beatSteps() const noexcept { return ymseq::beatSteps(signature(), resolution()); }
 int SeqWindow::barSteps() const noexcept { return ymseq::barSteps(signature(), resolution()); }
-int SeqWindow::figSteps() const noexcept { return ymseq::figureSteps(ses().figure, resolution()); }
+int SeqWindow::figSteps() const noexcept { return ymseq::figureSteps(inputFigure(), resolution()); }
+int SeqWindow::inputFigure() const noexcept {
+    const int f = std::clamp(ses().figure, 0, ymseq::kFigureCount - 1);
+    return ymseq::figureFits(f, resolution()) ? f : 0;
+}
 bool SeqWindow::latin() const { return m_.host_.preference("noteNames", "0") == "1"; }
 std::string SeqWindow::noteName(int pc) const {
     return std::string(ymseq::noteName(pc, latin() ? ymseq::NoteNames::Latin : ymseq::NoteNames::English));
@@ -674,7 +862,7 @@ ymseq::EditContext SeqWindow::context() const {
     c.drum = drum();
     c.mono = mono();
     c.threeVoice = mode3();
-    c.figure = ses().figure;
+    c.figure = inputFigure();
     c.resolution = resolution();
     c.chord = ses().chord;
     c.scale = scale();
@@ -696,27 +884,25 @@ void SeqWindow::edit(const std::function<void(plugin::NonParamState&)>& fn) {
 // ------------------------------------------------------------------------------------------- Ticks rate
 
 void SeqWindow::resolutionMenu() {
-    // Resolutions of the prototype (BPM rate), then, under a rule, the Ticks rate of STYM2149 (D-149): a line lasts
-    // Speed replay ticks plus those of the groove; Speed and Groove are set in either rate.
+    // Resolutions of the prototype (BPM rate), 1/64 after 1/32 (D-422), 1/32T after 1/16T (D-433), then, under a rule,
+    // the Ticks rate of STYM2149 (D-149): a line lasts Speed replay ticks plus those of the groove; Speed and Groove
+    // are set in either rate. The check mark counts the plain entries only, the rules left out (D-422: it fell one
+    // entry too low after a rule).
     const ymengine::GlobalParams& g = st().global;
     const bool ticks = g.timing == ymengine::SeqTiming::Ticks;
     std::vector<MenuItem> items;
     int checked = -1;
-    for (int i = 0; i < ymseq::kResolutionCount; ++i) {
-        if (i == ymseq::kResolutionSep) items.push_back(MenuItem::separatorItem());
-        if (!ticks && i == resolution()) checked = int(items.size());
+    for (int k = 0; k < ymseq::kResolutionCount; ++k) {
+        const int i = ymseq::kResolutionOrder[size_t(k)];
+        if (k == ymseq::kResolutionSep) items.push_back(MenuItem::separatorItem());
+        if (!ticks && i == resolution()) checked = k;
         MenuItem m;
         m.label = collapse(ymseq::kResolutions[size_t(i)].name);
-        m.pick = [this, i] {
-            edit([i](plugin::NonParamState& s) {
-                s.global.resolution = uint8_t(i);
-                s.global.timing = ymengine::SeqTiming::Bpm;
-            });
-        };
+        m.pick = [this, i] { setResolution(i); };
         items.push_back(std::move(m));
     }
     items.push_back(MenuItem::separatorItem());
-    if (ticks) checked = int(items.size());
+    if (ticks) checked = ymseq::kResolutionCount;
     MenuItem t;
     t.label = "Ticks: Speed ticks per line";
     t.pick = [this] { edit([](plugin::NonParamState& s) { s.global.timing = ymengine::SeqTiming::Ticks; }); };
@@ -747,6 +933,44 @@ void SeqWindow::resolutionMenu() {
     }
     items.push_back(std::move(cmd));
     popup(reso_, std::move(items), checked);
+}
+
+// Another grid with notes in the patterns (Indus, 26/10/2026, D-448): Fit moves and resizes them so that they keep
+// their time (every pattern, the tracks' own lengths and the rests of the Song; one undo step); Keep leaves them on
+// their steps, which then last the new resolution's time, as before; Cancel, the default, changes nothing.
+void SeqWindow::setResolution(int i) {
+    auto apply = [this, i](bool fit) {
+        // Steps per quarter note doubled: whole numbers for every resolution (1.5 for 1/4T).
+        int num = int(std::lround(2 * ymseq::kResolutions[size_t(i)].stepsPerBeat));
+        int den = int(std::lround(2 * ymseq::kResolutions[size_t(resolution())].stepsPerBeat));
+        const int g = std::gcd(num, den);
+        num /= g;
+        den /= g;
+        if (fit) {
+            UndoEntry e;
+            e.kind = UndoEntry::Kind::Grid;
+            ses().undo.push(m_.undoEntryLike(e));
+        }
+        edit([i, fit, num, den](plugin::NonParamState& s) {
+            if (fit) s.seq.fitResolution(num, den);
+            s.global.resolution = uint8_t(i);
+            s.global.timing = ymengine::SeqTiming::Bpm;
+        });
+    };
+    if (i == resolution() || !proj().hasNotes()) {
+        apply(false);
+        return;
+    }
+    const std::string to(ymseq::kResolutions[size_t(i)].label);
+    gemui::Alert::Spec spec;
+    spec.lines = {{"The patterns hold notes. Fit them to " + to + "?"},
+                  {"Fit: each note keeps its time, on the steps of " + to + ".", 12},
+                  {"Keep: each note keeps its step, which lasts " + to + ".", 12}};
+    spec.buttons = {"Cancel", "Keep", "Fit"};
+    spec.defaultButton = spec.escapeButton = spec.focusButton = 0;  // the safest choice
+    gemui::Alert::open(desk(), std::move(spec), [apply](int button, const std::string&) {
+        if (button > 0) apply(button == 2);
+    });
 }
 
 void SeqWindow::prompt(const std::string& message, const std::string& text, int chars,
@@ -809,16 +1033,30 @@ void SeqWindow::askCmd(int s) {
         const uint16_t c = lane().cmdAt(k, s);
         spec.entries[size_t(i - 1)] = {c != 0, c ? int(ymengine::seqCmdParam(c)) : start(k)};
     }
-    spec.ok = [this, s, at = stepTarget()](const CmdBox::Entries& entries) {
+    // The slides that cannot act from this step are left out (D-386), but those written there, to be switched off. The
+    // Volume Slide is only that of an older project: the Slide of the VOL row replaces it (D-393).
+    for (size_t i = 0; i < CmdBox::kOrder.size(); ++i) {
+        const SeqCmd k = CmdBox::kOrder[i];
+        if (k == SeqCmd::VolSlide) spec.shown[i] = lane().cmdAt(k, s) != 0;
+        else if (k == SeqCmd::EnvSlide || k == SeqCmd::NoiseSlide)
+            spec.shown[i] = lane().cmdAt(k, s) != 0 || slideActs(k, s);
+    }
+    // 16 channels: the Buzzer and Noise slides take a curve, Kxx and Qxx (D-394); the 3-channel modes leave them as
+    // they are (straight slides of the replay).
+    spec.curves = !mode3();
+    spec.ok = [this, s, at = stepTarget(), curves = spec.curves](const CmdBox::Entries& entries) {
         if (!stillOn(at)) return;  // the box was for that step of another track or pattern
         editLane([&](ymseq::LaneEditor&, ymseq::Lane& l) {
-            for (const SeqCmd k : CmdBox::kOrder) {
+            const auto write = [&](SeqCmd k) {
                 const CmdBox::Entry& e = entries[size_t(int(k) - 1)];
                 if (e.on)
                     l.setCmd(s, ymengine::seqCmd(k, uint8_t(e.value)));
                 else
                     l.clearCmd(k, s);
-            }
+            };
+            for (const SeqCmd k : CmdBox::kOrder) write(k);
+            if (curves)
+                for (const SeqCmd k : {SeqCmd::EnvCurve, SeqCmd::NoiseCurve}) write(k);
             return true;
         });
     };
@@ -904,7 +1142,8 @@ UndoEntry SeqWindow::entryLike(const UndoEntry& e) const {
     case UndoEntry::Kind::Kit:
     case UndoEntry::Kind::Dma:
     case UndoEntry::Kind::Digi:
-    case UndoEntry::Kind::Import: return m_.undoEntryLike(e);
+    case UndoEntry::Kind::Import:
+    case UndoEntry::Kind::Grid: return m_.undoEntryLike(e);
     }
     return e;
 }
@@ -1113,6 +1352,14 @@ void SeqWindow::layout() {
 
     // Bottom of the window: margin of .mixbody (8), margin and border of .gwin (4 + 2).
     const double h = y + 8 + 4 + 2 - oy;
+    // Grown past the bottom of the desktop (every control row, the 2 px gaps of the grid, D-458): the window moves up
+    // until its bottom shows, its top never above the menu bar.
+    const gemui::Desktop& d = m_.desktop();
+    const double top = std::max(double(d.workTop()), std::min(oy, double(d.height()) - h));
+    if (h > box().h + 0.01 && top < oy) {
+        place({ox, top, double(kW), h});
+        return layout();
+    }
     if (std::abs(h - box().h) > 0.01) {
         setBox({ox, oy, double(kW), h});
         titleBar().setBounds({int(ox) + kInset, int(oy) + kInset, kW - 2 * kInset, gemui::TitleBar::kHeight});
@@ -1133,13 +1380,28 @@ void SeqWindow::fitTrSlider() {
 
 std::vector<MenuItem> SeqWindow::figItems() {
     std::vector<MenuItem> items;
+    const int r = resolution();
+    const std::string step(ymseq::kResolutions[size_t(r)].label);
     for (int k = 0; k < ymseq::kFigureCount; ++k) {
         if (std::find(ymseq::kFigureSeps.begin(), ymseq::kFigureSeps.end(), k) != ymseq::kFigureSeps.end())
             items.push_back(MenuItem::separatorItem());
-        const int n = ymseq::figureSteps(k, resolution());
+        const std::string name(ymseq::kFigures[size_t(k)].name);
+        const int n = ymseq::figureSteps(k, r);
         MenuItem m;
-        m.label = std::string(ymseq::kFigures[size_t(k)].name) + " " + std::to_string(n) + (n > 1 ? " steps" : " step");
+        m.label = name + " " + std::to_string(n) + (n > 1 ? " steps" : " step");
         m.icon = &icons::kFigures[size_t(k)];
+        // A value that is not a whole number of steps is greyed, its length shown unrounded (Indus, 25/10/2026 17:21,
+        // D-425): a thirty-second note in 1/16 lasts half a step, a quarter-note triplet two steps and two thirds.
+        if (!ymseq::figureFits(k, r)) {
+            const double x = ymseq::figureStepsExact(k, r);
+            std::string v = fmt2(x);
+            while (v.back() == '0') v.pop_back();
+            if (v.back() == '.') v.pop_back();
+            m.label = name + " " + v + (x > 1 ? " steps" : " step");
+            m.disabled = true;
+            m.why = x < 1 ? "Shorter than one step of " + step
+                          : "Lasts " + v + " steps of " + step + ": not a whole number";
+        }
         m.pick = [this, k] {
             ses().figure = k;
             refreshControls();
@@ -1253,7 +1515,11 @@ void SeqWindow::refreshControls() {
         reso_.setText(std::string(ymseq::kResolutions[size_t(resolution())].label));
         reso_.setTip("Value of one step");
     }
-    fig_.setText(std::string(ymseq::kFigures[size_t(std::clamp(s.figure, 0, ymseq::kFigureCount - 1))].name));
+    // The note drawn rather than its name (24/10/2026, D-382): Step, the note of the resolution.
+    static constexpr std::array<int, ymseq::kResolutionCount> kStepFigure = {3, 4, 5, 6, 11, 12, 13, 7, 14};
+    const int fig = inputFigure();
+    fig_.setText({});
+    fig_.setIcon(&icons::kFigures[size_t(fig ? fig : kStepFigure[size_t(resolution())])]);
     fig_.setEnabled(!dr);
     labNote_.setDim(dr);
     fig_.setTip(dr ? "Percussion hits are one step long" : "Length written when you place a note");

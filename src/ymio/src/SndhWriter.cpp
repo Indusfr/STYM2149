@@ -636,9 +636,10 @@ private:
 
     static int gainLevel(float g) { return int(std::lround(std::clamp(double(g), 0.0, 1.0) * 16)); }  // 0-16
 
-    // Copy of the slot from the frame start (Oxx of the CMD row, D-338) at the pitch (read step, like the engine:
-    // sample at the integer position) and the volume (sixteen levels) of the attack, at the slot's rate; even length
-    // (even DMA addresses). The loop of the copy resumes at its first frame, as in the engine.
+    // Copy of the slot from the frame start (its Start, D-444, then Oxx, D-338) to the end of its bytes (End) at the
+    // pitch (read step, like the engine: sample at the integer position) and the volume (sixteen levels) of the attack,
+    // at the slot's rate; even length (even DMA addresses). The loop of the copy resumes at its first frame, as in the
+    // engine.
     uint16_t copyFor(int slot, float step, float gain, uint32_t start) {
         const int level = gainLevel(gain);
         const auto key = std::make_tuple(slot, step, level, start);

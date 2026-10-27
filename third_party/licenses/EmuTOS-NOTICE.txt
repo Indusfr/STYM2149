@@ -15,3 +15,16 @@ STYM2149 uses them under the GNU GPL version 3, as part of a work distributed
 under the GNU Affero General Public License version 3 (see LICENSE). The
 converted glyph tables are in src/gemui/src/FontData.cpp and
 src/gemui/src/FontDataSmall.cpp of the STYM2149 source code.
+
+EmuTOS desktop icons in STYM2149
+================================
+
+The pictures of the floppy disk and trash icons of the desktop come from the
+EmuTOS desktop's resource desk/icon.rsc, same commit (SHA-256
+ce16d833b8e12260...; icons by Christian Quante, Copyright (C) The EmuTOS
+development team). EmuTOS is distributed under the GNU General Public License
+(doc/license.txt); the resource carries no notice of its own. STYM2149 uses
+them under the GNU GPL version 3, as part of a work distributed under the GNU
+Affero General Public License version 3. The converted pictures are in
+src/pluginui/src/DeskIcons.cpp; the resource itself is not part of the
+STYM2149 source code (tools/icon/make_desk_icons.py reads it from EmuTOS).

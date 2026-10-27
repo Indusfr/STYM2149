@@ -86,8 +86,10 @@ std::optional<std::vector<int>> playedTracks(OfflineRender::Source source, const
 // isolate() of the prototype: only that track audible, even when muted (its level and pan stay).
 ParamValues isolated(const ParamValues& values, int track) {
     ParamValues v = values;
-    for (int t = 0; t < kTracks; ++t) v[size_t(paramIndex(t, Track::Solo))] = t == track ? 1.0f : 0.0f;
+    for (int t = 0; t < kTracks; ++t)
+        for (const Track f : {Track::Solo, Track::SoloR}) v[size_t(paramIndex(t, f))] = t == track ? 1.0f : 0.0f;
     v[size_t(paramIndex(track, Track::Mute))] = 0.0f;
+    v[size_t(paramIndex(track, Track::MuteR))] = 0.0f;  // both sides of a stereo DMA sample (D-459)
     return v;
 }
 

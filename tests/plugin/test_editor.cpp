@@ -13,6 +13,7 @@
 #include "KeyboardLayout.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "pluginui/IconData.h"
 
 using namespace stym;
 using namespace stym::plugin;
@@ -55,7 +56,8 @@ double play(StymProcessor& p, int blocks) {
 }
 
 // Screen of `scale` pixels per component pixel (the display scale): each logical pixel of the desktop becomes a k × k
-// block of the screen (whole number of screen pixels per desktop pixel, D-201).
+// block of the screen (whole number of screen pixels per desktop pixel, D-201). The Atari logo of the menu bar aside
+// when k > 1: its outline is filled at the screen's resolution (D-404), its box only has to hold ink.
 bool sameAsDesktop(StymEditor& editor, float scale, int k) {
     const juce::Image shot = editor.createComponentSnapshot(editor.getLocalBounds(), true, scale);
     gemui::Desktop& desk = editor.window().desktop();
@@ -63,11 +65,20 @@ bool sameAsDesktop(StymEditor& editor, float scale, int k) {
     desk.paint();
     const gemui::Surface& s = desk.surface();
     if (shot.getWidth() != s.width() * k || shot.getHeight() != s.height() * k) return false;
+    const gemui::Rect title = *editor.window().rectOf("mFuji");
+    const gemui::Rect logo{title.x + 10, title.y + 5, pluginui::icons::kFuji.w, pluginui::icons::kFuji.h};
     const juce::Image::BitmapData bd(shot, juce::Image::BitmapData::readOnly);
+    int ink = 0;
     for (int y = 0; y < shot.getHeight(); ++y)
-        for (int x = 0; x < shot.getWidth(); ++x)
-            if ((bd.getPixelColour(x, y).getARGB() | 0xff000000u) != (s.row(y / k)[x / k] | 0xff000000u)) return false;
-    return true;
+        for (int x = 0; x < shot.getWidth(); ++x) {
+            const uint32_t v = bd.getPixelColour(x, y).getARGB() | 0xff000000u;
+            if (k > 1 && logo.contains({x / k, y / k})) {
+                ink += v != (s.row(logo.y)[logo.x] | 0xff000000u);
+                continue;
+            }
+            if (v != (s.row(y / k)[x / k] | 0xff000000u)) return false;
+        }
+    return k == 1 || ink > 0;
 }
 
 struct GestureListener : juce::AudioProcessorListener {
@@ -180,6 +191,26 @@ TEST_CASE("Editor: size set by resizing the window, kept in the preferences (ten
     CHECK(editor.getWidth() == pluginui::MainWindow::kWidth * 125 / 160);
     CHECK(host.preference("noteNames", "0") == "1");
     CHECK(host.preference("absent", "x") == "x");
+}
+
+TEST_CASE("Editor: Settings > Renderer offered on Windows only, the preference kept (D-420)", "[editor]") {
+    juce::ScopedJuceInitialiser_GUI juce;
+    juce::TemporaryFile prefs(".settings");
+    StymProcessor p;
+    {
+        StymEditor editor(p, preferencesIn(prefs.getFile()));
+        pluginui::Host& host = editor;
+#if JUCE_WINDOWS
+        CHECK(host.rendererChoice());
+#else
+        CHECK_FALSE(host.rendererChoice());
+#endif
+        CHECK(host.preference("renderer", "software") == "software");
+        host.setPreference("renderer", "direct2d");  // not on screen here: no window to change
+        CHECK(host.preference("renderer", "software") == "direct2d");
+    }
+    StymEditor editor(p, preferencesIn(prefs.getFile()));
+    CHECK(static_cast<const pluginui::Host&>(editor).preference("renderer", "software") == "direct2d");
 }
 
 TEST_CASE("Editor: Fuji > Information names the build, the CI run number and its commit (D-211)", "[editor]") {
@@ -298,9 +329,9 @@ TEST_CASE("Editor: click on the on-screen keyboard, note played then released by
     f->setValue("zoom", 160);
     auto editor = std::make_unique<StymEditor>(p, std::move(f));
     CHECK(play(p, 4) == 0.0);
-    // White key of the keyboard (main window, box {164, 716, 944, 110}): (178, 810) in logical pixels, the same in
+    // White key of the keyboard (main window, box {200, 716, 944, 110}): (214, 810) in logical pixels, the same in
     // the editor at 160 %.
-    const juce::Point<float> key(178.0f, 810.0f);
+    const juce::Point<float> key(214.0f, 810.0f);
     editor->mouseDown(mouseAt(*editor, key));
     CHECK(play(p, 8) > 0.0);
     editor->mouseUp(mouseAt(*editor, key));

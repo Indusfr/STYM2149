@@ -36,7 +36,9 @@
 //         D-151): u8 step of the SID wave, 16 × u8 volumes, u8 step of the Sync Buzzer, 8 × u8 R13 shapes; then the
 //         buzzer (B7, D-152): u8 tuned envelope, u8 N, u8 D, f64 fine tune in cents, u8 YM Pad; then the LFO (D-257):
 //         u8 on, u8 shape, u8 target, u8 sync, f64 rate (Hz), u8 division, f64 depth, u8 retrigger (D-279); then
-//         the echo of the notes (D-299): u8 on, u8 division, u8 repeats, u8 drop, i8 target track (-1: its own).
+//         the echo of the notes (D-299): u8 on, u8 division, u8 repeats, u8 drop, i8 target track (-1: its own);
+//         then u8 Sine button of the SID wave lit (D-402), u8 phase of its sine (0 to 15, D-405),
+//         u8 period of its sine (2 to 16 bars, D-406), u8 width of the square wave (1 to 15 sixteenths, D-408).
 //         Written for a track whose sequences, waves, buzzer, LFO or echo differ from the default.
 //   TIMG (M6, only when not default, D-149): rate of the sequencer lines: u8 timing (0 BPM, 1 Ticks), u8 speed
 //         (ticks per line), u8 groove length, 16 × u8 ticks added to the lines.
@@ -107,19 +109,21 @@ struct NonParamState {
     ymseq::Project seq;
     // Project instruments (M6), $01 to $20: the INS row of a step designates the slot + 1.
     std::array<Instrument, ymengine::kInstruments> instruments{};
-    // STE DMA track (M6, D-153): settings and signed bytes of the eight slots (kDmaMaxBytes at most).
+    // STE DMA track (M6, D-153): settings, signed bytes (kDmaMaxBytes at most) and names of the eight slots (the file
+    // loaded, or typed; cleanDigidrumName, D-445).
     ymengine::DmaParams dma{};
     std::array<std::vector<int8_t>, ymengine::kDmaSlots> dmaSamples{};
+    std::array<std::string, ymengine::kDmaSlots> dmaNames{};
 };
 
 // Rows of a pattern track as the state numbers them (PATN chunk): 0 to 15 those of the prototype (order of
 // ymseq::Row and of LANEKEYS), 16 to 30 the note, octave and duration of each chord voice (voices 2 to 6), 31 INS,
 // 32 to 37 the CMD rows Xyz, Sxx, Rxx, Zxx, Txx, Vxx (D-330), 38 to 46 those of D-338 (Axy, Pxy, Dxx, Cxx, Bxy, Nxy,
-// Exx, Oxx, Fxx) and 47 to 49 the switches of the twelfth DAW test (Lxx, Mxx, Jxx); a command written in one of them
-// goes to the row of its kind (Xyz and Pxy, retired by D-340 and D-344, are dropped). Value of a cell, empty value of a
-// row, write clamped as when reading a state (an unknown command leaves the cell empty; row or step out of range:
-// nothing is written).
-inline constexpr int kLaneRows = 50;
+// Exx, Oxx, Fxx), 47 to 49 the switches of the twelfth DAW test (Lxx, Mxx, Jxx) and 50 to 52 the volume glide and
+// the slide curves (Gxx, Kxx, Qxx; D-393, D-394); a command written in one of them goes to the row of its kind (Xyz
+// and Pxy, retired by D-340 and D-344, are dropped). Value of a cell, empty value of a row, write clamped as when
+// reading a state (an unknown command leaves the cell empty; row or step out of range: nothing is written).
+inline constexpr int kLaneRows = 53;
 int laneCell(const ymseq::Lane& l, int row, int step) noexcept;
 int laneEmpty(int row) noexcept;
 void setLaneCell(ymseq::Lane& l, int row, int step, int value) noexcept;

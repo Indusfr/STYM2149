@@ -11,9 +11,9 @@
 // worklet is instrumented: each sequencer operation on a voice is logged with its position. The C++ test replays
 // the same cases on the engine (tests/unit/test_proto_seq.cpp).
 //
-// The decided deviations (DECISIONS.md, D-097 to D-106, D-205, D-281, D-343 and D-345) are applied to the worklet
-// source by checked replacements; the prototype's random draws (CND, Random arpeggio, slide seeds) are replaced by the
-// draws tied to the engine's playback position (D-104).
+// The decided deviations (DECISIONS.md, D-097 to D-106, D-205, D-281, D-343, D-345 and D-421) are applied to the
+// worklet source by checked replacements; the prototype's random draws (CND, Random arpeggio, slide seeds) are replaced
+// by the draws tied to the engine's playback position (D-104).
 import { loadPrototype } from './load.mjs';
 import { patch, rng } from './page.mjs';
 
@@ -92,18 +92,26 @@ function transform(src) {
   }
   polyAny`, 'log R');
   P(`    if (!drum) this.killPoly(i);                     // un kit laisse resonner ses frappes\n`, '', 'D-102');
-  // D-281: a chord note whose rank is still held by an earlier note takes a free rank.
+  // D-281, D-421: a chord note whose rank is still held by an earlier note, or in its release, takes a silent rank,
+  // otherwise the oldest rank in its release.
   P(`    for (let k = 1; k <= 5; k++){
       const pa = c['pat' + (k + 1)];
       if (!pa || pa[st] < 0) continue;
       const note = pa[st];                           // deja absolue
       const v = this.voices[this.polyVoice(i, k)];`, `    const rank = [0, 0, 0, 0, 0, 0], taken = [0, 0, 0, 0, 0, 0];
     const has = (k) => { const pa = c['pat' + (k + 1)]; return pa && pa[st] >= 0; };
-    for (let k = 1; k <= 5; k++) if (has(k) && (drum || c.polyLeft[k] <= 0)) { rank[k] = k; taken[k] = 1; }
+    const pv = (k) => this.voices[this.polyVoice(i, k)];
+    for (let k = 1; k <= 5; k++)
+      if (has(k) && (drum || (c.polyLeft[k] <= 0 && !pv(k).on))) { rank[k] = k; taken[k] = 1; }
     for (let k = 1; k <= 5; k++){
       if (!has(k) || rank[k]) continue;
-      rank[k] = k;
-      for (let j = 1; j <= 5; j++) if (!taken[j] && c.polyLeft[j] <= 0) { rank[k] = j; break; }
+      let best = 0;
+      for (let j = 1; j <= 5; j++) {
+        if (taken[j] || c.polyLeft[j] > 0) continue;
+        if (!pv(j).on) { best = j; break; }
+        if (!best || pv(j).age < pv(best).age) best = j;
+      }
+      rank[k] = best || k;
       taken[rank[k]] = 1;
     }
     for (let r = 1; r <= 5; r++){
@@ -111,7 +119,7 @@ function transform(src) {
       if (!pa || pa[st] < 0) continue;
       const k = rank[r];
       const note = pa[st];
-      const v = this.voices[this.polyVoice(i, k)];`, 'D-281');
+      const v = this.voices[this.polyVoice(i, k)];`, 'D-281 D-421');
   P(`      const dk = c['dur' + (k + 1)];
       c.polyLeft[k]`, `      const dk = c['dur' + (r + 1)];
       c.polyLeft[k]`, 'D-281');
@@ -209,6 +217,14 @@ function transform(src) {
   P(`    v.adsrOn = (v.atk > 0 || v.dcy > 0 || v.sus < 1 || v.rel > 0) ? 1 : 0;`,
     `    v.adsrOn = (v.effect !== 2 && v.effect !== 4 && (v.atk > 0 || v.dcy > 0 || v.sus < 1 || v.rel > 0)) ? 1 : 0;`,
     'D-205');
+  // D-421: in 16 channels, the note before a new note of a polyphonic track goes on to its release on a chord voice.
+  P(`    } else {
+      this.killLane(vi);
+      c.arpNote = -1;
+`, `    } else {
+      if (!this.laneTail(i)) this.killLane(vi);
+      c.arpNote = -1;
+`, 'D-421');
   return src;
 }
 
@@ -287,6 +303,31 @@ W.heldStep = function (i, c, st, lvl, stepSamp) {
     this.laneTrigger(i, c.heldNote, lvl, eff);
     this.applyMix(this.voices[this.laneVoice(i)], c.rt.mix);
   }
+};
+
+// D-421 (Impl::laneTail): the note of the lane voice, if it has a release, moves to a chord voice of the track that no
+// chord note holds, a silent one, otherwise the oldest in its release, and goes on to its release there.
+W.laneTail = function (i) {
+  const c = this.chans[i], lv = this.voices[this.laneVoice(i)];
+  if (this.patch.mode3ch || c.mono || !lv.on || lv.tag !== 'seq' || lv.fade || lv.effect === 2 || lv.effect === 4 ||
+      !lv.adsrOn || !(lv.rel > 0)) return false;
+  let ti = -1, tk = -1;
+  for (let k = 1; k <= 5; k++) {
+    if (c.polyLeft[k] > 0) continue;
+    const j = this.polyVoice(i, k), t = this.voices[j];
+    if (!t.on) { ti = j; tk = k; break; }
+    if ((t.aStage === 4 || t.fade) && (ti < 0 || t.age < this.voices[ti].age)) { ti = j; tk = k; }
+  }
+  if (ti < 0) return false;
+  const t = this.voices[ti];
+  if (t.on) { t.on = 0; this.log('O', ti); }
+  Object.assign(t, lv);
+  t.tag = 'poly';
+  lv.on = 0;
+  c.polyLeft[tk] = 0; c.polyOff[tk] = 0;
+  this.relVoice(t, 32);
+  this.log('R', ti);
+  return true;
 };
 
 // ---- log of the voice operations (same points as Engine::Impl)
@@ -429,7 +470,7 @@ const SCALES = [0, 0xAB5, 0x5AD, 0x295, 0x891];
 const RESOS = [1, 2, 4, 8, 1.5, 3, 6];
 const out = [];
 out.push('# Generated by tools/proto_golden/seq.mjs from YM2149_Prototype.html (YMProc worklet, deviations ' +
-  'D-097 to D-106, D-205, D-281, D-343, D-345).');
+  'D-097 to D-106, D-205, D-281, D-343, D-345, D-421).');
 
 function runCase(id, mode, midi) {
   const R = rng(0x5E0 + id * 7919);

@@ -219,11 +219,11 @@ TEST_CASE("Song: click, Shift+click, block menu and drag and drop", "[ui][song]"
     CHECK(song.selection() == ymseq::SongSel{1, 2});
     CHECK(song.cursor() == 2);
 
-    // Block menu (6 px below the block, 20 px entries inside a 2 px frame): Repeat x4 on the selection.
+    // Block menu (its frame on the block's bottom rule, 20 px entries inside a 2 px frame): Repeat x4 on the selection.
     click(w, "songChip2", {}, gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
     const gemui::Rect chip = *w.rectOf("songChip2");
-    const gemui::Point x4{chip.x + 20, chip.bottom() + 6 + 2 + 2 * 20 + 10};
+    const gemui::Point x4{chip.x + 20, chip.bottom() - 2 + 2 + 2 * 20 + 10};
     w.desktop().mouseMove(x4, {});
     w.desktop().mouseDown(x4, gemui::MouseButton::Left, {});
     w.desktop().mouseUp(x4, {});

@@ -390,6 +390,54 @@ TEST_CASE("Demo pattern and Quit confirms: Cancel by default, only OK goes on (P
     CHECK(h.quits == 1);
 }
 
+TEST_CASE("Quit in a plugin: greyed in the File menu, ^Q left to the host", "[ui][alert]") {
+    struct PluginHost : UiHost {
+        bool standalone() const override { return false; }
+    };
+    PluginHost h;
+    pluginui::MainWindow w(h);
+    w.openMenu(1);
+    const std::vector<std::string> labels = menuLabels(w);
+    const auto at = std::find(labels.begin(), labels.end(), "Quit");
+    REQUIRE(at != labels.end());
+    const gemui::MenuItem& quit = topMenu(w)->items()[size_t(at - labels.begin())];
+    CHECK(quit.disabled);
+    CHECK(quit.why == "The host closes the plugin");
+    key(w, Key::Escape);
+    CHECK_FALSE(ctrlKey(w, U'q'));
+    CHECK_FALSE(topAlert(w));
+    CHECK(h.quits == 0);
+}
+
+TEST_CASE("Quit: the close box of the standalone application's window opens the Quit box, once (D-439)",
+          "[ui][alert]") {
+    UiHost h;
+    pluginui::MainWindow w(h);
+    w.requestQuit();
+    const Alert* a = topAlert(w);
+    REQUIRE(a);
+    CHECK(a->text() == "Quit STYM2149?\nUnsaved work will be lost.");
+    CHECK(w.quitAsked());
+    w.requestQuit();  // clicked again while the box is open: no second box
+    w.desktop().keyDown(charKey(U'q', true));  // nor from ^Q, which goes to the box
+    key(w, Key::Escape);
+    CHECK_FALSE(w.desktop().hasModal());
+    CHECK_FALSE(w.quitAsked());
+    CHECK(h.quits == 0);
+    w.requestQuit();
+    alertButton(w, 1);
+    CHECK(h.quits == 1);
+
+    // In a plugin the host closes the window: no box.
+    struct PluginHost : UiHost {
+        bool standalone() const override { return false; }
+    };
+    PluginHost p;
+    pluginui::MainWindow pw(p);
+    pw.requestQuit();
+    CHECK_FALSE(topAlert(pw));
+}
+
 TEST_CASE("Recorder Clear confirm: Cancel, then Delete; Enter keeps the take (P417)", "[ui][alert]") {
     UiHost h;
     h.rec.takeFrames = 500;
@@ -502,9 +550,9 @@ TEST_CASE("Prompts of the editor follow gemPrompt: Cancel then OK, none framed, 
     // Step Sequencer: Resolution > Speed (Ticks timing).
     w.sequencer().show();
     click(w, "seqReso");
-    pickItem(w, 9);  // Ticks: Speed ticks per line
+    pickItem(w, 11);  // Ticks: Speed ticks per line
     click(w, "seqReso");
-    pickItem(w, 10);  // Speed: 6 ticks...
+    pickItem(w, 12);  // Speed: 6 ticks...
     a = topAlert(w);
     REQUIRE(a);
     checkPrompt(*a);

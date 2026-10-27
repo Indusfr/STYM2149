@@ -124,6 +124,23 @@ void Painter::text(std::string_view utf8, double x, double top, int px, Color c,
     textAt(utf8, x, snap(top + Font::lineBox(utf8, px, face).ascent), px, c, letterSpacing, face);
 }
 
+bool Outline::inside(double x, double y) const noexcept {
+    // Winding number of the point: each edge crossing the horizontal half-line to its right counts +1 or -1 by its
+    // direction; an edge includes its end of smaller y only, so a vertex on the half-line counts once.
+    int winding = 0;
+    size_t first = 0;
+    for (const uint16_t end : ends) {
+        for (size_t k = first; k < end; ++k) {
+            const size_t j = k == first ? end - 1 : k - 1;
+            const double x0 = xy[2 * j], y0 = xy[2 * j + 1], x1 = xy[2 * k], y1 = xy[2 * k + 1];
+            if ((y0 <= y && y < y1) || (y1 <= y && y < y0))
+                if (x0 + (y - y0) * (x1 - x0) / (y1 - y0) > x) winding += y1 > y0 ? 1 : -1;
+        }
+        first = end;
+    }
+    return winding != 0;
+}
+
 void Painter::bitmap(const Bitmap& b, int x, int y, Color c) noexcept {
     for (int r = 0; r < b.h; ++r)
         for (int k = 0; k < b.w; ++k)

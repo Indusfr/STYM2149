@@ -54,9 +54,15 @@ uint32_t dmaFrames(std::span<const DmaFrame> dma) {
     return n;
 }
 
+// The part of each Digidrum that the engine plays, Start to End (D-443): a player plays its sample from the beginning.
 std::array<std::span<const uint8_t>, 8> digidrums(const NonParamState& x) {
     std::array<std::span<const uint8_t>, 8> out{};
-    for (size_t k = 0; k < out.size() && k < x.digidrums.size(); ++k) out[k] = x.digidrums[k];
+    for (size_t k = 0; k < out.size() && k < x.digidrums.size(); ++k) {
+        const std::span<const uint8_t> all = x.digidrums[k];
+        const ymengine::DigidrumSlot& p = x.digiSlots[k].play;
+        const ymengine::SampleSpan part = ymengine::sampleSpan(p.start, p.end, uint32_t(all.size()));
+        out[k] = all.subspan(part.start, part.size());
+    }
     return out;
 }
 
@@ -139,8 +145,12 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob (D-060)
         info.digidrums = digidrums(x);
         for (size_t k = 0; k < info.dma.size() && k < x.dmaSamples.size(); ++k) {
+            // The bytes up to End (D-444): the capture gives the first frame read, Start included.
             const ymengine::DmaSlot& d = x.dma.slots[k];
-            info.dma[k] = {x.dmaSamples[k], d.rate, d.stereo, d.loop};
+            const std::span<const int8_t> all = x.dmaSamples[k];
+            const size_t ch = d.stereo ? 2 : 1;
+            const ymengine::SampleSpan part = ymengine::sampleSpan(d.start, d.end, uint32_t(all.size() / ch));
+            info.dma[k] = {all.first(part.end * ch), d.rate, d.stereo, d.loop};
         }
         std::vector<ymio::SndhSubsong> subs = {{s.frames, s.dma}};
         if (!s.pattern.empty()) subs.push_back({s.pattern, s.patternDma});

@@ -65,7 +65,8 @@ public:
 
     // Opens a menu below an anchor box (layout position, fractional like the button's: the menu's text starts from
     // the exact position). Below the menu bar, the menu overlaps the bar's rule (y = bottom of the bar - 2); below a
-    // button, it is 6 px lower. It stays inside the desktop (4 px margin).
+    // button, its frame lies on the button's bottom rule (2 px), above it on its top rule, with no gap (GEM). It stays
+    // inside the desktop (4 px margin).
     // columns (the prototype's chordCols): entries in as many columns as needed to fit within kColumnsMargin px less
     // than the desktop height (at least kColumnsMin px).
     // checked: index of the checked entry among the plain entries, or a negative value for no check marks. Any menu

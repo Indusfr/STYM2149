@@ -20,6 +20,7 @@
 #include "plugincore/Driver.h"
 #include "plugincore/Mapping.h"
 #include "plugincore/Parameters.h"
+#include "plugincore/Patches.h"
 #include "plugincore/State.h"
 #include "plugincore/EngineStatus.h"
 
@@ -194,8 +195,9 @@ std::vector<uint8_t> parm(const std::vector<std::pair<std::string, float>>& entr
 }
 
 // M5 file as it is rewritten now: PARM chunk completed with the Computer parameter (ST or STE machine, D-153), the
-// frequency of the Custom clock (D-237), Arp Sync (D-256), the Master of the stereo outputs (D-284) and the delay
-// (D-299), at their defaults, inserted after "gateAll" (index order), parameter count and chunk length updated.
+// frequency of the Custom clock (D-237), Arp Sync (D-256), the Master of the stereo outputs (D-284), the delay
+// (D-299), the Tuning A4 (D-429) and the MIDI expression (D-432), at their defaults, inserted after "gateAll" (index
+// order), parameter count and chunk length updated.
 std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
     auto get32 = [&](size_t i) {
         return uint32_t(f[i]) | uint32_t(f[i + 1]) << 8 | uint32_t(f[i + 2]) << 16 | uint32_t(f[i + 3]) << 24;
@@ -213,24 +215,31 @@ std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
         {"computer", 0},      {"chipClockHz", 2000000}, {"arpSync", 0},         {"master2", 70},
         {"masterPan", 0},     {"masterLink", 1},        {"delayOn", 0},         {"delaySync", 1},
         {"delayDivision", 4}, {"delayTime", 375},       {"delayFeedback", 35},  {"delayHiCut", 6000},
-        {"delayLevel", 100},  {"delayPingPong", 0}};
+        {"delayLevel", 100},  {"delayPingPong", 0},       {"a4Hz", 440},          {"bendTarget", 0},
+        {"wheelTarget", 1},   {"aftertouch", 1},        {"mpe", 0},             {"mpeBendRange", 48},
+        {"mpeSlide", 0}};
     std::vector<uint8_t> add = parm(added);
     add.erase(add.begin(), add.begin() + 4);  // without the count
     f.insert(f.begin() + std::ptrdiff_t(after), add.begin(), add.end());
     set32(at + 4, get32(at + 4) + uint32_t(add.size()));
     set32(at + 8, get32(at + 8) + uint32_t(added.size()));
-    // Sixth DAW test (D-254): Vibrato On of each track, after its Gate; then its Send (D-299).
+    // Sixth DAW test (D-254): Vibrato On of each track, after its Gate; then its Send (D-299) and the right side of a
+    // stereo DMA sample (D-459).
     for (int t = 1; t <= kTracks; ++t) {
         const std::string id = std::string(t < 10 ? "t0" : "t") + std::to_string(t) + "_gate";
         std::vector<uint8_t> key = {uint8_t(id.size()), 0};
         key.insert(key.end(), id.begin(), id.end());
         const auto g = std::search(f.begin(), f.end(), key.begin(), key.end());
         REQUIRE(g != f.end());
-        std::vector<uint8_t> on = parm({{id.substr(0, 4) + "vibOn", 1}, {id.substr(0, 4) + "send", 0}});
+        const std::string tr = id.substr(0, 4);
+        const std::vector<std::pair<std::string, float>> fields = {{tr + "vibOn", 1}, {tr + "send", 0},
+                                                                   {tr + "levelR", 75}, {tr + "muteR", 0},
+                                                                   {tr + "soloR", 0},  {tr + "link", 1}};
+        std::vector<uint8_t> on = parm(fields);
         on.erase(on.begin(), on.begin() + 4);
         f.insert(g + std::ptrdiff_t(key.size() + 4), on.begin(), on.end());
         set32(at + 4, get32(at + 4) + uint32_t(on.size()));
-        set32(at + 8, get32(at + 8) + 2);
+        set32(at + 8, get32(at + 8) + uint32_t(fields.size()));
     }
     // Seventh DAW test (D-288): the level of the metronome (100 %) at the end of the SEQS chunk.
     const std::string seqs = "SEQS";
@@ -276,7 +285,7 @@ struct Recorder : ParamListener {
 
 TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
     const auto& specs = paramSpecs();
-    REQUIRE(kParamCount == 35 + 16 * 28);
+    REQUIRE(kParamCount == 42 + 16 * 32);
     std::set<std::string> ids;
     for (int i = 0; i < kParamCount; ++i) {
         const ParamSpec& s = specs[size_t(i)];
@@ -289,14 +298,21 @@ TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
         CHECK(clampToSpec(s, s.def) == s.def);
         // Version of appearance: 2 for the sequencer parameters (M5), 3 for the ST or STE machine (M6, D-153), 4 for
         // the frequency of the Custom clock (D-237), the Vibrato On of the tracks (D-254) and Arp Sync (D-256), 5 for
-        // the Master of the stereo outputs (D-284), 6 for the delay and the Send of the tracks (D-299).
+        // the Master of the stereo outputs (D-284), 6 for the delay and the Send of the tracks (D-299), 7 for the
+        // Tuning A4 (D-429), 8 for the MIDI expression (D-432), 9 for the right side of a stereo DMA sample (D-459).
         const bool delay = s.id.starts_with("delay") || s.id.ends_with("_send");
         const bool master = s.id == "master2" || s.id == "masterPan" || s.id == "masterLink";
         const bool m5 = s.id == "freeTempo" || s.id == "swing" || s.id == "gate" || s.id == "gateAll" ||
                         s.id.ends_with("_gate");
         const bool m6 = s.id == "computer";
         const bool daw = s.id == "chipClockHz" || s.id.ends_with("_vibOn") || s.id == "arpSync";
-        CHECK(s.version == (delay ? 6 : master ? 5 : daw ? 4 : m6 ? 3 : m5 ? 2 : 1));
+        const bool expr =
+            s.id == "bendTarget" || s.id == "wheelTarget" || s.id == "aftertouch" || s.id.starts_with("mpe");
+        const bool right = s.id.ends_with("_levelR") || s.id.ends_with("_muteR") || s.id.ends_with("_soloR") ||
+                           s.id.ends_with("_link");
+        const int version =
+            right ? 9 : expr ? 8 : s.id == "a4Hz" ? 7 : delay ? 6 : master ? 5 : daw ? 4 : m6 ? 3 : m5 ? 2 : 1;
+        CHECK(s.version == version);
         if (s.kind == ParamKind::Choice) CHECK(s.choices.size() == size_t(s.max) + 1);
     }
     CHECK(findParam("inconnu") == -1);
@@ -368,6 +384,10 @@ TEST_CASE("Mapping: parameter defaults = defaults of the engine and of the proto
         CHECK(p.arp.rateHz == base.arp.rateHz);
         CHECK(p.mix.level == base.mix.level);
         CHECK(p.mix.enabled == (t == 0));
+        CHECK(p.mix.link == base.mix.link);
+        CHECK(p.mix.levelR == base.mix.levelR);
+        CHECK(p.mix.muteR == base.mix.muteR);
+        CHECK(p.mix.soloR == base.mix.soloR);
     }
     const ymengine::GlobalParams g = toGlobal(v, {});
     const ymengine::GlobalParams d{};
@@ -381,6 +401,33 @@ TEST_CASE("Mapping: parameter defaults = defaults of the engine and of the proto
     CHECK(g.tempo == d.tempo);
     CHECK(g.swing == d.swing);
     CHECK(toTrack(v, 3, base).seq.gate == base.seq.gate);
+}
+
+TEST_CASE("Mapping: the right side of a stereo DMA sample, a setting of the Mixer (Indus, 26/10/2026, D-459)",
+          "[plugin]") {
+    ParamValues v = defaultValues();
+    v[size_t(paramIndex(2, Track::Level))] = 80;
+    v[size_t(paramIndex(2, Track::LevelR))] = 40;
+    v[size_t(paramIndex(2, Track::MuteR))] = 1;
+    v[size_t(paramIndex(2, Track::SoloR))] = 1;
+    ymengine::TrackMix m = toMix(v, 2);
+    CHECK(m.link);  // Link on by default: the engine plays the right side at the Level
+    CHECK(m.level == 0.8);
+    CHECK(m.levelR == 0.4);
+    CHECK(m.muteR);
+    CHECK(m.soloR);
+    CHECK_FALSE(m.mute);
+    CHECK_FALSE(m.solo);
+    v[size_t(paramIndex(2, Track::Link))] = 0;
+    CHECK_FALSE(toMix(v, 2).link);
+    CHECK(toTrack(v, 2, {}).mix.levelR == 0.4);
+    // Neither in patches nor copied with a track: settings of the Mixer, like the pan.
+    for (const Track f : {Track::LevelR, Track::MuteR, Track::SoloR, Track::Link}) {
+        CHECK(mixerOnly(f));
+        CHECK_FALSE(inPatch(f));
+    }
+    CHECK_FALSE(mixerOnly(Track::Level));
+    CHECK(inPatch(Track::Level));
 }
 
 TEST_CASE("Mapping: global gate takes priority when Gate All is on (D-134)", "[plugin][seq]") {
@@ -578,6 +625,53 @@ TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other mod
     CHECK(chipClock(v).hz() == 8021247.0 / 4.0);
 }
 
+TEST_CASE("Mapping: Tuning A4, 350 to 480 Hz, 440 by default (D-429, D-434)", "[plugin]") {
+    ParamValues v = defaultValues();
+    const ParamSpec& s = paramSpecs()[size_t(idx("a4Hz"))];
+    CHECK(s.min == 350.0f);
+    CHECK(s.max == 480.0f);
+    CHECK(s.def == 440.0f);
+    CHECK(s.unit == "Hz");
+    CHECK_FALSE(s.automatable);
+    CHECK(toGlobal(v, {}).a4Hz == 440.0);
+    v[size_t(idx("a4Hz"))] = 432;
+    CHECK(toGlobal(v, {}).a4Hz == 432.0);
+    // Hundredths of a hertz; a value outside the range read from a state is clamped.
+    CHECK(clampToSpec(s, 442.123f) == 442.12f);
+    CHECK(clampToSpec(s, 392.0f) == 392.0f);  // below 400 Hz (D-434)
+    CHECK(clampToSpec(s, 300.0f) == 350.0f);
+    CHECK(clampToSpec(s, 1000.0f) == 480.0f);
+}
+
+TEST_CASE("Mapping: targets of the MIDI expression and their depths (D-432)", "[plugin]") {
+    ParamValues v = defaultValues();
+    for (const char* id : {"bendTarget", "wheelTarget", "aftertouch", "mpe", "mpeBendRange", "mpeSlide"}) {
+        INFO(id);
+        CHECK_FALSE(paramSpecs()[size_t(idx(id))].automatable);  // MIDI settings (D-057)
+    }
+    ymengine::GlobalParams g = toGlobal(v, {});
+    CHECK(g.bendTarget == ymengine::BendTarget::Pitch);
+    CHECK(g.bendRange == 2.0);
+    CHECK(g.wheelTarget == ymengine::ExpressTarget::Vibrato);
+    CHECK(g.aftertouch == ymengine::ExpressTarget::Vibrato);
+    CHECK(g.mpeSlide == ymengine::SlideTarget::Volume);
+    CHECK(g.expressCents == 50.0);
+    CHECK(paramSpecs()[size_t(idx("mpeBendRange"))].def == 48.0f);
+    v[size_t(idx("bendTarget"))] = 2;
+    v[size_t(idx("bendRange"))] = 12;
+    v[size_t(idx("wheelTarget"))] = 4;
+    v[size_t(idx("aftertouch"))] = 2;
+    v[size_t(idx("mpeSlide"))] = 1;
+    v[size_t(idx("wheelDepth"))] = 120;
+    g = toGlobal(v, {});
+    CHECK(g.bendTarget == ymengine::BendTarget::Envelope);
+    CHECK(g.bendRange == 12.0);
+    CHECK(g.wheelTarget == ymengine::ExpressTarget::Lfo);
+    CHECK(g.aftertouch == ymengine::ExpressTarget::Volume);
+    CHECK(g.mpeSlide == ymengine::SlideTarget::Envelope);
+    CHECK(g.expressCents == 120.0);
+}
+
 TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     const PluginState ref = referenceState();
     const std::vector<uint8_t> bytes = encodeState(ref);
@@ -674,7 +768,7 @@ TEST_CASE("State: sequencer, cells clamped, unknown rows ignored", "[plugin][sta
     REQUIRE(r.ok);
     const auto& x = r.state.extras;
     CHECK(x.global.seqClock == ymengine::SeqClock::Host);
-    CHECK(x.global.resolution == 6);
+    CHECK(x.global.resolution == 8);  // the last resolution, 1/32T (D-433)
     CHECK(x.global.sigNum == 4);  // 4/3 is not a time signature of the prototype: 4/4
     CHECK(x.global.sigDen == 4);
     CHECK(x.global.metronomeLevel == 100);  // no level (before D-288): full level
@@ -723,7 +817,7 @@ TEST_CASE("State: INS row of M6 (id 31), clamped to the 32 instruments", "[plugi
     CHECK(r.state.extras.seq.patterns[0].lane(0).ins[6] == 0);
 }
 
-TEST_CASE("State: CMD rows (ids 32 to 49), unknown command cleared", "[plugin][state][commands]") {
+TEST_CASE("State: CMD rows (ids 32 to 52), unknown command cleared", "[plugin][state][commands]") {
     using ymengine::SeqCmd;
     using ymengine::seqCmd;
     PluginState st;
@@ -734,7 +828,8 @@ TEST_CASE("State: CMD rows (ids 32 to 49), unknown command cleared", "[plugin][s
     l.setCmd(9, seqCmd(SeqCmd::Retrig, 0x00));
     l.setCmd(255, seqCmd(SeqCmd::Sync, 0xff));
     l.setCmd(0, seqCmd(SeqCmd::Vibrato, 0));  // several commands on a step (tenth DAW test, item 122, D-330)
-    for (int k = int(SeqCmd::VolSlide); k <= int(SeqCmd::Arpeggiator); ++k)  // D-338, items 142 to 144: one step each
+    // D-338, items 142 to 144, D-393, D-394: one step each
+    for (int k = int(SeqCmd::VolSlide); k <= int(SeqCmd::NoiseCurve); ++k)
         if (k != int(SeqCmd::PitchSlide)) l.setCmd(20 + k, seqCmd(SeqCmd(k), uint8_t(k * 9)));
     l.setCmd(1, seqCmd(SeqCmd::Fine, 100));
     const ymseq::Lane kept = l;
@@ -752,7 +847,7 @@ TEST_CASE("State: CMD rows (ids 32 to 49), unknown command cleared", "[plugin][s
     std::vector<uint8_t> lane = {
         3,                                // three rows
         32, 4, 0, 4, 0x47, 0x01,          // CMD (Xyz): step 4 = X47, retired (D-340): dropped
-        6, 0x00, 0x13,                    // step 6 = letter 19 (unknown): empty
+        6, 0x00, 0x16,                    // step 6 = letter 22 (unknown): empty
         7, 0xff, 0xff,                    // step 7 = -1: empty
         4, 0x8c, 0x05,                    // step 4 = T8C: the single CMD row of a state before D-330, to its kind
         37, 1, 0, 4, 0x00, 0x06,          // CMD (Vxx): step 4 = V00
@@ -911,6 +1006,79 @@ TEST_CASE("Driver: delay parameters and Send of the track reach the engine, 16 c
     }
 }
 
+// Voice that plays the note in the engine of a driver (-1: none), the n-th of them by attack order.
+static int voiceOf(const Driver& d, int note, int nth = 0) {
+    std::vector<std::pair<uint64_t, int>> found;
+    for (int i = 0; i < ymengine::Engine::kVoices; ++i) {
+        const auto info = d.engine().voice(i);
+        if (info.on && info.note == note) found.emplace_back(info.age, i);
+    }
+    std::sort(found.begin(), found.end());
+    return nth < int(found.size()) ? found[size_t(nth)].second : -1;
+}
+
+TEST_CASE("Driver: channel and polyphonic pressure drive the Aftertouch target (D-432)",
+          "[plugin][driver][expression]") {
+    Rig g;
+    g.v[size_t(idx("aftertouch"))] = 2;  // Volume
+    g.v[size_t(paramIndex(0, Track::Volume))] = 8;
+    g.run(512);
+    g.run(2400, {msg(0, 0x90, 60, 100), msg(0, 0x90, 64, 100)});
+    const int a = voiceOf(g.d, 60), b = voiceOf(g.d, 64);
+    REQUIRE(a >= 0);
+    REQUIRE(b >= 0);
+    CHECK(g.d.engine().voice(a).volume == 8);
+    g.run(2400, {msg(0, 0xa0, 64, 127)});  // polyphonic: note 64 only
+    g.run(2400);
+    CHECK(g.d.engine().voice(a).volume == 8);
+    CHECK(g.d.engine().voice(b).volume == 15);
+    g.run(2400, {MidiEvent{0, 2, {0xd0, 127, 0}}});  // channel pressure: both
+    g.run(2400);
+    CHECK(g.d.engine().voice(a).volume == 15);
+    g.run(2400, {msg(0, 0xb0, 121, 0)});  // Reset All Controllers: the channel pressure back to rest
+    g.run(2400);
+    CHECK(g.d.engine().voice(a).volume == 8);
+}
+
+TEST_CASE("Driver: MPE in 16 ch, one note per member channel, routing of the keyboard (D-432)",
+          "[plugin][driver][expression][mpe]") {
+    Rig g;
+    g.v[size_t(idx("mpe"))] = 1;
+    g.v[size_t(idx("mpeBendRange"))] = 12;
+    g.v[size_t(idx("midiRouting"))] = 2;  // Per channel: ignored in MPE
+    g.v[size_t(paramIndex(0, Track::Volume))] = 8;
+    g.run(512);
+    g.run(2400, {msg(0, 0x91, 69, 100), msg(0, 0x92, 69, 100)});  // channels 2 and 3
+    const int a = voiceOf(g.d, 69, 0), b = voiceOf(g.d, 69, 1);
+    REQUIRE(a >= 0);
+    REQUIRE(b >= 0);
+    CHECK(g.d.engine().voice(a).track == 0);  // the focused track
+    CHECK(g.d.engine().voice(b).track == 0);
+    const int period = g.d.engine().voice(b).tonePeriod;
+    g.run(2400, {msg(0, 0xe1, 0, 0x60)});  // channel 2: +6 semitones of 12
+    g.run(2400);
+    CHECK(g.d.engine().voice(a).tonePeriod < period * 3 / 4);
+    CHECK(g.d.engine().voice(b).tonePeriod == period);
+    g.run(2400, {msg(0, 0xb2, 74, 127)});  // CC74 of channel 3: Volume
+    g.run(2400);
+    CHECK(g.d.engine().voice(a).volume == 8);
+    CHECK(g.d.engine().voice(b).volume == 15);
+    g.run(2400, {msg(0, 0x82, 69, 0)});  // note-off of channel 3: its note only
+    g.run(9600);
+    CHECK(g.d.engine().voice(a).on);
+    CHECK_FALSE(g.d.engine().voice(b).on);
+
+    // MPE off: a bend of channel 2 bends every note (Omni).
+    Rig o;
+    o.run(512);
+    o.run(2400, {msg(0, 0x91, 69, 100), msg(0, 0x92, 72, 100)});
+    const int c = voiceOf(o.d, 72);
+    REQUIRE(c >= 0);
+    const int before = o.d.engine().voice(c).tonePeriod;
+    o.run(2400, {msg(0, 0xe1, 0, 0x7f)});
+    CHECK(o.d.engine().voice(c).tonePeriod < before);
+}
+
 TEST_CASE("Driver: per-channel routing, the channel's track plays even when inactive", "[plugin][driver]") {
     Rig g;
     g.v[size_t(idx("midiRouting"))] = 2;
@@ -976,8 +1144,10 @@ TEST_CASE("Engine status: LEDs of audible tracks, attacked note, followed envelo
     CHECK(!t.active[1]);
     CHECK(t.noteSerial == 1);
     CHECK(t.notePeriod == 284);
-    CHECK(t.envStage == 1);
-    CHECK(std::fabs(t.envLevel - 1600.0f / 4800.0f) < 0.01f);
+    CHECK(t.envCount == 1);
+    CHECK(t.env[0].stage == 1);
+    CHECK(std::fabs(t.env[0].level - 1600.0f / 4800.0f) < 0.01f);
+    CHECK(t.env[1].stage == -1);
     float peak = 0;
     for (float x : t.scope) peak = std::max(peak, std::fabs(x));
     CHECK(peak > 0.01f);
@@ -1002,7 +1172,8 @@ TEST_CASE("Engine status: LEDs of audible tracks, attacked note, followed envelo
     g.v[size_t(idx("focusTrack"))] = 2;
     run(1600);
     REQUIRE(tap.update());
-    CHECK(tap.latest().envStage == -1);
+    CHECK(tap.latest().envCount == 0);
+    CHECK(tap.latest().env[0].stage == -1);
     // Arpeggio of the focused track in Table mode, one held note: step played from the table.
     g.v[size_t(idx("t02_arpOn"))] = 1;
     Snapshot s;
@@ -1012,6 +1183,114 @@ TEST_CASE("Engine status: LEDs of audible tracks, attacked note, followed envelo
     REQUIRE(tap.update());
     CHECK(tap.latest().arpStep >= 0);
     CHECK(tap.latest().arpStep < 3);
+}
+
+TEST_CASE("Engine status: a voice sounding until the release ends, the last period kept (Indus, 26/10/2026 04:00, "
+          "D-440)",
+          "[plugin][engine-status]") {
+    Rig g;
+    EngineStatusTap tap;
+    tap.prepare(48000);
+    auto run = [&](uint32_t n, std::vector<MidiEvent> midi = {}) {
+        g.run(n, std::move(midi));
+        tap.capture(g.d.engine(), g.v, g.l.data(), g.r.data(), n);
+    };
+    CHECK(!tap.latest().noteSounding);
+    g.v[size_t(idx("t01_release"))] = 50;
+    run(1600, {msg(0, 0x90, 69, 100)});
+    REQUIRE(tap.update());
+    CHECK(tap.latest().noteSounding);
+    // Released: the release still sounds for 50 ms.
+    run(1600, {msg(0, 0x80, 69, 0)});
+    REQUIRE(tap.update());
+    CHECK(tap.latest().noteSounding);
+    // The release ended: no voice; the period and the serial of the last note stay (register monitor).
+    for (int k = 0; k < 4; ++k) run(1600);
+    REQUIRE(tap.update());
+    CHECK(!tap.latest().noteSounding);
+    CHECK(tap.latest().notePeriod == 284);
+    CHECK(tap.latest().noteSerial == 1);
+}
+
+TEST_CASE("Engine status: one envelope point per note sounding on the focused track, the newest first (Indus, "
+          "24/10/2026 11:45, D-403)",
+          "[plugin][engine-status]") {
+    Rig g;
+    EngineStatusTap tap;
+    tap.prepare(48000);
+    auto run = [&](uint32_t n, std::vector<MidiEvent> midi = {}) {
+        g.run(n, std::move(midi));
+        tap.capture(g.d.engine(), g.v, g.l.data(), g.r.data(), n);
+    };
+    g.v[size_t(idx("t01_attack"))] = 10;
+    g.v[size_t(idx("t01_release"))] = 2000;  // a long release: the notes released still sound
+    // A note, released after one publication, then a second note while the first one still sounds.
+    run(1600, {msg(0, 0x90, 60, 100)});
+    run(1600, {msg(0, 0x80, 60, 0), msg(0, 0x90, 64, 100)});
+    REQUIRE(tap.update());
+    EngineStatus t = tap.latest();
+    CHECK(t.envCount == 2);
+    CHECK(t.env[0].stage != 4);  // the newest: the note held
+    CHECK(t.env[1].stage == 4);  // the first note, in its release
+    CHECK(t.env[1].level > 0.5f);
+    CHECK(t.env[2].stage == -1);
+    // A third note: three points.
+    run(1600, {msg(0, 0x90, 67, 100)});
+    REQUIRE(tap.update());
+    t = tap.latest();
+    CHECK(t.envCount == 3);
+    CHECK(t.env[2].stage == 4);
+    // The releases over: the held notes only.
+    run(48000 * 3);
+    REQUIRE(tap.update());
+    t = tap.latest();
+    CHECK(t.envCount == 2);
+    CHECK(t.env[0].stage != 4);
+    CHECK(t.env[1].stage != 4);
+}
+
+TEST_CASE("Engine status: a monophonic track shows one envelope point at a time, the newest note's (Indus, "
+          "24/10/2026 14:51)",
+          "[plugin][engine-status]") {
+    // Voicing Monophonic in 16 channels; any track of the 3-channel modes (one voice per channel, Voicing greyed),
+    // whose keyboard notes still end their release on the other channels of the chip.
+    for (const int mode : {0, 1, 2}) {
+        CAPTURE(mode);
+        Rig g;
+        g.v[size_t(idx("voiceMode"))] = float(mode);
+        if (mode == 0) g.v[size_t(idx("t01_voicing"))] = 1;  // Monophonic
+        g.v[size_t(idx("t01_attack"))] = 10;
+        g.v[size_t(idx("t01_release"))] = 2000;  // a long release: a released note would still sound
+        EngineStatusTap tap;
+        tap.prepare(48000);
+        auto run = [&](uint32_t n, std::vector<MidiEvent> midi = {}) {
+            g.run(n, std::move(midi));
+            tap.capture(g.d.engine(), g.v, g.l.data(), g.r.data(), n);
+        };
+        auto points = [&] {
+            REQUIRE(tap.update());
+            return int(tap.latest().envCount);
+        };
+        run(1600);
+        // Notes held over each other, then played apart, then the same note again: one point each time.
+        run(1600, {msg(0, 0x90, 60, 100)});
+        CHECK(points() == 1);
+        run(1600, {msg(0, 0x90, 64, 100)});
+        CHECK(points() == 1);
+        run(1600, {msg(0, 0x80, 60, 0), msg(0, 0x80, 64, 0)});
+        CHECK(points() == 1);  // the last note, in its release
+        CHECK(tap.latest().env[0].stage == 4);
+        run(1600, {msg(0, 0x90, 67, 100)});
+        CHECK(points() == 1);
+        CHECK(tap.latest().env[0].stage != 4);
+        run(1600, {msg(0, 0x80, 67, 0)});
+        CHECK(points() == 1);
+        run(1600, {msg(0, 0x90, 67, 100)});
+        CHECK(points() == 1);
+        CHECK(tap.latest().env[0].stage != 4);
+        run(1600, {msg(0, 0x80, 67, 0), msg(0, 0x90, 69, 100), msg(0, 0x90, 71, 100)});
+        CHECK(points() == 1);
+    }
 }
 
 TEST_CASE("Engine status: the followed envelope ignores the echo repeats of the track", "[plugin][engine-status]") {
@@ -1032,9 +1311,10 @@ TEST_CASE("Engine status: the followed envelope ignores the echo repeats of the 
     for (int k = 0; k < 27; ++k) {  // 27 publications of 1600 samples: inside the attack of 48000 samples
         REQUIRE(tap.update());
         const EngineStatus t = tap.latest();
-        CHECK(t.envStage == 1);
-        CHECK(t.envLevel >= last);
-        last = t.envLevel;
+        CHECK(t.envCount == 1);  // the note alone, not its repeats
+        CHECK(t.env[0].stage == 1);
+        CHECK(t.env[0].level >= last);
+        last = t.env[0].level;
         for (int i = 0; i < ymengine::Engine::kVoices; ++i) {
             const auto v = g.d.engine().voice(i);
             echoed = echoed || (v.on && v.tag == ymengine::VoiceTag::Echo && v.track == 0);

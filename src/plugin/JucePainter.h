@@ -11,11 +11,13 @@
 // - a glyph or an icon is a mask computed once, placed on whole screen pixels: every occurrence looks the same.
 // - an oblique line (the Smooth ADSR curve) is a stroke through the centres of its end pixels, d pixels wide, with
 //   anti-aliasing at any d (second DAW test, item 13, D-214); a horizontal or vertical line stays a rectangle.
+// - a bitmap with an outline (the Atari logo of the menu bar, D-404) is that outline filled with anti-aliasing at any
+//   d but 1; with sharp pixels (at any d), the screen pixels whose centre lies inside.
 // At a whole d, each desktop pixel becomes a d × d block (glyphs from the framebuffer's rasters): the image is the
-// framebuffer enlarged with nearest-neighbour scaling, oblique lines aside. Otherwise glyphs and icons are the contours
-// of their pixel squares (the prototype's TrueType "GEM 8x16") filled with anti-aliasing, as the browser shows the
-// prototype on a 125 or 150 % display; with sharp pixels (D-331) each square goes to whole screen pixels instead, its
-// edges rounded on the grid of the glyph: crisp edges, squares of unequal sizes.
+// framebuffer enlarged with nearest-neighbour scaling, oblique lines and outlines aside. Otherwise glyphs and icons
+// are the contours of their pixel squares (the prototype's TrueType "GEM 8x16") filled with anti-aliasing, as the
+// browser shows the prototype on a 125 or 150 % display; with sharp pixels (D-331) each square goes to whole screen
+// pixels instead, its edges rounded on the grid of the glyph: crisp edges, squares of unequal sizes.
 #pragma once
 #include <juce_graphics/juce_graphics.h>
 

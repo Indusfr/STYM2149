@@ -33,24 +33,28 @@ int snapToScale(int absNote, int scale, int root, bool snap) noexcept;
 // next degree the way of the transposition, so that +1 or -1 never leaves a note where it was.
 int snapTransposed(int absNote, int semis, int scale, int root, bool snap) noexcept;
 
-// Note figures (FIGS): duration in beats (quarter note = 1), 0 = one step whatever the resolution.
+// Note figures (FIGS): duration in beats (quarter note = 1), 0 = one step whatever the resolution. 1/64 (D-422), which
+// the prototype does not have, comes after 1/32: the figures after it are one index further than in the prototype.
+// 1/32T (D-433), the note of the 1/32T resolution, comes last, after the other triplets.
 struct Figure {
     std::string_view name;
     double beats;
 };
-inline constexpr int kFigureCount = 13;
+inline constexpr int kFigureCount = 15;
 extern const std::array<Figure, kFigureCount> kFigures;
-inline constexpr std::array<int, 3> kFigureSeps = {1, 7, 10};  // after Step, before dotted, before triplets
+inline constexpr std::array<int, 3> kFigureSeps = {1, 8, 11};  // after Step, before dotted, before triplets
 
-// Grid resolutions (RESOS): steps per quarter note.
+// Grid resolutions (RESOS): steps per quarter note. 1/64 (D-422) and 1/32T (D-433) are added at the end so that the
+// saved indices keep their meaning; the menus show 1/64 after 1/32 and 1/32T after 1/16T (kResolutionOrder).
 struct Resolution {
     std::string_view name;   // menu label ("1/16  sixteenth")
     std::string_view label;  // button label ("1/16")
     double stepsPerBeat;     // steps per quarter note: 4 for 1/16, 1.5 for 1/4T
 };
-inline constexpr int kResolutionCount = 7;
+inline constexpr int kResolutionCount = 9;
 extern const std::array<Resolution, kResolutionCount> kResolutions;
-inline constexpr int kResolutionSep = 4;  // separator before the triplets
+inline constexpr std::array<int, kResolutionCount> kResolutionOrder = {0, 1, 2, 3, 7, 4, 5, 6, 8};  // menu order
+inline constexpr int kResolutionSep = 5;  // separator before the triplets (position in kResolutionOrder)
 inline constexpr int kDefaultResolution = 2;  // 1/16
 
 // Time signatures (SIGS).
@@ -64,6 +68,11 @@ inline constexpr int kDefaultSignature = 2;  // 4/4
 
 // Duration of a figure in steps for a resolution (figSteps): round(beats × steps per quarter note), at least 1.
 int figureSteps(int figure, int resolution) noexcept;
+// The same, not rounded: 0.5 for a thirty-second note in 1/16, 1 for Step.
+double figureStepsExact(int figure, int resolution) noexcept;
+// Whether a figure lasts a whole number of steps of a resolution, one at least (Step always does). The Note length
+// menu greys the others (Indus, 25/10/2026 17:21, D-425).
+bool figureFits(int figure, int resolution) noexcept;
 // Steps in a beat and in a bar (beatSteps, barSteps). A beat is the signature's denominator note (an eighth in 6/8),
 // rounded to whole steps, at least 1.
 int beatSteps(int signature, int resolution) noexcept;

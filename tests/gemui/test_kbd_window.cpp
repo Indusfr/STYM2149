@@ -126,12 +126,13 @@ bool numpad(MainWindow& w, int n) {
     return w.desktop().keyDown(e);
 }
 
-// Entry of a menu opened below a button (6 px lower, 20 px entries inside a 2 px border).
+// Entry of a menu opened below a button (its frame on the button's bottom rule, D-396; 20 px entries inside a 2 px
+// border).
 void pick(MainWindow& w, const std::string& anchor, int index) {
     const auto r = w.rectOf(anchor);
     REQUIRE(r);
     REQUIRE(w.desktop().hasPopups());
-    press(w, {r->x + 20, r->bottom() + 6 + 2 + 20 * index + 10});
+    press(w, {r->x + 20, r->bottom() - 2 + 2 + 20 * index + 10});
     CHECK_FALSE(w.desktop().hasPopups());
 }
 

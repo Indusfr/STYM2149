@@ -4,6 +4,7 @@
 #include "gemui/Controls.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <clocale>
 #include <cstdio>
@@ -20,6 +21,28 @@ constexpr int kGlyphClose = 99;  // E005: close box
 constexpr int kGlyphFull = 101;  // E007: full-screen box
 
 bool isDigit(char32_t c) noexcept { return c >= '0' && c <= '9'; }
+
+// A glyph of the 8×8 font at twice its size, each pixel a 2×2 square, its ink centred in a: the close and
+// full-screen boxes of a title bar, twice as big (Indus, 24/10/2026 20:40, D-418) and square like those of the ST's
+// desktop in low resolution, where the AES draws them from the 8×8 font (25/10/2026 16:28, D-424); the 8×16 glyphs
+// are 7 × 11.
+void doubledGlyph(Painter& p, int index, const Rect& a, Color c) {
+    const Font::Raster g = Font::raster(8, index, 0, Face::kSystem);
+    int r0 = g.count, r1 = -1;
+    uint16_t cols = 0;
+    for (int r = 0; r < g.count; ++r)
+        if (const uint16_t bits = g.bits(r)) {
+            r0 = std::min(r0, r);
+            r1 = r;
+            cols |= bits;
+        }
+    if (r1 < 0) return;
+    const int c0 = std::countl_zero(cols), c1 = 15 - std::countr_zero(cols);
+    const int x = a.x + (a.w - 2 * (c1 - c0 + 1)) / 2, y = a.y + (a.h - 2 * (r1 - r0 + 1)) / 2;
+    for (int r = r0; r <= r1; ++r)
+        for (int k = c0; k <= c1; ++k)
+            if (g.bits(r) & (0x8000 >> k)) p.fill({x + 2 * (k - c0), y + 2 * (r - r0), 2, 2}, c);
+}
 
 // First number of a text (the prototype's `-?[0-9]+([.,][0-9]+)?`), comma included.
 std::string firstNumber(const std::string& s) {
@@ -557,6 +580,18 @@ void ValueField::setPadChars(int n) {
     repaint();
 }
 
+void ValueField::setFace(Face f) {
+    if (f == face_) return;
+    face_ = f;
+    repaint();
+}
+
+void ValueField::setCentered(bool c) {
+    if (c == centered_) return;
+    centered_ = c;
+    repaint();
+}
+
 void ValueField::setEditable(bool e) {
     if (e == editable_) return;
     if (!e && editing_) endEdit(false);
@@ -572,7 +607,7 @@ void ValueField::setDim(bool d) {
     repaint();
 }
 
-double ValueField::charWidth() const noexcept { return Font::advance(px_); }
+double ValueField::charWidth() const noexcept { return Font::advance(px_, face_); }
 
 double ValueField::naturalWidth() const noexcept {
     return (std::max(minChars_, Font::length(text_)) + padChars_) * charWidth();
@@ -656,6 +691,11 @@ std::string ValueField::maskDisplay() const {
     return buf;
 }
 
+std::string ValueField::shownText() const {
+    if (!editing_) return text_;
+    return mask_.empty() ? free_ : maskDisplay();
+}
+
 std::string ValueField::maskRead() const {
     std::string s = ent_.empty() ? "0" : ent_;
     if (mask_.find('.') != std::string::npos && !dec_.empty()) s += "." + dec_;
@@ -663,15 +703,16 @@ std::string ValueField::maskRead() const {
 }
 
 // Masked input, as the prototype's maskEdit places it: with a point, at the point while the integer part is typed,
-// then after the last decimal; without a point, at the n-th free position for n digits typed; at the end of the mask
-// once that part is full.
+// then after the last decimal; without a point, at the n-th free position for n digits typed; after the mask's last
+// digit position once that part is full (before a unit that follows it, " Hz", D-434).
 int ValueField::caretChar() const {
     if (mask_.empty()) return Font::length(free_);
     std::vector<int> left, right;
     const size_t dot = mask_.find('.');
     for (size_t i = 0; i < mask_.size(); ++i)
         if (mask_[i] == '9') (dot == std::string::npos || i < dot ? left : right).push_back(int(i));
-    const int end = int(mask_.size());
+    const size_t last = mask_.find_last_of('9');
+    const int end = last == std::string::npos ? int(mask_.size()) : int(last) + 1;
     if (dot == std::string::npos) return ent_.size() < left.size() ? left[ent_.size()] : end;
     if (afterDot_) return dec_.size() < right.size() ? right[dec_.size()] : end;
     return int(dot);
@@ -747,30 +788,43 @@ void ValueField::paint(Painter& p) {
     const Rect r = bounds();
     const double cw = charWidth();
     const Box& b = box();
+    const double top = b.y + (b.h - px_) / 2;
     // While typing: white field, the input drawn from the left of the last cols_ character cells (a masked input
-    // exactly as wide as its mask), the selected old value in reverse video, otherwise a 1 px text cursor.
+    // exactly as wide as its mask; centred in a centred field), the selected old value in reverse video, otherwise a
+    // 1 px text cursor.
     if (editing_) {
         const std::string shown = mask_.empty() ? free_ : maskDisplay();
-        const double tw = mask_.empty() ? Font::width(shown, px_) : cols_ * cw;
-        const double x = b.x + b.w - (mask_.empty() ? cols_ * cw : tw);
+        const double tw = mask_.empty() ? Font::width(shown, px_, 0, face_) : cols_ * cw;
+        const double x = centered_      ? b.x + (b.w - tw) / 2
+                         : mask_.empty() ? b.x + b.w - cols_ * cw
+                                         : b.x + b.w - tw;
         p.fill(r, colors::kWhite);
         if (mask_.empty() && selected_) {
-            const Rect sel = Box{x, b.y, Font::width(shown, px_), double(px_)}.snapped();
+            const Rect sel = Box{x, b.y, Font::width(shown, px_, 0, face_), double(px_)}.snapped();
             p.fill(sel, colors::kBlack);
-            p.text(shown, x, b.y + (b.h - px_) / 2, px_, colors::kWhite);
+            p.text(shown, x, top, px_, colors::kWhite, 0, face_);
         } else {
-            p.text(shown, x, b.y + (b.h - px_) / 2, px_, colors::kBlack);
+            p.text(shown, x, top, px_, colors::kBlack, 0, face_);
             const int cx = snap(x + caretChar() * cw);
             p.fill({cx, r.y, 1, r.h}, colors::kBlack);
         }
         return;
     }
     const bool inverse = hover_ && editable_ && !dim_;
+    const double tw = Font::width(text_, px_, 0, face_);
+    const double x = centered_ ? b.x + (b.w - tw) / 2 : b.x + b.w - tw;
+    // The unit that a mask puts after its last digit (" Hz"), or the one set without a mask, is not typed: the pointer
+    // leaves it in normal video (Indus, 26/10/2026 03:51 and 15:25, D-438, D-451).
+    const size_t last = mask_.find_last_of('9');
+    std::string unit = last != std::string::npos ? mask_.substr(last + 1) : mask_.empty() ? unit_ : std::string();
+    if (unit.size() > text_.size() || text_.compare(text_.size() - unit.size(), unit.size(), unit) != 0) unit.clear();
+    const std::string value = text_.substr(0, text_.size() - unit.size());
     // Background and dashes on the box without the left padding (#susv, #kitSliders .val: origin and clip at the
     // content).
     const int left = snap(b.x + padChars_ * cw);
-    if (inverse) p.fill({left, r.y, r.right() - left, r.h}, colors::kBlack);
-    if (editable_ && !inverse) {
+    const int inverseRight = unit.empty() ? r.right() : snap(x + Font::width(value, px_, 0, face_));
+    if (inverse) p.fill({left, r.y, inverseRight - left, r.h}, colors::kBlack);
+    if (editable_ && !inverse && !centered_) {
         // Dashes aligned right.
         // One per character cell, counted from the right edge; the cells under the text get none. Each dash is its
         // cell less 1 px of gap, 2 px high, 1 px above the bottom, cut at the left padding.
@@ -785,8 +839,14 @@ void ValueField::paint(Painter& p) {
             if (z > a) p.fill({a, y, z - a, 2}, colors::kBlack);
         }
     }
-    const double x = b.x + b.w - Font::width(text_, px_);
-    p.text(text_, x, b.y + (b.h - px_) / 2, px_, inverse ? colors::kWhite : colors::kBlack);
+    p.text(value, x, top, px_, inverse ? colors::kWhite : colors::kBlack, 0, face_);
+    if (!unit.empty()) p.text(unit, x + Font::width(value, px_, 0, face_), top, px_, colors::kBlack, 0, face_);
+}
+
+void ValueField::setUnit(std::string u) {
+    if (u == unit_) return;
+    unit_ = std::move(u);
+    repaint();
 }
 
 // ---------------------------------------------------------------------------------------------- TextField
@@ -952,15 +1012,15 @@ void TitleBar::paint(Painter& p) {
     p.fill({r.x, r.y, r.w, kBox}, colors::kWhite);
     p.fill({r.x, r.y + kBox, r.w, 2}, colors::kBlack);
     const Rect c = closeRect(), f = fullRect();
-    // Each box: a 2 px rule on its inner side; the 8 px glyph centred in the 22 px left beside it (7 px), and the
-    // 16 px line centred in the 24 px box (4 px), its baseline 13 px below the line's top (ascent 13/16).
+    // Each box: a 2 px rule on its inner side; the 8×8 glyph at twice its size (D-418, D-424), 16 × 14 px, centred in
+    // the 22 px left beside it.
     if (close_) {
         p.fill({c.right() - 2, c.y, 2, kBox}, colors::kBlack);
-        p.glyph(kGlyphClose, c.x + 7, c.y + 4 + 13, 16, colors::kBlack);
+        doubledGlyph(p, kGlyphClose, {c.x, c.y, kBox - 2, kBox}, colors::kBlack);
     }
     if (full_) {
         p.fill({f.x, f.y, 2, kBox}, colors::kBlack);
-        p.glyph(kGlyphFull, f.x + 2 + 7, f.y + 4 + 13, 16, colors::kBlack);
+        doubledGlyph(p, kGlyphFull, {f.x + 2, f.y, kBox - 2, kBox}, colors::kBlack);
     }
     const Rect mid{c.right(), r.y, f.x - c.right(), kBox};
     p.tile(mid, tiles::titleHatch(), {mid.x, mid.y});
@@ -1014,24 +1074,38 @@ FloatWindow::FloatWindow() {
     add(bar_);
     bar_.setBoxes(true, false);
     bar_.setMovable(true);
-    bar_.onClose = [this] { close(); };
+    bar_.onClose = [this] { requestClose(); };
     bar_.onGrab = [this](Point p) { grab_ = {p.x - bounds().x, p.y - bounds().y}; };
     // The window follows the pointer at the offset where its bar was grabbed, its left edge never negative and its
-    // top never above the work area (mkWinDrag, D-302).
+    // top never above the work area (mkWinDrag, D-302), its right and bottom edges never past the desktop's (D-460).
     bar_.onDrag = [this](Point p) {
-        const int top = desktop() ? desktop()->workTop() : 0;
-        const int x = std::max(0, p.x - grab_.x), y = std::max(top, p.y - grab_.y);
-        moveBy(x - bounds().x, y - bounds().y);
+        const Point at = onDesktop(p.x - grab_.x, p.y - grab_.y);
+        moveBy(at.x - bounds().x, at.y - bounds().y);
     };
+}
+
+Point FloatWindow::onDesktop(int x, int y) const noexcept {
+    const Desktop* d = desktop();
+    if (!d) return {std::max(0, x), std::max(0, y)};
+    const Rect r = bounds();
+    return {std::max(0, std::min(x, d->width() - r.w)), std::max(d->workTop(), std::min(y, d->height() - r.h))};
+}
+
+void FloatWindow::keepOnDesktop() {
+    const Rect r = bounds();
+    const Point at = onDesktop(r.x, r.y);
+    if (at.x != r.x || at.y != r.y) moveBy(at.x - r.x, at.y - r.y);
 }
 
 void FloatWindow::place(const Box& b) {
     setBox(b);
     const Rect r = bounds();
     bar_.setBounds({r.x + kInset, r.y + kInset, r.w - 2 * kInset, TitleBar::kHeight});
+    keepOnDesktop();  // grown near the right or bottom edge: moved back inside (D-460)
 }
 
 void FloatWindow::open() {
+    keepOnDesktop();
     setVisible(true);
     toFront();
 }
@@ -1084,19 +1158,33 @@ void DeskIcon::paint(Painter& p) {
     const int px = b.x + (kW - kPicture) / 2;
     if (mask_) p.bitmap(*mask_, px, b.y, colors::kWhite);
     if (data_) p.bitmap(*data_, px, b.y, colors::kBlack);
-    if (letter_) {
-        const char text[2] = {letter_, 0};
-        p.text(text, px + letterAt_.x, b.y + letterAt_.y, 8, colors::kBlack);
+    if (letter_) {  // the top of the 6×6 cell at letterAt_ (D-419)
+        const int g = Font::glyph(char32_t(uint8_t(letter_)));
+        const int top = Font::raster(8, g, 0, Face::kSmall).top;
+        p.glyph(g, px + letterAt_.x, b.y + letterAt_.y - top, 8, colors::kBlack, 0, Face::kSmall);
     }
     p.fill({b.x, b.y + kPicture, kW, kNameH}, colors::kWhite);
     const double w = Font::width(name_, 8, 0, Face::kSmall);
     p.text(name_, b.x + std::floor((kW - w) / 2), b.y + kPicture, 8, colors::kBlack, 0, Face::kSmall);
 }
 
-Point DeskIcon::landing(Point pointer) const noexcept {
-    const int x = std::clamp(pointer.x - grab_.x, limits_.x, std::max(limits_.x, limits_.right() - kW));
-    const int y = std::clamp(pointer.y - grab_.y, limits_.y, std::max(limits_.y, limits_.bottom() - kH));
-    return {x, y};
+Point DeskIcon::landing(Point pointer) const noexcept { return snapped({pointer.x - grab_.x, pointer.y - grab_.y}); }
+
+Point DeskIcon::snapped(Point topLeft) const noexcept {
+    if (!gridOn_) {
+        const int x = std::clamp(topLeft.x, limits_.x, std::max(limits_.x, limits_.right() - kW));
+        const int y = std::clamp(topLeft.y, limits_.y, std::max(limits_.y, limits_.bottom() - kH));
+        return {x, y};
+    }
+    // Nearest cell (a half towards the right or the bottom), within the first and last cells wholly inside the limits.
+    auto cell = [](int v, int origin, int size, int lo, int hi) {
+        const int first = -static_cast<int>(std::floor(double(origin - lo) / size));
+        const int last = std::max(first, static_cast<int>(std::floor(double(hi - size - origin) / size)));
+        const int k = static_cast<int>(std::floor(double(v - origin) / size + 0.5));
+        return origin + std::clamp(k, first, last) * size;
+    };
+    return {cell(topLeft.x, grid_.x, kW, limits_.x, limits_.right()),
+            cell(topLeft.y, grid_.y, kH, limits_.y, limits_.bottom())};
 }
 
 Rect DeskIcon::dragRect() const noexcept { return {at_.x, at_.y, kW, kH}; }
@@ -1122,12 +1210,16 @@ void DeskIcon::mouseDown(const MouseEvent& e) {
     if (e.button != MouseButton::Left) return;
     pressed_ = true;
     drag_ = false;
+    wandered_ = false;
+    pressAt_ = e.pos;
     grab_ = {e.pos.x - bounds().x, e.pos.y - bounds().y};
     at_ = {bounds().x, bounds().y};
 }
 
 void DeskIcon::mouseDrag(const MouseEvent& e) {
     if (!pressed_) return;
+    // Beyond a few pixels, the press is a drag even if the icon stays in its cell: its release is not a click.
+    wandered_ = wandered_ || std::abs(e.pos.x - pressAt_.x) > 2 || std::abs(e.pos.y - pressAt_.y) > 2;
     const Point to = landing(e.pos);
     if (!drag_ && to.x == bounds().x && to.y == bounds().y) return;  // not moved yet: maybe a click
     if (drag_) repaintDrag();
@@ -1138,12 +1230,16 @@ void DeskIcon::mouseDrag(const MouseEvent& e) {
 
 // The drop: the outline goes, the icon moves to its landing place and onMoved tells the owner.
 void DeskIcon::mouseUp(const MouseEvent&) {
-    const bool moved = drag_;
+    const bool moved = drag_, was = pressed_;
     pressed_ = false;
-    if (!moved) return;
+    if (!moved) {
+        if (was && !wandered_ && onClick) onClick();
+        return;
+    }
     repaintDrag();
     drag_ = false;
     if (at_.x == bounds().x && at_.y == bounds().y) return;
+    if (canLand && !canLand(at_)) return;
     moveBy(at_.x - bounds().x, at_.y - bounds().y);
     if (onMoved) onMoved(at_);
 }

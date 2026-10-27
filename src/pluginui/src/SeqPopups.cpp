@@ -183,12 +183,25 @@ public:
 };
 
 // #volmenu: vertical slider (96 px), value below; each move is heard at once. The value can be typed (D-274): two
-// positions, or the signed values without a mask.
+// positions, or the signed values without a mask. A toggle can follow the value (Slide of the VOL row, D-393).
 class VolPopup : public PopupBox {
 public:
-    VolPopup(SliderPopupSpec spec, const Rect& anchor, int deskW, int deskH) : set_(std::move(spec.set)) {
+    VolPopup(SliderPopupSpec spec, const Rect& anchor, int deskW, int deskH)
+        : set_(std::move(spec.set)), onToggle_(std::move(spec.onToggle)) {
         add(range_);
         add(value_);
+        const bool toggle = !spec.toggle.empty();
+        if (toggle) {
+            add(toggle_);
+            toggle_.setText(spec.toggle);
+            toggle_.setOn(spec.toggleOn);
+            toggle_.setEnabled(spec.toggleEnabled);
+            toggle_.setTip(spec.toggleTip);
+            toggle_.onClick = [this] {
+                toggle_.setOn(!toggle_.on());
+                if (onToggle_) onToggle_(toggle_.on());
+            };
+        }
         range_.setVertical(true);
         range_.setRange(spec.min, spec.max, 1);
         range_.setValue(spec.value);
@@ -209,25 +222,31 @@ public:
             value_.setText(std::to_string(int(range_.value())));
             return true;
         };
-        // Size: column as wide as the value (20 px at least), padding 4 and border 2 on each side; height: border,
-        // padding, 96 px slider, 2 px, value line, padding, border. Under the cell, or above it at the bottom of the
-        // desktop.
+        // Size: column as wide as the value (20 px at least) or the toggle, padding 4 and border 2 on each side;
+        // height: border, padding, 96 px slider, 2 px, value line [, 4 px, toggle], padding, border. Under the cell, or
+        // above it at the bottom of the desktop.
         const double lh = lineH(16);
-        const double cw = std::max(20.0, value_.naturalWidth());
-        const double mw = cw + 8 + 4, mh = 2 + 6 + 96 + 2 + lh + 6 + 2;
+        const double tw = toggle ? std::ceil(toggle_.naturalWidth()) : 0;
+        const double th = toggle ? 4.0 + toggle_.naturalHeight() : 0;
+        const double cw = std::max({20.0, value_.naturalWidth(), tw});
+        const double mw = cw + 8 + 4, mh = 2 + 6 + 96 + 2 + lh + th + 6 + 2;
         double x = anchor.x, y = anchor.bottom() + 2;
         if (x + mw > deskW - 4) x = deskW - mw - 4;
         if (y + mh > deskH - 4) y = anchor.y - mh - 2;
         setBox({x, y, mw, mh});
         const double wrapX = x + 2 + 4 + (cw - 20) / 2;
         range_.setBox({wrapX + 2, y + 8, 16, 96});  // 96 px rotated inside a 20 px .trwrap
-        value_.setBox({x + 6, y + 8 + 96 + 2, cw, lh});
+        const double vw = std::max(20.0, value_.naturalWidth());
+        value_.setBox({x + 6 + std::floor((cw - vw) / 2), y + 8 + 96 + 2, vw, lh});
+        if (toggle) toggle_.setBox({x + 6, y + 8 + 96 + 2 + lh + 4, cw, double(toggle_.naturalHeight())});
     }
 
 private:
     std::function<void(int)> set_;
+    std::function<void(bool)> onToggle_;
     ResetSlider range_;
     gemui::ValueField value_;
+    Button toggle_;
 };
 
 // Preview of the Euclidean pattern: 11 × 16 px cells, 2 px border, black (accent), grey (hit) or white.
@@ -272,15 +291,54 @@ std::unique_ptr<gemui::Widget> makeVolumePopup(int value, std::function<void(int
 void SeqWindow::openVol(const Rect& cell, int s) {
     // openVolMenu: the value applies live (the undo step armed by the press is taken at the first change, D-282).
     desk().closePopups();
-    const int v = std::clamp<int>(lane().vol[size_t(s)], 0, 15);
-    auto set = [this, s, at = stepTarget()](int nv) {
+    SliderPopupSpec spec;
+    spec.value = std::clamp<int>(lane().vol[size_t(s)], 0, 15);
+    spec.set = [this, s, at = stepTarget()](int nv) {
         if (!stillOn(at)) return;
         editLane([&](ymseq::LaneEditor&, ymseq::Lane& l) {
             l.vol[size_t(s)] = uint8_t(nv);
             return true;
         });
     };
-    desk().openPopup(makeVolumePopup(v, set, cell, desk().width(), desk().height()));
+    // Slide (D-393): the volume of the step glides to that of the next step (Gxx); not on the drums.
+    spec.toggle = "Slide";
+    spec.toggleOn = lane().cmdAt(ymengine::SeqCmd::VolGlide, s) != 0;
+    spec.toggleEnabled = !drum();
+    spec.toggleTip = drum() ? "Slide: not on a drum track"
+                            : "Slide: the volume of this step glides to that of the next step";
+    spec.onToggle = [this, s, at = stepTarget()](bool on) {
+        if (!stillOn(at)) return;
+        editLane([&](ymseq::LaneEditor&, ymseq::Lane& l) {
+            if (on) l.setCmd(s, ymengine::seqCmd(ymengine::SeqCmd::VolGlide, 1));
+            else l.clearCmd(ymengine::SeqCmd::VolGlide, s);
+            return true;
+        });
+    };
+    desk().openPopup(makeSliderPopup(std::move(spec), cell, desk().width(), desk().height()));
+}
+
+bool SeqWindow::openStepSound(SeqLane row, int s) {
+    const ymseq::Lane& l = lane();
+    const size_t k = size_t(s);
+    using Kind = StepSoundWindow::Kind;
+    switch (row) {
+    case SeqLane::Fx:
+        if (!l.fx[k]) return false;
+        desk().closePopups();
+        m_.stepWin_.openFor(Kind::Generator, s, ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))]);
+        return true;
+    case SeqLane::Mix:
+        if (!l.mix[k]) return false;
+        desk().closePopups();
+        m_.stepWin_.openFor(Kind::Source, s, l.mix[k]);
+        return true;
+    case SeqLane::Env:
+        if (!l.cmdAt(ymengine::SeqCmd::Shape, s) && !l.cmdAt(ymengine::SeqCmd::Retrig, s)) return false;
+        desk().closePopups();
+        m_.stepWin_.openFor(Kind::Envelope, s, 0);
+        return true;
+    default: return false;
+    }
 }
 
 // gatPopup: gate of step s in % (0 = the channel's gate, also Channel); the change takes the undo step armed by the
@@ -309,7 +367,7 @@ void SeqWindow::openGate(const Rect& cell, int s) {
 }
 
 // panPopup: pan of step s from -10 to +10, stored as v·10 + 101 (0 = the channel's pan, also Center), so that a typed
-// 0 is an explicit centre.
+// 0 is an explicit centre. The centre shows its 0 too (24/10/2026, D-384: the field was empty).
 void SeqWindow::openPan(const Rect& cell, int s) {
     desk().closePopups();
     const int stored = lane().pnr[size_t(s)];
@@ -319,7 +377,7 @@ void SeqWindow::openPan(const Rect& cell, int s) {
     spec.min = -10;
     spec.max = 10;
     spec.value = cur0;
-    spec.text = stored ? std::to_string(cur0) : "";
+    spec.text = std::to_string(cur0);
     spec.textW = 42;
     spec.chanLabel = "Center";
     spec.apply = [this, s, at = stepTarget()](bool chan, const std::string& t) {

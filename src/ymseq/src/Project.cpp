@@ -4,10 +4,43 @@
 #include "ymseq/Project.h"
 
 #include <algorithm>
+#include <memory>
+
+#include "ymseq/Edit.h"
 
 namespace stym::ymseq {
 
 void Project::setSteps(int n) noexcept { cur().steps = std::clamp(n, 1, kSteps); }
+
+void Project::fitResolution(int num, int den) {
+    if (num <= 0 || den <= 0 || num == den) return;
+    for (int i = 0; i < kPatterns; ++i) {
+        if (!used.test(size_t(i))) continue;
+        Pattern& p = patterns[size_t(i)];
+        for (auto& l : p.lanes)
+            if (l) l = std::make_shared<const Lane>(fitLane(*l, num, den));
+        std::array<uint8_t, kSteps> bpm{};
+        for (int s = 0; s < kSteps; ++s)
+            if (const int ns = fitStep(s, num, den); p.bpm[size_t(s)] && ns < kSteps && !bpm[size_t(ns)])
+                bpm[size_t(ns)] = p.bpm[size_t(s)];
+        p.bpm = bpm;
+        p.steps = std::clamp(fitStep(p.steps, num, den), 1, kSteps);
+        p.compact();
+    }
+    for (TrackSeq& t : tracks)
+        if (t.length > 0) t.length = std::clamp(fitStep(t.length, num, den), 1, 64);
+    for (SongEntry& e : song.entries)
+        if (e.kind == SongKind::Rest || e.kind == SongKind::NoteOff)
+            e.arg = std::clamp(fitStep(e.arg, num, den), 1, kSteps);
+}
+
+bool Project::hasNotes() const noexcept {
+    for (int i = 0; i < kPatterns; ++i)
+        if (used.test(size_t(i)))
+            for (const auto& l : patterns[size_t(i)].lanes)
+                if (l && l->hasNotes()) return true;
+    return false;
+}
 
 int Project::trackLength(int t) const noexcept {
     const int plen = tracks[size_t(std::clamp(t, 0, kTracks - 1))].length;

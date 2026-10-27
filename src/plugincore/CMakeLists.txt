@@ -8,6 +8,7 @@ add_library(stym_plugincore STATIC
   src/EngineStatus.cpp
   src/Digidrum.cpp
   src/DigidrumBanks.cpp
+  src/DmaBanks.cpp
   src/DmaSample.cpp
   src/Json.cpp
   src/Patches.cpp

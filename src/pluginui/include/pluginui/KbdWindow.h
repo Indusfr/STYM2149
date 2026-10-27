@@ -8,7 +8,7 @@
 // The computer keyboard plays only while the window is open (kbdWinOn); closing it cuts on-screen playing.
 //
 // Keys: the prototype reads the physical position (KeyboardEvent.code); a plugin receives only the character.
-// The layout chosen in the Options > Keyboard layout menu says which character each position carries; Auto takes the
+// The layout chosen in Settings > Keyboard layout says which character each position carries; Auto takes the
 // layout of the system keyboard (Host::keyboardLayout, D-215; QWERTY before, D-131). Positions and sizes: the
 // prototype's CSS boxes at 100 % (window at 120, 120).
 // Percussion track (Chipdrum, Digidrum, D-229): the eight keys of the middle row from A to K play pads 1 to 8 like the

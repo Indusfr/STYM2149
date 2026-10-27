@@ -77,7 +77,7 @@ struct DmaFrame {
     uint8_t voices = 0;    // DMA voices that sound (more than one: layered)
     float step = 1;        // pitch ratio (1: rate of the sample)
     float gain = 1;        // volume of the note, from 0 to 1
-    uint32_t start = 0;    // first frame of the slot read at the attack (Oxx of the CMD row, D-338)
+    uint32_t start = 0;    // first frame of the slot read at the attack (its Start, D-444, then Oxx, D-338)
     bool operator==(const DmaFrame&) const = default;
 };
 
@@ -156,13 +156,28 @@ public:
     // applying only to the focused track. A track beyond the current mode (3-channel: 4 tracks per chip) is
     // ignored. noteOff(track ≥ 0) only releases the notes of this track. Velocity 1 to 127 (above: 127); 0 or less is
     // a noteOff.
-    void noteOn(uint32_t offset, int note, int velocity, int track = -1) noexcept;
-    void noteOff(uint32_t offset, int note, int track = -1) noexcept;
-    // Pitch bend and wheel: all the tracks (`track` < 0) or only one.
+    // `channel` 1 to 15: a note of that MPE member channel (D-432), whose bend, pressure and slide its channel sets
+    // (mpeBend, mpePressure, mpeSlide); noteOff then releases the note of that channel only.
+    void noteOn(uint32_t offset, int note, int velocity, int track = -1, int channel = 0) noexcept;
+    void noteOff(uint32_t offset, int note, int track = -1, int channel = 0) noexcept;
+    // Pitch bend and wheel: all the tracks (`track` < 0) or only one. The bend drives what GlobalParams::bendTarget
+    // says (D-432), the pitch by default.
     void pitchBend(uint32_t offset, double semitones, int track = -1) noexcept;
-    // Modulation wheel: vibrato depth added to that of the track, in cents, at the speed of the track and at the
-    // VBL cadence (like the vibrato of the prototype). Drums have none.
-    void modWheel(uint32_t offset, double cents, int track = -1) noexcept;
+    // Modulation wheel, 0 to 1: what GlobalParams::wheelTarget says, at the VBL cadence (D-432). By default a vibrato
+    // added to that of the track, up to GlobalParams::expressCents, at the speed of the track (like the vibrato of the
+    // prototype). Drums have none.
+    void modWheel(uint32_t offset, double amount, int track = -1) noexcept;
+    // Aftertouch (D-432): the pressure, 0 to 1, of a channel on all the tracks (`track` < 0) or one, and that of one
+    // note (polyphonic aftertouch). A note takes the higher of the two; GlobalParams::aftertouch says what it drives,
+    // at the VBL cadence like the wheel. Drums have none.
+    void channelPressure(uint32_t offset, double amount, int track = -1) noexcept;
+    void notePressure(uint32_t offset, int note, double amount, int track = -1) noexcept;
+    // MPE (D-432): the bend in semitones, the pressure (0 to 1) and the slide (CC74, 0 to 1, 0.5 changes nothing) of
+    // member channel 1 to 15, for its sounding notes and the next ones. The pressure drives what the aftertouch drives,
+    // the slide what GlobalParams::mpeSlide says.
+    void mpeBend(uint32_t offset, int channel, double semitones) noexcept;
+    void mpePressure(uint32_t offset, int channel, double amount) noexcept;
+    void mpeSlide(uint32_t offset, int channel, double amount) noexcept;
     void allNotesOff(uint32_t offset) noexcept;   // panic: 64-sample fade (allOff)
     void releaseManual(uint32_t offset) noexcept; // change of timbre: cuts the manual playing (manOff)
     // Start of the YM Player (ymplay of the prototype): manual playing, chords and sequencer notes released
@@ -213,11 +228,13 @@ public:
     // Preview of an instrument of the Chipdrum kit (Audition button of the Drum Kit window, drumprev): its
     // 16-channel sample, played as is into the main output, whatever the track.
     void drumPreview(uint32_t offset, int slot) noexcept;
-    // Preview of a Digidrum slot (editor, D-154): once, at its rate and fine tune, without loop, through the level
-    // table of the chip (one channel alone), added to the mix like the preview of the kit.
+    // Preview of a Digidrum slot (editor, D-154): from Start to End (D-443), at its rate and fine tune, through the
+    // level table of the chip (one channel alone), added to the mix like the preview of the kit. With the slot's Loop
+    // on, the part repeats until digidrumStopPreview or until Loop goes off; otherwise it plays once (D-449).
     void digidrumPreview(uint32_t offset, int slot) noexcept;
-    // Preview of a DMA slot (DMA window): at its rate, once, centred, added to the mix like that of a Digidrum,
-    // whatever the machine; only one at a time. The panic (allNotesOff) stops it too.
+    void digidrumStopPreview(uint32_t offset) noexcept;
+    // Preview of a DMA slot (DMA window): at its rate, centred, added to the mix like that of a Digidrum, whatever
+    // the machine, once or in a loop as a Digidrum's (D-449); only one at a time. The panic (allNotesOff) stops both.
     void dmaPreview(uint32_t offset, int slot) noexcept;
     void dmaStopPreview(uint32_t offset) noexcept;
 
@@ -246,9 +263,11 @@ public:
     // track (last note played on the channel).
     static constexpr int kScopePoints = 128;
     static constexpr double kScopeRate = 6000;
+    // A stereo DMA sample (D-457): peak holds its left side's peaks, peakR its right side's (the same for the other
+    // voices), side half the difference of the right and left sides around scope, their mean (0 without one).
     struct TrackMeters {
-        std::array<float, kTracks> peak{};
-        std::array<std::array<float, kScopePoints>, kTracks> scope{};
+        std::array<float, kTracks> peak{}, peakR{};
+        std::array<std::array<float, kScopePoints>, kTracks> scope{}, side{};
         uint32_t scopePos = 0;  // next point written: the oldest
     };
     // Copies the meters and resets the peaks (audio thread, between two renders).
@@ -291,6 +310,7 @@ public:
         uint16_t notePeriod = 0;      // period of the note at the attack ("tp" message of the prototype)
         uint16_t tonePeriod = 0;      // effective period (vibrato and ornament included)
         uint8_t volume = 0;           // current 4-bit volume
+        double accent = 1;            // 16-channel and DMA: level of the step (VOL, its Gxx glide), audio gain
         bool noise = false;           // audible noise (setting of the track or ornament step)
         double timerHz = 0;           // frequency requested from the effect timer (0: no timer)
         double timerActualHz = 0;     // frequency actually played (quantised by the MFP or continuous)
@@ -306,8 +326,12 @@ public:
         bool fading = false;
     };
     VoiceInfo voice(int index) const noexcept;
+    // Notes played live that a sequencer or chord note took the voice of while they sounded, in the 3-channel modes or
+    // with no free voice in 16 channels (D-431): one counter per MIDI note, wrapping at 256. The interface lets go of
+    // their keys.
+    const std::array<uint8_t, 128>& manualCuts() const noexcept;
     // DMA voice (D-153): its slot, its frame and its read step (frames of the sample per frame of the stream), at
-    // the rate of the slot. dmaPreviewSlot: slot being previewed (-1: none).
+    // the rate of the slot. dmaPreviewSlot and digidrumPreviewSlot: slot being previewed (-1: none).
     struct DmaInfo {
         bool on = false;
         int slot = 0;
@@ -316,8 +340,11 @@ public:
     };
     DmaInfo dmaVoice(int index) const noexcept;
     int dmaPreviewSlot() const noexcept;
+    int digidrumPreviewSlot() const noexcept;
     uint8_t dmaPlayingSlots() const noexcept;  // bit k: slot k played by a voice or the preview
     int program(int track) const noexcept;      // instrument chosen by Program Change (0: the sound of the track)
+    // DMA track whose sample is stereo: the right side has its own fader, mute and solo (TrackMix, D-459).
+    bool trackStereo(int track) const noexcept;
     int activeVoices() const noexcept;
     uint64_t droppedEvents() const noexcept;
     uint64_t samplesRendered() const noexcept;

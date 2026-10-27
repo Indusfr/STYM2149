@@ -279,6 +279,7 @@ void MainWindow::loadXmBytes(std::string_view bytes, const std::string& fileName
             s.instruments[size_t(k)] = x.instruments[size_t(k)];
             s.dma.slots[size_t(k)] = x.dma.slots[size_t(k)];
             s.dmaSamples[size_t(k)] = x.dmaSamples[size_t(k)];
+            s.dmaNames[size_t(k)] = x.dmaNames[size_t(k)];
         }
         s.global.timing = x.global.timing;
         s.global.speed = x.global.speed;

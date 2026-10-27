@@ -49,10 +49,14 @@ size_t digidrumMaxSamples(double rateHz) noexcept;
 std::vector<uint8_t> toDigidrum(std::span<const float> channel, double sampleRate, double rateHz = 7800);
 // Signed 8-bit source at the same rate: round(v × 127) clamped to -128..127.
 std::vector<int8_t> toDigidrumSource(std::span<const float> channel, double sampleRate, double rateHz = 7800);
-// 4-bit values of a source.
+// 4-bit value of a source byte, and those of a source.
+uint8_t digidrumNibble(int8_t source, DigiConvert mode) noexcept;
 std::vector<uint8_t> digidrumNibbles(std::span<const int8_t> source, DigiConvert mode);
 // Source derived from 4-bit values (inverse linear conversion): round((n - 7.5) / 7.5 × 127).
 std::vector<int8_t> digidrumSourceOf(std::span<const uint8_t> nibbles);
+// Playback settings of a slot for the engine: `play` with the value of silence of its conversion (rest, D-455).
+// Without allocation: the driver calls it on the audio thread.
+ymengine::DigidrumSlot digidrumEngineSlot(const DigidrumSlotState& s) noexcept;
 
 // Editor tools, on the source: Normalize (peak at ±127), Reverse, Fade out (linear over the whole sample).
 void digiNormalize(std::vector<int8_t>& s) noexcept;

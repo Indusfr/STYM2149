@@ -8,6 +8,7 @@
 #include "ymseq/Edit.h"
 
 #include <cmath>
+#include <utility>
 
 #include "ymengine/Pitch.h"
 #include "ymseq/Tables.h"
@@ -69,15 +70,17 @@ void LaneEditor::writeVoiceAt(int s, int row, int v) noexcept {
     l_.vo(v, s) = int8_t(octaveCode(no, T));
 }
 
-int LaneEditor::noteStart(int c) const noexcept {
-    if (!inLane(c)) return -1;
-    if (l_.pat[u(c)] >= 0) return c;
-    if (!l_.tie[u(c)]) return -1;  // this step is not held
+int noteStartOf(const Lane& l, int c) noexcept {
+    if (c < 0 || c >= kSteps) return -1;
+    if (l.pat[u(c)] >= 0) return c;
+    if (!l.tie[u(c)]) return -1;  // this step is not held
     // Back over the steps without a note whose previous step is tied: the note found there holds c.
     int k = c;
-    while (k > 0 && l_.pat[u(k)] < 0 && l_.tie[u(k - 1)]) --k;
-    return l_.pat[u(k)] >= 0 ? k : -1;
+    while (k > 0 && l.pat[u(k)] < 0 && l.tie[u(k - 1)]) --k;
+    return l.pat[u(k)] >= 0 ? k : -1;
 }
+
+int LaneEditor::noteStart(int c) const noexcept { return inLane(c) ? noteStartOf(l_, c) : -1; }
 
 int LaneEditor::figLenAt(int c) const noexcept {
     if (!inLane(c) || !l_.tie[u(c)]) return 1;
@@ -934,7 +937,7 @@ void copyStep(Lane& dst, int ds, const Lane& src, int ss, std::optional<Row> row
     }
     if (row) {
         dst.set(*row, ds, src.get(*row, ss));
-        dst.set(envPartner(*row), ds, src.get(envPartner(*row), ss));
+        dst.set(rowPartner(*row), ds, src.get(rowPartner(*row), ss));
         return;
     }
     for (int r = 0; r < kRowCount; ++r) dst.set(Row(r), ds, src.get(Row(r), ss));
@@ -964,7 +967,7 @@ void LaneEditor::blockClear(int a, int b, std::optional<Row> row) noexcept {
             l_.clearBoxCmds(s);  // every kind of the CMD row (D-330)
         else if (row) {
             l_.set(*row, s, Lane::emptyValue(*row));
-            l_.set(envPartner(*row), s, Lane::emptyValue(envPartner(*row)));
+            l_.set(rowPartner(*row), s, Lane::emptyValue(rowPartner(*row)));
         }
         else
             l_.clearStep(s);  // Deviation: the chord voices are emptied (-1); the prototype wrote 0 there (a C)
@@ -991,6 +994,65 @@ void LaneEditor::recordAt(int s, int note, int velocity) noexcept {
         l_.oct[u(s)] = int8_t(octaveCode(oct, c_.trackOctave));
     }
     l_.vol[u(s)] = uint8_t(std::max(1, int(std::floor(double(velocity) / 127.0 * 15.0 + 0.5))));  // velocity → accent
+}
+
+// ---------------------------------------------------------------- resolution change (D-448)
+
+Lane fitLane(const Lane& src, int num, int den) {
+    Lane out;
+    if (num <= 0 || den <= 0) return src;
+    const int N = kSteps;
+    auto at = [num, den](int s) { return fitStep(s, num, den); };
+    // Length of the root at s, its hold included (LaneEditor::noteLenAt over the 256 steps).
+    auto lenAt = [&src](int s) {
+        int d = 1;
+        while (s + d < N && src.pat[u(s + d)] < 0 && src.tie[u(s + d)]) ++d;
+        return src.tie[u(s)] ? d : 1;
+    };
+    // End (excluded) of a note or voice of `len` steps from s, one step at least.
+    auto endOf = [&](int s, int ns, int len) { return std::max(ns + 1, at(s + len)); };
+    auto copyVoices = [&](int s, int ns, bool fill) {
+        for (int v = 2; v <= kPolyMax; ++v) {
+            if (src.vp(v, s) < 0 || (fill && out.vp(v, ns) >= 0)) continue;
+            out.vp(v, ns) = src.vp(v, s);
+            out.vo(v, ns) = src.vo(v, s);
+            const int d = std::max(1, int(src.vdur[u(v - 2)][u(s)]));
+            out.vdur[u(v - 2)][u(ns)] = uint16_t(std::min(endOf(s, ns, d), N) - ns);
+        }
+    };
+    // Roots first, each with the rows of its step; their lengths once they are all placed.
+    std::vector<std::pair<int, int>> ends;  // new start, new end (excluded)
+    for (int s = 0; s < N; ++s) {
+        if (src.pat[u(s)] < 0) continue;
+        const int ns = at(s);
+        if (ns >= N || out.pat[u(ns)] >= 0) continue;
+        for (int r = 0; r < kRowCount; ++r)
+            if (Row(r) != Row::Tie) out.set(Row(r), ns, src.get(Row(r), s));
+        copyVoices(s, ns, false);
+        ends.emplace_back(ns, endOf(s, ns, lenAt(s)));
+    }
+    // The other steps: their rows into the empty cells (a step held by a note keeps its VOL, ARP, RTG...).
+    for (int s = 0; s < N; ++s) {
+        if (src.pat[u(s)] >= 0) continue;
+        const int ns = at(s);
+        if (ns >= N) continue;
+        for (int r = 0; r < kRowCount; ++r) {
+            const Row row = Row(r);
+            if (row == Row::Tie || row == Row::Pat) continue;
+            const int v = src.get(row, s);
+            if (v != Lane::emptyValue(row) && out.get(row, ns) == Lane::emptyValue(row)) out.set(row, ns, v);
+        }
+        copyVoices(s, ns, true);
+    }
+    // Holds: up to the new end, never over the next root (setNoteLen's ties).
+    for (size_t k = 0; k < ends.size(); ++k) {
+        const int ns = ends[k].first;
+        const int next = k + 1 < ends.size() ? ends[k + 1].first : N;
+        const int len = std::min(ends[k].second, next) - ns;
+        if (len > 1)
+            for (int j = 0; j < len; ++j) out.tie[u(ns + j)] = 1;
+    }
+    return out;
 }
 
 }  // namespace stym::ymseq

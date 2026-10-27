@@ -1,12 +1,13 @@
-// STYM2149 — STE DMA sound in the interface (M6, B8, D-153, D-155): Computer row below Voices (ST or STE), modes menu
-// and Options; DMA type of the generator and its slot; tabs DMA1 to DMA8 in 3 ch mode; DMA window (bank: slots,
-// loading and listening, rate, mono or stereo, loop, root note, Sign and Gain tools, undo steps); Mixer of the DMA
-// tracks (panning, Out L and Out R in 3 ch mode); session.
+// STYM2149 — STE DMA sound in the interface (M6, B8, D-153, D-155): Computer row below Voices (ST or STE) and Options
+// (no longer the modes menu, D-397); DMA type of the generator and its slot; tabs DMA1 to DMA8 in 3 ch mode; DMA window
+// (bank: slots, name, loading and listening, rate, mono or stereo, loop, root note, Sign and Gain tools, undo steps);
+// Mixer of the DMA tracks (panning, Out L and Out R in 3 ch mode); session; named banks (D-462).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -31,7 +32,7 @@ public:
     pluginui::EditorSession editor;
     std::optional<plugin::EngineStatus> pending;
     plugin::EngineStatus last;
-    std::vector<int> loads, previews;
+    std::vector<int> loads, previews, stops;
 
     float param(int i) const override { return values[size_t(i)]; }
     void beginGesture(int) override {}
@@ -47,8 +48,8 @@ public:
     void setMidiCapture(const plugin::MidiKeys&, bool) override {}
     bool learnMidi(std::array<uint8_t, 3>&) override { return false; }
     bool hostNote(std::array<uint8_t, 3>&) override { return false; }
-    void seqCommand(SeqCommand c, int a, int, int) override {
-        if (c == SeqCommand::DmaPreview) previews.push_back(a);
+    void seqCommand(SeqCommand c, int a, int b, int) override {
+        if (c == SeqCommand::DmaPreview) (b ? stops : previews).push_back(a);
     }
     const plugin::EngineStatus* engineStatus() override {
         if (!pending) return nullptr;
@@ -65,10 +66,17 @@ public:
     void openAudioSettings() override {}
     void loadDigidrum(int) override {}
     void loadDmaSample(int slot) override { loads.push_back(slot); }
-    std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
-    void setPreference(std::string_view, std::string_view) override {}
+    std::map<std::string, std::string, std::less<>> prefs;
+    std::string preference(std::string_view key, std::string_view fallback) const override {
+        const auto it = prefs.find(key);
+        return it == prefs.end() ? std::string(fallback) : it->second;
+    }
+    void setPreference(std::string_view key, std::string_view value) override { prefs[std::string(key)] = value; }
     std::string patchLibrary() const override { return {}; }
     void setPatchLibrary(const std::string&) override {}
+    std::string library;  // the DMA bank file (D-462)
+    std::string dmaLibrary() const override { return library; }
+    void setDmaLibrary(const std::string& json) override { library = json; }
 
     int global(Global g) const { return int(values[size_t(paramIndex(g))]); }
     const ymengine::DmaParams& dma() const { return state.dma; }
@@ -146,6 +154,44 @@ void dragSlider(MainWindow& w, const char* id, bool toMax) {
     drag(w, {centre(t), {r.x + r.w / 2, t.y + 8}, {toMax ? r.right() + 20 : r.x - 20, t.y + 8}});
 }
 
+// Computer menu button (thirteenth DAW test, item 164, D-373): 0 = ST, 1 = STE.
+void setComputer(MainWindow& w, int machine) {
+    click(w, "compSel");
+    pick(w, machine);
+}
+
+void answer(MainWindow& w, const std::string& text) {
+    REQUIRE(w.desktop().hasModal());
+    for (int i = 0; i < 40; ++i) key(w, gemui::Key::Backspace);
+    for (char c : text) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    key(w, gemui::Key::Enter);
+    CHECK_FALSE(w.desktop().hasModal());
+}
+
+// Captions of the DMA drawings and tips of every widget under `root`.
+void collect(const gemui::Widget& root, std::vector<std::string>& caps, std::vector<std::string>& tips) {
+    if (const auto* d = dynamic_cast<const pluginui::DmaWave*>(&root)) caps.push_back(d->caption());
+    if (!root.tip().empty()) tips.push_back(root.tip());
+    for (const gemui::Widget* c : root.children()) collect(*c, caps, tips);
+}
+
+std::vector<std::string> captions(MainWindow& w) {
+    std::vector<std::string> caps, tips;
+    collect(*w.desktop().root(), caps, tips);
+    return caps;
+}
+
+std::vector<std::string> tips(MainWindow& w) {
+    std::vector<std::string> caps, tips;
+    collect(*w.desktop().root(), caps, tips);
+    return tips;
+}
+
 std::vector<int8_t> ramp(size_t n) {
     std::vector<int8_t> b(n);
     for (size_t i = 0; i < n; ++i) b[i] = int8_t(int(i % 200) - 100);
@@ -154,47 +200,54 @@ std::vector<int8_t> ramp(size_t n) {
 
 }  // namespace
 
-TEST_CASE("DMA: Computer row below Voices, ST by default, modes menu and Options", "[ui][dma]") {
+TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in the modes menu", "[ui][dma]") {
     TestHost h;
     MainWindow w(h);
     CHECK(h.global(Global::Computer) == 0);
-    const gemui::Rect voices = *w.rectOf("modeSel"), st = *w.rectOf("steSt"), ste = *w.rectOf("steSte");
+    const gemui::Rect voices = *w.rectOf("modeSel"), comp = *w.rectOf("compSel");
     const gemui::Rect clock = *w.rectOf("clkSel");
-    CHECK(st.y > voices.bottom());
-    CHECK(clock.y > st.bottom());
-    CHECK(ste.x > st.right());
+    CHECK(comp.y > voices.bottom());
+    CHECK(clock.y > comp.bottom());
+    // The three buttons start together (thirteenth DAW test, item 161, D-370).
+    CHECK(comp.x == voices.x);
+    CHECK(clock.x == voices.x);
     // Band of the row and rows moved down (comparison with the screenshots, D-155).
     const gemui::Rect row = *w.rectOf("computerRow"), below = *w.rectOf("systemBelow");
-    CHECK(row.y == st.y);
+    CHECK(row.y == comp.y);
     CHECK(row.bottom() == clock.y);
     CHECK(below.y == clock.y);
 
+    // A menu button (item 164, D-373): ST or STE, the current one marked.
+    click(w, "compSel");
+    CHECK(labels(w) == std::vector<std::string>{"ST", "STE"});
+    CHECK(menu(w).checked() == 0);
     // STE: host setting (no undo step), notes cut as on a mode change.
-    click(w, "steSte");
+    pick(w, 1);
     CHECK(h.global(Global::Computer) == 1);
     CHECK(h.editor.undo.undoSize() == 0);
-    click(w, "steSt");
+    w.tick(0);
+    click(w, "compSel");
+    CHECK(menu(w).checked() == 1);
+    pick(w, 0);
     CHECK(h.global(Global::Computer) == 0);
 
-    // Modes menu: Computer submenu.
+    // Modes menu: the three modes alone, the machine left to the Computer row (24/10/2026, D-397).
     click(w, "modeSel");
-    const std::vector<std::string> modes = labels(w);
-    REQUIRE(modes.size() == 5);
-    CHECK(modes[3] == "---");
-    CHECK(modes[4] == "Computer");
-    pick(w, 4);
-    CHECK(labels(w) == std::vector<std::string>{"ST", "STE"});
+    CHECK(labels(w).size() == 3);
+    pick(w, 0);
+    click(w, "compSel");
     pick(w, 1);
     CHECK(h.global(Global::Computer) == 1);
 
-    // Options > Sound engine > Computer.
+    // Options > Settings..., then Computer in its window (D-430).
     w.openMenu(3);
     const std::vector<std::string> opts = labels(w);
-    const size_t at = size_t(std::find(opts.begin(), opts.end(), "Sound engine") - opts.begin());
+    const size_t at = size_t(std::find(opts.begin(), opts.end(), "Settings...") - opts.begin());
     REQUIRE(at < opts.size());
     pick(w, int(at));
-    CHECK(labels(w).front() == "Computer");
-    pick(w, 0);
+    REQUIRE(w.settingsWindow().isOpen());
+    CHECK(w.settingsWindow().button("setComputer")->text() == "STE");
+    click(w, "setComputer");
     CHECK(labels(w) == std::vector<std::string>{"ST", "STE"});
     pick(w, 0);
     CHECK(h.global(Global::Computer) == 0);
@@ -254,7 +307,7 @@ TEST_CASE("DMA: DMA tracks in 3 ch mode with the STE (tabs, enforced role, Mixer
     h.values[size_t(paramIndex(Global::VoiceMode))] = 1;
     MainWindow w(h);
     CHECK(w.trackTitle(4) == "5");
-    click(w, "steSte");
+    setComputer(w, 1);
     CHECK(w.trackTitle(3) == "Digi");
     CHECK(w.trackTitle(4) == "DMA1");
     CHECK(w.trackTitle(11) == "DMA8");
@@ -283,14 +336,14 @@ TEST_CASE("DMA: DMA tracks in 3 ch mode with the STE (tabs, enforced role, Mixer
     CHECK(w.rectOf("mixMute0")->y == w.rectOf("mixMute4")->y);  // M and S aligned
 
     // Back to the ST: the DMA track left hands over to the first track, mono Mixer with four strips.
-    click(w, "steSt");
+    setComputer(w, 0);
     CHECK(h.global(Global::FocusTrack) == 1);
     w.tick(0);
     CHECK_FALSE(w.rectOf("mixFad4"));
     CHECK_FALSE(w.rectOf("vuhR"));
 
     // A change of voice mode keeps a focused track that the new mode still has, a DMA track of the STE included.
-    click(w, "steSte");
+    setComputer(w, 1);
     click(w, "modeSel");
     pick(w, 0);  // 16 ch
     click(w, "tab9");
@@ -344,7 +397,8 @@ TEST_CASE("DMA: Edit > Samples menu, greyed out on an ST (fourth DAW test, item 
     CHECK(win.right() <= MainWindow::kWidth);
     CHECK(win.bottom() <= MainWindow::kHeight);
     for (const char* id : {"dmaSlot0", "dmaSlot7", "dmaWave", "dmaLoad", "dmaPlay", "dmaClear", "dmaRate0", "dmaRate3",
-                           "dmaMono", "dmaStereo", "dmaLoop", "dmaRoot", "dmaSign", "dmaGainDown", "dmaGainUp"}) {
+                           "dmaMono", "dmaStereo", "dmaLoop", "dmaRoot", "dmaNormalize", "dmaReverse", "dmaFade",
+                           "dmaSign", "dmaGainDown", "dmaGainUp", "dmaChanL", "dmaChanR"}) {
         INFO(id);
         const auto r = w.rectOf(id);
         REQUIRE(r);
@@ -396,6 +450,95 @@ TEST_CASE("DMA: slot, rate, format, loop, root note, one undo step each", "[ui][
     CHECK(h.dma().slots[3].root == 60);
     for (int i = 0; i < 3; ++i) CHECK(undoKey(w));
     CHECK(h.dma() == ymengine::DmaParams{});
+}
+
+TEST_CASE("DMA: Start and End of the part played, with or without Loop (D-444)", "[ui][dma][undo]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot1");
+    CHECK_FALSE(w.dmaWindow().slider("dmaStart")->enabled());  // empty slot
+    h.editExtras([](plugin::NonParamState& s) { s.dmaSamples[1] = ramp(1000); });
+    w.tick(0);
+    CHECK(w.dmaWindow().slider("dmaStart")->enabled());
+    CHECK(w.dmaWindow().slider("dmaEnd")->enabled());
+    CHECK(w.dmaWindow().startText() == "0");
+    CHECK(w.dmaWindow().endText() == "1000");  // End 0: the end of the sample, shown as its frames
+
+    // Start at the end: brought back to End - 1 (End written); End at the start: brought back to Start + 1.
+    dragSlider(w, "dmaStart", true);
+    CHECK(h.dma().slots[1].start == 999);
+    CHECK(h.dma().slots[1].end == 1000);
+    CHECK_FALSE(h.dma().slots[1].loop);
+    dragSlider(w, "dmaEnd", false);
+    CHECK(h.dma().slots[1].end == 1000);
+    dragSlider(w, "dmaStart", false);
+    CHECK(h.dma().slots[1].start == 0);
+    dragSlider(w, "dmaEnd", false);
+    CHECK(h.dma().slots[1].end == 1);
+    CHECK(w.dmaWindow().endText() == "1");
+    CHECK(h.editor.undo.undoSize() == 3);  // End already at the lowest allowed: no step
+
+    // Mono → stereo keeps the frames, and the part; Clear empties it, undone with the bytes.
+    click(w, "dmaStereo");
+    CHECK(h.dma().slots[1].end == 1);
+    click(w, "dmaClear");
+    CHECK(h.dma().slots[1].start == 0);
+    CHECK(h.dma().slots[1].end == 0);
+    CHECK_FALSE(w.dmaWindow().slider("dmaEnd")->enabled());
+    CHECK(undoKey(w));
+    CHECK(h.dma().slots[1].end == 1);
+    CHECK(h.state.dmaSamples[1].size() == 2000);
+    CHECK(undoKey(w));  // stereo
+    CHECK(undoKey(w));  // End
+    CHECK(h.dma().slots[1].start == 0);
+    CHECK(h.dma().slots[1].end == 1000);
+    CHECK(undoKey(w));  // Start
+    CHECK(h.dma().slots[1].start == 999);
+}
+
+TEST_CASE("DMA: name of the sample in the window, the drawings and the tips; renamed, undone, cleared (D-445)",
+          "[ui][dma][undo]") {
+    TestHost h;
+    h.values[size_t(paramIndex(Global::Computer))] = 1;
+    h.values[size_t(paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Dma);
+    h.state.tracks[0].patch.dmaSlot = 1;
+    h.state.dmaSamples[1] = ramp(1000);
+    h.state.dmaNames[1] = "Pad loop";
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot1");
+    w.tick(0);
+    CHECK(w.rectOf("dmaName"));
+    // The name first in both drawings, in the tips of the slots and in the text of the generator frame.
+    const std::vector<std::string> caps = captions(w);
+    CHECK(std::count_if(caps.begin(), caps.end(), [](const std::string& c) {
+              return c.starts_with("sample 2: Pad loop, 1000 bytes, ");
+          }) == 2);
+    const std::vector<std::string> t = tips(w);
+    CHECK(std::find(t.begin(), t.end(), "Slot 2 \"Pad loop\": 1000 bytes") != t.end());
+    const std::string trackTip =
+        "DMA sample 2 \"Pad loop\": 1000 bytes. This track plays it, tuned from its root note.";
+    CHECK(std::find(t.begin(), t.end(), trackTip) != t.end());
+    CHECK(std::find(t.begin(), t.end(), "Slot 1: empty") != t.end());
+
+    // Renamed (cleaned like a Digidrum name): one step; the same name again: none.
+    click(w, "dmaName");
+    answer(w, "  Strings ");
+    CHECK(h.state.dmaNames[1] == "Strings");
+    CHECK(h.editor.undo.undoSize() == 1);
+    click(w, "dmaName");
+    answer(w, "Strings");
+    CHECK(h.editor.undo.undoSize() == 1);
+    // Clear empties the name with the sample; both come back with the undo.
+    click(w, "dmaClear");
+    CHECK(h.state.dmaNames[1].empty());
+    CHECK(h.state.dmaSamples[1].empty());
+    CHECK(undoKey(w));
+    CHECK(h.state.dmaNames[1] == "Strings");
+    CHECK(h.state.dmaSamples[1].size() == 1000);
+    CHECK(undoKey(w));
+    CHECK(h.state.dmaNames[1] == "Pad loop");
 }
 
 TEST_CASE("DMA: loading, listening, tools and mono-stereo switch; bytes in the undo step", "[ui][dma][undo]") {
@@ -458,6 +601,302 @@ TEST_CASE("DMA: loading, listening, tools and mono-stereo switch; bytes in the u
     CHECK(h.state.dmaSamples[2].empty());
     CHECK(undoKey(w));
     CHECK(h.state.dmaSamples[2].size() == ymengine::kDmaMaxBytes);
+}
+
+TEST_CASE("DMA: Normalize, Reverse and Fade out of the Digidrums; L and R choose the channels of a stereo sample "
+          "(Indus, 26/10/2026, D-450)",
+          "[ui][dma][undo]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot3");
+    // Empty slot: the new tools are greyed out too.
+    for (const char* id : {"dmaNormalize", "dmaReverse", "dmaFade", "dmaChanL"}) click(w, id);
+    CHECK(h.editor.undo.undoSize() == 0);
+
+    // Mono: Reverse turns the whole sample round and mirrors Start and End; L and R are greyed out.
+    h.editExtras([](plugin::NonParamState& s) {
+        s.dmaSamples[3] = {10, 20, 30, 40, 50};
+        s.dma.slots[3].start = 1;
+        s.dma.slots[3].end = 3;
+    });
+    w.tick(0);
+    click(w, "dmaChanL");  // greyed: both channels stay chosen
+    click(w, "dmaReverse");
+    CHECK(h.state.dmaSamples[3] == std::vector<int8_t>{50, 40, 30, 20, 10});
+    CHECK(h.dma().slots[3].start == 2);
+    CHECK(h.dma().slots[3].end == 4);
+    click(w, "dmaNormalize");
+    CHECK(h.state.dmaSamples[3].front() == 127);
+    click(w, "dmaFade");
+    CHECK(h.state.dmaSamples[3].back() < 25);
+    CHECK(h.editor.undo.undoSize() == 3);
+    CHECK(undoKey(w));
+    CHECK(undoKey(w));
+    CHECK(undoKey(w));
+    CHECK(h.state.dmaSamples[3] == std::vector<int8_t>{10, 20, 30, 40, 50});
+    CHECK(h.dma().slots[3].start == 1);
+    CHECK(h.dma().slots[3].end == 3);
+
+    // Stereo, frames (L, R): both channels by default; Reverse keeps left and right in place.
+    h.editExtras([](plugin::NonParamState& s) {
+        s.dma.slots[3] = {};
+        s.dma.slots[3].stereo = true;
+        s.dma.slots[3].start = 1;
+        s.dmaSamples[3] = {1, -1, 2, -2, 3, -3};
+    });
+    w.tick(0);
+    click(w, "dmaReverse");
+    CHECK(h.state.dmaSamples[3] == std::vector<int8_t>{3, -3, 2, -2, 1, -1});
+    CHECK(h.dma().slots[3].start == 0);
+    CHECK(h.dma().slots[3].end == 2);
+    CHECK(undoKey(w));
+
+    // L off: the tools work on the right channel only, and Start and End stay; R cannot go off as well.
+    click(w, "dmaChanL");
+    click(w, "dmaChanR");
+    click(w, "dmaReverse");
+    CHECK(h.state.dmaSamples[3] == std::vector<int8_t>{1, -3, 2, -2, 3, -1});
+    CHECK(h.dma().slots[3].start == 1);
+    CHECK(h.dma().slots[3].end == 0);
+    click(w, "dmaSign");
+    CHECK(h.state.dmaSamples[3][0] == 1);
+    CHECK(h.state.dmaSamples[3][1] == int8_t(-3 ^ 0x80));
+    // L on again with R: both channels.
+    click(w, "dmaChanL");
+    click(w, "dmaSign");
+    CHECK(h.state.dmaSamples[3][0] == int8_t(1 ^ 0x80));
+    CHECK(h.state.dmaSamples[3][1] == -3);
+}
+
+TEST_CASE("DMA: -3 dB after a clipped +3 dB gives the peaks back; each step undone alone (Indus, 26/10/2026, D-453)",
+          "[ui][dma][undo]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot0");
+    const std::vector<int8_t> orig = {100, -100, 50, 1};
+    h.editExtras([&](plugin::NonParamState& s) { s.dmaSamples[0] = orig; });
+    w.tick(0);
+    for (int i = 0; i < 3; ++i) click(w, "dmaGainUp");
+    CHECK(h.state.dmaSamples[0][0] == 127);  // clipped
+    for (int i = 0; i < 3; ++i) click(w, "dmaGainDown");
+    CHECK(h.state.dmaSamples[0] == orig);
+    CHECK(h.editor.undo.undoSize() == 6);  // one step each
+    // Another tool ends the run: the next step starts from its bytes.
+    click(w, "dmaGainUp");
+    click(w, "dmaReverse");
+    click(w, "dmaGainDown");
+    std::vector<int8_t> want = orig;
+    plugin::dmaGain(want, 3);
+    std::reverse(want.begin(), want.end());
+    plugin::dmaGain(want, -3);
+    CHECK(h.state.dmaSamples[0] == want);
+}
+
+TEST_CASE("DMA: with Resample on, a new rate resamples the sample; Start and End follow (Indus, 26/10/2026, D-454)",
+          "[ui][dma][undo]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot1");
+    h.editExtras([](plugin::NonParamState& s) {
+        s.dmaSamples[1] = ramp(1000);
+        s.dma.slots[1].rate = 2;  // 25 kHz
+        s.dma.slots[1].start = 100;
+        s.dma.slots[1].end = 400;
+    });
+    w.tick(0);
+    // Off (default): the rate changes alone, the bytes are kept.
+    REQUIRE(w.dmaWindow().rectOf("dmaResample"));
+    click(w, "dmaRate3");
+    CHECK(h.dma().slots[1].rate == 3);
+    CHECK(h.state.dmaSamples[1] == ramp(1000));
+    // On: kept in the preferences; back to 25 kHz, the sample is resampled to half its frames.
+    click(w, "dmaResample");
+    CHECK(h.prefs["dmaResample"] == "1");
+    const size_t undo = h.editor.undo.undoSize();
+    click(w, "dmaRate2");
+    CHECK(h.dma().slots[1].rate == 2);
+    CHECK(h.state.dmaSamples[1] == plugin::dmaResample(ramp(1000), false, 50066, 25033));
+    CHECK(h.state.dmaSamples[1].size() == 500);
+    CHECK(h.dma().slots[1].start == 50);
+    CHECK(h.dma().slots[1].end == 200);
+    CHECK(h.editor.undo.undoSize() == undo + 1);  // one step, bytes included
+    CHECK(undoKey(w));
+    CHECK(h.state.dmaSamples[1] == ramp(1000));
+    CHECK(h.dma().slots[1].rate == 3);
+    CHECK(h.dma().slots[1].start == 100);
+    // Off again: the next rate keeps the bytes.
+    click(w, "dmaResample");
+    CHECK(h.prefs["dmaResample"] == "0");
+    click(w, "dmaRate0");
+    CHECK(h.state.dmaSamples[1] == ramp(1000));
+}
+
+TEST_CASE("DMA: Fine tunes the slot from -100 to +100 cents, one undo step per gesture, typed too (Indus, 26/10/2026, "
+          "D-452)",
+          "[ui][dma][undo]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot4");
+    REQUIRE(w.dmaWindow().rectOf("dmaFine"));
+    CHECK(w.dmaWindow().fineText() == "0 ct");
+    dragSlider(w, "dmaFine", true);
+    CHECK(h.dma().slots[4].cents == 100);
+    CHECK(w.dmaWindow().fineText() == "+100 ct");
+    CHECK(h.editor.undo.undoSize() == 1);  // one step for the gesture
+    click(w, "dmaFineV");
+    for (int i = 0; i < 8; ++i) key(w, gemui::Key::Backspace);
+    for (char c : std::string("-37")) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    key(w, gemui::Key::Enter);
+    CHECK(h.dma().slots[4].cents == -37);
+    CHECK(w.dmaWindow().fineText() == "-37 ct");
+    CHECK(h.editor.undo.undoSize() == 2);
+    CHECK(h.dma().slots[0].cents == 0);  // the other slots keep theirs
+    CHECK(undoKey(w));
+    CHECK(h.dma().slots[4].cents == 100);
+    CHECK(undoKey(w));
+    CHECK(h.dma().slots[4].cents == 0);
+}
+
+TEST_CASE("DMA: with Loop on, Play loops the sample; Play again, Loop or closing stops it (Indus, 26/10/2026, D-449)",
+          "[ui][dma]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot2");
+    h.editExtras([](plugin::NonParamState& s) { s.dmaSamples[2] = ramp(1000); });
+    w.tick(0);
+    plugin::EngineStatus t;
+    // Loop off: each click plays the part once, Play never lit.
+    click(w, "dmaPlay");
+    click(w, "dmaPlay");
+    CHECK(h.previews == std::vector<int>{2, 2});
+    CHECK(h.stops.empty());
+    CHECK_FALSE(w.dmaWindow().playLit());
+    h.pending = t;  // the part played to its end
+    w.tick(0);
+    // Loop on: Play lit while the engine loops the slot, a second click stops it.
+    click(w, "dmaLoop");
+    REQUIRE(h.dma().slots[2].loop);
+    click(w, "dmaPlay");
+    CHECK(h.previews.size() == 3);
+    t.dmaPreview = 2;
+    h.pending = t;
+    w.tick(0);
+    CHECK(w.dmaWindow().playLit());
+    click(w, "dmaPlay");
+    CHECK(h.stops == std::vector<int>{2});
+    CHECK_FALSE(w.dmaWindow().playLit());
+    t.dmaPreview = -1;
+    h.pending = t;
+    w.tick(0);
+    // Loop switched off: Play goes out (the engine stops the loop itself).
+    click(w, "dmaPlay");
+    t.dmaPreview = 2;
+    h.pending = t;
+    w.tick(0);
+    REQUIRE(w.dmaWindow().playLit());
+    click(w, "dmaLoop");
+    CHECK_FALSE(h.dma().slots[2].loop);
+    CHECK_FALSE(w.dmaWindow().playLit());
+    // Another slot chosen: Play plays that one.
+    click(w, "dmaLoop");
+    h.pending = t;
+    w.tick(0);
+    REQUIRE(w.dmaWindow().playLit());
+    click(w, "dmaSlot3");
+    CHECK_FALSE(w.dmaWindow().playLit());
+    // Closing the window stops the preview.
+    w.dmaWindow().close();
+    CHECK(h.stops == std::vector<int>{2, 2});
+}
+
+TEST_CASE("DMA: named banks in a shared library, as in the Digidrums window (Indus, 26/10/2026, D-462)",
+          "[ui][dma]") {
+    TestHost h;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    w.tick(0);
+    // Under Fine, in the slot column.
+    const auto banksBtn = w.rectOf("dmaBanks"), fine = w.rectOf("dmaFine");
+    REQUIRE(banksBtn);
+    REQUIRE(fine);
+    CHECK(banksBtn->y > fine->y);
+    // Empty library: Load and Delete unavailable.
+    click(w, "dmaBanks");
+    CHECK(labels(w) == std::vector<std::string>{"Save bank...", "Load bank", "---", "Delete bank"});
+    CHECK(menu(w).items()[1].disabled);
+    CHECK(menu(w).items()[3].disabled);
+    pick(w, 0);
+    h.editExtras([](plugin::NonParamState& s) {
+        s.dmaSamples[0] = ramp(400);
+        s.dmaNames[0] = "Pad";
+        s.dma.slots[0].stereo = true;
+        s.dma.slots[0].rate = 1;
+    });
+    w.tick(0);
+    answer(w, "Set A");
+    REQUIRE(w.dmaWindow().banks().size() == 1);
+    CHECK(w.dmaWindow().banks()[0].name == "Set A");
+    CHECK(w.dmaWindow().banks()[0].samples[0].size() == 400);
+
+    // Same name: replaced; another name: added.
+    h.editExtras([](plugin::NonParamState& s) { s.dmaSamples[1] = ramp(10); });
+    w.tick(0);
+    w.dmaWindow().saveBank("Set A");
+    w.dmaWindow().saveBank("Set B");
+    REQUIRE(w.dmaWindow().banks().size() == 2);
+    CHECK(w.dmaWindow().banks()[0].samples[1].size() == 10);
+
+    // Reloading a bank: confirmation, then the eight samples replaced (no undo step), a looping preview stopped.
+    h.editExtras([](plugin::NonParamState& s) {
+        s.dmaSamples = {};
+        s.dmaNames = {};
+        s.dma = {};
+    });
+    w.tick(0);
+    plugin::EngineStatus t;
+    t.dmaPreview = 0;
+    h.pending = t;
+    w.tick(0);
+    const size_t undoBefore = h.editor.undo.undoSize();
+    click(w, "dmaBanks");
+    pick(w, 1);  // Load bank submenu
+    CHECK(labels(w) == std::vector<std::string>{"Set A", "Set B"});
+    pick(w, 0);
+    REQUIRE(w.desktop().hasModal());
+    key(w, gemui::Key::Escape);  // Cancel
+    CHECK(h.state.dmaSamples[0].empty());
+    w.dmaWindow().loadBank("Set A");
+    CHECK(h.state.dmaSamples[0] == ramp(400));
+    CHECK(h.state.dmaNames[0] == "Pad");
+    CHECK(h.dma().slots[0].stereo);
+    CHECK(h.dma().slots[0].rate == 1);
+    CHECK(h.state.dmaSamples[1] == ramp(10));
+    CHECK(h.editor.undo.undoSize() == undoBefore);
+    CHECK(h.stops == std::vector<int>{0});
+
+    // Delete.
+    w.dmaWindow().deleteBank("Set A");
+    REQUIRE(w.dmaWindow().banks().size() == 1);
+    CHECK(w.dmaWindow().banks()[0].name == "Set B");
+
+    // Unreadable file: nothing is overwritten, an alert says so; Save is greyed.
+    h.library = "{ not json";
+    w.dmaWindow().saveBank("Set C");
+    CHECK(h.library == "{ not json");
+    CHECK(w.desktop().hasModal());
+    key(w, gemui::Key::Enter);
+    click(w, "dmaBanks");
+    CHECK(menu(w).items()[0].disabled);
 }
 
 TEST_CASE("DMA: window reopened with the session", "[ui][dma]") {

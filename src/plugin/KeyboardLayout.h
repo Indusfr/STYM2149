@@ -1,4 +1,4 @@
-// STYM2149 — plugin: layout of the system keyboard, for Auto in Options > Keyboard layout (D-215)
+// STYM2149 — plugin: layout of the system keyboard, for Auto in Settings > Keyboard layout (D-215)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

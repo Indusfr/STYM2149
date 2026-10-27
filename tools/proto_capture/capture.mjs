@@ -6,9 +6,9 @@
 // Needs Playwright and its Chromium (NODE_PATH, or PLAYWRIGHT_MODULE pointing to the playwright module).
 //
 // Each scene puts the prototype in a state (functions of the page), then captures the whole page in a browser
-// window the size of the editor's desktop: 1272 × 944 px (D-067), the main window (980 × 902) centred 18 px from
-// the top. The alert boxes (centred at 38 % of the height) and the menus (kept inside the page) thus fall at the
-// same places as in the plugin.
+// window the size of the editor's desktop: 1344 × 984 px (1272 × 944, D-067, larger by a desktop icon, D-461), the
+// main window (980 × 902) centred 18 px from the top. The alert boxes (centred at 38 % of the height) and the menus
+// (kept inside the page) thus fall at the same places as in the plugin.
 // The text is rendered without antialiasing: the prototype asks for it (-webkit-font-smoothing:none), but Chromium
 // on Linux only applies it with a fontconfig configuration without antialiasing (fonts-noaa.conf, passed to the
 // browser). SVG and canvas drawings stay antialiased, as in the prototype.
@@ -30,7 +30,7 @@ async function loadPlaywright() {
   return createRequire(import.meta.url)('playwright');
 }
 
-const VIEW = { width: 1272, height: 944 };
+const VIEW = { width: 1344, height: 984 };
 
 // Scenes: name → code run in the page (functions and global variables of the prototype).
 const SCENES = {

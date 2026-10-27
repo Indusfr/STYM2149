@@ -12,6 +12,7 @@
 #include "../../src/ymio/src/Asm68k.h"
 #include "plugincore/Mapping.h"
 #include "plugincore/RegisterExport.h"
+#include "plugincore/RegisterFiles.h"
 #include "ymio/Sndh.h"
 #include "ymio/SndhWriter.h"
 
@@ -495,6 +496,46 @@ TEST_CASE("SNDH of a captured pattern: registers, SID and DMA replayed by AtariA
     }
     CHECK(sid >= 3);
     CHECK((dmaFirst == 75 || dmaFirst == 76));
+}
+
+// The part of a DMA sample from Start to End (D-444): the capture starts it at Start, the file stops it at End.
+TEST_CASE("SNDH of a project: the DMA sample plays from Start to End (D-444)", "[sndhwriter][regexport]") {
+    using namespace stym::plugin;
+    ParamValues v = defaultValues();
+    NonParamState x;
+    v[size_t(paramIndex(Global::VoiceMode))] = 1;
+    v[size_t(paramIndex(Global::FreeTempo))] = 120;
+    v[size_t(paramIndex(Global::Computer))] = 1;  // STE
+    v[size_t(paramIndex(4, Track::On))] = 1;
+    x.seq.cur().steps = 16;
+    x.seq.cur().edit(4).pat[0] = 0;  // DMA 1 at step 0
+    std::vector<int8_t> pcm(3000);
+    for (size_t i = 0; i < pcm.size(); ++i) pcm[i] = int8_t(int(i % 64) * 2 - 63);
+    x.dmaSamples[0] = pcm;
+    x.dma.slots[0].loop = false;
+    x.dma.slots[0].root = 48;  // the note of the step: the bytes at their rate, each one a new DAC level
+    x.dma.slots[0].start = 1000;
+    x.dma.slots[0].end = 1400;
+    const auto c = captureRegisters(OfflineRender::Source::Pattern, v, x);
+    REQUIRE(c);
+    REQUIRE_FALSE(c->dma.empty());
+    REQUIRE(c->dma[0].on);
+    CHECK(c->dma[0].start == 1000);
+    REQUIRE(c->dma[0].step == 1.0f);
+
+    const auto f = exportSongRegisters(RegisterFormat::Sndh, v, x, RegisterFileOptions{});
+    REQUIRE(f);
+    INFO(f->error);
+    REQUIRE(f->error.empty());
+    const std::vector<Played> p = play(load(f->bytes), 2, 10);  // subsong 2: the current pattern
+    std::vector<int16_t> dac;
+    for (const Played& q : p) dac.insert(dac.end(), q.dac.begin(), q.dac.end());
+    REQUIRE(dac.size() >= 400);
+    for (size_t i = 0; i < 400; ++i) {
+        CAPTURE(i);
+        CHECK(dac[i] == pcm[1000 + i] * 64);
+    }
+    for (size_t i = 400; i < dac.size(); ++i) CHECK(dac[i] == 0);  // stopped at End
 }
 
 TEST_CASE("SNDH of a captured pattern: Zxx commands in the sync byte, address in A0 (D-150)",

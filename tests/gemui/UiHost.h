@@ -12,6 +12,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -42,7 +43,7 @@ public:
     std::vector<Command> commands;    // sequencer commands
     int quits = 0;
     std::map<std::string, std::string, std::less<>> prefs;
-    std::string patches, digidrums;
+    std::string patches, digidrums, dmaBanks;
     std::string systemLang = "en";       // systemLanguage
     std::vector<TextFile> languages;     // .po files, the user's and the installed ones (D-283)
     std::vector<TextFile> folderFiles;   // files written when the folder was last opened
@@ -96,6 +97,8 @@ public:
     void setPatchLibrary(const std::string& json) override { patches = json; }
     std::string digidrumLibrary() const override { return digidrums; }
     void setDigidrumLibrary(const std::string& json) override { digidrums = json; }
+    std::string dmaLibrary() const override { return dmaBanks; }
+    void setDmaLibrary(const std::string& json) override { dmaBanks = json; }
     Recorder recorder() const override { return rec; }
     void clearRecording() override { rec.takeFrames = 0; }
 
@@ -186,6 +189,23 @@ inline void alertButton(pluginui::MainWindow& w, size_t index) {
     REQUIRE(a);
     REQUIRE(index < a->buttonCount());
     press(w, centre(a->button(index).bounds()));
+}
+
+// A setting of the Settings window (Options > Settings..., D-430) as the Options submenu that held it: its label,
+// greyed out with its button's tooltip as the reason, the entries of its menu and the checked one. Opens the window.
+inline gemui::MenuItem setting(pluginui::MainWindow& w, std::string_view id) {
+    pluginui::SettingsWindow& s = w.settingsWindow();
+    if (!s.isOpen()) s.show();
+    s.refresh();
+    const gemui::Button* b = s.button(id);
+    REQUIRE(b);
+    gemui::MenuItem m;
+    m.label = std::string(pluginui::SettingsWindow::labelOf(id));
+    m.disabled = !b->enabled();
+    if (m.disabled) m.why = b->tip();
+    m.subMarks = true;
+    m.sub = s.items(id, m.subCur);
+    return m;
 }
 
 }  // namespace stym::ui_testing

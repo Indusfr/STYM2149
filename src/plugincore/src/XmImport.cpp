@@ -7,6 +7,7 @@
 #include <cmath>
 #include <map>
 
+#include "plugincore/Digidrum.h"
 #include "plugincore/DmaSample.h"
 #include "plugincore/Instruments.h"
 #include "plugincore/Mapping.h"
@@ -546,6 +547,9 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         dst.patch.dmaSlot = int8_t(k);
         state.dma.slots[k] = {builds[k].rate, false, 60, builds[k].loop};  // mono, root note 60
         state.dmaSamples[k] = std::move(builds[k].bytes);
+        // Name of the slot (D-445): that of the sample, otherwise that of the instrument.
+        state.dmaNames[k] = cleanDigidrumName(ins.samples[size_t(picks[k].sample)].name);
+        if (state.dmaNames[k].empty()) state.dmaNames[k] = cleanDigidrumName(ins.name);
     }
     state.global.timing = r.ticks ? ymengine::SeqTiming::Ticks : ymengine::SeqTiming::Bpm;
     if (r.ticks) {

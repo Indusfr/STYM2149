@@ -1,5 +1,5 @@
 // STYM2149 — Step Sequencer window (M5): All button of the gate (D-134), Gate slider, Clock selector (D-188);
-// Options > Sound engine > Quantize to VBL (D-111).
+// Settings > Quantize to VBL (D-111, D-430); moved up when it grows past the bottom of the desktop (D-458).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -170,13 +170,12 @@ TEST_CASE("Step Sequencer: Clock on MIDI ext, BPM slider greyed out (D-188)", "[
     CHECK(h.v("freeTempo") == 60.0f);
 }
 
-TEST_CASE("Options > Sound engine > Quantize to VBL, state setting (D-111)", "[ui][seq]") {
+TEST_CASE("Settings > Quantize to VBL, state setting (D-111, D-430)", "[ui][seq]") {
     TestHost h;
     MainWindow w(h);
+    w.settingsWindow().show();
     auto choose = [&](const std::string& value) {
-        w.openMenu(3);  // Options
-        pick(w, "Sound engine");
-        pick(w, "Quantize to VBL");
+        click(w, "setQuantize");
         CHECK(labels(w) == std::vector<std::string>{"Off", "On"});
         pick(w, value);
         w.tick(0);
@@ -200,10 +199,46 @@ TEST_CASE("Step Sequencer: right click on the metronome, its volume by slider (D
     REQUIRE(w.desktop().hasPopups());
     CHECK_FALSE(h.state.global.metronome);  // the right click does not switch it on
     CHECK(h.state.global.metronomeLevel == 100);
-    // 96 px vertical slider below the button: its bottom is worth 0, its middle about half.
-    press(w, {m.x + 2 + 4 + 2 + 8, m.bottom() + 2 + 8 + 95});
+    // 96 px vertical slider under the button, or above it near the bottom of the desktop: its bottom is worth 0, its
+    // middle about half.
+    REQUIRE(w.desktop().topPopup());
+    const gemui::Rect pb = w.desktop().topPopup()->bounds();
+    CHECK(pb.x == m.x);
+    CHECK((pb.y == m.bottom() + 2 || pb.bottom() == m.y - 2));
+    press(w, {pb.x + 2 + 4 + 2 + 8, pb.y + 8 + 95});
     CHECK(h.state.global.metronomeLevel == 0);
-    press(w, {m.x + 2 + 4 + 2 + 8, m.bottom() + 2 + 8 + 48});
+    press(w, {pb.x + 2 + 4 + 2 + 8, pb.y + 8 + 48});
     CHECK(h.state.global.metronomeLevel >= 45);
     CHECK(h.state.global.metronomeLevel <= 55);
+}
+
+TEST_CASE("Step Sequencer: grown past the bottom of the desktop, the window moves up until its bottom shows (D-458)",
+          "[ui][seq]") {
+    TestHost h;
+    MainWindow w(h);
+    pluginui::SeqWindow& s = w.sequencer();
+    s.show();
+    // Moved low by its bar: its bottom on the desktop's, never below (Indus, 26/10/2026, D-460).
+    const gemui::Rect b0 = s.bounds();
+    const int low = MainWindow::kHeight - b0.h;
+    s.place({double(b0.x), double(MainWindow::kHeight - b0.h / 2), double(b0.w), double(b0.h)});
+    s.refresh();
+    REQUIRE(s.bounds().y == low);
+    REQUIRE(s.bounds().h == b0.h);
+    // The overview opens: taller, the window moves up, its bottom on the desktop's.
+    click(w, "seqOver");
+    REQUIRE(w.rectOf("overMap"));
+    const gemui::Rect b1 = s.bounds();
+    CHECK(b1.h > b0.h);
+    CHECK(b1.bottom() == MainWindow::kHeight);
+    // It closes: the window gets shorter where it stands.
+    click(w, "seqOver");
+    CHECK_FALSE(w.rectOf("overMap"));
+    CHECK(s.bounds().y == b1.y);
+    CHECK(s.bounds().h == b0.h);
+    // Never above the menu bar: at the top of the work area, it grows downwards.
+    s.place({double(b0.x), double(w.desktop().workTop()), double(b0.w), double(b0.h)});
+    s.refresh();
+    click(w, "seqOver");
+    CHECK(s.bounds().y == w.desktop().workTop());
 }

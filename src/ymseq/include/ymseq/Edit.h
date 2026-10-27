@@ -71,6 +71,10 @@ struct BlockClip {
     Lane data;               // steps 0..n-1
 };
 
+// Start of the note held at step c of a lane (0-255): c for a root, the step of the root whose ties reach c, -1
+// otherwise. LaneEditor::noteStart within the length of the track.
+int noteStartOf(const Lane& lane, int c) noexcept;
+
 // The editing rules of one track, with the context of the current channel. Short-lived, on the message thread: the
 // Step Sequencer builds one for each change (SeqWindow::editLane, on the lane that Pattern::edit returns inside
 // Host::editExtras) or to read a track. It keeps a reference to the lane and a copy of the context. Steps (s, c, a, at)
@@ -189,6 +193,17 @@ private:
     EditContext c_;
 };
 
+// Step s of a grid whose steps are multiplied by num / den (D-448), rounded half up: a resolution change that keeps
+// the time of the notes (1/16 to 1/8: num 1, den 2).
+inline int fitStep(int s, int num, int den) noexcept { return (2 * s * num + den) / (2 * den); }
+
+// The track at a resolution num / den times finer (D-448), the notes keeping their time: the root at step s moves to
+// fitStep(s) with the rows of its step and ends at fitStep of its end (one step at least, before the next note); a
+// chord voice the same. When two notes land on the same step, the first one stays and the other is dropped with its
+// step; the rows of the steps without a root then move the same way, into the cells still empty. What lands beyond
+// the 256 steps is dropped.
+Lane fitLane(const Lane& src, int num, int den);
+
 // Rows that follow a root moved in the grid, as with Copy and Paste (VOL, SRC, GEN, INS, SLD, CRV); a drum hit also
 // takes its OCT and TON. Order of Moving::under.
 inline constexpr std::array<Row, 8> kNoteRows = {Row::Vol,   Row::Mix, Row::Fx,  Row::Ins,
@@ -196,12 +211,13 @@ inline constexpr std::array<Row, 8> kNoteRows = {Row::Vol,   Row::Mix, Row::Fx, 
 inline constexpr int kDrumNoteRows = 8, kMelodicNoteRows = 6;
 
 // Rows copied by the track rotation (rotateLane): not PAN, RTG, CND, CRV, TON nor the chord voices. INS (M6) rotates
-// with GEN (D-147), the CMD rows with their line (D-150, D-330, D-338), except the retired Xyz and Pxy (D-340, D-344);
-// the BPM row belongs to the pattern (twelfth DAW test, item 150).
-inline constexpr std::array<Row, 27> kRotatedRows = {
+// with GEN (D-147), the CMD rows with their line (D-150, D-330, D-338; Gxx with VOL, Kxx and Qxx with their slides,
+// D-393, D-394), except the retired Xyz and Pxy (D-340, D-344); the BPM row belongs to the pattern (twelfth DAW test,
+// item 150).
+inline constexpr std::array<Row, 30> kRotatedRows = {
     Row::Pat, Row::Tie, Row::Slide, Row::Afl, Row::Vol, Row::Mix, Row::Fx, Row::Slt, Row::Cut, Row::Oct, Row::Gat,
     Row::Ins, Row::CmdSpeed, Row::CmdRetrig, Row::CmdSync, Row::CmdVibrato, Row::CmdVolSlide,
     Row::CmdDelay, Row::CmdCut, Row::CmdEnvSlide, Row::CmdNoiseSlide, Row::CmdShape, Row::CmdOffset, Row::CmdFine,
-    Row::CmdLfo, Row::CmdMod, Row::CmdArpeggiator};
+    Row::CmdLfo, Row::CmdMod, Row::CmdArpeggiator, Row::CmdVolGlide, Row::CmdEnvCurve, Row::CmdNoiseCurve};
 
 }  // namespace stym::ymseq

@@ -45,13 +45,15 @@ enum class SeqLane : uint8_t {
     Lfo, Mod, Smp, Tun
 };
 inline constexpr int kSeqLanes = 26;
-// Order on screen: ENV under GEN; VIB, LFO, MOD and TUN under ARP; DLY, CUT and SMP under GAT; BPM, shared by the
-// tracks, under VOL behind a separator (item 150).
+// Order on screen, by what the rows do to the note (thirteenth DAW test, item 166, D-375): its pitch (OCT, TON, TUN);
+// its sound (INS, GEN, then SRC, ENV and SMP, which GEN decides); its modulations (ARP, VIB, LFO, MOD); its slide
+// (SLD, CRV); its timing in the step (CND, DLY, RTG, GAT, HLD, CUT); the other commands (CMD); its place in the mix
+// (PAN, VOL); then BPM, shared by the tracks, under VOL behind a separator (item 150).
 inline constexpr std::array<SeqLane, kSeqLanes> kSeqLaneOrder = {
-    SeqLane::Slt, SeqLane::Oct, SeqLane::Ton, SeqLane::Ins, SeqLane::Cmd, SeqLane::Mix, SeqLane::Fx,
-    SeqLane::Env, SeqLane::Afl, SeqLane::Vib, SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun, SeqLane::Tie,
-    SeqLane::Cut, SeqLane::Slide, SeqLane::Slc, SeqLane::Gat, SeqLane::Dly, SeqLane::NoteCut, SeqLane::Smp,
-    SeqLane::Pnr, SeqLane::Rtg, SeqLane::Cnd, SeqLane::Vol, SeqLane::Bpm};
+    SeqLane::Slt, SeqLane::Oct, SeqLane::Ton, SeqLane::Tun,   SeqLane::Ins,  SeqLane::Fx,  SeqLane::Mix,
+    SeqLane::Env, SeqLane::Smp, SeqLane::Afl, SeqLane::Vib,   SeqLane::Lfo,  SeqLane::Mod, SeqLane::Slide,
+    SeqLane::Slc, SeqLane::Cnd, SeqLane::Dly, SeqLane::Rtg,   SeqLane::Gat,  SeqLane::Tie, SeqLane::Cut,
+    SeqLane::NoteCut, SeqLane::Cmd, SeqLane::Pnr, SeqLane::Vol, SeqLane::Bpm};
 // Model row carried by a control row.
 ymseq::Row laneRow(SeqLane l) noexcept;
 // TUN: cents typed and shown, two digits and a sign in the cell (the engine takes ±100).
@@ -66,14 +68,15 @@ struct SeqStepTarget {
 
 // .seqgrid: 38 px label column then 64 columns of 16 px, 1 px gap on a black background, 2 px line; header of the
 // step numbers (13 px, 3 px bottom rule), 13 note rows of 16 px (8 for a percussion track), 4 px separator, control
-// rows of 13 px and VOL of 44 px.
+// rows of 13 px and VOL of 44 px. The gaps between the columns and between the rows are 2 px (Indus, 26/10/2026,
+// D-458).
 class SeqGrid : public gemui::Widget {
 public:
     static constexpr int kCols = 64;  // NCOLS
     static constexpr int kRows = 13;  // note rows
-    static constexpr int kBorder = 2, kGap = 1, kLabelW = 38, kCellW = 16;
+    static constexpr int kBorder = 2, kGap = 2, kLabelW = 38, kCellW = 16;
     static constexpr int kHeaderH = 13, kNoteH = 16, kSepH = 4, kLaneH = 13, kVolH = 44;
-    static constexpr int kWidth = 2 * kBorder + kLabelW + kCols * (kCellW + kGap);  // 1130
+    static constexpr int kWidth = 2 * kBorder + kLabelW + kCols * (kCellW + kGap);  // 1194
 
     explicit SeqGrid(SeqWindow& win) : w_(win) {}
 
@@ -114,6 +117,7 @@ public:
     const std::string& laneText(int col, SeqLane lane) const { return lanes_[size_t(lane)][size_t(col)].text; }
     // Control cell greyed and crossed: its value cannot act there (item 145).
     bool laneCrossed(int col, SeqLane lane) const { return lanes_[size_t(lane)][size_t(col)].nope; }
+    bool laneBlocked(int col, SeqLane lane) const { return lanes_[size_t(lane)][size_t(col)].blocked; }
 
     void paint(gemui::Painter& p) override;
     bool acceptsMouse() const noexcept override { return true; }
@@ -168,6 +172,9 @@ private:
         std::string text;
         bool on = false, dim = false, sel = false, qtr = false, dead = false;
         bool nope = false;  // a value that cannot act there: greyed and crossed (twelfth DAW test, item 145, D-354)
+        // Empty, and nothing written there could act (thirteenth DAW test, item 165, D-374): crossed, a click opens
+        // nothing.
+        bool blocked = false;
     };
     struct StepNum {
         std::string text;
@@ -217,6 +224,7 @@ private:
     std::array<std::array<NoteCell, kRows>, kCols> cells_{};
     std::array<std::array<LaneCell, kCols>, kSeqLanes> lanes_{};
     std::array<int, kCols> vol_{};
+    std::array<int, kCols> volTo_{};  // Gxx (D-393): VOL of the next step that the step glides to, -1: no glide
     std::array<StepNum, kCols> stepNums_{};
     std::array<std::string, kRows> noteLabels_{};
     std::array<bool, kRows> labelDis_{};
@@ -302,7 +310,7 @@ private:
 // grey, percussion band, blue frame of the view, playhead; a click or a drag moves the view.
 class SeqOverview : public gemui::Widget {
 public:
-    static constexpr int kCanvasW = SeqGrid::kWidth - 4, kCanvasH = 104;  // 38 + 64 × 17, inside a 2 px line
+    static constexpr int kCanvasW = SeqGrid::kWidth - 4, kCanvasH = 104;  // 38 + 64 × 18, inside a 2 px line
     explicit SeqOverview(SeqWindow& win) : w_(win) {}
     void paint(gemui::Painter& p) override;
     bool acceptsMouse() const noexcept override { return true; }
@@ -320,7 +328,9 @@ private:
 // holds the undo entry points of the whole editor (undo, redo, applyUndo).
 class SeqWindow : public gemui::FloatWindow {
 public:
-    static constexpr int kX = 36, kY = 96, kW = 1200;  // #seqWin: left 36, top 96, 112 + 64 × 17 px
+    // #seqWin: top 96, 112 + 64 × 17 px wide; 64 px wider with the 2 px gaps of the grid (D-458), so 4 px from the
+    // left of the desktop instead of 36.
+    static constexpr int kX = 4, kY = 96, kW = SeqGrid::kWidth + 70;
 
     explicit SeqWindow(MainWindow& main);
 
@@ -372,6 +382,7 @@ private:
     friend class SeqGrid;
     friend class SeqOverview;
     friend class SongWindow;
+    friend class StepSoundWindow;
 
     // Reading.
     const plugin::NonParamState& st() const noexcept;
@@ -411,10 +422,28 @@ private:
     bool modShown() const;
     bool smpShown() const;
     bool tunShown() const;
+    bool crvShown() const;  // an SLD cell lit, or a curve written (D-387)
     bool ownRowShown(ymengine::SeqCmd k) const;  // the preference, or a command of kind k written in the track
     bool written(ymengine::SeqCmd k) const;      // a command of kind k written in the track
     bool envPlays() const;  // Env source, Sync Buzzer, an Env entry of SRC or a Sync Buzzer step of GEN
+    // The sound of step s as the engine plays it (thirteenth DAW test, item 165, D-374): the generator of its note (of
+    // a note written there on a rest step), and how the note of the track goes through the step.
+    struct StepSound {
+        int gen = 0;               // ymengine::Generator
+        bool attack = false;       // a note starts there (root or chord voice)
+        bool held = false;         // a note started earlier sounds on (TIE, or the steps of a slide)
+        bool slid = false;         // held while it slides to the next note (SLD): only VOL acts
+        bool slideTarget = false;  // a root that a slide reaches: no new attack
+        bool continues = false;    // the note goes on after the step (TIE, or SLD towards the next note)
+        int ins = 0;               // instrument of the note (INS, 1 to 32), 0 for the sound of the track
+    };
+    StepSound stepSound(int s) const;
+    // A slide of the CMD box (Axy, Bxy, Nxy) written at step s can move a note of the track (D-386).
+    bool slideActs(ymengine::SeqCmd kind, int s) const;
+    // What the sound of step s forbids to a row, written or not (item 165: the cell is crossed even empty).
+    std::string stepBlocks(SeqLane lane, int s) const;
     // Why the value of a row at step s cannot act there (item 145: the cell is greyed and crossed); empty if it can.
+    // An empty cell gets the reasons of stepBlocks only.
     std::string cantAct(SeqLane lane, int s) const;
     // Replay ticks of a line at the current tempo (Ticks timing: ticks per line; BPM timing: the line at the tempo of
     // the sequencer), at least 1.
@@ -427,6 +456,8 @@ private:
     int beatSteps() const noexcept;
     int barSteps() const noexcept;
     int figSteps() const noexcept;
+    // Note length written: the one chosen, or Step while it is not a whole number of steps of the resolution (D-425).
+    int inputFigure() const noexcept;
     bool latin() const;
     std::string noteName(int pitchClass) const;
     std::string absName(int absNote) const;
@@ -439,6 +470,9 @@ private:
     void edit(const std::function<void(plugin::NonParamState&)>& fn);
     // Ticks rate (M6, D-149): Resolution menu, input boxes of the speed and the groove.
     void resolutionMenu();
+    // Resolution i chosen (BPM rate); with notes in the patterns, an alert first asks whether they fit the new grid
+    // (D-448).
+    void setResolution(int i);
     void askSpeed();
     void askGroove();
     // CMD row (M6, D-150): box of the commands of step s (CmdBox, tenth DAW test: D-330).
@@ -507,6 +541,9 @@ private:
     void openEuclid();
     void openTrackLength();
     void openVol(const gemui::Rect& cell, int s);   // openVolMenu
+    // Right click on a GEN, SRC or ENV cell that holds a value: the window of the settings it brings into play
+    // (24/10/2026, D-392); false for an empty cell (the right button erases, as before).
+    bool openStepSound(SeqLane row, int s);
     void openGate(const gemui::Rect& cell, int s);  // gatPopup
     void openPan(const gemui::Rect& cell, int s);   // panPopup
     // Value of a command with a row of its own (DLY, CUT, SMP, TUN, the restart tick of ENV): slider, field, None and

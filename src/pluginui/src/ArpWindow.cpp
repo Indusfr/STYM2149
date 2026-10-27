@@ -421,6 +421,10 @@ void ArpWindow::layout() {
         return it;
     };
 
+    // Rate and Steps: one label column, so that their sliders start together (thirteenth DAW test, item 162, D-371).
+    const double sliderLabW = std::max(labRate_.naturalWidth(), labSteps_.naturalWidth());
+    auto sliderLab = [sliderLabW](gemui::Label& l) { return FlexItem{&l, sliderLabW, 16}; };
+
     // Content width (width:max-content): the widest of the rows shown, sliders at their default width; in Table mode,
     // the grid. Each row: its items and kGap between them.
     const double rateValW = ratev_.naturalWidth() + hz_.naturalWidth();
@@ -431,10 +435,10 @@ void ArpWindow::layout() {
         contentW = std::max(contentW, labMode_.naturalWidth() + kGap + mode_.naturalWidth() + kGap +
                                           sync_.naturalWidth() + divW);
         if (!divided)
-            contentW = std::max(contentW, labRate_.naturalWidth() + kGap + kSliderW + kGap + rateValW + kGap +
+            contentW = std::max(contentW, sliderLabW + kGap + kSliderW + kGap + rateValW + kGap +
                                               track_.naturalWidth() + kGap + land_.naturalWidth());
         if (table) {
-            contentW = std::max({contentW, labSteps_.naturalWidth() + kGap + kSliderW + kGap + lenv_.naturalWidth(),
+            contentW = std::max({contentW, sliderLabW + kGap + kSliderW + kGap + lenv_.naturalWidth(),
                                  chord_.naturalWidth(), double(ArpGrid::kWidth), gridHint_.naturalWidth()});
         } else {
             contentW = std::max(contentW, labOct_.naturalWidth() + kGap + group(octs_));
@@ -458,7 +462,8 @@ void ArpWindow::layout() {
         }
         y += flexRow(x, y, contentW, rm) + kRowMargin;
         if (!divided) {
-            std::vector<FlexItem> rr = {lab(labRate_), slider(rate_), {nullptr, rateValW, 16}, btn(track_), btn(land_)};
+            std::vector<FlexItem> rr = {sliderLab(labRate_), slider(rate_), {nullptr, rateValW, 16}, btn(track_),
+                                        btn(land_)};
             const double h = flexRow(x, y, contentW, rr);
             ratev_.setBox({rr[2].box.x, rr[2].box.y, ratev_.naturalWidth(), 16});
             hz_.setBox({rr[2].box.x + ratev_.naturalWidth(), rr[2].box.y, hz_.naturalWidth(), 16});
@@ -477,7 +482,7 @@ void ArpWindow::layout() {
         } else {
             // #arpTablePanel: Steps (16 px row), Chord... (.btngroup without margin), grid (margin-top 8), .hint
             // (margin-top 6); no margin under the panel.
-            std::vector<FlexItem> rs = {lab(labSteps_), slider(len_), {&lenv_, lenv_.naturalWidth(), 16}};
+            std::vector<FlexItem> rs = {sliderLab(labSteps_), slider(len_), {&lenv_, lenv_.naturalWidth(), 16}};
             y += flexRow(x, y, contentW, rs) + kRowMargin;
             chord_.setBox({x, y, chord_.naturalWidth(), double(chord_.naturalHeight())});
             y += chord_.naturalHeight() + 8;

@@ -19,8 +19,29 @@ msgstr "16 ch: dezesseis canais com pan e polifonia. 3 ch: o YM autêntico, trê
 msgid "4-bit values matched to the chip's measured output levels (the sample keeps its shape)"
 msgstr "Valores de 4 bits ajustados aos níveis de saída medidos do chip (a amostra mantém a forma)"
 
+msgid "A DMA note plays its sample: no square, no noise, no envelope"
+msgstr "Uma nota DMA toca o seu sample: sem quadrada, sem ruído, sem envelope"
+
+msgid "A DMA track has no envelope: the Tm column moves its sample"
+msgstr "Uma faixa DMA não tem envelope: a coluna Tm move sua amostra"
+
+msgid "A DMA track has no square: the Tm column moves its sample"
+msgstr "Uma faixa DMA não tem quadrada: a coluna Tm move sua amostra"
+
+msgid "A DMA track plays its sample: no square, no noise, no 4-bit volume, no envelope"
+msgstr "Uma faixa DMA toca o seu sample: sem quadrada, sem ruído, sem volume de 4 bits, sem envelope"
+
 msgid "A SID Voice writes its own volumes: the envelope is not used"
 msgstr "Uma SID Voice escreve os seus próprios volumes: o envelope não é usado"
+
+msgid "A drum hit plays its own sound: no source, no envelope"
+msgstr "Um golpe de percussão toca o seu próprio som: sem fonte, sem envelope"
+
+msgid "A held DMA or drum note keeps its sound: GEN acts on the notes that start"
+msgstr "Uma nota DMA ou de percussão sustentada mantém o seu som: GEN age sobre as notas que começam"
+
+msgid "A held note keeps the instrument it started with"
+msgstr "Uma nota sustentada mantém o instrumento com que começou"
 
 msgid "A loop plays nothing: it has no tempo"
 msgstr "Um loop não toca nada: não tem andamento"
@@ -28,8 +49,14 @@ msgstr "Um loop não toca nada: não tem andamento"
 msgid "A second euclidean figure raises the volume of those hits"
 msgstr "Uma segunda figura euclidiana aumenta o volume dessas batidas"
 
+msgid "A slide keeps the instrument of the note it starts from"
+msgstr "Um deslizamento mantém o instrumento da nota de onde parte"
+
 msgid "ARP: switch the arpeggiator of the track on or off from this step"
 msgstr "ARP: liga ou desliga o arpejador da faixa a partir deste passo"
+
+msgid "Aftertouch: what the pressure of the keys drives (of the channel or of each note), with the wheel's choices"
+msgstr "Aftertouch: o que a pressão das teclas controla (do canal ou de cada nota), com as opções da roda"
 
 msgid "Amount of noise mixed with the tone (0 to 100)"
 msgstr "Quantidade de ruído misturada ao tom (0 a 100)"
@@ -94,8 +121,8 @@ msgstr "Banco {1}: oito padrões ({2}1 a {3}8). Shift+{4} pelo teclado."
 msgid "Bar length: accents and metronome follow it"
 msgstr "Duração do compasso: os acentos e o metrônomo a seguem"
 
-msgid "Buzzer Slide (Bxy): the envelope goes up x or down y 1/16 semitones per replay tick, until B00"
-msgstr "Deslizamento de buzzer (Bxy): o envelope sobe x ou desce y dezesseis avos de semitom por tick de replay, até B00"
+msgid "Buzzer Slide (Bxy): the envelope goes up or down this many 1/16 semitones per replay tick; 0 stops it"
+msgstr "Deslizamento de buzzer (Bxy): o envelope sobe ou desce tantos dezesseis avos de semitom por tick de replay; 0 para-o"
 
 msgid "CMD: commands of this step, click to set them (ticks per line, sync mark, slides); MUL: several"
 msgstr "CMD: comandos deste passo, clique para ajustá-los (ticks por linha, marca de sincronia, deslizamentos); MUL: vários"
@@ -112,11 +139,17 @@ msgstr "CUT: corte o som neste passo"
 msgid "CUT: the notes of this step stop at this tick of the line"
 msgstr "CUT: as notas deste passo param neste tick da linha"
 
+msgid "Cancel: put back the settings changed since the window opened, then close it"
+msgstr "Cancel: restaura os ajustes alterados desde que a janela abriu e a fecha"
+
 msgid "Channel"
 msgstr "Canal"
 
 msgid "Channel level in the mix"
 msgstr "Nível do canal na mixagem"
+
+msgid "Chip clock: the frequency that drives the YM, and so its pitch. Custom, typed in MHz, plays in 16 ch only"
+msgstr "Relógio do chip: a frequência que move o YM, e portanto a sua altura. Custom, digitado em MHz, só toca em 16 ch"
 
 msgid "Chip conformity"
 msgstr "Conformidade com o chip"
@@ -168,6 +201,9 @@ msgstr "Computer: Atari STE, o YM mais o som DMA: oito faixas DMA em 3 ch, o tip
 
 msgid "Copy the note under the cursor, or the selection (Ctrl+C)"
 msgstr "Copie a nota sob o cursor, ou a seleção (Ctrl+C)"
+
+msgid "Curve (16 channels): Up, Down and the shapes of the CRV row, from this step to the next command of its kind"
+msgstr "Curva (16 canais): Up, Down e as formas da linha CRV, deste passo até ao próximo comando do seu tipo"
 
 msgid "Custom clock: 16 ch only (2 MHz in the other modes)"
 msgstr "Relógio personalizado: só 16 ch (2 MHz nos outros modos)"
@@ -247,17 +283,11 @@ msgstr "Digidrum {1} - {2}"
 msgid "Digidrums window: load the eight samples, set their rate, root note, tuning and loop"
 msgstr "Janela Digidrums: carregue as oito amostras e ajuste taxa, nota raiz, afinação e loop"
 
+msgid "Direction of the slide: up or down"
+msgstr "Direção do deslizamento: para cima ou para baixo"
+
 msgid "Disable every track"
 msgstr "Desative todas as faixas"
-
-msgid "Down: lower noise, y quarter steps of its period per tick"
-msgstr "Descer: ruído mais grave, y quartos de passo do seu período por tick"
-
-msgid "Down: y quarter steps of volume per tick"
-msgstr "Descer: y quartos de passo de volume por tick"
-
-msgid "Down: y sixteenths of a semitone per tick"
-msgstr "Descer: y dezesseis avos de semitom por tick"
 
 msgid "Drag to choose the value"
 msgstr "Arraste para escolher o valor"
@@ -277,8 +307,11 @@ msgstr "Percussão a disparar"
 msgid "Dual chip (2x3ch) only"
 msgstr "Só com chip duplo (2x3ch)"
 
-msgid "ENV: hardware envelope shape of the track from this step on; R: the envelope restarts"
-msgstr "ENV: forma do envelope do chip da faixa a partir deste passo; R: o envelope recomeça"
+msgid "During a slide, only VOL acts"
+msgstr "Durante um deslizamento, só VOL age"
+
+msgid "ENV: hardware envelope shape of the track from this step on; R: the envelope restarts. Right click: its settings"
+msgstr "ENV: forma do envelope do chip da faixa a partir deste passo; R: o envelope recomeça. Clique direito: as suas definições"
 
 msgid "Echo: none for Sync Buzzer in 3 ch, a repeat would restart the shared hardware envelope at full level"
 msgstr "Echo: nenhum para Sync Buzzer em 3 ch, uma repetição reiniciaria em nível máximo o envelope de hardware partilhado"
@@ -292,11 +325,11 @@ msgstr "Efeitos: eco das notas e o delay de áudio em 16 ch (Ctrl+F)"
 msgid "Empty slot"
 msgstr "Slot vazio"
 
-msgid "Empty this slot"
-msgstr "Esvazie este slot"
+msgid "Empty this slot (name, sample, Start and End)"
+msgstr "Esvazie este slot (nome, amostra, Start e End)"
 
-msgid "Empty this slot (name, sample and loop)"
-msgstr "Esvazie este slot (nome, amostra e loop)"
+msgid "Empty this slot (name, sample, Start, End and Loop)"
+msgstr "Esvazie este slot (nome, amostra, Start, End e Loop)"
 
 msgid "Enable every track"
 msgstr "Ative todas as faixas"
@@ -307,8 +340,11 @@ msgstr "Ative o arpejador neste canal"
 msgid "Enable the modulation table for this channel"
 msgstr "Ative a tabela de modulação neste canal"
 
-msgid "End of the loop (the value after its last one)"
-msgstr "Fim do loop (o valor após o último)"
+msgid "End of the part played (the frame after its last one)"
+msgstr "Fim da parte tocada (o quadro após o último)"
+
+msgid "End of the part played (the value after its last one)"
+msgstr "Fim da parte tocada (o valor após o último)"
 
 msgid "Env period: a DMA track plays a sample, without the envelope"
 msgstr "Período do envelope: uma pista DMA toca uma amostra, sem o envelope"
@@ -324,6 +360,15 @@ msgstr "Frequência do envelope: taxa de repetição da forma"
 
 msgid "Envelope shape: Smooth for a continuous curve, Chip for 4-bit steps at VBL rate"
 msgstr "Forma do envelope: Smooth para curva contínua, Chip para degraus de 4 bits na taxa VBL"
+
+msgid "Envelope, an octave either way (Sync Buzzer, Env sources); Vibrato, from the middle up to the Wheel depth"
+msgstr "Envelope, uma oitava para cada lado (Sync Buzzer, fontes Env); Vibrato, do meio para cima até ao Wheel depth"
+
+msgid "Envelope, the envelope frequency by the bend's semitones, the note unchanged (Sync Buzzer, Env sources)"
+msgstr "Envelope, a frequência do envelope pelos semitons do bend, a nota inalterada (Sync Buzzer, fontes Env)"
+
+msgid "Envelope, up to an octave higher (Sync Buzzer, Env sources); LFO, the depth of the track's LFO; or Off"
+msgstr "Envelope, até uma oitava acima (Sync Buzzer, fontes Env); LFO, a profundidade do LFO da faixa; ou Off"
 
 msgid "Erase: click or drag over notes to remove them"
 msgstr "Apagar: clique ou arraste sobre notas para removê-las"
@@ -364,8 +409,11 @@ msgstr "Afinação fina do envelope, em cents"
 msgid "Fine tuning of this slot in cents"
 msgstr "Afinação fina deste slot em cents"
 
-msgid "First value of the loop"
-msgstr "Primeiro valor do loop"
+msgid "First frame played (and of the loop)"
+msgstr "Primeiro quadro tocado (e do loop)"
+
+msgid "First value played (and of the loop)"
+msgstr "Primeiro valor tocado (e do loop)"
 
 msgid "Fixed 4-bit volume, as on the chip"
 msgstr "Volume fixo de 4 bits, como no chip"
@@ -385,6 +433,9 @@ msgstr "Volte a seguir o comprimento do padrão"
 msgid "Follow: a held note jumps to the new octave when you change it"
 msgstr "Follow: uma nota mantida pula para a nova oitava quando você a troca"
 
+msgid "Form of the SID wave: Base, the plain square; Square, a square of Steps steps, the note volume over Width of them; Sine, a sine of Period bars; Bounce, a sine of the chip's level, which the bars show as a bounce; Custom, the bars drawn with the mouse"
+msgstr "Forma da onda SID: Base, o quadrado simples; Square, um quadrado de Steps passos, o volume da nota em Width deles; Sine, uma senoide de Period barras; Bounce, uma senoide do nível do chip, que as barras mostram como um ressalto; Custom, as barras desenhadas com o rato"
+
 msgid "GAT: note length on this step, as a share of it"
 msgstr "GAT: duração da nota neste passo, como fração dele"
 
@@ -394,8 +445,11 @@ msgstr "Passo GEN {1}: gerador da nota. Clique para escolher."
 msgid "GEN step {1}: {2}. Click to choose."
 msgstr "Passo GEN {1}: {2}. Clique para escolher."
 
-msgid "GEN: use another generator on this step only"
-msgstr "GEN: use outro gerador só neste passo"
+msgid "GEN: a DMA track keeps its sample"
+msgstr "GEN: uma faixa DMA mantém sua amostra"
+
+msgid "GEN: use another generator on this step only. Right click: its settings"
+msgstr "GEN: use outro gerador só neste passo. Clique direito: as suas definições"
 
 msgid "Gap between the bursts that make up the clap"
 msgstr "Intervalo entre as rajadas que formam o Clap"
@@ -405,6 +459,9 @@ msgstr "Dê a esta faixa um comprimento próprio: ela faz loop sozinha enquanto 
 
 msgid "HLD: do not retrigger the drum while it still rings"
 msgstr "HLD: não redispare a percussão enquanto ela ainda soa"
+
+msgid "Hard sync: a DMA track plays a sample, with no square or timer to restart"
+msgstr "Hard sync: uma faixa DMA toca uma amostra, sem quadrada nem timer para reiniciar"
 
 msgid "Hard sync: restart the square (16 voices) and the timer on tied and slid notes too"
 msgstr "Hard sync: reinicie a onda quadrada (16 vozes) e o timer também em notas ligadas e deslizadas"
@@ -475,8 +532,20 @@ msgstr "LFO: liga ou desliga o LFO da faixa a partir deste passo"
 msgid "Land: on the last tick of a glissando, fall back to the root so the target note joins without a jump"
 msgstr "Land: no último tick de um glissando, volte à raiz para que a nota-alvo entre sem salto"
 
+msgid "Language of the tooltips"
+msgstr "Idioma das dicas"
+
+msgid "Lasts {1} steps of {2}: not a whole number"
+msgstr "Dura {1} passos de {2}: não é um número inteiro"
+
 msgid "Latch: keys stay held until you press them again"
 msgstr "Latch: as teclas ficam presas até você pressioná-las de novo"
+
+msgid "Layout of the computer keyboard; Auto follows the system's"
+msgstr "Layout do teclado do computador; Auto segue o do sistema"
+
+msgid "Left side of the stereo sample"
+msgstr "Lado esquerdo da amostra estéreo"
 
 msgid "Length of the figure before it repeats"
 msgstr "Comprimento da figura antes de se repetir"
@@ -505,6 +574,9 @@ msgstr "Link: um só Master para os dois chips; desligado: um nível para cada u
 msgid "Link: one Master for both outputs; off: a level for each"
 msgstr "Link: um só Master para as duas saídas; desligado: um nível para cada uma"
 
+msgid "Link: one Volume for both sides; off: a level for each"
+msgstr "Link: um só volume para os dois lados; desligado: um nível para cada um"
+
 msgid "Load a patch library from a file"
 msgstr "Abra uma biblioteca de patches"
 
@@ -520,14 +592,8 @@ msgstr "Mais longo que a faixa ({1} passos)"
 msgid "Loop"
 msgstr "Loop"
 
-msgid "Loop from Start to End while the note is held; at note off the sample plays to its end"
-msgstr "Loop de Start a End enquanto a nota é mantida; ao soltar a nota, a amostra toca até o fim"
-
 msgid "Loop the table instead of playing it once"
 msgstr "Faça loop da tabela em vez de tocá-la uma vez"
-
-msgid "Loop while the note is held; otherwise the sample plays to its end"
-msgstr "Loop enquanto a nota é mantida; senão a amostra toca até o fim"
 
 msgid "Lower the 8-bit source by 3 dB"
 msgstr "Abaixe a fonte de 8 bits em 3 dB"
@@ -544,14 +610,35 @@ msgstr "Menor deslocamento de período do tom na tabela de vibrato"
 msgid "MIDI ext: the arpeggio follows the incoming MIDI clock"
 msgstr "MIDI ext: o arpejo segue o clock MIDI recebido"
 
+msgid "MIDI routing: Omni, the focused track; Layer, every enabled track; Per channel, channel n plays track n"
+msgstr "Roteamento MIDI: Omni, a faixa em foco; Layer, todas as faixas ativas; Per channel, o canal n toca a faixa n"
+
 msgid "MIX step {1}: the track's mixer. Click to choose."
 msgstr "Passo MIX {1}: o mixer da faixa. Clique para escolher."
 
 msgid "MIX step {1}: {2}. Click to choose."
 msgstr "Passo MIX {1}: {2}. Clique para escolher."
 
+msgid "MIX: a DMA track plays a sample, without the chip's mixer"
+msgstr "MIX: uma faixa DMA toca uma amostra, sem o mixer do chip"
+
 msgid "MOD: switch the modulation table of the track on or off from this step"
 msgstr "MOD: liga ou desliga a tabela de modulação da faixa a partir deste passo"
+
+msgid "MPE slide (CC74) of each note: Volume, from 0 at the bottom to 15 at the top (64 leaves it)"
+msgstr "Slide MPE (CC74) de cada nota: Volume, de 0 em baixo a 15 em cima (64 deixa-o igual)"
+
+msgid "MPE: 16 ch only"
+msgstr "MPE: só 16 ch"
+
+msgid "MPE: channel 1 plays as usual, channels 2 to 16 one note each, with its own bend, pressure and slide"
+msgstr "MPE: o canal 1 toca como de costume, os canais 2 a 16 uma nota cada, com o seu próprio bend, pressão e slide"
+
+msgid "MPE: pitch bend range of each note, in semitones (48 is the MPE default)"
+msgstr "MPE: alcance do pitch bend de cada nota, em semitons (48 é o valor MPE predefinido)"
+
+msgid "MPE: set MPE to On"
+msgstr "MPE: ponha MPE em On"
 
 msgid "Master output level"
 msgstr "Nível de saída master"
@@ -582,6 +669,9 @@ msgstr "Metrônomo: um clique a cada tempo, sino no primeiro tempo do compasso; 
 
 msgid "Mixer: levels, panning, mute and solo for every channel (Ctrl+M)"
 msgstr "Mixer: níveis, pan, mudo e solo de cada canal (Ctrl+M)"
+
+msgid "Modulation wheel: what it drives, from nothing at the bottom to all of it at the top. Vibrato; Volume, up to 15"
+msgstr "Roda de modulação: o que ela controla, de nada em baixo a tudo em cima. Vibrato; Volume, até 15"
 
 msgid "Modulation: per-tick table for pitch, noise and volume (Ctrl+R)"
 msgstr "Modulation: tabela por tick de altura, ruído e volume (Ctrl+R)"
@@ -616,6 +706,12 @@ msgstr "Suba o teclado virtual uma oitava (tecla X)"
 msgid "Move: drag notes or a selection without resizing them"
 msgstr "Mover: arraste notas ou uma seleção sem redimensioná-las"
 
+msgid "Mute the left side of the stereo sample"
+msgstr "Silencia o lado esquerdo da amostra estéreo"
+
+msgid "Mute the right side of the stereo sample"
+msgstr "Silencia o lado direito da amostra estéreo"
+
 msgid "N: the envelope plays the note x N / D"
 msgstr "N: o envelope toca a nota x N / D"
 
@@ -625,8 +721,17 @@ msgstr "Passo NP {1}: período de ruído {2}. Arraste para desenhar, clique dire
 msgid "NP step {1}: the track's noise period. Drag to draw, right click for a slider."
 msgstr "Passo NP {1}: o período de ruído da faixa. Arraste para desenhar, clique direito para um controle deslizante."
 
+msgid "NP: a DMA track plays a sample, without noise"
+msgstr "NP: uma faixa DMA toca uma amostra, sem ruído"
+
 msgid "NSE step {1}: add noise on this tick"
 msgstr "Passo NSE {1}: adicione ruído neste tick"
+
+msgid "NSE: a DMA track plays a sample, without noise"
+msgstr "NSE: uma faixa DMA toca uma amostra, sem ruído"
+
+msgid "Name of this sample, 16 characters (taken from the file loaded)"
+msgstr "Nome desta amostra, 16 caracteres (tirado do arquivo carregado)"
 
 msgid "Name of this slot, 16 characters (shown in its tip and kept in banks)"
 msgstr "Nome deste slot, 16 caracteres (mostrado na dica e guardado nos bancos)"
@@ -640,8 +745,11 @@ msgstr "Próxima submúsica (reinicia a música)"
 msgid "No bank saved yet"
 msgstr "Nenhum banco salvo ainda"
 
-msgid "Noise Slide (Nxy): the noise goes up x or down y quarter period steps per replay tick, until N00"
-msgstr "Deslizamento de ruído (Nxy): o ruído sobe x ou desce y quartos de passo de período por tick de replay, até N00"
+msgid "No note starts on this step"
+msgstr "Nenhuma nota começa neste passo"
+
+msgid "Noise Slide (Nxy): the noise goes up or down this many quarter period steps per replay tick; 0 stops it"
+msgstr "Deslizamento de ruído (Nxy): o ruído sobe ou desce tantos quartos de passo de período por tick de replay; 0 para-o"
 
 msgid "Noise colour: low is dull, high is crisp"
 msgstr "Cor do ruído: baixo é abafado, alto é nítido"
@@ -661,11 +769,17 @@ msgstr "Período do ruído: não há ruído na fonte deste canal"
 msgid "Noise period: no noise in this track's source"
 msgstr "Período do ruído: não há ruído na fonte desta pista"
 
+msgid "Not a DMA note: there is no sample to start further in"
+msgstr "Não é uma nota DMA, não há sample para começar mais adiante"
+
 msgid "Not used by percussion tracks"
 msgstr "Não usado pelas faixas de percussão"
 
 msgid "Note length as a share of the step"
 msgstr "Duração da nota como fração do passo"
+
+msgid "Note names: English (C D E) or Latin (Do Re Mi)"
+msgstr "Nomes das notas: inglês (C D E) ou latino (Do Re Mi)"
 
 msgid "Notes are forced into the scale"
 msgstr "As notas são forçadas para a escala"
@@ -687,6 +801,9 @@ msgstr "Número de passos na tabela de modulação"
 
 msgid "OCT: shift this step by one or more octaves"
 msgstr "OCT: desloque este passo em uma ou mais oitavas"
+
+msgid "OK: keep the settings and close the window"
+msgstr "OK: mantém os ajustes e fecha a janela"
 
 msgid "OUT step {1}, {2} played: period {3}, {4} Hz"
 msgstr "Passo OUT {1}, {2} tocada: período {3}, {4} Hz"
@@ -718,6 +835,9 @@ msgstr "Abra a janela Song e encadeie padrões"
 msgid "Open the computer keyboard: play with the keys or click them. Typing only plays while this window is open."
 msgstr "Abra o teclado do computador: toque com as teclas ou clique nelas. Digitar só toca com esta janela aberta."
 
+msgid "Open the folder of the language files, to add a translation or change one"
+msgstr "Abrir a pasta dos arquivos de idioma, para adicionar uma tradução ou alterar uma"
+
 msgid "Order in which the table is played"
 msgstr "Ordem em que a tabela é tocada"
 
@@ -726,6 +846,9 @@ msgstr "Oscilações ao longo do comprimento da tabela"
 
 msgid "Out-of-scale rows are greyed; click to force notes in"
 msgstr "Linhas fora da escala ficam cinza; clique para forçar as notas nela"
+
+msgid "Output chain: Raw, the chip alone; ST, the filter of the Atari ST board; STE, the STE output with its bass and treble"
+msgstr "Cadeia de saída: Raw, o chip sozinho; ST, o filtro da placa do Atari ST; STE, a saída do STE com seus graves e agudos"
 
 msgid "Overview strip: one line per channel"
 msgstr "Barra Overview: uma linha por canal"
@@ -799,6 +922,12 @@ msgstr "Faixas de percussão não usam o arpejador"
 msgid "Percussion tracks do not use the vibrato"
 msgstr "As faixas de percussão não usam o vibrato"
 
+msgid "Percussion tracks play their own sounds (Drum Kit or sample): no source, no fixed volume, no envelope"
+msgstr "As faixas de percussão tocam os seus próprios sons (Drum Kit ou sample): sem fonte, sem volume fixo, sem envelope"
+
+msgid "Period of the Sine-SID in bars (8 by default): the bars of one cycle of the sine. Sine and Bounce only"
+msgstr "Período do Sine-SID em barras (8 por omissão): as barras de um ciclo da senoide. Só com Sine e Bounce"
+
 msgid "Pick a known rhythm: its steps and pulses"
 msgstr "Escolher um ritmo conhecido: seus passos e pulsos"
 
@@ -811,6 +940,12 @@ msgstr "Escolha uma escala primeiro"
 msgid "Ping-pong: the echoes go from one side to the other"
 msgstr "Ping-pong: os ecos vão de um lado para o outro"
 
+msgid "Pitch bend range, in semitones"
+msgstr "Alcance do pitch bend, em semitons"
+
+msgid "Pitch bend: what it drives. Pitch, the note; Volume, the 4-bit volume (up towards 15, down towards 0)"
+msgstr "Pitch bend: o que ele controla. Pitch, a nota; Volume, o volume de 4 bits (para cima até 15, para baixo até 0)"
+
 msgid "Pitch of the metallic ring"
 msgstr "Altura da ressonância metálica"
 
@@ -819,6 +954,9 @@ msgstr "Altura da parte tonal"
 
 msgid "Pitch written by the generator"
 msgstr "Altura escrita pelo gerador"
+
+msgid "Pixels: Sharp puts each pixel on whole screen pixels; Smooth draws the letters and icons with anti-aliasing"
+msgstr "Pixels: Sharp põe cada pixel sobre pixels inteiros da tela; Smooth desenha letras e ícones com suavização"
 
 msgid "Play"
 msgstr "Tocar"
@@ -835,14 +973,14 @@ msgstr "Toque desde o início"
 msgid "Play the loaded YM tune"
 msgstr "Toque a música YM carregada"
 
-msgid "Play this sample at {1} Hz (the bytes are kept: the pitch moves)"
-msgstr "Toque esta amostra a {1} Hz (os bytes são mantidos: a altura muda)"
+msgid "Play this sample at its rate, from Start to End: once, or with Loop on in a loop until Play or Loop is clicked again"
+msgstr "Toca esta amostra na sua frequência, de Start a End: uma vez, ou com Loop em loop até clicar de novo em Play ou Loop"
 
-msgid "Play this sample once at its rate"
-msgstr "Toque esta amostra uma vez na sua taxa"
+msgid "Play this sample at {1} Hz (Resample off: the bytes are kept, the pitch moves)"
+msgstr "Toque esta amostra a {1} Hz (Resample desligado: os bytes são mantidos, a altura muda)"
 
-msgid "Play this slot once at its rate, through the chip's volume table"
-msgstr "Toque este slot uma vez na sua taxa, pela tabela de volume do chip"
+msgid "Play this slot's part at its rate, through the chip's volume table: once, or with Loop on in a loop until Play or Loop is clicked again"
+msgstr "Toca a parte deste slot na sua frequência, pela tabela de volume do chip: uma vez, ou com Loop em loop até clicar de novo em Play ou Loop"
 
 msgid "Play/Stop"
 msgstr "Tocar/Parar"
@@ -871,6 +1009,9 @@ msgstr "Submúsica anterior (reinicia a música)"
 msgid "Put this command in the step, or take it out"
 msgstr "Colocar este comando no passo, ou retirá-lo"
 
+msgid "Quantize to VBL: notes and steps start on the replay frames, as an Atari replay routine plays them"
+msgstr "Quantize to VBL: notas e passos começam nos quadros de replay, como uma rotina de replay do Atari os toca"
+
 msgid "RTG: repeat the hit 2, 3 or 4 times inside the step"
 msgstr "RTG: repita a batida 2, 3 ou 4 vezes dentro do passo"
 
@@ -882,6 +1023,9 @@ msgstr "Leve a fonte de 8 bits à escala total"
 
 msgid "Raise the sample by 3 dB (clipped)"
 msgstr "Aumente a amostra em 3 dB (com clipping)"
+
+msgid "Raise the sample to full scale"
+msgstr "Normaliza a amostra à escala completa"
 
 msgid "Rate {1} Hz"
 msgstr "Taxa {1} Hz"
@@ -904,6 +1048,24 @@ msgstr "Dumps de registradores levam três vozes YM: mude para Authentic 3ch"
 msgid "Release: time to fade out once the note ends"
 msgstr "Liberação (Release): tempo para o som sumir após o fim da nota"
 
+msgid "Renderer: Windows only"
+msgstr "Renderizador: só Windows"
+
+msgid "Renderer: how the window reaches the screen on Windows, Software or Direct2D"
+msgstr "Renderizador: como a janela chega à tela no Windows, Software ou Direct2D"
+
+msgid "Repeat the part from Start to End while the note is held; at note off it plays on to End"
+msgstr "Repete a parte de Start a End enquanto a nota é mantida; ao soltar a nota, ela segue até End"
+
+msgid "Repeat the part from Start to End while the note sounds; otherwise the part plays once"
+msgstr "Repete a parte de Start a End enquanto a nota soa; caso contrário, a parte toca uma vez"
+
+msgid "Resample on: a new rate resamples the sample, which keeps its length and its pitch (32 KB at most)"
+msgstr "Resample ligado: uma nova taxa reamostra a amostra, que mantém a sua duração e a sua altura (32 KB no máximo)"
+
+msgid "Resampling: how the chip's rate is brought to the host's. Box and Retro fall back to Sinc above clk/8"
+msgstr "Reamostragem: como a taxa do chip é levada à do host. Box e Retro passam para Sinc acima de clk/8"
+
 msgid "Reset the custom curve to a straight line"
 msgstr "Redefina a curva personalizada como uma linha reta"
 
@@ -913,8 +1075,11 @@ msgstr "Restaure os valores de fábrica desta percussão"
 msgid "Retrig: the LFO restarts at each note; off: it runs free and a note takes it where it is"
 msgstr "Retrig: o LFO recomeça a cada nota; desligado: corre livre e uma nota o pega onde ele está"
 
-msgid "Reverse the sample"
-msgstr "Inverta a amostra"
+msgid "Reverse the sample: it plays from its end"
+msgstr "Inverte a amostra: toca a partir do fim"
+
+msgid "Right click: a slider and the Slide to the next step"
+msgstr "Clique direito: um slider e o deslizamento até ao passo seguinte"
 
 msgid "Right click: copy / paste this row across tracks"
 msgstr "Clique direito: copie / cole esta linha entre faixas"
@@ -927,6 +1092,9 @@ msgstr "Clique direito: copie, recorte, cole ou adicione à música."
 
 msgid "Right click: copy, paste or rename."
 msgstr "Clique direito: copie, cole ou renomeie."
+
+msgid "Right side of the stereo sample"
+msgstr "Lado direito da amostra estéreo"
 
 msgid "Root note: the note that plays the sample at its rate"
 msgstr "Nota raiz: a nota que toca a amostra na sua taxa"
@@ -958,23 +1126,26 @@ msgstr "SLT: slot de Digidrum deste passo"
 msgid "SMP: the DMA sample of this step starts further in"
 msgstr "SMP: o sample DMA deste passo começa mais adiante"
 
-msgid "SRC: tone, noise or both on this step; the Env entries put its volume on the envelope"
-msgstr "SRC: tom, ruído ou ambos neste passo; as entradas Env põem o seu volume no envelope"
+msgid "SRC: tone, noise or both on this step; the Env entries put its volume on the envelope. Right click: its settings"
+msgstr "SRC: tom, ruído ou ambos neste passo; as entradas Env põem o seu volume no envelope. Clique direito: as suas definições"
 
 msgid "ST voice used by the Digidrum track in 3 ch mode"
 msgstr "Voz ST usada pela faixa Digidrum no modo 3 ch"
 
+msgid "STE bass: -12 to +12 dB, with the STE output chain"
+msgstr "Graves STE: -12 a +12 dB, com a cadeia de saída STE"
+
 msgid "STE only: set Computer to STE"
 msgstr "Só STE: defina Computer como STE"
 
-msgid "Sample {1}: empty"
-msgstr "Amostra {1}: vazia"
-
-msgid "Sample {1}: {2} bytes"
-msgstr "Amostra {1}: {2} bytes"
+msgid "STE treble: -12 to +12 dB, with the STE output chain"
+msgstr "Agudos STE: -12 a +12 dB, com a cadeia de saída STE"
 
 msgid "Samples are played by the Digidrum track, not by a hardware voice"
 msgstr "As amostras são tocadas pela faixa Digidrum, não por uma voz de hardware"
+
+msgid "Save the 8 samples as a named bank, load or delete a bank (library shared by all projects)"
+msgstr "Salve as 8 amostras como banco nomeado, carregue ou apague um banco (biblioteca comum a todos os projetos)"
 
 msgid "Save the 8 slots as a named bank, load or delete a bank (library shared by all projects)"
 msgstr "Salve os 8 slots como banco nomeado, carregue ou apague um banco (biblioteca comum a todos os projetos)"
@@ -1000,8 +1171,8 @@ msgstr "Selecionar: arraste um retângulo na grade para selecionar notas"
 msgid "Send to the delay, after the fader (Edit > Effects)"
 msgstr "Envio para o delay, depois do fader (Edit > Effects)"
 
-msgid "Set Computer to STE (SYSTEM panel, or Options > Sound engine > Computer)"
-msgstr "Defina Computer como STE (SYSTEM panel, ou Options > Sound engine > Computer)"
+msgid "Set Computer to STE (SYSTEM panel, or Options > Settings)"
+msgstr "Defina Computer como STE (SYSTEM panel, ou Options > Settings)"
 
 msgid "Shift every other step: 50% straight, 66% triplet shuffle"
 msgstr "Desloque os passos alternados: 50% reto, 66% shuffle de tercina"
@@ -1009,14 +1180,20 @@ msgstr "Desloque os passos alternados: 50% reto, 66% shuffle de tercina"
 msgid "Shift the whole figure to the right"
 msgstr "Desloque a figura inteira para a direita"
 
+msgid "Shorter than one step of {1}"
+msgstr "Mais curto que um passo de {1}"
+
 msgid "Show the other channels behind the grid"
 msgstr "Mostre os outros canais atrás da grade"
 
-msgid "Sine-SID: 8 volumes following a sine (YM-Tracker Y41)"
-msgstr "Sine-SID: 8 volumes seguindo uma senoide (YM-Tracker Y41)"
-
 msgid "Slide follows: during a glissando, the arpeggio rate rises with the pitch"
 msgstr "Seguir glissando: durante um glissando, a velocidade do arpejo sobe com a altura"
+
+msgid "Slide: not on a drum track"
+msgstr "Slide: não numa faixa de percussão"
+
+msgid "Slide: the volume of this step glides to that of the next step"
+msgstr "Slide: o volume deste passo desliza até ao do passo seguinte"
 
 msgid "Slides moves the envelope period (buzzer)"
 msgstr "Glissandos movem o período do envelope (buzzer)"
@@ -1024,17 +1201,29 @@ msgstr "Glissandos movem o período do envelope (buzzer)"
 msgid "Slides moves the square (tone period)"
 msgstr "Glissandos movem a onda quadrada (período do tom)"
 
-msgid "Slides moves the timer (SID, Sync Buzzer)"
-msgstr "Glissandos movem o timer (SID, Sync Buzzer)"
+msgid "Slides moves the timer (SID, Sync Buzzer) and the DMA sample"
+msgstr "Glissandos movem o timer (SID, Sync Buzzer) e a amostra DMA"
 
 msgid "Slot {1}: empty"
 msgstr "Slot {1}: vazio"
+
+msgid "Slot {1}: {2} bytes"
+msgstr "Slot {1}: {2} bytes"
 
 msgid "Slot {1}: {2} values"
 msgstr "Slot {1}: {2} valores"
 
 msgid "Smooth out a jagged curve"
 msgstr "Suavize uma curva serrilhada"
+
+msgid "Soft clip: a gentle saturation of the output instead of a hard clip"
+msgstr "Soft clip: uma saturação suave da saída em vez de um corte brusco"
+
+msgid "Solo the left side of the stereo sample"
+msgstr "Solo do lado esquerdo da amostra estéreo"
+
+msgid "Solo the right side of the stereo sample"
+msgstr "Solo do lado direito da amostra estéreo"
 
 msgid "Sound generator of this channel: Chip Voice, SID Voice, Sync Buzzer, Chipdrum, Digidrum or the DMA sound of the STE"
 msgstr "Gerador de som deste canal: Chip Voice, SID Voice, Sync Buzzer, Chipdrum, Digidrum ou o som DMA do STE"
@@ -1044,9 +1233,6 @@ msgstr "Fonte de som deste canal: onda quadrada, ruído, ambos ou nenhum, com o 
 
 msgid "Split: click a note to cut it in two at that step"
 msgstr "Dividir: clique numa nota para cortá-la em duas nesse passo"
-
-msgid "Square wave of the SID Voice: note volume, then low volume"
-msgstr "Onda quadrada da SID Voice: volume da nota, depois volume baixo"
 
 msgid "Starting pitch of the tone burst (25 to 90)"
 msgstr "Altura inicial da rajada tonal (25 a 90)"
@@ -1069,8 +1255,8 @@ msgstr "Passo {1}: volume {2} (após o fim da onda). Arraste para desenhar, roda
 msgid "Step {1}: volume {2}. Drag to draw, wheel to adjust, right click for a slider."
 msgstr "Passo {1}: volume {2}. Arraste para desenhar, roda para ajustar, clique direito para um controle deslizante."
 
-msgid "Step {1}: volume {2}. Square wave: set Steps to 2 or more to play this wave."
-msgstr "Passo {1}: volume {2}. Onda quadrada: ponha Steps em 2 ou mais para tocar esta onda."
+msgid "Step {1}: volume {2}. Square wave: the note's volume, then SID min vol. Choose Custom in the menu to draw a wave."
+msgstr "Passo {1}: volume {2}. Onda quadrada: o volume da nota, depois SID min vol. Escolha Custom no menu para desenhar uma onda."
 
 msgid "Step {1}: {2} semitone. Drag to draw the pitch table."
 msgstr "Passo {1}: {2} semitom. Arraste para desenhar a tabela de altura."
@@ -1084,14 +1270,20 @@ msgstr "Passos antes de esta faixa voltar ao início"
 msgid "Steps for the vibrato to reach its full depth"
 msgstr "Passos para o vibrato atingir a profundidade total"
 
-msgid "Steps of the SID wave, one per timer interrupt (far left: the square wave)"
-msgstr "Passos da onda SID, um por interrupção do timer (à extrema esquerda: a onda quadrada)"
+msgid "Steps of the SID wave, one per timer interrupt: those of a period of the Square, or the bars played of Sine, Bounce and Custom. Base has none"
+msgstr "Passos da onda SID, um por interrupção do timer: os de um período do Square, ou as barras tocadas de Sine, Bounce e Custom. Base não tem"
 
 msgid "Steps of the Sync Buzzer, one per restart (0: the track's shape every time)"
 msgstr "Passos do Sync Buzzer, um por reinício (0: a forma da faixa toda vez)"
 
 msgid "Stereo: bytes interleaved left, right (a mono sample is doubled, 16 KB per side at most)"
 msgstr "Stereo: bytes intercalados esquerda, direita (amostra mono é duplicada, 16 KB por lado no máximo)"
+
+msgid "Stereo: the tools work on the left channel"
+msgstr "Estéreo: as ferramentas atuam no canal esquerdo"
+
+msgid "Stereo: the tools work on the right channel"
+msgstr "Estéreo: as ferramentas atuam no canal direito"
 
 msgid "Stop"
 msgstr "Parar"
@@ -1147,8 +1339,8 @@ msgstr "A altura da tabela (ARP, PER, FIX) move o período do envelope (buzzer)"
 msgid "Table pitch (ARP, PER, FIX) moves the square (tone period)"
 msgstr "A altura da tabela (ARP, PER, FIX) move a onda quadrada (período do tom)"
 
-msgid "Table pitch (ARP, PER, FIX) moves the timer (SID, Sync Buzzer)"
-msgstr "A altura da tabela (ARP, PER, FIX) move o timer (SID, Sync Buzzer)"
+msgid "Table pitch (ARP, PER, FIX) moves the timer (SID, Sync Buzzer) and the DMA sample"
+msgstr "A altura da tabela (ARP, PER, FIX) move o timer (SID, Sync Buzzer) e a amostra DMA"
 
 msgid "Table speed, in VBL ticks per step"
 msgstr "Velocidade da tabela, em ticks VBL por passo"
@@ -1174,6 +1366,9 @@ msgstr "A faixa Digidrum só toca amostras"
 msgid "The bank file could not be read"
 msgstr "Não foi possível ler o arquivo do banco"
 
+msgid "The chip plays the nearest period it can: at 2 MHz, an A4 at 440 Hz plays 440.14 Hz"
+msgstr "O chip toca o período mais próximo possível: a 2 MHz, um Lá4 a 440 Hz soa a 440,14 Hz"
+
 msgid "The envelope restarts at this tick of the line (0: at once)"
 msgstr "O envelope recomeça neste tick da linha (0: na hora)"
 
@@ -1182,6 +1377,12 @@ msgstr "O host escolhe a saída de áudio e envia MIDI ao plugin"
 
 msgid "The host closes the plugin"
 msgstr "O host fecha o plugin"
+
+msgid "The note goes on after this step: only the GAT of its last step acts"
+msgstr "A nota continua depois deste passo: só o GAT do seu último passo age"
+
+msgid "The notes go to the focused track (or Layer); 16 ch only"
+msgstr "As notas vão para a faixa ativa (ou Layer); só 16 ch"
 
 msgid "The notes of this step start at this tick of the line"
 msgstr "As notas deste passo começam neste tick da linha"
@@ -1234,6 +1435,12 @@ msgstr "O tempo corre da esquerda para a direita. A, D e R são durações, S é
 msgid "Timer rate at the root note (the values are kept: the pitch moves). A file loads at this rate."
 msgstr "Taxa do timer na nota raiz (os valores são mantidos: a altura muda). Um arquivo é carregado nesta taxa."
 
+msgid "Timer: the timer effects on the steps of the Atari MFP 68901, or Free, continuous"
+msgstr "Timer: os efeitos de timer nos passos do MFP 68901 do Atari, ou Free, contínuos"
+
+msgid "Tooltips: show these help boxes, or not"
+msgstr "Dicas: mostrar estas caixas de ajuda, ou não"
+
 msgid "Track length (polymeter)"
 msgstr "Comprimento da faixa (polimetria)"
 
@@ -1264,6 +1471,9 @@ msgstr "Envelope afinado: o período do envelope segue a nota (Env freq fica sem
 msgid "Tuning of the track in cents from this step on, until the next TUN"
 msgstr "Afinação da faixa em cents a partir deste passo, até o próximo TUN"
 
+msgid "Tuning: the frequency of A4, from which every note is tuned (350 to 480 Hz, 440 by default)"
+msgstr "Afinação: a frequência do Lá4, a partir da qual cada nota é afinada (350 a 480 Hz, 440 por padrão)"
+
 msgid "Turn the whole curve upside down: the slide runs from the target note back to the start"
 msgstr "Vira a curva inteira de cima para baixo: o deslize vai da nota alvo de volta ao início"
 
@@ -1285,17 +1495,11 @@ msgstr "Sem uso no modo 3 ch: o YM tem três vozes mais a faixa Digidrum"
 msgid "Unused in 3 ch mode: the YM has three voices plus the Digidrum track. Computer STE adds eight DMA tracks"
 msgstr "Sem uso no modo 3 ch: o YM tem três vozes mais a faixa Digidrum. Computer STE adiciona oito faixas DMA"
 
-msgid "Up: higher noise, x quarter steps of its period per tick"
-msgstr "Subir: ruído mais agudo, x quartos de passo do seu período por tick"
-
-msgid "Up: x quarter steps of volume per tick"
-msgstr "Subir: x quartos de passo de volume por tick"
-
-msgid "Up: x sixteenths of a semitone per tick"
-msgstr "Subir: x dezesseis avos de semitom por tick"
-
 msgid "Used by Chipdrum tracks only"
 msgstr "Usado apenas pelas faixas Chipdrum"
+
+msgid "VBL frequency: the replay tick, which paces the Chip ADSR, the Modulation tables, the Ticks timing and the register exports"
+msgstr "VBL frequency: o tick de replay, que dá o ritmo do ADSR Chip, das tabelas de Modulation, da cadência Ticks e das exportações de registradores"
 
 msgid "VIB: switch the vibrato of the track on or off from this step"
 msgstr "VIB: liga ou desliga o vibrato da faixa a partir deste passo"
@@ -1309,6 +1513,9 @@ msgstr "VOL: acento. Arraste para desenhar, clique direito para um slider"
 msgid "Value of one step"
 msgstr "Valor de um passo"
 
+msgid "Velocity: Accent (a gain in 16 ch, the 4-bit volume in 3 ch), Vol 4-bit or Off"
+msgstr "Velocidade: Accent (um ganho em 16 ch, o volume de 4 bits em 3 ch), Vol 4-bit ou Off"
+
 msgid "Vibrato depth in cents"
 msgstr "Profundidade do vibrato em cents"
 
@@ -1318,11 +1525,14 @@ msgstr "O vibrato move o período do envelope (buzzer)"
 msgid "Vibrato moves the square (tone period)"
 msgstr "O vibrato move a onda quadrada (período do tom)"
 
-msgid "Vibrato moves the timer (SID, Sync Buzzer)"
-msgstr "O vibrato move o timer (SID, Sync Buzzer)"
+msgid "Vibrato moves the timer (SID, Sync Buzzer) and the DMA sample"
+msgstr "O vibrato move o timer (SID, Sync Buzzer) e a amostra DMA"
 
-msgid "Vibrato of this channel On or Off (Vxx in the CMD row of the sequencer: V00 off, V01 on)"
-msgstr "Vibrato deste canal ligado ou desligado (Vxx na linha CMD do sequenciador: V00 desligado, V01 ligado)"
+msgid "Vibrato of the wheel, the aftertouch and the MPE slide at their top, in cents"
+msgstr "Vibrato da roda, do aftertouch e do slide MPE no máximo, em cents"
+
+msgid "Vibrato of this track On or Off (the VIB row of the Step Sequencer switches it from a step on)"
+msgstr "Vibrato desta faixa ligado ou desligado (a linha VIB do Step Sequencer o liga ou desliga a partir de um passo)"
 
 msgid "Vibrato speed in Hz"
 msgstr "Velocidade do vibrato em Hz"
@@ -1336,8 +1546,14 @@ msgstr "Voz {1} - {2}"
 msgid "Volume"
 msgstr "Volume"
 
-msgid "Volume Slide (Axy): the volume goes up x or down y quarter steps per replay tick, until A00"
-msgstr "Deslizamento de volume (Axy): o volume sobe x ou desce y quartos de passo por tick de replay, até A00"
+msgid "Volume Slide (Axy) of an older project: the volume goes up or down this many quarter steps per replay tick; 0 stops it. The Slide of the VOL cell replaces it"
+msgstr "Deslizamento de volume (Axy) de um projeto anterior: o volume sobe ou desce tantos quartos de passo por tick de replay; 0 para-o. O Slide da célula VOL substitui-o"
+
+msgid "Volume of the left side (both with Link)"
+msgstr "Volume do lado esquerdo (os dois com Link)"
+
+msgid "Volume of the right side (both with Link)"
+msgstr "Volume do lado direito (os dois com Link)"
 
 msgid "Volume source: fixed level or hardware envelope"
 msgstr "Fonte do volume: nível fixo ou envelope de hardware"
@@ -1360,6 +1576,9 @@ msgstr "Volume: a fonte toca o envelope de hardware, o volume de 4 bits é ignor
 msgid "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 channels)"
 msgstr "O que o LFO move: volume, período do ruído, período do envelope, razão SID, altura ou panorâmica (16 canais)"
 
+msgid "Width of the Square: the note volume over Width of its Steps, SID min vol over the rest (half and half by default). Square only"
+msgstr "Largura do Square: o volume da nota durante Width dos seus Steps, SID min vol no resto (metade e metade por omissão). Só com Square"
+
 msgid "Write the figure into the track"
 msgstr "Escreva a figura na faixa"
 
@@ -1378,23 +1597,38 @@ msgstr "Gravar este comando no passo"
 msgid "Write this tempo into the step, for every track"
 msgstr "Gravar este andamento no passo, para todas as faixas"
 
-msgid "YM Pad: the tone runs at period 0 under the envelope, about -6 dB (TTrak)"
-msgstr "YM Pad: o tom roda no período 0 sob o envelope, cerca de -6 dB (TTrak)"
+msgid "YM Pad: the tone runs at period 0 under the envelope, about -6 dB"
+msgstr "YM Pad: o tom roda no período 0 sob o envelope, cerca de -6 dB"
 
-msgid "{1}: A drum track has no LFO"
-msgstr "{1}: uma faixa de percussão não tem LFO"
+msgid "{1}: A DMA note plays its sample: no square, no noise, no envelope"
+msgstr "{1}: uma nota DMA toca o seu sample: sem quadrada, sem ruído, sem envelope"
 
-msgid "{1}: A drum track has no arpeggiator"
-msgstr "{1}: uma faixa de percussão não tem arpejador"
+msgid "{1}: A SID Voice writes its own volumes: the envelope is not used"
+msgstr "{1}: uma SID Voice escreve os seus próprios volumes: o envelope não é usado"
 
-msgid "{1}: A drum track has no modulation table"
-msgstr "{1}: uma faixa de percussão não tem tabela de modulação"
-
-msgid "{1}: A drum track has no vibrato"
-msgstr "{1}: uma faixa de percussão não tem vibrato"
+msgid "{1}: A drum hit plays its own sound: no source, no envelope"
+msgstr "{1}: um golpe de percussão toca o seu próprio som: sem fonte, sem envelope"
 
 msgid "{1}: A drum track keeps its tuning (OCT and TON rows)"
 msgstr "{1}: uma faixa de percussão mantém a sua afinação (linhas OCT e TON)"
+
+msgid "{1}: A held DMA or drum note keeps its sound: GEN acts on the notes that start"
+msgstr "{1}: uma nota DMA ou de percussão sustentada mantém o seu som: GEN age sobre as notas que começam"
+
+msgid "{1}: A held note keeps the instrument it started with"
+msgstr "{1}: uma nota sustentada mantém o instrumento com que começou"
+
+msgid "{1}: A slide keeps the instrument of the note it starts from"
+msgstr "{1}: um deslizamento mantém o instrumento da nota de onde parte"
+
+msgid "{1}: During a slide, only VOL acts"
+msgstr "{1}: durante um deslizamento, só VOL age"
+
+msgid "{1}: In 3 ch mode, the DMA tracks play the DMA sound"
+msgstr "{1}: no modo 3 ch, as faixas DMA tocam o som DMA"
+
+msgid "{1}: No note on this step"
+msgstr "{1}: nenhuma nota neste passo"
 
 msgid "{1}: No note starts on this step"
 msgstr "{1}: nenhuma nota começa neste passo"
@@ -1402,26 +1636,23 @@ msgstr "{1}: nenhuma nota começa neste passo"
 msgid "{1}: No slide runs on this step (SLD row)"
 msgstr "{1}: nenhum deslizamento toca neste passo (linha SLD)"
 
-msgid "{1}: Not a DMA track: there is no sample to start further in"
-msgstr "{1}: não é uma faixa DMA, não há sample para começar mais adiante"
+msgid "{1}: Not a DMA note: there is no sample to start further in"
+msgstr "{1}: não é uma nota DMA, não há sample para começar mais adiante"
+
+msgid "{1}: Sync Buzzer plays the hardware envelope alone: no square, no noise, no fixed volume"
+msgstr "{1}: o Sync Buzzer toca só o envelope de hardware: sem quadrada, sem ruído, sem volume fixo"
 
 msgid "{1}: The LFO of this track is off (Modulation window)"
 msgstr "{1}: o LFO desta faixa está desligado (janela Modulation)"
 
-msgid "{1}: The arpeggiator of this track is off (Arpeggiator window)"
-msgstr "{1}: o arpejador desta faixa está desligado (janela Arpeggiator)"
-
 msgid "{1}: The envelope does not play on this track (Source Env, Sync Buzzer, an Env entry of SRC or Sync Buzzer in GEN)"
 msgstr "{1}: o envelope não toca nesta faixa (Source Env, Sync Buzzer, uma entrada Env de SRC ou Sync Buzzer em GEN)"
 
-msgid "{1}: The modulation table of this track is off (Modulation window)"
-msgstr "{1}: a tabela de modulação desta faixa está desligada (janela Modulation)"
+msgid "{1}: The note goes on after this step: only the GAT of its last step acts"
+msgstr "{1}: a nota continua depois deste passo: só o GAT do seu último passo age"
 
 msgid "{1}: The sequencer follows an external clock"
 msgstr "{1}: o sequenciador segue um relógio externo"
-
-msgid "{1}: The vibrato of this track is off (VIBRATO frame)"
-msgstr "{1}: o vibrato desta faixa está desligado (quadro VIBRATO)"
 
 msgid "{1}: Ticks timing: a line lasts its ticks per line"
 msgstr "{1}: temporização Ticks, uma linha dura os seus ticks por linha"

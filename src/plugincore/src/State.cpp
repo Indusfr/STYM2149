@@ -200,7 +200,9 @@ bool defaultSequences(const TrackPatch& p) {
     const TrackPatch d;
     return p.rows == d.rows && p.fixedNote == d.fixedNote && p.detuneCents == d.detuneCents &&
            p.analogCents == d.analogCents && p.hardSync == d.hardSync && p.link == d.link && p.pitchMatrix == d.pitchMatrix &&
-           p.sidWave == d.sidWave && p.sidWaveLen == d.sidWaveLen && p.buzzShapes == d.buzzShapes && p.buzzLen == d.buzzLen &&
+           p.sidWave == d.sidWave && p.sidWaveLen == d.sidWaveLen && p.sidForm == d.sidForm &&
+           p.sidWavePhase == d.sidWavePhase && p.sidWavePeriod == d.sidWavePeriod && p.sidWidth == d.sidWidth &&
+           p.buzzShapes == d.buzzShapes && p.buzzLen == d.buzzLen &&
            p.envTuned == d.envTuned && p.envRatioN == d.envRatioN && p.envRatioD == d.envRatioD &&
            p.envFineCents == d.envFineCents && p.ymPad == d.ymPad && p.lfo == d.lfo && p.echo == d.echo;
 }
@@ -238,6 +240,11 @@ void writeSequences(Writer& w, const TrackPatch& p) {
     w.u8(p.echo.repeats);
     w.u8(p.echo.drop);
     w.i8(p.echo.target);
+    w.u8(ymengine::sineForm(p.sidForm) ? 1 : 0);  // Sine lit (D-402; a Bounce for an older version, D-414)
+    w.u8(p.sidWavePhase);                         // its phase (D-405)
+    w.u8(p.sidWavePeriod);                        // its period (D-406)
+    w.u8(p.sidWidth);                             // width of the square wave (D-408)
+    w.u8(uint8_t(p.sidForm));                     // form of the SID wave (D-411)
 }
 
 // Reads the fields present, like readTrack.
@@ -253,6 +260,7 @@ void readSequences(Reader r, TrackPatch& p) {
     if (r.has(1)) p.hardSync = r.u8() != 0;
     if (r.has(1)) p.link = r.u8();
     if (r.has(2)) p.pitchMatrix = r.u16();
+    p.sidWaveLen = 0;  // a chunk without the waves: the square of the prototype (form of the SID wave, below)
     if (r.has(1 + kSidWaveSteps)) {
         p.sidWaveLen = r.u8();
         for (auto& v : p.sidWave) v = r.u8();
@@ -285,6 +293,32 @@ void readSequences(Reader r, TrackPatch& p) {
         p.echo.drop = r.u8();
         p.echo.target = r.i8();
     }
+    bool sine = false;
+    if (r.has(1)) sine = r.u8() != 0;  // Sine lit (D-402)
+    if (r.has(1)) p.sidWavePhase = uint8_t(r.u8() % ymengine::kSidWaveSteps);  // its phase (D-405)
+    // Its period (D-406). A chunk without it was written while a lit Sine was one cycle over the 16 bars: its bars keep
+    // that period; with the Sine out, the period by default waits for the next Sine.
+    if (r.has(1))
+        p.sidWavePeriod = uint8_t(std::clamp<int>(r.u8(), ymengine::kSidWavePeriodMin, ymengine::kSidWaveSteps));
+    else if (sine) p.sidWavePeriod = uint8_t(ymengine::kSidWaveSteps);
+    const bool width = r.has(1);
+    if (width) p.sidWidth = uint8_t(std::clamp<int>(r.u8(), 1, ymengine::kSidWidthMax));  // square width (D-408)
+    // Form of the SID wave (D-411). A chunk without it: Steps 2 or more played the bars, Sine lit or not, a lit Sine
+    // being drawn on the chip's levels, the Bounce now (D-414); less, the plain square, whose width counted sixteenths
+    // of its period, 8 being half and half: another width becomes the Square of 16 Steps, the same sound, half and half
+    // Base, with the width by default for the next Square.
+    if (r.has(1)) p.sidForm = ymengine::sidFormOf(r.u8());
+    else {
+        if (p.sidWaveLen >= 2) p.sidForm = sine ? ymengine::SidForm::Bounce : ymengine::SidForm::Custom;
+        else if (width && p.sidWidth != 2 * ymengine::kSidWidth) {
+            p.sidForm = ymengine::SidForm::Square;
+            p.sidWaveLen = uint8_t(ymengine::kSidWaveSteps);
+        } else p.sidForm = ymengine::SidForm::Base;
+        if (p.sidForm != ymengine::SidForm::Square) p.sidWidth = uint8_t(ymengine::kSidWidth);
+    }
+    // Steps 2 to 16; 0 or 1, the plain square of a chunk without the form, takes those by default.
+    p.sidWaveLen = uint8_t(p.sidWaveLen < 2 ? ymengine::kSidSquareSteps
+                                            : std::min<int>(p.sidWaveLen, ymengine::kSidWaveSteps));
 }
 
 // GLBX: channel taken by the Digidrum track of each chip (0 = A to 2 = C), scale of the scale-locked slides (u16
@@ -313,10 +347,11 @@ void readGlobal(Reader r, GlobalParams& g) {
 // Rows of a pattern track in the state: the 16 rows of the prototype (ymseq::Row up to TON), then for each chord
 // voice its note, its octave and its duration (16 to 30), then the rows of M6 in the order of ymseq::Row (31: INS,
 // 32 to 37: the CMD rows Xyz, Sxx, Rxx, Zxx, Txx, Vxx, D-330; 38 to 46: Axy, Pxy, Dxx, Cxx, Bxy, Nxy, Exx, Oxx, Fxx,
-// D-338; 47 to 49: Lxx, Mxx, Jxx, twelfth DAW test; before D-330, row 32 held every kind of command: a command read
-// there goes to the row of its kind). Xyz and Pxy are retired (D-340, D-344): their rows are no longer written and a
-// value read for them is dropped. An M5 state does not have the last ones; M5 ignores their ids. The ARP flags (row
-// 3) and the Txx of a state written before the twelfth DAW test become Jxx and the BPM row of the pattern.
+// D-338; 47 to 49: Lxx, Mxx, Jxx, twelfth DAW test; 50 to 52: Gxx, Kxx, Qxx, D-393, D-394; before D-330, row 32
+// held every kind of command: a command read there goes to the row of its kind). Xyz and Pxy are retired (D-340,
+// D-344): their rows are no longer written and a value read for them is dropped. An M5 state does not have the last
+// ones; M5 ignores their ids. The ARP flags (row 3) and the Txx of a state written before the twelfth DAW test become
+// Jxx and the BPM row of the pattern.
 constexpr int kChordRow0 = ymseq::kProtoRows;
 constexpr int kChordRowEnd = kChordRow0 + 3 * ymseq::kExtraVoices;
 constexpr int kStateRows = kLaneRows;
@@ -536,7 +571,9 @@ void sanitize(TrackParams& t) {
     p.link = uint8_t(std::min<int>(p.link, kInstruments));
     p.pitchMatrix &= kPitchMatrixAll;
     for (auto& v : p.sidWave) v = uint8_t(std::min<int>(v, 15));
-    p.sidWaveLen = p.sidWaveLen < 2 ? 0 : uint8_t(std::min<int>(p.sidWaveLen, kSidWaveSteps));
+    p.sidWaveLen = uint8_t(p.sidWaveLen < 2 ? kSidSquareSteps : std::min<int>(p.sidWaveLen, kSidWaveSteps));
+    p.sidForm = sidFormOf(int(p.sidForm));
+    p.sidWidth = uint8_t(std::clamp<int>(p.sidWidth, 1, kSidWidthMax));
     for (auto& v : p.buzzShapes) v = uint8_t(std::min<int>(v, 15));
     p.buzzLen = uint8_t(std::min<int>(p.buzzLen, kBuzzSteps));
     p.envRatioN = uint8_t(std::clamp<int>(p.envRatioN, 1, kEnvRatioMax));
@@ -588,9 +625,13 @@ void sanitize(NonParamState& s) {
     for (DmaSlot& sl : s.dma.slots) {
         sl.rate = uint8_t(std::min<int>(sl.rate, kDmaRates - 1));
         sl.root = uint8_t(std::min<int>(sl.root, 127));
+        sl.cents = std::isfinite(sl.cents) ? std::clamp(sl.cents, -kDmaCentsMax, kDmaCentsMax) : 0.0;  // D-452
+        sl.end = std::min<uint32_t>(sl.end, kDmaMaxBytes);  // frames (D-444); End 0: to the end of the sample
+        sl.start = std::min(sl.start, sl.end > 0 ? sl.end : kDmaMaxBytes);
     }
     for (auto& smp : s.dmaSamples)
         if (smp.size() > kDmaMaxBytes) smp.resize(kDmaMaxBytes);
+    for (auto& n : s.dmaNames) n = cleanDigidrumName(n);
     // Digidrum editor (D-154).
     for (DigidrumSlotState& ds : s.digiSlots) {
         ds.name = cleanDigidrumName(ds.name);
@@ -598,8 +639,8 @@ void sanitize(NonParamState& s) {
         p.rateHz = std::isfinite(p.rateHz) ? std::clamp(p.rateHz, kDigidrumRateMin, kDigidrumRateMax) : kDigidrumRate;
         p.root = uint8_t(std::min<int>(p.root, 127));
         p.cents = std::isfinite(p.cents) ? std::clamp(p.cents, -kDigidrumCentsMax, kDigidrumCentsMax) : 0.0;
-        p.loopEnd = std::min<uint32_t>(p.loopEnd, Engine::kMaxUserSample);
-        p.loopStart = std::min(p.loopStart, p.loopEnd);
+        p.end = std::min<uint32_t>(p.end, Engine::kMaxUserSample);
+        p.start = std::min(p.start, p.end > 0 ? p.end : Engine::kMaxUserSample);  // End 0: to the end of the sample
         ds.convert = DigiConvert(std::min<int>(int(ds.convert), int(DigiConvert::YmLevels)));
         if (ds.source.size() > Engine::kMaxUserSample) ds.source.resize(Engine::kMaxUserSample);
     }
@@ -840,7 +881,8 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
     // STE DMA bank (D-153): chunk written only when not default.
     const NonParamState& x = state.extras;
     if (!(x.dma == DmaParams{}) ||
-        std::any_of(x.dmaSamples.begin(), x.dmaSamples.end(), [](const auto& v) { return !v.empty(); })) {
+        std::any_of(x.dmaSamples.begin(), x.dmaSamples.end(), [](const auto& v) { return !v.empty(); }) ||
+        std::any_of(x.dmaNames.begin(), x.dmaNames.end(), [](const auto& n) { return !n.empty(); })) {
         c = w.begin(kDmas);
         w.u8(uint8_t(kDmaSlots));
         for (int k = 0; k < kDmaSlots; ++k) {
@@ -854,6 +896,18 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             w.u32(uint32_t(n));
             w.bytes(std::string_view(reinterpret_cast<const char*>(smp.data()), n));
         }
+        // After the slots (older readers stop there): Start and End of each slot, in frames (D-444).
+        for (const DmaSlot& sl : x.dma.slots) {
+            w.u32(sl.start);
+            w.u32(sl.end);
+        }
+        // Then the names of the slots (D-445), and their fine tune (D-452).
+        for (const std::string& n : x.dmaNames) {
+            const std::string name = cleanDigidrumName(n);
+            w.u8(uint8_t(name.size()));
+            w.bytes(name);
+        }
+        for (const DmaSlot& sl : x.dma.slots) w.f64(sl.cents);
         w.end(c);
     }
     // Digidrum editor (D-154): chunk written only when not default.
@@ -869,8 +923,8 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             w.u8(ds.play.root);
             w.f64(ds.play.cents);
             w.u8(ds.play.loop ? 1 : 0);
-            w.u32(ds.play.loopStart);
-            w.u32(ds.play.loopEnd);
+            w.u32(ds.play.start);
+            w.u32(ds.play.end);
             w.u8(uint8_t(ds.convert));
             const size_t n = std::min<size_t>(ds.source.size(), Engine::kMaxUserSample);
             w.u32(uint32_t(n));
@@ -1086,6 +1140,27 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 smp.resize(std::min<size_t>(n, kDmaMaxBytes));
                 if (!smp.empty()) std::memcpy(smp.data(), bytes.data(), smp.size());
             }
+            // Start and End (D-444), absent from older states: the whole sample.
+            for (int k = 0; k < count && b.has(8); ++k) {
+                const uint32_t start = b.u32(), end = b.u32();
+                if (k >= kDmaSlots) continue;
+                d.slots[size_t(k)].start = start;
+                d.slots[size_t(k)].end = end;
+            }
+            // Names (D-445), absent from older states: none.
+            for (int k = 0; k < count && b.has(1); ++k) {
+                const uint8_t n = b.u8();
+                const auto text = b.take(n);
+                if (!b.ok()) break;
+                if (k >= kDmaSlots) continue;
+                st.extras.dmaNames[size_t(k)] =
+                    cleanDigidrumName(std::string_view(reinterpret_cast<const char*>(text.data()), text.size()));
+            }
+            // Fine tune (D-452), absent from older states: 0.
+            for (int k = 0; k < count && b.has(8); ++k) {
+                const double cents = b.f64();
+                if (k < kDmaSlots) d.slots[size_t(k)].cents = cents;
+            }
         } else if (tag == kTseq) {
             const int count = b.u8();
             for (int k = 0; k < count && b.ok(); ++k) {
@@ -1106,8 +1181,8 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 g.play.root = b.u8();
                 g.play.cents = b.f64();
                 g.play.loop = b.u8() != 0;
-                g.play.loopStart = b.u32();
-                g.play.loopEnd = b.u32();
+                g.play.start = b.u32();
+                g.play.end = b.u32();
                 g.convert = DigiConvert(std::min<int>(b.u8(), int(DigiConvert::YmLevels)));
                 const uint32_t n = b.u32();
                 const auto src = b.take(n);

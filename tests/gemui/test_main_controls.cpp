@@ -16,10 +16,13 @@
 #include <cstdio>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "UiHost.h"
+#include "gemui/Desktop.h"
+#include "gemui/Font.h"
 #include "plugincore/Mapping.h"
 #include "plugincore/Parameters.h"
 #include "pluginui/Widgets.h"
@@ -156,10 +159,10 @@ TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P2
     UiHost h;
     pluginui::MainWindow w(h);
 
-    // Smooth: Attack and Decay 0 to 1000 ms, Sustain 0 to 100 %, Release 0 to 2000 ms.
-    enter(w, "atkv", "1500");
-    CHECK(h.p(0, Track::Attack) == 1000.0f);
-    CHECK(field(w, "atkv").text() == "1000");
+    // Smooth: Attack, Decay and Release 0 to 2000 ms (D-428), Sustain 0 to 100 %.
+    enter(w, "atkv", "2500");
+    CHECK(h.p(0, Track::Attack) == 2000.0f);
+    CHECK(field(w, "atkv").text() == "2000");
     enter(w, "dcyv", "250");
     CHECK(h.p(0, Track::Decay) == 250.0f);
     CHECK(field(w, "dcyv").text() == "250");
@@ -175,15 +178,15 @@ TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P2
     CHECK(rel->value() == 2000);
     // The mask takes as many digits as the maximum has.
     enter(w, "dcyv", "98765");
-    CHECK(h.p(0, Track::Decay) == 1000.0f);
+    CHECK(h.p(0, Track::Decay) == 2000.0f);
     // Escape: nothing changes.
     type(w, "atkv", "300");
     key(w, gemui::Key::Escape);
     CHECK_FALSE(field(w, "atkv").editing());
-    CHECK(h.p(0, Track::Attack) == 1000.0f);
-    CHECK(field(w, "atkv").text() == "1000");
+    CHECK(h.p(0, Track::Attack) == 2000.0f);
+    CHECK(field(w, "atkv").text() == "2000");
 
-    // Chip: VBL ticks (0 to 64) and level (0 to 15), stored in ms and percent (20 ms per tick at 50 Hz).
+    // Chip: VBL ticks (0 to 100) and level (0 to 15), stored in ms and percent (20 ms per tick at 50 Hz).
     h.p(0, Track::AdsrMode) = 1;
     w.tick(0);
     enter(w, "dcyv", "10");
@@ -195,13 +198,31 @@ TEST_CASE("ADSR values typed in: rounded and clamped in the unit of the mode (P2
     enter(w, "susv", "6");
     CHECK(h.p(0, Track::Sustain) == 40.0f);
     CHECK(field(w, "susv").text() == "6");
-    enter(w, "relv", "99");
+    enter(w, "relv", "64");
     CHECK(h.p(0, Track::Release) == 1280.0f);
     CHECK(field(w, "relv").text() == "64");
-    // Attack and Decay stop at 1000 ms: 64 ticks are kept as 50 at 50 Hz (D-085).
-    enter(w, "atkv", "64");
-    CHECK(h.p(0, Track::Attack) == 1000.0f);
-    CHECK(field(w, "atkv").text() == "50");
+    // A, D and R go to the end of their sliders, 100 ticks at 50 Hz: the 2000 ms of Smooth (Indus, 18:30, D-428; A
+    // and D stopped at 50 ticks, D-085, then 64, D-427; R at 64 ticks like the prototype's).
+    const auto* atk = dynamic_cast<const gemui::Slider*>(w.widgetOf("atk"));
+    const auto* dcy = dynamic_cast<const gemui::Slider*>(w.widgetOf("dcy"));
+    REQUIRE(atk);
+    REQUIRE(dcy);
+    for (const auto& [id, param, slider] : {std::tuple{"atkv", Track::Attack, atk},
+                                            std::tuple{"dcyv", Track::Decay, dcy},
+                                            std::tuple{"relv", Track::Release, rel}}) {
+        CAPTURE(id);
+        enter(w, id, "999");
+        CHECK(h.p(0, param) == 2000.0f);
+        CHECK(field(w, id).text() == "100");
+        CHECK(slider->max() == 100);
+        CHECK(slider->value() == slider->max());
+    }
+    // Back in Smooth, the same end: 2000 ms.
+    h.p(0, Track::AdsrMode) = 0;
+    w.tick(0);
+    CHECK(atk->max() == 2000);
+    CHECK(atk->value() == 2000);
+    CHECK(field(w, "atkv").text() == "2000");
 }
 
 TEST_CASE("Envelope: EP typed in decimal or $hex, frequency typed in Hz, clamped to 1..65535 (P465, P466)",
@@ -286,8 +307,8 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     press(w, whiteKey(w, 2), gemui::MouseButton::Right);
     const gemui::MenuList* m = topMenu(w);
     REQUIRE(m);
-    CHECK(m->box().x == 231.4375);  // 164 + 2 × 33.71875
-    CHECK(m->box().y == 388);       // 716 − 326 − 2
+    CHECK(m->box().x == 267.4375);  // 200 + 2 × 33.71875
+    CHECK(m->box().y == 392);       // 716 − 326 + 2: its frame on the key's top rule
     CHECK(m->box().w == 207);
     CHECK(m->box().h == 326);
     CHECK(h.take().empty());
@@ -315,8 +336,8 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     REQUIRE(kb);
     press(w, {kb->x + 66, kb->y + 5}, gemui::MouseButton::Right);
     REQUIRE(topMenu(w));
-    CHECK(topMenu(w)->box().x == 220.625);
-    CHECK(topMenu(w)->box().y == 388);
+    CHECK(topMenu(w)->box().x == 256.625);
+    CHECK(topMenu(w)->box().y == 392);
     CHECK(topMenu(w)->checked() == 2);
     key(w, gemui::Key::Escape);
     CHECK(h.take().empty());
@@ -347,15 +368,15 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     pluginui::MainWindow wp(hp);
     press(wp, centre(wp.pads().padRect(2)), gemui::MouseButton::Right);
     REQUIRE(topMenu(wp));
-    CHECK(topMenu(wp)->box().x == 401);
-    CHECK(topMenu(wp)->box().y == 386);  // 714 − 326 − 2
+    CHECK(topMenu(wp)->box().x == 437);
+    CHECK(topMenu(wp)->box().y == 390);  // 714 − 326 + 2
     CHECK(menuLabels(wp)[0] == "Channel 1 [Chipdrum]");
     key(wp, gemui::Key::Escape);
     const gemui::Rect pad0 = wp.pads().padRect(0);
     press(wp, {pad0.right() + 1, pad0.y + 10}, gemui::MouseButton::Right);
     REQUIRE(topMenu(wp));
-    CHECK(topMenu(wp)->box().x == 164);
-    CHECK(topMenu(wp)->box().y == 386);
+    CHECK(topMenu(wp)->box().x == 200);
+    CHECK(topMenu(wp)->box().y == 390);
     CHECK(hp.take().empty());
 }
 
@@ -785,6 +806,57 @@ TEST_CASE("SOURCE: what the sound does not use is greyed out with its reason (si
     w.desktop().closePopups();
 }
 
+TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteenth DAW test, items 169 and 170, "
+          "D-378)",
+          "[ui][source][env]") {
+    UiHost h;
+    h.p(Global::Computer) = 1;  // the STE, for the DMA type in 16 ch
+    pluginui::MainWindow w(h);
+    h.p(0, Track::Noise) = 1;
+    h.p(0, Track::VolMode) = 1;
+    w.tick(0);
+    auto on = [&w](std::string_view id) {
+        const gemui::Widget* x = w.widgetOf(id);
+        REQUIRE(x);
+        return x->enabled();
+    };
+    auto tip = [&w](std::string_view id) { return w.widgetOf(id)->tip(); };
+    // Chip Voice with noise and the envelope: everything acts.
+    for (const char* id : {"srcSel", "np", "vol", "vmSel", "ef", "shapeSel"}) CHECK(on(id));
+    CHECK_FALSE(w.rectOf("envInert"));
+    const struct {
+        Generator gen;
+        const char* why;
+    } cases[] = {{Generator::Dma, "A DMA track plays its sample"},
+                 {Generator::Digidrum, "Percussion tracks play their own sounds"},
+                 {Generator::Chipdrum, "Percussion tracks play their own sounds"}};
+    for (const auto& c : cases) {
+        CAPTURE(int(c.gen));
+        h.p(0, Track::Generator) = float(c.gen);
+        w.tick(0);
+        // The square, the noise, the fixed volume and Mode are not used; Voicing and Level still act.
+        for (const char* id : {"srcSel", "np", "vol", "vmSel"}) {
+            CAPTURE(id);
+            CHECK_FALSE(on(id));
+            CHECK(tip(id).find(c.why) == 0);
+        }
+        CHECK(on("polySel"));
+        CHECK(on("chLevel"));
+        // ENVELOPE dimmed with its title, the mouse going through it.
+        const auto env = w.rectOf("envInert");
+        REQUIRE(env);
+        CHECK(*env == *w.rectOf("envFrame"));
+        CHECK_FALSE(on("ef"));
+        CHECK_FALSE(on("shapeSel"));
+        click(w, "shapeSel");
+        CHECK_FALSE(topMenu(w));
+    }
+    h.p(0, Track::Generator) = float(Generator::Chip);
+    w.tick(0);
+    for (const char* id : {"srcSel", "np", "vol", "vmSel", "ef", "shapeSel"}) CHECK(on(id));
+    CHECK_FALSE(w.rectOf("envInert"));
+}
+
 TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the session (third DAW test, item 25, "
           "D-224)",
           "[ui][windows]") {
@@ -815,9 +887,11 @@ TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the s
         click(w, "fxSel");
         CHECK(topMenu(w));
         w.desktop().closePopups();
-        // Kept on the desktop: 96 px of its title bar at least.
+        // Kept on the desktop: its right and bottom edges on those of the desktop (Indus, 26/10/2026, D-460).
         w.moveMainTo(5000, 5000);
-        CHECK(w.mainPlace() == gemui::Point{MainWindow::kWidth - 96, MainWindow::kHeight - 48});
+        const gemui::Rect f = w.mainFrame().bounds();
+        CHECK(f.right() == MainWindow::kWidth);
+        CHECK(f.bottom() == MainWindow::kHeight);
         w.moveMainTo(-50, -50);  // below the menu bar of the desktop (ninth DAW test, item 101)
         CHECK(w.mainPlace() == gemui::Point{0, MainWindow::kMenuH});
         w.moveMainTo(home.x + 10, home.y + 20);
@@ -876,4 +950,168 @@ TEST_CASE("Typed and shown decimals do not depend on the C locale of the host", 
     click(w, "efv");
     key(w, gemui::Key::Enter);
     CHECK(h.p(0, Track::EnvPeriod) == ep);
+}
+
+TEST_CASE("ADSR curve: one point per note sounding (Indus, 24/10/2026 11:45, D-403)", "[ui][adsr]") {
+    using pluginui::AdsrCurve;
+    AdsrCurve c;
+    c.setBox({0, 0, 300, 74});
+    c.setShape({100, 200, 0.5, 1000});
+    // Columns of the canvas where the green bar of a point stands.
+    auto bars = [&] {
+        gemui::Surface s(300, 74, gemui::colors::kWhite);
+        gemui::Painter p(s);
+        c.paint(p);
+        std::vector<int> xs;
+        bool prev = false;
+        for (int x = 0; x < 300; ++x) {
+            const bool green = s.at(x, 10) == gemui::colors::kGreen;
+            if (green && !prev) xs.push_back(x);
+            prev = green;
+        }
+        return xs;
+    };
+    CHECK(bars().empty());
+    // Three notes: one in its attack, one held on the sustain, one released; a point without a stage is left out.
+    const std::vector<AdsrCurve::LivePoint> three = {{1, 0.5}, {3, 0.5}, {4, 0.25}, {-1, 0}};
+    c.setLive(three);
+    CHECK(c.live().size() == 3);
+    CHECK(bars().size() == 3);
+    // One note left: one point.
+    const std::vector<AdsrCurve::LivePoint> one = {{3, 0.5}};
+    c.setLive(one);
+    CHECK(bars().size() == 1);
+    c.setLive({});
+    CHECK(bars().empty());
+}
+
+TEST_CASE("ADSR curve: a note released before its sustain goes on down the decay line (Indus, 24/10/2026 09:11)",
+          "[ui][adsr]") {
+    using pluginui::AdsrCurve;
+    constexpr double hold = AdsrCurve::kHoldMs;
+    // A = 153 ms, D = 1000 ms, S = 0 %, R = 1000 ms: released at the start of the decay, the level falls from near 1.
+    AdsrCurve::Shape s{153, 1000, 0, 1000};
+    const double decayAt09 = 153 + 0.1 * 1000;
+    CHECK(std::abs(AdsrCurve::liveTime(s, 2, 0.9) - decayAt09) < 1e-9);
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0.9) - decayAt09) < 1e-9);  // on the decay line, not at the R segment
+    CHECK(AdsrCurve::liveTime(s, 4, 0.9) < 153 + 1000);
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0) - (153 + 1000)) < 1e-9);  // the end of the decay line
+    // S = 50 %: above the sustain level the decay line, at and under it the release line.
+    s.sustain = 0.5;
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0.8) - (153 + 0.2 / 0.5 * 1000)) < 1e-9);
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0.5) - (153 + 1000 + hold)) < 1e-9);
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0.25) - (153 + 1000 + hold + 500)) < 1e-9);
+    // A release from the sustain, and one from the attack under it, stay on the release line.
+    s.sustain = 1;
+    CHECK(std::abs(AdsrCurve::liveTime(s, 4, 0.6) - (153 + 1000 + hold + 400)) < 1e-9);
+    CHECK(AdsrCurve::liveTime(s, 0, 1) < 0);
+}
+
+TEST_CASE("ADSR curve: with S = 0 %, a released note ends at the end of the decay line (Indus, 24/10/2026 14:58)",
+          "[ui][adsr]") {
+    using pluginui::AdsrCurve;
+    // Indus's settings: A = 1000 ms, D = 1000 ms, S = 0 %, R = 2000 ms. A note released in its attack or its decay
+    // falls from its level to 0 in R; its point goes down the decay line and never reaches the release segment, not
+    // even in its last milliseconds, where it used to show at the end of the release.
+    const AdsrCurve::Shape s{1000, 1000, 0, 2000};
+    for (const double from : {1.0, 0.5, 0.1}) {
+        double last = -1;
+        for (int k = 0; k <= 1000; ++k) {
+            const double lv = from * (1000 - k) / 1000.0, t = AdsrCurve::liveTime(s, 4, lv);
+            CHECK(t >= last);  // the point only goes forward
+            CHECK(t <= 1000 + 1000);  // never past the decay
+            last = t;
+        }
+        CHECK(std::abs(last - 2000) < 1e-9);
+    }
+    // In the sustain at level 0, released or not: the decay's end or the middle of the plateau, not the release's end.
+    CHECK(std::abs(AdsrCurve::liveTime(s, 3, 0) - (2000 + AdsrCurve::kHoldMs / 2)) < 1e-9);
+    CHECK(AdsrCurve::liveTime(s, 4, 0) < 2000 + AdsrCurve::kHoldMs);
+}
+
+TEST_CASE("Sample drawings: every column drawn and joined to the next one where the wave jumps (Indus, 26/10/2026, "
+          "D-447)",
+          "[ui][digidrum][dma]") {
+    // A square wave: 37 samples high, 37 low. Each column of the inside of the box, below the line of text, must
+    // hold black pixels touching those of the column before (the canvas of 360 columns stretched into the box left
+    // gaps and dropped columns).
+    std::vector<uint8_t> nibbles(3000);
+    std::vector<int8_t> bytes(3000);
+    for (size_t i = 0; i < nibbles.size(); ++i) {
+        const bool high = (i / 37) % 2 == 0;
+        nibbles[i] = high ? 15 : 0;
+        bytes[i] = int8_t(high ? 100 : -100);
+    }
+    auto joined = [](gemui::Widget& wave, gemui::Box box, int designH) {
+        wave.setBox(box);
+        const gemui::Rect r = wave.bounds(), in = r.inset(2);
+        gemui::Surface s(r.right() + 2, r.bottom() + 2, gemui::colors::kWhite);
+        gemui::Painter p(s);
+        wave.paint(p);
+        // Rows below the baseline of the line of text (design row 10).
+        const int top = in.y + int(std::lround(10.0 * in.h / designH)) + 1;
+        int prevLo = -1, prevHi = -1, bad = 0;
+        for (int x = in.x; x < in.right(); ++x) {
+            int lo = -1, hi = -1;
+            for (int y = top; y < in.bottom(); ++y)
+                if (s.at(x, y) == gemui::colors::kBlack) {
+                    if (lo < 0) lo = y;
+                    hi = y;
+                }
+            if (lo < 0 || (prevLo >= 0 && (lo > prevHi + 1 || hi < prevLo - 1))) ++bad;
+            prevLo = lo;
+            prevHi = hi;
+        }
+        return bad;
+    };
+    pluginui::DrumWave drum;  // GENERATOR frame, Digidrum
+    drum.setSample(0, nibbles);
+    CHECK(joined(drum, {10, 10, 204.5, 48}, pluginui::DrumWave::kH) == 0);
+    pluginui::DmaWave frame(false);  // GENERATOR frame, DMA
+    frame.setSample(0, bytes, 25033, false);
+    CHECK(joined(frame, {10, 10, 204.5, 48}, pluginui::DmaWave::kH) == 0);
+    pluginui::DmaWave dma;  // DMA window
+    dma.setSample(0, bytes, 25033, false);
+    CHECK(joined(dma, {10, 10, 360, 72}, pluginui::DmaWave::kH) == 0);
+    pluginui::DigiWave digi;  // Digidrums window
+    digi.setSample(0, nibbles, 7800, false, 0, 3000);
+    CHECK(joined(digi, {10, 10, 360, 72}, pluginui::DigiWave::kH) == 0);
+}
+
+TEST_CASE("The units of the typed values stay in normal video under the pointer (Indus, 26/10/2026, D-464)",
+          "[ui][units]") {
+    UiHost h;
+    h.p(Global::DelayOn) = 1;
+    h.p(Global::DelaySync) = 0;  // the time in ms
+    h.state.tracks[0].patch.lfo.on = true;
+    h.state.tracks[0].patch.lfo.target = ymengine::LfoTarget::Pitch;
+    h.state.tracks[0].patch.envTuned = true;
+    pluginui::MainWindow w(h);
+    gemui::Desktop& d = w.desktop();
+    // Pointer on the left of the field: the number reversed (black on the field's top row, above the glyphs), its
+    // unit at the right edge left white.
+    auto check = [&](const char* id, std::optional<gemui::Rect> r, const char* unit, int px = 14) {
+        CAPTURE(id);
+        REQUIRE(r);
+        d.mouseMove({r->x + 3, r->y + r->h / 2}, {});
+        d.paint();
+        const int uw = int(std::ceil(gemui::Font::width(unit, px)));
+        CHECK(d.surface().at(r->right() - 2, r->y) == gemui::colors::kWhite);
+        CHECK(d.surface().at(r->right() - uw - 2, r->y) == gemui::colors::kBlack);
+        d.mouseMove({1, 300}, {});
+    };
+    w.modulation().show();
+    check("seqxDetuneV", w.rectOf("seqxDetuneV"), "c");
+    check("seqxAnalogV", w.rectOf("seqxAnalogV"), "c");
+    check("lfoRateV", w.rectOf("lfoRateV"), " Hz");
+    check("lfoDepthV", w.rectOf("lfoDepthV"), "c");
+    w.modulation().close();
+    w.echoWindow().show();
+    check("delayTimev", w.echoWindow().rectOf("delayTimev"), " ms", 16);
+    check("delayFbv", w.echoWindow().rectOf("delayFbv"), " %", 16);
+    check("delayCutv", w.echoWindow().rectOf("delayCutv"), " Hz", 16);
+    check("delayLevelv", w.echoWindow().rectOf("delayLevelv"), " %", 16);
+    w.echoWindow().close();
+    w.pickGenerator(int(Generator::SyncBuzzer));
+    check("genFinev", w.rectOf("genFinev"), "c");
 }

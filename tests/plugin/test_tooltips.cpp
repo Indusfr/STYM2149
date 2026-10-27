@@ -17,10 +17,12 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "gemui/Controls.h"
 #include "gemui/Font.h"
 #include "gemui/Menu.h"
 #include "pluginui/TipLanguage.h"
@@ -87,6 +89,18 @@ void collect(std::set<std::string>& lines, StymEditor& editor) {
         }
         w.desktop().closePopups();
     }
+    // The menus of the Settings window (D-430): their greyed-out values give a reason.
+    for (const std::string_view id : pluginui::SettingsWindow::menuIds()) {
+        int checked = -1;
+        collectMenu(lines, w.settingsWindow().items(id, checked));
+    }
+    // The Note length menu of the Step Sequencer: the values that do not fit the resolution give a reason (D-425).
+    if (const auto* fig = dynamic_cast<const gemui::Button*>(w.sequencer().widgetOf("seqFig")); fig && fig->onClick) {
+        fig->onClick();
+        if (const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().firstPopup()))
+            collectMenu(lines, list->items());
+        w.desktop().closePopups();
+    }
 }
 
 }  // namespace
@@ -102,7 +116,7 @@ TEST_CASE("Tooltips: every line is translated, with characters of the GEM font (
              &w.sequencer(), &w.songWindow(), &w.mixer(), &w.arpeggiator(), &w.modulation(), &w.drumKit(),
              &w.patches(), &w.instruments(), &w.dmaWindow(),
              &w.recorderWindow(), &w.ymPlayerWindow(), &w.digidrums(), &w.slideCurve(), &w.keyboardWindow(),
-             &w.echoWindow()})
+             &w.echoWindow(), &w.settingsWindow()})
         static_cast<gemui::FloatWindow*>(win)->open();
     w.openScope(0);
     // Modulation table on for track 1: the sequence rows show below it (D-240). Echo and delay on: their rows show

@@ -2,7 +2,8 @@
 // retrigger at tick xx), Zxx (silent), Txx (tempo, D-243), Vxx (vibrato, D-254); one of each kind on a row (D-330);
 // the effects of D-338: Axy, Bxy and Nxy slides, Dxx note delay, Cxx note cut, Exx envelope shape, Oxx DMA sample
 // offset, Fxx fine tune. Xyz and Pxy are retired (D-340, D-344). Twelfth DAW test: Lxx, Mxx and Jxx switches (items 142
-// to 144); the tempo in the BPM row of the pattern (item 150).
+// to 144); the tempo in the BPM row of the pattern (item 150). Gxx volume glide set from the VOL row (D-393); Kxx and Qxx
+// curves of the Buzzer and Noise slides (D-394).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -13,6 +14,7 @@
 #include <vector>
 
 #include "ymengine/Engine.h"
+#include "ymengine/Pitch.h"
 
 using namespace stym;
 using namespace stym::ymengine;
@@ -617,6 +619,48 @@ TEST_CASE("Commands: Oxx starts the DMA samples of the row xx × 256 frames in; 
     CHECK_FALSE(dma().on);
 }
 
+TEST_CASE("Commands: Oxx counts from the Start of the DMA slot; End stops it (D-338, D-444)",
+          "[engine][seq][commands][dma]") {
+    Rig r;
+    r.g.ste = true;
+    TrackParams p;
+    p.mix.enabled = true;
+    p.patch.generator = Generator::Dma;
+    p.patch.dmaSlot = 0;
+    r.e.setTrack(0, p);
+    DmaParams d;
+    d.slots[0].rate = 2;
+    d.slots[0].loop = true;
+    d.slots[0].start = 100;
+    d.slots[0].end = 800;
+    r.e.setDma(d);
+    r.e.setDmaSample(0, std::vector<int8_t>(1000, 50));
+    SeqLane& l = r.lane(0);
+    l.pat[0] = l.pat[2] = 0;
+    l.tie[0] = l.tie[1] = 1;
+    l.setCmd(0, seqCmd(SeqCmd::Offset, 2));  // 100 + 512
+    l.setCmd(2, seqCmd(SeqCmd::Offset, 3));  // 100 + 768: past End, silence
+    r.start();
+    auto dma = [&] {
+        for (int i = 0; i < Engine::kVoices; ++i)
+            if (const Engine::DmaInfo x = r.e.dmaVoice(i); x.on) return x;
+        return Engine::DmaInfo{};
+    };
+    r.render(48);
+    REQUIRE(dma().on);
+    CHECK(dma().position >= 612);
+    CHECK(dma().position < 700);
+    for (int k = 0; k < 11; ++k) {  // the loop goes back to frame 612 and turns before End
+        r.render(kTick);
+        CAPTURE(k);
+        REQUIRE(dma().on);
+        CHECK(dma().position >= 612);
+        CHECK(dma().position < 800);
+    }
+    r.render(kTick);  // row 2
+    CHECK_FALSE(dma().on);
+}
+
 TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, held note included (D-338)",
           "[engine][seq][commands]") {
     Rig plain;
@@ -646,4 +690,108 @@ TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, he
     l.clearCmd(SeqCmd::Fine, 0);
     r.render(kTick / 2);
     CHECK(r.e.voice(0).tonePeriod == tp);
+}
+
+TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, frame after frame (D-393)",
+          "[engine][seq][commands]") {
+    // 16-channel: the accent goes down a straight line from VOL 15 to VOL 3 over the 6 ticks of row 0, then holds at
+    // the level of row 1, which has no Gxx.
+    Rig r;
+    SeqLane& l = r.lane(0);
+    l.pat[0] = 0;
+    l.tie[0] = l.tie[1] = 1;
+    l.vol[0] = 15;
+    l.vol[1] = 3;
+    l.setCmd(0, seqCmd(SeqCmd::VolGlide, 1));
+    r.start();
+    const auto a = perTick(r, 12, [](const Engine::VoiceInfo& x) { return x.accent; });
+    for (size_t k = 0; k < 6; ++k) {
+        CAPTURE(k);
+        CHECK(std::fabs(a[k] - (15 - 12 * double(k) / 6) / 15) < 1e-9);
+    }
+    for (size_t k = 6; k < 12; ++k) CHECK(std::fabs(a[k] - 3 / 15.0) < 1e-9);
+
+    // 3-channel: the 4-bit volume steps down to that of row 1 (16 levels: the registers carry it, exportable), and up
+    // again on a glide to a louder step.
+    Rig u(VoiceMode::Authentic3);
+    SeqLane& m = u.lane(0);
+    m.pat[0] = 0;
+    m.tie[0] = m.tie[1] = 1;
+    m.vol[0] = 15;
+    m.vol[1] = 3;
+    m.vol[2] = 15;
+    m.setCmd(0, seqCmd(SeqCmd::VolGlide, 1));
+    m.setCmd(1, seqCmd(SeqCmd::VolGlide, 1));
+    u.start();
+    const auto v = perTick(u, 13, [](const Engine::VoiceInfo& x) { return x.volume; });
+    CAPTURE(v);
+    CHECK(v[0] >= 12);      // VOL 15 at the level of the track
+    CHECK(v[12] == v[0]);  // row 2, VOL 15
+    for (size_t k = 1; k < 6; ++k) CHECK(v[k] <= v[k - 1]);
+    CHECK(v[5] < v[1]);
+    for (size_t k = 7; k < 12; ++k) CHECK(v[k] >= v[k - 1]);
+    CHECK(v[11] > v[6]);
+
+    // Without Gxx, the level of row 0 holds over the row.
+    Rig w;
+    w.lane(0).pat[0] = 0;
+    w.lane(0).tie[0] = w.lane(0).tie[1] = 1;
+    w.lane(0).vol[0] = 15;
+    w.lane(0).vol[1] = 3;
+    w.start();
+    const auto b = perTick(w, 6, [](const Engine::VoiceInfo& x) { return x.accent; });
+    for (const double x : b) CHECK(x == 1);
+}
+
+TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to the next command, 16 channels only "
+          "(D-394)",
+          "[engine][seq][commands]") {
+    // Envelope slide up over rows 0 and 1 (B00 at row 2), noise slide down: straight, then Exponential (slow start).
+    const auto run = [](VoiceMode mode, int curve) {
+        Rig r(mode);
+        TrackParams p;
+        p.mix.enabled = true;
+        p.patch.noiseOn = true;
+        p.patch.noisePeriod = 8;
+        p.patch.envelopeVolume = true;
+        p.patch.envPeriod = 1000;
+        r.e.setTrack(0, p);
+        SeqLane& l = r.lane(0);
+        l.pat[0] = 0;
+        l.tie[0] = l.tie[1] = l.tie[2] = 1;
+        l.setCmd(0, seqCmd(SeqCmd::EnvSlide, 0x0C));    // down 12/16 semitone per tick: longer period
+        l.setCmd(0, seqCmd(SeqCmd::NoiseSlide, 0x02));  // down half a step per tick
+        if (curve) {
+            l.setCmd(0, seqCmd(SeqCmd::EnvCurve, curve));
+            l.setCmd(0, seqCmd(SeqCmd::NoiseCurve, curve));
+        }
+        l.setCmd(2, seqCmd(SeqCmd::EnvSlide, 0));
+        l.setCmd(2, seqCmd(SeqCmd::NoiseSlide, 0));
+        r.start();
+        std::vector<double> np;
+        const auto ep = perTick(r, 16, [&](const Engine::VoiceInfo& x) {
+            np.push_back(x.noisePeriod);
+            return x.envPeriod;
+        });
+        return std::make_pair(ep, np);
+    };
+    const int expo = int(SlideCurve::Exponential);
+    const auto [lin, linN] = run(VoiceMode::Studio16, 0);
+    const auto [cur, curN] = run(VoiceMode::Studio16, expo);
+    CAPTURE(lin, cur, linN, curN);
+    // Halfway (row 1): the curve has covered less than the straight line; at the end of the span, the whole distance
+    // (9 semitones, 6 period steps) but the start of the curve, which the frame of the attack does not slide (the
+    // straight line loses a tick there).
+    CHECK(cur[6] < lin[6] - 20);
+    CHECK(cur[11] >= lin[11]);
+    CHECK(cur[11] <= std::round(1000 * std::pow(2.0, 9.0 / 12)));
+    for (size_t k = 12; k < 16; ++k) CHECK(cur[k] == cur[11]);  // B00: it stops there
+    CHECK(curN[6] < linN[6]);
+    CHECK(curN[11] >= linN[11]);
+    CHECK(curN[11] <= 14);
+    // 3 channels: the straight slide of the replay, whatever the curve.
+    const auto [lin3, linN3] = run(VoiceMode::Authentic3, 0);
+    const auto [cur3, curN3] = run(VoiceMode::Authentic3, expo);
+    CHECK(cur3 == lin3);
+    CHECK(curN3 == linN3);
 }

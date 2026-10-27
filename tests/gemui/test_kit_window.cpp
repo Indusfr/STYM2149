@@ -285,7 +285,7 @@ TEST_CASE("Drum Kit: Audition, Reset of the instrument, banks of the Kits menu",
     click(w, "kitBank");
     REQUIRE(w.desktop().hasPopups());
     const gemui::Rect b = *w.rectOf("kitBank");
-    press(w, {b.x + 20, b.bottom() + 6 + 2 + 20 * 10 + 10});
+    press(w, {b.x + 20, b.bottom() - 2 + 2 + 20 * 10 + 10});
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(h.state.kit == bank("TR-808-ish"));
     CHECK(h.editor.undo.undoSize() == 1);

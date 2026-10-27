@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 
 #include <string>
 #include <string_view>
@@ -429,6 +430,83 @@ TEST_CASE("Sequences: fixed note, detune, hard sync, matrix, chained instrument,
     dragToMax(w, "seqxVibMax");
     click(w, "seqxVibWrite");
     CHECK(h.patch().rows.period == SequencesPanel::vibratoTable(-8, ymengine::kPeriodDeltaMax, 15, 0, 4));
+}
+
+TEST_CASE("Modulation on a DMA track: what moves no sample greyed, with the reason (Indus, 26/10/2026, D-463)",
+          "[ui][sequences][dma]") {
+    TestHost h;
+    h.values[size_t(paramIndex(plugin::Global::Computer))] = 1;  // the STE, for the DMA type in 16 ch
+    const size_t gen = size_t(paramIndex(0, plugin::Track::Generator));
+    h.values[gen] = float(int(ymengine::Generator::Dma));
+    h.state.tracks[0].patch.ornamentOn = true;
+    h.state.tracks[0].patch.ornamentLength = 4;
+    MainWindow w(h);
+    w.modulation().show();
+    const pluginui::OrnGrid& table = w.modulation().grid();
+    const pluginui::SeqRowsGrid& rows = w.modulation().sequences().grid();
+    const SequencesPanel& seqx = w.modulation().sequences();
+
+    // NSE: faded, no click, no N key, the reason in its tooltip.
+    const std::string nse = "NSE: a DMA track plays a sample, without noise";
+    CHECK(table.state().noiseOff == nse);
+    CHECK(table.tipAt(centre(table.noiseRect(1))) == nse);
+    press(w, centre(table.noiseRect(1)));
+    CHECK(h.patch().ornamentNoise[1] == 0);
+    CHECK(letter(w, U'n'));
+    CHECK(h.patch().ornamentNoise[size_t(h.editor.ornCur)] == 0);
+    CHECK(h.editor.undo.undoSize() == 0);
+
+    // NP, MIX, GEN: faded, no click nor wheel nor menu, the reason in their tooltips; PER, FIX and OUT act.
+    const std::array<std::string, pluginui::SeqRowsGrid::kRowCount> why = {
+        "", "NP: a DMA track plays a sample, without noise",
+        "MIX: a DMA track plays a sample, without the chip's mixer", "GEN: a DMA track keeps its sample", "", ""};
+    CHECK(rows.state().off == why);
+    for (Row r : {Row::Noise, Row::Mix, Row::Gen}) {
+        CAPTURE(int(r));
+        CHECK(rows.tipAt(centre(cell(w, r, 0))) == why[size_t(r)]);
+        press(w, centre(cell(w, r, 0)));
+        CHECK_FALSE(w.desktop().topPopup());
+        press(w, centre(cell(w, r, 0)), gemui::MouseButton::Right);
+        CHECK_FALSE(w.desktop().topPopup());
+        wheel(w, centre(cell(w, r, 0)), -1);
+    }
+    CHECK(h.patch().rows == ymengine::SeqRows{});
+    CHECK(h.editor.undo.undoSize() == 0);
+    press(w, {centre(cell(w, Row::Period, 0)).x, cell(w, Row::Period, 0).y + 1});
+    CHECK(h.patch().rows.period[0] > 0);
+    press(w, centre(cell(w, Row::Fix, 1)));
+    CHECK(h.patch().rows.fix[1] == 1);
+    press(w, centre(table.volumeRect(0)));
+    CHECK(h.patch().ornamentVolume[0] < 15);
+
+    // Hard sync and the Sq and Bz columns of the matrix greyed with the reason; Tm, Link and the vibrato table act.
+    const ymengine::TrackPatch before = h.patch();
+    click(w, "seqxSync");
+    for (int k : {0, 2, 3, 5, 6, 8}) click(w, "seqxMx" + std::to_string(k));
+    CHECK(h.patch() == before);
+    CHECK_FALSE(seqx.button("seqxSync")->enabled());
+    CHECK(seqx.button("seqxSync")->tip() ==
+          "Hard sync: a DMA track plays a sample, with no square or timer to restart");
+    CHECK(seqx.button("seqxMx3")->tip() == "A DMA track has no square: the Tm column moves its sample");
+    CHECK(seqx.button("seqxMx8")->tip() == "A DMA track has no envelope: the Tm column moves its sample");
+    CHECK(seqx.button("seqxMx4")->tip() == "Slides moves the timer (SID, Sync Buzzer) and the DMA sample");
+    click(w, "seqxMx4");
+    CHECK_FALSE(h.patch().pitchMatrix & pitchBit(PitchSource::Slide, PitchTarget::Timer));
+    for (const char* id : {"seqxLink", "seqxVibWrite"}) CHECK(seqx.button(id)->enabled());
+    for (const char* id : {"seqxFix", "seqxDetune", "seqxAnalog"}) CHECK(seqx.slider(id)->enabled());
+
+    // Chip Voice again: everything acts.
+    h.values[gen] = float(int(ymengine::Generator::Chip));
+    w.tick(0);
+    CHECK(table.state().noiseOff.empty());
+    CHECK(rows.state().off == std::array<std::string, pluginui::SeqRowsGrid::kRowCount>{});
+    CHECK(seqx.button("seqxSync")->enabled());
+    CHECK(seqx.button("seqxMx0")->enabled());
+    CHECK(seqx.button("seqxMx3")->tip() == "Slides moves the square (tone period)");
+    press(w, centre(table.noiseRect(1)));
+    CHECK(h.patch().ornamentNoise[1] == 1);
+    press(w, centre(cell(w, Row::Gen, 0)));
+    CHECK(w.desktop().topPopup());
 }
 
 TEST_CASE("Sequences: shown again with the Modulation window of the session", "[ui][sequences]") {

@@ -10,6 +10,8 @@
 #include <cmath>
 #include <unordered_map>
 
+#include "ymengine/Pitch.h"
+
 namespace stym::plugin {
 namespace {
 
@@ -26,6 +28,10 @@ constexpr std::array kVblNames = {"50 Hz (PAL)"sv, "60 Hz (NTSC)"sv, "70 Hz (Mon
 constexpr std::array kTimers = {"MFP"sv, "Free"sv};
 constexpr std::array kRoutings = {"Omni"sv, "Layer"sv, "Per channel"sv};
 constexpr std::array kVelocities = {"Accent"sv, "Vol 4-bit"sv, "Off"sv};
+// MIDI expression (D-432): ymengine::BendTarget, ExpressTarget and SlideTarget, in their order.
+constexpr std::array kBendTargets = {"Pitch"sv, "Volume"sv, "Envelope"sv};
+constexpr std::array kExpressTargets = {"Off"sv, "Vibrato"sv, "Volume"sv, "Envelope"sv, "LFO"sv};
+constexpr std::array kSlideTargets = {"Volume"sv, "Envelope"sv, "Vibrato"sv};
 constexpr std::array kArpClocks = {"Internal"sv, "MIDI ext"sv};
 constexpr std::array kArpSyncs = {"Rate"sv, "Tempo"sv};
 constexpr std::array kDelaySyncs = {"Time"sv, "Tempo"sv};
@@ -136,6 +142,20 @@ ParamSpec globalSpec(Global g) {
                      6);
     case Global::DelayLevel: return since(num("delayLevel", "Delay Level", ParamKind::Int, 0, 100, 1, 100, "%"), 6);
     case Global::DelayPingPong: return since(flag("delayPingPong", "Delay Ping-Pong", false), 6);
+    // Frequency of A4 for every note (Indus, 25/10/2026 19:29, D-429): 350 (D-434) to 480 Hz, 440 by default.
+    case Global::A4Hz:
+        return since(num("a4Hz", "Tuning A4", ParamKind::Float, float(ymengine::kA4MinHz), float(ymengine::kA4MaxHz),
+                         0.01f, float(ymengine::kA4Hz), "Hz"),
+                     7);
+    // MIDI expression (Indus, 25/10/2026 19:50-20:51, D-432): the bend on the pitch, the wheel and the aftertouch on
+    // the vibrato, MPE off with notes bent by ±48 semitones (the MPE default) and CC74 on the volume.
+    case Global::BendTarget: return since(choice("bendTarget", "Bend Target", kBendTargets, 0), 8);
+    case Global::WheelTarget: return since(choice("wheelTarget", "Wheel Target", kExpressTargets, 1), 8);
+    case Global::Aftertouch: return since(choice("aftertouch", "Aftertouch", kExpressTargets, 1), 8);
+    case Global::Mpe: return since(flag("mpe", "MPE", false), 8);
+    case Global::MpeBendRange:
+        return since(num("mpeBendRange", "MPE Bend Range", ParamKind::Int, 0, 96, 1, 48, "st"), 8);
+    case Global::MpeSlide: return since(choice("mpeSlide", "MPE Slide", kSlideTargets, 0), 8);
     case Global::Count: break;
     }
     return {};
@@ -163,8 +183,10 @@ ParamSpec trackSpec(Track f, int t) {
     case Track::SidVmin: return num("sidVmin", "SID Min Vol", ParamKind::Int, 0, 15, 1, 0);
     case Track::VibDepth: return num("vibDepth", "Vibrato Depth", ParamKind::Int, 0, 200, 1, 0, "ct");
     case Track::VibRate: return num("vibRate", "Vibrato Rate", ParamKind::Float, 1, 20, 0.5f, 6, "Hz");
-    case Track::Attack: return num("attack", "Attack", ParamKind::Int, 0, 1000, 1, 0, "ms");
-    case Track::Decay: return num("decay", "Decay", ParamKind::Int, 0, 1000, 1, 0, "ms");
+    // Attack and Decay up to 2 000 ms like Release, the 100 VBL ticks of the Chip ADSR at 50 Hz (Indus, 25/10/2026
+    // 18:30, D-428; 1 280 ms for a few minutes, D-427, and 1 000 ms before, D-085, as in the prototype).
+    case Track::Attack: return num("attack", "Attack", ParamKind::Int, 0, 2000, 1, 0, "ms");
+    case Track::Decay: return num("decay", "Decay", ParamKind::Int, 0, 2000, 1, 0, "ms");
     case Track::Sustain: return num("sustain", "Sustain", ParamKind::Int, 0, 100, 1, 100, "%");
     case Track::Release: return num("release", "Release", ParamKind::Int, 0, 2000, 1, 0, "ms");
     case Track::AdsrMode: return choice("adsrMode", "ADSR Mode", kAdsrModes, 0);
@@ -174,6 +196,11 @@ ParamSpec trackSpec(Track f, int t) {
     case Track::Gate: return since(num("gate", "Gate", ParamKind::Int, 5, 95, 1, 50, "%"), 2);  // Gate slider (M5)
     case Track::VibOn: return since(flag("vibOn", "Vibrato On", true), 4);  // VIBRATO frame (D-254)
     case Track::Send: return since(num("send", "Send", ParamKind::Int, 0, 100, 1, 0, "%"), 6);  // Mixer (D-299)
+    // Right side of a stereo DMA sample (Mixer, D-459).
+    case Track::LevelR: return since(num("levelR", "Level R", ParamKind::Int, 0, 100, 1, 75, "%"), 9);
+    case Track::MuteR: return since(flag("muteR", "Mute R", false), 9);
+    case Track::SoloR: return since(flag("soloR", "Solo R", false), 9);
+    case Track::Link: return since(flag("link", "Link", true), 9);
     case Track::Count: break;
     }
     return {};
@@ -186,7 +213,13 @@ bool isMidiSetting(Global g) {
     case Global::BendRange:
     case Global::WheelDepth:
     case Global::ArpClock:
-    case Global::ArpDivision: return true;
+    case Global::ArpDivision:
+    case Global::BendTarget:
+    case Global::WheelTarget:
+    case Global::Aftertouch:
+    case Global::Mpe:
+    case Global::MpeBendRange:
+    case Global::MpeSlide: return true;
     default: return false;
     }
 }
@@ -200,8 +233,8 @@ std::array<ParamSpec, kParamCount> buildSpecs() {
         s.group = "Global";
         s.field = g;
         // MIDI settings: a matter of configuration, not of automation (D-057). Custom clock: typed in a dialogue, each
-        // value builds a new engine (D-237).
-        s.automatable = !isMidiSetting(Global(g)) && Global(g) != Global::ChipClockHz;
+        // value builds a new engine (D-237). Tuning A4: a setting of the project, typed in the Settings window (D-429).
+        s.automatable = !isMidiSetting(Global(g)) && Global(g) != Global::ChipClockHz && Global(g) != Global::A4Hz;
         specs[size_t(paramIndex(Global(g)))] = std::move(s);
     }
     for (int t = 0; t < kTracks; ++t) {

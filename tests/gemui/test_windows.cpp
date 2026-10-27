@@ -19,7 +19,7 @@ void click(Desktop& d, Point p) {
 }
 }  // namespace
 
-TEST_CASE("Floating window: dragged by its bar, bounded at the top and left, closed by its box", "[gemui]") {
+TEST_CASE("Floating window: dragged by its bar, bounded on the desktop, closed by its box", "[gemui]") {
     Desktop d(1272, 944);
     Widget root;
     root.setBounds(d.bounds());
@@ -48,19 +48,51 @@ TEST_CASE("Floating window: dragged by its bar, bounded at the top and left, clo
     d.mouseDrag({230, 160}, {});
     CHECK(w.bounds() == Rect{140, 145, 300, 200});
     CHECK(w.titleBar().bounds() == Rect{146, 151, 288, 26});
-    // Left and top edges never negative (mkWinDrag: Math.max(0, ...)); free to the right and at the bottom.
+    // Left and top edges never negative (mkWinDrag: Math.max(0, ...)); right and bottom edges never past the
+    // desktop's either (Indus, 26/10/2026, D-460).
     d.mouseDrag({10, 5}, {});
     CHECK(w.bounds().x == 0);
     CHECK(w.bounds().y == 0);
     d.mouseDrag({1200, 900}, {});
-    CHECK(w.bounds() == Rect{1110, 885, 300, 200});  // grabbed at (90, 15) from the corner
+    CHECK(w.bounds() == Rect{1272 - 300, 944 - 200, 300, 200});  // not (1110, 885), where the grab point would be
+    CHECK(w.titleBar().bounds() == Rect{978, 750, 288, 26});
     d.mouseUp({1200, 900}, {});
 
-    click(d, {1110 + 6 + 10, 885 + 6 + 10});  // close box
+    click(d, {972 + 6 + 10, 744 + 6 + 10});  // close box
     CHECK_FALSE(w.isOpen());
     CHECK(closed == 1);
     w.open();  // reopened where it was left
-    CHECK(w.bounds() == Rect{1110, 885, 300, 200});
+    CHECK(w.bounds() == Rect{972, 744, 300, 200});
+    d.setRoot(nullptr);
+}
+
+TEST_CASE("Floating window: grown or opened past the right and bottom edges, moved back inside (D-460)", "[gemui]") {
+    Desktop d(1272, 944);
+    d.setWorkTop(20);
+    Widget root;
+    root.setBounds(d.bounds());
+    d.setRoot(&root);
+    FloatWindow w;
+    Label content{"Volume"};
+    w.add(content);
+    root.add(w);
+    w.place({900, 700, 300, 200});
+    content.setBox({916, 750, 60, 12});
+    w.open();
+    CHECK(w.bounds() == Rect{900, 700, 300, 200});
+    // Grown by its layout (another row, wider strips): moved left and up with its content and its bar.
+    w.place({900, 700, 500, 300});
+    CHECK(w.bounds() == Rect{772, 644, 500, 300});
+    CHECK(w.titleBar().bounds() == Rect{778, 650, 488, 26});
+    CHECK(content.bounds() == Rect{788, 694, 60, 12});
+    // Moved past the edges while hidden (a place restored from an older, larger desktop): opened inside.
+    w.close();
+    w.moveBy(400, 400);
+    w.open();
+    CHECK(w.bounds() == Rect{772, 644, 500, 300});
+    // Larger than the desktop: the left edge and the top of the work area win.
+    w.place({100, 100, 1400, 1000});
+    CHECK(w.bounds() == Rect{0, 20, 1400, 1000});
     d.setRoot(nullptr);
 }
 

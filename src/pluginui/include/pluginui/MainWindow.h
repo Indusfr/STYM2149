@@ -2,8 +2,8 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// The editor desktop (1272 × 944 logical px, D-067) and the prototype's main window (980 px wide, centred, 18 px
-// from the top): title bar, menu bar and CHIP / MIDI indicators, track tabs, SOURCE, ENVELOPE, VIBRATO, ADSR,
+// The editor desktop (1344 × 984 logical px: D-067, D-461) and the prototype's main window (980 px wide, centred,
+// 18 px from the top): title bar, menu bar and CHIP / MIDI indicators, track tabs, SOURCE, ENVELOPE, VIBRATO, ADSR,
 // GENERATOR, ADSR curve and SYSTEM panels, window buttons, oscilloscope, register monitor, keyboard or pads, bottom
 // row. Positions and sizes: the prototype's CSS boxes at 100 % (STYM2149_SPEC.md §6).
 //
@@ -30,6 +30,7 @@
 #include "pluginui/BackgroundJob.h"
 #include "pluginui/CurveWindow.h"
 #include "pluginui/EchoWindow.h"
+#include "pluginui/StepSoundWindow.h"
 #include "pluginui/HelpWindow.h"
 #include "pluginui/KbdWindow.h"
 #include "pluginui/Host.h"
@@ -40,6 +41,7 @@
 #include "pluginui/PatchesWindow.h"
 #include "pluginui/ScopeWindow.h"
 #include "pluginui/SeqWindow.h"
+#include "pluginui/SettingsWindow.h"
 #include "pluginui/TipLanguage.h"
 #include "pluginui/DeskIcons.h"
 #include "pluginui/DigidrumWindow.h"
@@ -56,7 +58,8 @@ namespace stym::pluginui {
 // read and write its state (values_, extras_, cur_, the undo helpers...) directly.
 class MainWindow : public gemui::Widget {
 public:
-    static constexpr int kWidth = 1272, kHeight = 944;  // editor desktop at 100 % (D-067)
+    // Editor desktop at 100 % (1272 × 944, D-067), larger by a desktop icon in width and height (D-461): 1344 × 984.
+    static constexpr int kWidth = 1272 + gemui::DeskIcon::kW, kHeight = 944 + gemui::DeskIcon::kH;
     // Menu bar at the top of the desktop, as on a GEM desktop (ninth DAW test, item 101): the windows stay below it.
     static constexpr int kMenuH = gemui::MenuBar::kHeight;
     // Main window: 980 px wide, centred as in the prototype's page (body flex, align-items:center), 18 px below the
@@ -76,7 +79,7 @@ public:
     // Window commands, also used by the capture tool and the tests.
     void pickGenerator(int generator);   // setEffect of the prototype
     void openMenu(int title);            // 0 Fuji, 1 File, 2 Edit, 3 Options
-    // Tooltip language (Options > Tooltips > Language, "tipLanguage" preference, D-185): "en", built in, or the code
+    // Tooltip language (Settings window, Language, "tipLanguage" preference, D-185): "en", built in, or the code
     // of a language file, installed or in the user's Languages folder (D-283).
     const std::string& tipLanguage() const noexcept { return tipLang_; }
     void setTipLanguage(std::string_view id);
@@ -96,7 +99,7 @@ public:
     void newProject();
     void doNew();
     void lightKey(int note, bool on);    // key lit without playing (sequencer, captures)
-    // Layout the computer keyboard plays and the Computer Keyboard window draws: the one chosen in Options > Keyboard
+    // Layout the computer keyboard plays and the Computer Keyboard window draws: the one chosen in Settings > Keyboard
     // layout, or the system's for Auto (D-215).
     std::string keyLayout() const;
     // Box of a control, by the prototype's id ("fxSel", "shapeSel", "srcSel", "chipTxt", "mFile", "seqWin"...); empty
@@ -110,15 +113,33 @@ public:
     std::vector<const gemui::Widget*> greyedInert() const;
     // Control of the page by the prototype's id ($(): main window, then floating windows; tests).
     const gemui::Widget* widgetOf(std::string_view id) const { return findById(id); }
-    // SID wave and Sync Buzzer steps of the GENERATOR frame (D-251, D-252; tests): the grid, a step button, the
-    // Steps sliders ("waveSteps", "buzzSteps").
+    // SID wave and Sync Buzzer steps of the GENERATOR frame (D-251, D-252; tests): the grid, the form of the SID wave
+    // chosen in its menu (D-411), a step button, the Steps sliders ("waveSteps", "buzzSteps"), the Period slider of
+    // the sine ("wavePeriod", D-406) and the Width slider of the square ("waveWidth", D-408).
+    // The forms of the SID wave menu (24/10/2026, D-411): Base, the prototype's square, without settings; Square, a
+    // square of Steps steps, the note's volume over Width of them; Sine, a Sine-SID of Period bars; Bounce, the
+    // Sine-SID on the chip's levels (D-414); Custom, the bars drawn.
+    using WaveForm = ymengine::SidForm;  // form of the SID wave (D-411)
+    static WaveForm waveFormOf(const ymengine::TrackPatch& p) noexcept;
+    WaveForm waveForm() const noexcept;  // of the focused track
+    const gemui::Button& waveFormButton() const noexcept { return waveForm_; }
     const SidWaveGrid& sidWave() const noexcept { return sidWave_; }
     const gemui::Button& buzzStep(int k) const { return buzzStep_[size_t(k)]; }
     const gemui::Slider* stepsSlider(std::string_view id) const noexcept {
-        return id == "waveSteps" ? &waveSteps_ : id == "buzzSteps" ? &buzzLen_ : nullptr;
+        return id == "waveSteps"   ? &waveSteps_
+               : id == "buzzSteps"  ? &buzzLen_
+               : id == "wavePeriod" ? &wavePeriod_
+               : id == "waveWidth"  ? &waveWidth_
+                                    : nullptr;
     }
     // Name of a track in its tab (YM channels in 3-channel mode, DMA1 to DMA8 for the DMA tracks).
     std::string trackTitle(int track) const { return trackName(track); }
+    // The close box of the standalone application's window (Indus, 26/10/2026 03:57, D-439): the Quit box of
+    // File > Quit, once (a second click while it is open does nothing); nothing in a plugin.
+    void requestQuit();
+    bool quitAsked() const noexcept { return quitAsked_; }
+    // Value of the SYSTEM "Note" line: "TP=… -> … Hz" of the newest note, "-" when no voice sounds (D-440).
+    const std::string& noteReadout() const noexcept { return tpread_.text(); }
     // Floating windows.
     SeqWindow& sequencer() noexcept { return seq_; }
     SongWindow& songWindow() noexcept { return song_; }
@@ -132,7 +153,8 @@ public:
     RecorderWindow& recorderWindow() noexcept { return recWin_; }
     YmPlayerWindow& ymPlayerWindow() noexcept { return ymWin_; }
     // Main window moved by its title bar (third DAW test, item 25, D-224): top-left corner of its frame, kept on the
-    // desktop (its title bar stays within reach); the plugin keeps the place as long as it lives.
+    // desktop, below the menu bar and never past its right and bottom edges (D-460); the plugin keeps the place as
+    // long as it lives.
     void moveMainTo(int x, int y);
     // Desktop icons (floppy disks A and B, trash; ninth DAW test, item 102), for the tests and the capture tool.
     const std::array<gemui::DeskIcon, 3>& deskIcons() const noexcept { return deskIcons_; }
@@ -156,6 +178,8 @@ public:
     CurveWindow& slideCurve() noexcept { return curveWin_; }
     KbdWindow& keyboardWindow() noexcept { return kbdWin_; }
     EchoWindow& echoWindow() noexcept { return echo_; }  // Edit > Effects (D-299, D-311)
+    SettingsWindow& settingsWindow() noexcept { return settings_; }  // Options > Settings (D-430)
+    StepSoundWindow& stepSoundWindow() noexcept { return stepWin_; }  // right click on GEN, SRC, ENV (D-392)
     // Pads of the main window (tests).
     const Pads& pads() const noexcept { return pads_; }
     // SHORTCUTS window (#helpWin, openHelp): ^/, ^? and the Shortcuts entry of the Fuji menu (D-189).
@@ -198,6 +222,8 @@ private:
     friend class CurveWindow;
     friend class KbdWindow;
     friend class EchoWindow;
+    friend class StepSoundWindow;
+    friend class SettingsWindow;
 
     struct Held {
         bool mouse;  // played on the piano (otherwise the Computer Keyboard or a pad); with Latch, one at a time
@@ -217,6 +243,8 @@ private:
     bool ste() const noexcept;    // STE machine (Computer, D-153)
     bool dmaTrack(int track) const noexcept;  // DMA track in 3-channel mode with the STE
     bool scopeShown() const;                  // Options > Oscilloscope (preference "mainScope", on by default)
+    bool regsShown() const;                   // Options > Register monitor (preference "mainRegs", on by default)
+    bool noteShown() const;                   // Options > Note monitor (preference "mainNote", on by default, D-442)
     int dmaSlot(int track) const noexcept;    // DMA sample played by the track
     int generator() const noexcept;
     bool drumTrack() const noexcept;
@@ -302,12 +330,22 @@ private:
     // Starts a long job (bee); alert if one is already running.
     bool startJob(BackgroundJob::Work work, std::function<void()> done);
     void confirmQuit();
+    // Tab: the open window at the back comes to the front, Shift+Tab sends the front one to the back (D-389).
+    bool cycleWindows(bool back);
     void showInfo();
     void selectSlot(int slot);
     void selectDmaSlot(int slot);
     void setComputer(int machine);  // 0 ST, 1 STE
-    // Options > Sound engine > Chip clock > Custom (D-237): frequency typed in a prompt box, then the Custom clock.
+    // Settings > Chip clock > Custom (D-237, D-430): frequency typed in a prompt box, then the Custom clock.
     void customClock();
+    // Chip clocks of the ZX Spectrum and the Amstrad CPC after the two Atari ones (D-058); Free timer, after the MFP.
+    static constexpr int kFirstAyClock = 2, kTimerFree = 1;
+    // Custom chip clock in MHz with four decimals (fifth DAW test, D-239): "2.0000", to the nearest 100 Hz.
+    static std::string clockMHz(uint32_t hz);
+    // Values of a global parameter as menu entries (Settings window), from its description in the parameter table:
+    // the choices of a Choice, Off/On for a Bool, otherwise every `stride` steps from min to max with the unit;
+    // picking one sets the parameter. `checked` gets the entry of the current value, -1 if none.
+    std::vector<gemui::MenuItem> paramItems(plugin::Global g, int stride, int& checked);
     void popup(gemui::Widget& anchor, std::vector<gemui::MenuItem> items, int checked);
     // Menu whose entries write into the focused track: they act only while that track is still the focused one.
     void trackPopup(gemui::Widget& anchor, std::vector<gemui::MenuItem> items, int checked);
@@ -316,7 +354,12 @@ private:
     // (nothing on a percussion track); a preset (BuzzerPresets.h) in one undo step; the shape of a Sync Buzzer step.
     void editPatch(const std::function<void(ymengine::TrackPatch&)>& fn);
     void applyBuzzerPreset(int k);
-    void buzzStepMenu(int step);
+    // Menus of a Sync Buzzer step's shape and of the buzzer presets, at `anchor` (the GENERATOR frame's button, or
+    // that of the step settings window, D-392).
+    void buzzStepMenu(int step, gemui::Widget& anchor);
+    void buzPresetsMenu(gemui::Widget& anchor);
+    void waveFormMenu(gemui::Widget& anchor);  // Base, Square, Sine, Bounce, Custom (D-411, D-414)
+    void setWaveForm(WaveForm f);
 
     // Floating windows and sequencer.
     void pullExtras();          // reads the non-automatable state again at once (after a modification)
@@ -382,6 +425,7 @@ private:
     std::optional<plugin::NonParamState> clipboardExtras_;
     std::optional<std::array<float, plugin::kTrackParams>> clipboard_;
     uint64_t noteSerial_ = 0;   // last EngineStatus::noteSerial seen
+    std::array<uint8_t, 128> manualCut_{};  // last EngineStatus::manualCut seen (D-431)
     uint16_t lastTp_ = 284;     // last period attacked (lastTP of the prototype)
     std::array<uint8_t, plugin::kTracks> program_{};  // instrument chosen by Program Change (engine status, D-156)
     double lastRegs_ = -1e9;    // register monitor: every 120 ms
@@ -443,12 +487,11 @@ private:
     gemui::Slider ratio_, vmin_;
     gemui::ValueField ratiov_, vminv_;
     // SID Voice: the SID wave of the former Timer Wave window (sixth DAW test, items 53 and 80, D-251, D-278).
-    gemui::Label labSidWave_{"SID wave"}, labWaveSteps_{"Steps"}, waveUnit_{" steps"};
+    gemui::Label labSidWave_{"SID wave"}, labWaveSteps_{"Steps"}, labWavePeriod_{"Period"}, labWaveWidth_{"Width"};
     SidWaveGrid sidWave_;
-    gemui::Slider waveSteps_;
-    gemui::ValueField waveStepsv_;
-    gemui::Button waveSquare_{"Square"}, waveSine_{"Sine"};
-    bool squareFill_ = false;  // Steps gesture started from an empty wave
+    gemui::Slider waveSteps_, wavePeriod_, waveWidth_;  // Period of the Sine-SID (D-406), width of the square (D-408)
+    gemui::ValueField waveStepsv_, wavePeriodv_, waveWidthv_;
+    gemui::Button waveForm_;  // menu of the forms (D-411)
     // Sync Buzzer: the tuning, YM Pad and presets of the former Buzzer window (D-227, D-238).
     gemui::Label labBuzTune_{"Tuning"}, labBuzN_{"N"}, labBuzD_{"D"}, labBuzFine_{"Fine"};
     gemui::Button buzTuned_{"Off"}, buzPad_{"YM Pad"}, buzPresets_{"Presets"};
@@ -484,7 +527,7 @@ private:
         labNote_{"Note"}, tpread_{"-"};
     gemui::Button modeSel_, clkSel_;
     gemui::Label labComputer_{"Computer"};
-    gemui::Button steSt_{"ST"}, steSte_{"STE"};
+    gemui::Button compSel_;
     gemui::Slider master_;
     gemui::ValueField masterv_;
     VoiceLeds leds_;
@@ -518,6 +561,7 @@ private:
         bool range;      // slider (otherwise button)
     };
     bool learn_ = false;
+    bool quitAsked_ = false;  // the Quit box is open (D-439)
     std::optional<LearnTarget> learnTarget_;  // armed control
     plugin::MidiMap midiMap_;
     std::map<std::string, int> ccLast_;       // last value of each key (rising edge of the buttons)
@@ -540,6 +584,8 @@ private:
     CurveWindow curveWin_{*this};
     KbdWindow kbdWin_{*this};
     EchoWindow echo_{*this};        // Effects: echo and delay (eighth DAW test, item 98, D-299; D-311)
+    SettingsWindow settings_{*this};  // Options > Settings (D-430)
+    StepSoundWindow stepWin_{*this};  // a step's sound settings: right click on GEN, SRC, ENV (D-392)
     HelpWindow help_;               // SHORTCUTS (#helpWin, D-189)
     std::array<std::unique_ptr<ScopeWindow>, plugin::kTracks> scopes_;  // created at the first opening
 };

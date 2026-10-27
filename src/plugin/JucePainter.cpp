@@ -250,10 +250,49 @@ void JucePainter::glyph(int index, int x, int baseline, int px, Color c, int qua
     drawMask(glyphMask(index, px, quarter, face), at(origin), at(baseline), c);
 }
 
+namespace {
+
+// Mask of a bitmap's outline at d screen pixels per pixel (D-404): the polygons filled with anti-aliasing, or with
+// `sharp` the screen pixels whose centre lies inside, opaque.
+JucePainter::Cache::Mask outlineMask(const gemui::Bitmap& b, double d, bool sharp) {
+    const gemui::Outline& o = *b.outline;
+    if (!sharp) {
+        juce::Path path;
+        size_t first = 0;
+        for (const uint16_t end : o.ends) {
+            for (size_t k = first; k < end; ++k) {
+                const float x = float(o.xy[2 * k] * d), y = float(o.xy[2 * k + 1] * d);
+                if (k == first)
+                    path.startNewSubPath(x, y);
+                else
+                    path.lineTo(x, y);
+            }
+            path.closeSubPath();
+            first = end;
+        }
+        return maskOf(path);
+    }
+    const int w = int(std::ceil(b.w * d)), h = int(std::ceil(b.h * d));
+    juce::Image image(juce::Image::SingleChannel, w, h, true, juce::SoftwareImageType());
+    {
+        const juce::Image::BitmapData bd(image, juce::Image::BitmapData::writeOnly);
+        for (int r = 0; r < h; ++r)
+            for (int k = 0; k < w; ++k)
+                if (o.inside((k + 0.5) / d, (r + 0.5) / d)) *bd.getPixelPointer(k, r) = 255;
+    }
+    return {image, 0, 0};
+}
+
+}  // namespace
+
 void JucePainter::bitmap(const gemui::Bitmap& b, int x, int y, Color c) noexcept {
-    // Cached by the address of its bits: the icons are static data. One rectangle per run of lit pixels of a row.
+    // Cached by the address of its bits: the icons are static data. One rectangle per run of lit pixels of a row; a
+    // bitmap with an outline (the Atari logo, D-404) is its outline filled at any d but 1, whole or not, where the
+    // squares would show steps; without anti-aliasing in sharp pixels at any d.
     auto [it, fresh] = cache_.bitmaps_.try_emplace(b.bits);
-    if (fresh) {
+    if (fresh && b.outline && d_ != 1) {
+        it->second = outlineMask(b, d_, cache_.sharp());
+    } else if (fresh) {
         Squares s;
         s.snap = sharp_;
         for (int r = 0; r < b.h; ++r)

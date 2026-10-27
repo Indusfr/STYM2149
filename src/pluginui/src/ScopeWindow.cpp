@@ -54,10 +54,10 @@ void ScopeWindow::setName(const std::string& name) { setTitle("SCOPE - " + name)
 
 void ScopeWindow::openAt(int n) {
     const double x = kX + kStep * n, y = kY + kStep * n;
-    place({x, y, kW, kH});
     // .mixbody: canvas inline (margin of 8, 2 px border included in its 364 × 144). 14 = border and margin of the
-    // window (6) + 8; 40 = title bar (32) + 8.
+    // window (6) + 8; 40 = title bar (32) + 8. Then the window, which place() keeps on the desktop (D-460).
     scope_.setBox({x + 14, y + 40, TrackScope::kW + 4, TrackScope::kH + 4});
+    place({x, y, kW, kH});
     open();
 }
 

@@ -1,15 +1,16 @@
 # Prototype reference captures (visual regression test, M4)
 
-The 46 PNGs in this folder (outside `stym/`) are captures of `YM2149_Prototype.html` (STYM2149_SPEC.md §6): 1272 × 944 px
-(the editor desktop, D-067), 8-bit RGB, one per scene of `tools/proto_capture/capture.mjs`. `orn.png` and `orn_on.png`
+The 46 PNGs in this folder (outside `stym/`) are captures of `YM2149_Prototype.html` (STYM2149_SPEC.md §6): 1344 × 984 px
+(the editor desktop, D-067, D-461), 8-bit RGB, one per scene of `tools/proto_capture/capture.mjs`. `orn.png` and `orn_on.png`
 (the prototype's Modulation window) are kept but no longer compared: the sequences joined that window below its table
 in the fifth DAW test (D-240), so its scenes `orn` and `orn_on` are now STYM2149 scenes (`stym/`); likewise
 `menu_source.png`, the Source menu having four more entries with the envelope (D-246), and `arp_table.png`, the
-arpeggio grid having the offsets +16 to +24 (D-322). The `ui` test
+arpeggio grid having the offsets +16 to +24 (D-322), and `seq.png` and `seq_demo.png`, the Step Sequencer's grid
+having 2 px gaps between its columns and rows (D-458). The `ui` test
 (`tests/gemui/test_visual.cpp`) renders the same scenes with the GEM window (`tools/gemshot/Scenes.cpp`) and requires
-fewer than 9591 differing pixels, that is 1 % of the M4 desktop (1016 × 944; the added columns are only
-background; 2 % for the floating window scenes `seq`, `seq_demo`, `song` and `song_demo`, D-121; the Mixer,
-scenes `mixer`, `mixer_3ch` and `mixer_scope`, the Arpeggiator, scenes `arp`, `arp_on` and `arp_midi`,
+fewer than 9591 differing pixels, that is 1 % of the M4 desktop (1016 × 944; the added columns and rows are only
+background; 2 % for the floating window scenes `song` and `song_demo`, D-121, and formerly `seq` and `seq_demo`;
+the Mixer, scenes `mixer`, `mixer_3ch` and `mixer_scope`, the Arpeggiator, scenes `arp`, `arp_on` and `arp_midi`,
 the Slide Curve, scenes `curve` and `curve_custom`, the Computer Keyboard, scenes `kbd`, `kbd_held`, `kbd_azerty` and
 `kbd_high`, the YM Player, scene `ym` (M7), and the SHORTCUTS window, scene `help` (M8, D-189), fit within
 1 %). A pixel differs when one of its channels is off by more than 4 out of 255, outside the areas that a scene ignores
@@ -19,7 +20,10 @@ Taken on 15/10/2026 with Chromium 141.0.7390.37 (Playwright 1.56.1) on Linux, wi
 (`tools/proto_capture/fonts-noaa.conf`), prototype zoom at 100 %, without MIDI access; taken again the same day at
 1272 px wide (M5); the `ym` (M7) and `help` (M8) scenes were added on 16/10/2026 with the same tools. The main
 window is identical pixel for pixel there, shifted by 128 px; only the CHIP alert changes (its 520 px `max-width`
-replaces half the desktop as the bound).
+replaces half the desktop as the bound). All of them taken again on 26/10/2026 at 1344 × 984, the desktop larger by a
+desktop icon (D-461), with the same tools, which first gave back the 1272 × 944 captures unchanged: the main window
+and the alerts, centred, move by 36 px (the alerts also by 15 px down); the floating windows and menus stay (the body of the SHORTCUTS window, 70 % of
+the height, gets 28 px taller).
 
 Regenerate (only if the prototype changes):
 

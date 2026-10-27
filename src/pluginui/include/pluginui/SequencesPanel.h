@@ -52,7 +52,11 @@ public:
         uint16_t notePeriod = 478;
         int refNote = 60;
         double clockHz = 2'000'000;
+        double a4Hz = 440;  // Tuning A4 (D-429)
         bool latin = false;  // Do Ré Mi note names
+        // Why a row moves nothing on this track (NP, MIX and GEN on a DMA track, D-463), empty when it applies: the
+        // row is drawn faded, takes no click nor wheel, and its tooltip gives the reason.
+        std::array<std::string, kRowCount> off{};
         bool operator==(const State&) const = default;
     };
     void setState(const State& s);
@@ -122,6 +126,8 @@ public:
     // Slider of a setting (tests): "seqxFix", "seqxDetune", "seqxAnalog", "seqxVibMin", "seqxVibMax",
     // "seqxVibCycles", "seqxVibRamp".
     const gemui::Slider* slider(std::string_view id) const noexcept;
+    // Button of a setting (tests): "seqxSync", "seqxLink", "seqxMx0" to "seqxMx8", "seqxVibWrite".
+    const gemui::Button* button(std::string_view id) const noexcept;
 
     // Vibrato table (X12) written into PER over the length of the table: sine of `cycles` periods between `lo` and
     // `hi`, amplitude rising from 0 to full over the first `ramp` steps.
@@ -131,6 +137,7 @@ private:
     void build();
     void wire();
     bool drum() const noexcept;
+    bool dma() const noexcept;  // a DMA track: what moves no sample is greyed (Indus, 26/10/2026, D-463)
     const ymengine::TrackPatch& patch() const noexcept;  // the focused track's patch, as MainWindow last read it
     // Changes it in the state; one undo step of the track per gesture (MainWindow::pushCur).
     void editPatch(const std::function<void(ymengine::TrackPatch&)>& fn);

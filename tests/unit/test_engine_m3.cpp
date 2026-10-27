@@ -290,7 +290,10 @@ TEST_CASE("Wheel: vibrato added at the VBL cadence, exact return to the pitch wh
             e.render(l, r, 480);
             REQUIRE(e.voice(0).tonePeriod == 284);
         }
-        e.modWheel(0, 100);
+        ymengine::GlobalParams g = e.global();
+        g.expressCents = 100;  // Wheel depth
+        e.setGlobal(g);
+        e.modWheel(0, 1);
         int lo = 4096, hi = 0;
         for (int k = 0; k < 100; ++k) {
             e.render(l, r, 480);

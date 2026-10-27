@@ -118,7 +118,7 @@ void menuPick(MainWindow& w, int patch, int index) {
     click(w, id, gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
     const gemui::Rect r = *w.rectOf(id);
-    const int top = r.bottom() + 6;
+    const int top = r.bottom() - 2;  // the menu's frame on the button's bottom rule (D-396)
     const int sep = index >= 3 ? 8 - 20 : 0;  // 8 px rule in place of an entry
     press(w, {r.x + 20, top + 2 + 20 * index + sep + 10});
     CHECK_FALSE(w.desktop().hasPopups());

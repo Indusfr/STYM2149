@@ -89,15 +89,15 @@ void click(MainWindow& w, const std::string& id) {
     press(w, centre(*r));
 }
 
-// Entry of a menu opened below a button (6 px lower, or above if it does not fit; 20 px entries inside a 2 px
-// border).
+// Entry of a menu opened below a button (its frame on the button's bottom rule, or on its top rule above it when it
+// does not fit; 20 px entries inside a 2 px border, D-396).
 void pick(MainWindow& w, const std::string& anchor, int entries, int index) {
     const auto r = w.rectOf(anchor);
     REQUIRE(r);
     REQUIRE(w.desktop().hasPopups());
     const int h = 4 + 20 * entries;
-    int top = r->bottom() + 6;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h - 2);
+    int top = r->bottom() - 2;
+    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h + 2);
     press(w, {r->x + 20, top + 2 + 20 * index + 10});
     CHECK_FALSE(w.desktop().hasPopups());
 }
@@ -181,11 +181,11 @@ TEST_CASE("Arpeggiator: on/off, mode, rate, Track, Land, octaves, MIDI division"
     w.arpeggiator().show();
     click(w, "arpOn");
     CHECK(h.track(0, Track::ArpOn) == 1.0f);
-    CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 372, 180});
+    CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 380, 180});
     CHECK(w.rectOf("arpModeSel") == gemui::Rect{134, 176, 38, 24});
-    CHECK(w.rectOf("arpRate") == gemui::Rect{134, 210, 129, 16});
-    CHECK(w.rectOf("arpGlideRate") == gemui::Rect{319, 206, 59, 24});
-    CHECK(w.rectOf("arpLand") == gemui::Rect{386, 206, 52, 24});
+    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162, D-371)
+    CHECK(w.rectOf("arpGlideRate") == gemui::Rect{327, 206, 59, 24});
+    CHECK(w.rectOf("arpLand") == gemui::Rect{394, 206, 52, 24});
     CHECK(w.rectOf("arpOct2") == gemui::Rect{195, 236, 31, 24});
     CHECK_FALSE(w.rectOf("arpDiv"));
 
@@ -242,7 +242,7 @@ TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and gr
     REQUIRE(sync);
     CHECK(sync->y == mode->y);
     CHECK(sync->x > mode->right());
-    CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 372, 180});
+    CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 380, 180});
 
     // Sync: the global parameter Arp Sync, Division in place of Rate.
     click(w, "arpSync");
@@ -258,7 +258,7 @@ TEST_CASE("Arpeggiator: Sync to the tempo, Division in place of Rate, lit and gr
     CHECK(h.global(Global::ArpDivision) == 7.0f);  // 1/32T
     click(w, "arpSync");
     CHECK(h.global(Global::ArpSync) == 0.0f);
-    CHECK(w.rectOf("arpRate") == gemui::Rect{134, 210, 129, 16});
+    CHECK(w.rectOf("arpRate") == gemui::Rect{142, 210, 129, 16});  // under Steps (item 162, D-371)
     CHECK_FALSE(w.rectOf("arpDiv"));
 
     // MIDI ext: the MIDI clock decides; the button stays lit and does nothing.
@@ -292,6 +292,8 @@ TEST_CASE("Arpeggiator: table (grid, number of steps, chords, keyboard, playing 
     CHECK(w.rectOf("arpWin") == gemui::Rect{80, 100, 394, 500});
     CHECK(w.rectOf("arpgrid") == gemui::Rect{94, 290, 366, 278});  // +0 to +24 (D-322)
     CHECK(w.rectOf("arpLen") == gemui::Rect{142, 236, 294, 16});
+    // Rate starts with Steps (thirteenth DAW test, item 162, D-371).
+    CHECK(w.rectOf("arpRate")->x == 142);
     CHECK(w.rectOf("chordSel") == gemui::Rect{94, 258, 80, 24});
     CHECK_FALSE(w.rectOf("arpOct1"));
     const ArpGrid& g = w.arpeggiator().grid();

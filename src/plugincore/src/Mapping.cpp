@@ -120,6 +120,14 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     d.hiCutHz = double(value(v, Global::DelayHiCut));
     d.level = double(value(v, Global::DelayLevel)) / 100.0;
     d.pingPong = value(v, Global::DelayPingPong) >= 0.5f;
+    g.a4Hz = double(value(v, Global::A4Hz));  // D-429
+    // MIDI expression (D-432).
+    g.bendTarget = BendTarget(std::clamp(intValue(v, Global::BendTarget), 0, 2));
+    g.bendRange = double(value(v, Global::BendRange));
+    g.wheelTarget = ExpressTarget(std::clamp(intValue(v, Global::WheelTarget), 0, 4));
+    g.aftertouch = ExpressTarget(std::clamp(intValue(v, Global::Aftertouch), 0, 4));
+    g.mpeSlide = SlideTarget(std::clamp(intValue(v, Global::MpeSlide), 0, 2));
+    g.expressCents = double(value(v, Global::WheelDepth));
     return g;
 }
 
@@ -131,6 +139,10 @@ TrackMix toMix(const ParamValues& v, int t) noexcept {
     m.mute = value(v, t, Track::Mute) >= 0.5f;
     m.solo = value(v, t, Track::Solo) >= 0.5f;
     m.send = double(value(v, t, Track::Send)) / 100.0;
+    m.link = value(v, t, Track::Link) >= 0.5f;  // the right side of a stereo DMA sample (D-459)
+    m.levelR = double(value(v, t, Track::LevelR)) / 100.0;
+    m.muteR = value(v, t, Track::MuteR) >= 0.5f;
+    m.soloR = value(v, t, Track::SoloR) >= 0.5f;
     return m;
 }
 

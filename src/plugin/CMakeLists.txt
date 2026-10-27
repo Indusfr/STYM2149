@@ -43,7 +43,7 @@ string(SUBSTRING "${STYM_BUILD_COMMIT}" 0 7 STYM_BUILD_COMMIT_SHORT)
 configure_file(BuildId.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp @ONLY)
 
 target_sources(STYM2149 PRIVATE PluginProcessor.cpp PluginEditor.cpp JucePainter.cpp KeyboardLayout.cpp
-                                ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp)
+                                StandaloneApp.cpp ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp)
 # Keyboard layout of the system (D-215): Carbon's input sources on macOS, Xlib loaded at run time on Linux.
 if(APPLE)
   target_link_libraries(STYM2149 PRIVATE "-framework Carbon")
@@ -56,7 +56,9 @@ target_compile_definitions(STYM2149 PUBLIC
   JUCE_USE_CURL=0
   JUCE_VST3_CAN_REPLACE_VST2=0
   JUCE_ASIO=$<IF:$<PLATFORM_ID:Windows>,1,0>
-  JUCE_STRICT_REFCOUNTEDPOINTER=1)
+  JUCE_STRICT_REFCOUNTEDPOINTER=1
+  # The standalone application of StandaloneApp.cpp: its window's close box asks as File > Quit (D-439).
+  JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_link_libraries(STYM2149
   PRIVATE
     stym_plugincore

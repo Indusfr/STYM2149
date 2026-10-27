@@ -75,6 +75,7 @@ void Engine::prepare(const EngineConfig& config) {
     // Mixer meters: buckets of the steps of a render and of those computed ahead (16-channel), points of a render
     // (3-channel).
     for (auto& d : m.meterD) d.assign(size_t(std::ceil(2.0 * double(cap) / m.meterTickStep())) + 3, 0);
+    for (auto& d : m.meterDD) d.assign(m.meterD[0].size(), 0);
     m.meterTickInv = 1.0 / m.meterTickStep();
     m.bucketStart.assign(m.meterD[0].size() + 1, 0);
     m.meterAt.assign(size_t(std::ceil(kChunk / m.meterSampleStep())) + 2, 0);
@@ -102,6 +103,8 @@ void Engine::reset() noexcept {
     m.stamp = 0;
     m.bend.fill(0);
     m.wheel.fill(0);
+    m.press.fill(0);
+    m.mpe.fill({});
     m.program.fill(0);
     m.arpWasEnabled = m.arpEnabled();
     m.resetSeq();
@@ -118,6 +121,7 @@ void Engine::setGlobal(const GlobalParams& g) noexcept {
     if (g.seqClock != m.global.seqClock) m.clockChanged = true;
     if (g.speed != m.global.speed) m.seq.speed = std::clamp<int>(g.speed, 1, kSpeedMax);  // Ticks: replaces Sxx
     if (g.tempo != m.global.tempo) m.seq.cmdBpm = 0;  // BPM: replaces Txx (D-243)
+    const BendTarget bentWas = m.global.bendTarget;
     m.global = g;
     m.global.vblHz = std::clamp<uint32_t>(g.vblHz, 1, 1000);
     if (modeChanged && m.prepared) {
@@ -135,6 +139,24 @@ void Engine::setGlobal(const GlobalParams& g) noexcept {
             }
     }
     if (jitterChanged) m.jitter.configure(cpuCyclesToYmMaster(g.irqJitterCpuCycles), m.config.seed + 0x51u);
+    if (m.prepared) {
+        // MIDI expression (D-432): the sounding notes follow a new target of the bend (their pitch let go of or taken
+        // up again) and start their frames for a new target of the wheel or the pressure.
+        const uint64_t c = m.eventCycle();
+        for (int i = 0; i < kVoices; ++i) {
+            Voice& v = m.voices[size_t(i)];
+            if (!v.on) continue;
+            if (bentWas != g.bendTarget && v.track >= 0) {
+                const double b = m.bend[size_t(v.track)];
+                const double d = (g.bendTarget == BendTarget::Pitch ? b : 0) - (bentWas == BendTarget::Pitch ? b : 0);
+                if (d != 0) {
+                    m.bendVoice(v, d, c);
+                    m.touch(i, c);
+                }
+            }
+            if (m.expressive(v)) m.startFrames(v, c);
+        }
+    }
     m.refreshLive();
 }
 
@@ -180,8 +202,9 @@ void Engine::setDigidrumSlot(int slot, const DigidrumSlot& s) noexcept {
     d.rateHz = std::isfinite(s.rateHz) ? std::clamp(s.rateHz, kDigidrumRateMin, kDigidrumRateMax) : kDigidrumRate;
     d.root = uint8_t(std::min<int>(s.root, 127));
     d.cents = std::isfinite(s.cents) ? std::clamp(s.cents, -kDigidrumCentsMax, kDigidrumCentsMax) : 0.0;
-    d.loopEnd = std::min<uint32_t>(s.loopEnd, kMaxUserSample);
-    d.loopStart = std::min(s.loopStart, d.loopEnd);
+    d.end = std::min<uint32_t>(s.end, kMaxUserSample);
+    d.start = std::min(s.start, d.end > 0 ? d.end : kMaxUserSample);  // End 0: to the end of the sample
+    d.rest = uint8_t(std::min<int>(s.rest, 15));
     impl_->digiSlots[size_t(slot)] = d;
 }
 
@@ -189,7 +212,15 @@ const DigidrumSlot& Engine::digidrumSlot(int slot) const noexcept {
     return impl_->digiSlots[size_t(std::clamp(slot, 0, kDigidrumSlots - 1))];
 }
 
-void Engine::setDma(const DmaParams& p) noexcept { impl_->dmaBank.setParams(p); }
+void Engine::setDma(const DmaParams& p) noexcept {
+    Impl& m = *impl_;
+    bool moved = false;  // a slot goes from mono to stereo or back: the right side's mixer comes or goes (D-459)
+    for (int k = 0; k < kDmaSlots; ++k) moved |= m.dmaBank.slot(k).stereo != p.slots[size_t(k)].stereo;
+    m.dmaBank.setParams(p);
+    if (!moved) return;
+    m.refreshLive();
+    if (m.prepared) m.remix(m.eventCycle());
+}
 const DmaParams& Engine::dma() const noexcept { return impl_->dmaBank.params(); }
 void Engine::setDmaSample(int slot, std::span<const int8_t> bytes) noexcept {
     Impl& m = *impl_;
@@ -207,25 +238,51 @@ void Engine::setDmaSample(int slot, std::span<const int8_t> bytes) noexcept {
     }
 }
 
-void Engine::noteOn(uint32_t offset, int note, int velocity, int track) noexcept {
+void Engine::noteOn(uint32_t offset, int note, int velocity, int track, int channel) noexcept {
     if (note < 0 || note > 127 || track >= kTracks) return;
     if (velocity <= 0) {
-        noteOff(offset, note, track);
+        noteOff(offset, note, track, channel);
         return;
     }
-    if (Event* e = impl_->push(offset, EventType::NoteOn, note, std::min(velocity, 127), 0)) e->track = int16_t(std::max(track, -1));
+    const double ch = std::clamp(channel, 0, Impl::kMpeChannels - 1);  // MPE member channel in value (D-432)
+    if (Event* e = impl_->push(offset, EventType::NoteOn, note, std::min(velocity, 127), ch))
+        e->track = int16_t(std::max(track, -1));
 }
-void Engine::noteOff(uint32_t offset, int note, int track) noexcept {
+void Engine::noteOff(uint32_t offset, int note, int track, int channel) noexcept {
     if (note < 0 || note > 127 || track >= kTracks) return;
-    if (Event* e = impl_->push(offset, EventType::NoteOff, note, 0, 0)) e->track = int16_t(std::max(track, -1));
+    const double ch = std::clamp(channel, 0, Impl::kMpeChannels - 1);
+    if (Event* e = impl_->push(offset, EventType::NoteOff, note, 0, ch)) e->track = int16_t(std::max(track, -1));
 }
 void Engine::pitchBend(uint32_t offset, double semitones, int track) noexcept {
     if (track >= kTracks) return;
     if (Event* e = impl_->push(offset, EventType::Bend, 0, 0, semitones)) e->track = int16_t(std::max(track, -1));
 }
-void Engine::modWheel(uint32_t offset, double cents, int track) noexcept {
+void Engine::modWheel(uint32_t offset, double amount, int track) noexcept {
     if (track >= kTracks) return;
-    if (Event* e = impl_->push(offset, EventType::Wheel, 0, 0, cents)) e->track = int16_t(std::max(track, -1));
+    if (Event* e = impl_->push(offset, EventType::Wheel, 0, 0, std::clamp(amount, 0.0, 1.0)))
+        e->track = int16_t(std::max(track, -1));
+}
+void Engine::channelPressure(uint32_t offset, double amount, int track) noexcept {
+    if (track >= kTracks) return;
+    if (Event* e = impl_->push(offset, EventType::Pressure, 0, 0, std::clamp(amount, 0.0, 1.0)))
+        e->track = int16_t(std::max(track, -1));
+}
+void Engine::notePressure(uint32_t offset, int note, double amount, int track) noexcept {
+    if (note < 0 || note > 127 || track >= kTracks) return;
+    if (Event* e = impl_->push(offset, EventType::NotePressure, note, 0, std::clamp(amount, 0.0, 1.0)))
+        e->track = int16_t(std::max(track, -1));
+}
+void Engine::mpeBend(uint32_t offset, int channel, double semitones) noexcept {
+    if (channel < 1 || channel >= Impl::kMpeChannels) return;
+    impl_->push(offset, EventType::MpeBend, channel, 0, std::clamp(semitones, -96.0, 96.0));
+}
+void Engine::mpePressure(uint32_t offset, int channel, double amount) noexcept {
+    if (channel < 1 || channel >= Impl::kMpeChannels) return;
+    impl_->push(offset, EventType::MpePressure, channel, 0, std::clamp(amount, 0.0, 1.0));
+}
+void Engine::mpeSlide(uint32_t offset, int channel, double amount) noexcept {
+    if (channel < 1 || channel >= Impl::kMpeChannels) return;
+    impl_->push(offset, EventType::MpeSlide, channel, 0, std::clamp(amount, 0.0, 1.0));
 }
 void Engine::programChange(uint32_t offset, int program, int track) noexcept {
     if (program < 0 || program > kInstruments || track >= kTracks) return;
@@ -298,6 +355,7 @@ void Engine::digidrumPreview(uint32_t offset, int slot) noexcept {
     if (slot < 0 || slot >= kDigidrumSlots) return;
     impl_->push(offset, EventType::DigiPreview, slot, 0, 0);
 }
+void Engine::digidrumStopPreview(uint32_t offset) noexcept { impl_->push(offset, EventType::DigiStop, 0, 0, 0); }
 
 void Engine::dmaPreview(uint32_t offset, int slot) noexcept {
     if (slot >= 0 && slot < kDmaSlots) impl_->push(offset, EventType::DmaPreview, slot, 0, 0);
@@ -330,9 +388,12 @@ void Engine::setSeqLog(std::vector<SeqLogRecord>* log) noexcept { impl_->seqLog 
 void Engine::takeMeters(TrackMeters& out) noexcept {
     Impl& m = *impl_;
     out.peak = m.meterPeak;
+    out.peakR = m.meterPeakR;
     out.scope = m.meterScope;
+    out.side = m.meterScopeD;
     out.scopePos = m.meterPos;
     m.meterPeak.fill(0);
+    m.meterPeakR.fill(0);
 }
 
 void Engine::setHostTransport(const HostTransport& t) noexcept { impl_->host = t; }
@@ -384,7 +445,7 @@ void Engine::render(const Outputs& out, uint32_t n) noexcept {
         m.seqHalt(m.at());
         m.seq.parkedAt = -1;
         m.hostPulse = Impl::kNoPulse;
-        m.arpHalfIn = 0;
+        m.halfPulseIn = 0;
     }
     const TrackArp& arpSet = m.arpSettings();
     const double arpInc = std::clamp(m.arpRate(arpSet.rateHz), 0.0, 1000.0) / m.hostRate();
@@ -474,6 +535,8 @@ uint32_t Engine::latencySamples() const noexcept {
     return m.studio() ? m.outL.latencySamples() : m.chips[0].latencySamples();
 }
 
+const std::array<uint8_t, 128>& Engine::manualCuts() const noexcept { return impl_->manualCut; }
+
 Engine::VoiceInfo Engine::voice(int index) const noexcept {
     const Impl& m = *impl_;
     VoiceInfo info;
@@ -487,6 +550,7 @@ Engine::VoiceInfo Engine::voice(int index) const noexcept {
     info.notePeriod = v.tp;
     info.tonePeriod = v.tpEff ? v.tpEff : v.tp;
     info.volume = v.vol4;
+    info.accent = v.accent;
     info.noise = v.noiseOn || v.ornNoiseOn;
     info.gen = v.gen;
     info.tone = v.toneOn;
@@ -515,8 +579,12 @@ Engine::DmaInfo Engine::dmaVoice(int index) const noexcept {
     return info;
 }
 int Engine::dmaPreviewSlot() const noexcept { return impl_->dmaBank.previewSlot(); }
+int Engine::digidrumPreviewSlot() const noexcept { return impl_->digiPreviewSlot; }
 int Engine::program(int track) const noexcept {
     return track >= 0 && track < kTracks ? impl_->program[size_t(track)] : 0;
+}
+bool Engine::trackStereo(int track) const noexcept {
+    return track >= 0 && track < kTracks && impl_->trackStereo(track);
 }
 uint8_t Engine::dmaPlayingSlots() const noexcept {
     const Impl& m = *impl_;

@@ -41,7 +41,7 @@ struct SndhSubsong {
 };
 
 struct SndhDmaSample {
-    std::span<const int8_t> data;  // signed bytes, interleaved left, right if stereo
+    std::span<const int8_t> data;  // signed bytes up to End of the slot, interleaved left, right if stereo
     uint8_t rate = 2;              // index into ymengine::kDmaRateHz
     bool stereo = false;
     bool loop = false;

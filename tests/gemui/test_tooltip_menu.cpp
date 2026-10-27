@@ -1,5 +1,6 @@
-// STYM2149 — Options > Tooltips: On, Off, a separator, then the Language submenu (sixth DAW test, item 67, D-265):
-// English, built in, then the languages of the PO files, installed or the user's (seventh DAW test, item 82, D-283).
+// STYM2149 — Tooltips and their language, in the Settings window since D-430 (Options > Tooltips before, its Language
+// submenu after a separator, sixth DAW test, item 67, D-265): English, built in, then the languages of the PO files,
+// installed or the user's (seventh DAW test, item 82, D-283), and the Languages folder button.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -16,62 +17,41 @@
 using namespace stym;
 using namespace stym::ui_testing;
 
-namespace {
-
-const gemui::MenuItem* find(const std::vector<gemui::MenuItem>& items, const std::string& label) {
-    for (const gemui::MenuItem& m : items)
-        if (m.label == label) return &m;
-    return nullptr;
-}
-
-// Options > Tooltips, as the menu builds it.
-gemui::MenuItem tooltips(pluginui::MainWindow& w) {
-    w.openMenu(3);
-    const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
-    REQUIRE(list);
-    REQUIRE_FALSE(find(list->items(), "Tooltip language"));
-    const gemui::MenuItem* t = find(list->items(), "Tooltips");
-    REQUIRE(t);
-    gemui::MenuItem copy = *t;
-    w.desktop().closePopups();
-    return copy;
-}
-
-}  // namespace
-
-TEST_CASE("Options: the tooltip language is a submenu of Tooltips, after a separator (sixth DAW test, item 67, D-265)",
-          "[ui][tips]") {
+TEST_CASE("Settings: Tooltips On or Off, then their Language, out of the Options menu (D-265, D-430)", "[ui][tips]") {
     UiHost h;
     h.languages = gemshot::installedLanguages();
     h.prefs["tipLanguage"] = "de";
     pluginui::MainWindow w(h);
 
-    gemui::MenuItem t = tooltips(w);
-    REQUIRE(t.sub.size() == 4);
+    w.openMenu(3);
+    for (const std::string& label : menuLabels(w)) {
+        CHECK(label != "Tooltips");
+        CHECK(label != "Language");
+    }
+    w.desktop().closePopups();
+
+    gemui::MenuItem t = setting(w, "setTips");
+    REQUIRE(t.sub.size() == 2);
     CHECK(t.sub[0].label == "On");
     CHECK(t.sub[1].label == "Off");
-    CHECK(t.sub[2].separator);
-    CHECK(t.sub[3].label == "Language");
-    CHECK(t.subMarks);
-    CHECK(t.subCur == 0);  // On, among the plain entries
-
-    const gemui::MenuItem& lang = t.sub[3];
-    REQUIRE(lang.sub.size() == 8);  // English, the five installed languages, a separator, Languages folder (D-283)
+    CHECK(t.subCur == 0);
+    gemui::MenuItem lang = setting(w, "setLanguage");
+    REQUIRE(lang.sub.size() == 6);  // English and the five installed languages; the folder has its own button
     CHECK(lang.sub[0].label == "English");
-    CHECK(lang.sub[6].separator);
-    CHECK(lang.sub[7].label == "Languages folder...");
-    CHECK(lang.subMarks);
     CHECK(lang.subCur == 1);  // Deutsch
+    CHECK(w.settingsWindow().button("setLanguage")->text() == "Deutsch");
 
-    // Picking a language from the nested submenu sets the preference; the next menu marks it.
+    // Picking a language sets the preference; the button and the next menu show it.
     lang.sub[3].pick();
     CHECK(h.prefs["tipLanguage"] == "fr");
-    CHECK(tooltips(w).sub[3].subCur == 3);
+    CHECK(setting(w, "setLanguage").subCur == 3);
+    CHECK(w.settingsWindow().button("setLanguage")->text() == "Fran\u00e7ais");
 
-    // Off is still the second entry.
-    tooltips(w).sub[1].pick();
+    t.sub[1].pick();
     CHECK(h.prefs["tooltips"] == "0");
-    CHECK(tooltips(w).subCur == 1);
+    CHECK_FALSE(w.desktop().tooltips());
+    CHECK(setting(w, "setTips").subCur == 1);
+    CHECK(w.settingsWindow().button("setTips")->text() == "Off");
 }
 
 namespace {
@@ -103,7 +83,22 @@ const char* const kDutch = "\xEF\xBB\xBF# Dutch tooltips\r\n"
                            "msgid \"Say \\\"hi\\\"\"\r\n"
                            "msgstr \"Zeg \\\"hoi\\\"\"\r\n";
 
-gemui::MenuItem languages(pluginui::MainWindow& w) { return tooltips(w).sub[3]; }
+// Settings > Language: its menu opened by a click, which reads the language files again (D-283), then closed.
+struct LanguageMenu {
+    std::vector<std::string> labels;
+    int checked;
+    std::vector<gemui::MenuItem> items;
+};
+LanguageMenu languages(pluginui::MainWindow& w) {
+    w.settingsWindow().show();
+    click(w, "setLanguage");
+    const gemui::MenuList* m = topMenu(w);
+    REQUIRE(m);
+    LanguageMenu out{{}, m->checked(), m->items()};
+    for (const gemui::MenuItem& e : out.items) out.labels.push_back(e.label);
+    w.desktop().closePopups();
+    return out;
+}
 
 // An installed language read as the plugin reads it.
 pluginui::TipFile installed(const std::string& name) {
@@ -115,12 +110,6 @@ pluginui::TipFile installed(const std::string& name) {
         }
     FAIL("no installed " << name);
     return {};
-}
-
-std::vector<std::string> labels(const gemui::MenuItem& m) {
-    std::vector<std::string> out;
-    for (const gemui::MenuItem& e : m.sub) out.push_back(e.separator ? "-" : e.label);
-    return out;
 }
 
 }  // namespace
@@ -199,15 +188,15 @@ TEST_CASE("Tooltip language files: the five installed languages hold every Engli
     CHECK(entries == pluginui::tipcatalog::kLineCount);
 }
 
-TEST_CASE("Options > Tooltips > Language: English alone without files; the installed languages, the user's files "
-          "over them, the folder opened (D-283)",
+TEST_CASE("Settings > Language: English alone without files; the installed languages, the user's files over them, "
+          "the folder opened (D-283, D-430)",
           "[ui][tips]") {
     {
         // No language file (the plugin not installed): English, and nothing to translate.
         UiHost h;
         h.prefs["tipLanguage"] = "de";
         pluginui::MainWindow w(h);
-        CHECK(labels(languages(w)) == std::vector<std::string>{"English", "-", "Languages folder..."});
+        CHECK(languages(w).labels == std::vector<std::string>{"English"});
         CHECK(w.tipLanguage() == "en");
         CHECK(w.desktop().translateTip("Click to type a value") == "Click to type a value");
     }
@@ -223,37 +212,36 @@ TEST_CASE("Options > Tooltips > Language: English alone without files; the insta
     CHECK(w.tipLanguage() == "nl-nl");
     CHECK(w.desktop().translateTip("Click to type a value") == "Klik om een waarde te typen");
 
-    gemui::MenuItem lang = languages(w);
-    CHECK(labels(lang) == std::vector<std::string>{"English", "Afrikaans", "Deutsch", "Español", "Français",
-                                                   "Italiano", "Nederlands", "Português", "-",
-                                                   "Languages folder..."});
-    CHECK(lang.subCur == 6);
+    LanguageMenu lang = languages(w);
+    CHECK(lang.labels == std::vector<std::string>{"English", "Afrikaans", "Deutsch", "Español", "Français",
+                                                  "Italiano", "Nederlands", "Português"});
+    CHECK(lang.checked == 6);
 
     // French corrected by the user's fr.po: its line first, the installed French for the others.
-    lang.sub[4].pick();
+    lang.items[4].pick();
     CHECK(h.prefs["tipLanguage"] == "fr");
     CHECK(w.desktop().translateTip("Click to type a value") == "Saisir une valeur");
     CHECK(w.desktop().translateTip("Track 3") == "Piste 3");
-    CHECK(languages(w).subCur == 4);
+    CHECK(languages(w).checked == 4);
 
     // The files of a language taken away: read again at the next opening of the menu.
-    lang.sub[6].pick();
+    lang.items[6].pick();
     CHECK(h.prefs["tipLanguage"] == "nl-nl");
     std::erase_if(h.languages, [](const pluginui::Host::TextFile& f) { return f.name.rfind("nl", 0) == 0; });
     lang = languages(w);
-    CHECK(lang.sub.size() == 9);
-    CHECK(lang.subCur == -1);
+    CHECK(lang.items.size() == 7);
+    CHECK(lang.checked < 0);
     CHECK(w.desktop().translateTip("Click to type a value") == "Click to type a value");
 
     // Languages folder: the read-me and the template written, the folder shown.
-    lang.sub.back().pick();
+    click(w, "setFolder");
     CHECK(h.foldersOpened == 1);
     REQUIRE(h.folderFiles.size() == 2);
     CHECK(h.folderFiles[0].name == "README.txt");
     CHECK(h.folderFiles[1].name == "template.pot");
 }
 
-TEST_CASE("Options > Tooltips > Language: a chosen language kept, a regional system language (D-185, D-283)",
+TEST_CASE("Settings > Language: a chosen language kept, a regional system language (D-185, D-283, D-430)",
           "[ui][tips]") {
     {
         UiHost h;

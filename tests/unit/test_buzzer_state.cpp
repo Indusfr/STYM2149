@@ -53,7 +53,9 @@ TEST_CASE("Buzzer: end of the TSEQ chunk, written for a track that only has a bu
     std::vector<uint8_t> b6 = encodeState(old);
     const size_t at = chunkAt(b6, "TSEQ");
     REQUIRE(at > 0);
-    const size_t tail = 1 + 1 + 1 + 8 + 1;  // fields of B7, at the end of the track
+    // Fields of B7, then of the LFO (D-257, D-279), the echo (D-299) and the SID wave (D-402 to D-411), at the end of
+    // the track.
+    const size_t tail = 1 + 1 + 1 + 8 + 1 + 21 + 1 + 5 + 5;
     auto u32 = [&](size_t i) { return uint32_t(b6[i]) | uint32_t(b6[i + 1]) << 8 | uint32_t(b6[i + 2]) << 16 | uint32_t(b6[i + 3]) << 24; };
     auto put = [&](size_t i, uint32_t v) {
         for (int k = 0; k < 4; ++k) b6[i + size_t(k)] = uint8_t(v >> (8 * k));

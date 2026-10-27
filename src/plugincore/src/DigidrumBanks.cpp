@@ -25,8 +25,8 @@ json::Value slotJson(const DigidrumSlotState& s, const std::vector<uint8_t>& nib
     o.set("root", int(s.play.root));
     o.set("cents", s.play.cents);
     o.set("loop", s.play.loop ? 1 : 0);
-    o.set("loopStart", double(s.play.loopStart));
-    o.set("loopEnd", double(s.play.loopEnd));
+    o.set("loopStart", double(s.play.start));
+    o.set("loopEnd", double(s.play.end));
     o.set("convert", s.convert == DigiConvert::YmLevels ? "ym" : "linear");
     std::string hex(nibbles.size(), '0');
     for (size_t i = 0; i < nibbles.size(); ++i) hex[i] = kHex[nibbles[i] & 15];
@@ -52,8 +52,8 @@ void readSlot(const json::Value& o, DigidrumSlotState& s, std::vector<uint8_t>& 
     s.play.cents = std::clamp(num("cents", 0), -kDigidrumCentsMax, kDigidrumCentsMax);
     s.play.loop = num("loop", 0) != 0;
     const double maxLen = double(Engine::kMaxUserSample);
-    s.play.loopEnd = uint32_t(std::clamp(std::floor(num("loopEnd", 0)), 0.0, maxLen));
-    s.play.loopStart = uint32_t(std::clamp(std::floor(num("loopStart", 0)), 0.0, double(s.play.loopEnd)));
+    s.play.end = uint32_t(std::clamp(std::floor(num("loopEnd", 0)), 0.0, maxLen));
+    s.play.start = uint32_t(std::clamp(std::floor(num("loopStart", 0)), 0.0, double(s.play.end)));
     if (const json::Value* v = o.find("convert"); v && v->isString())
         s.convert = v->string() == "ym" ? DigiConvert::YmLevels : DigiConvert::Linear;
     if (const json::Value* v = o.find("data"); v && v->isString()) {

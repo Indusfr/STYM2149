@@ -142,7 +142,7 @@ StymEditor::StymEditor(StymProcessor& owner, std::unique_ptr<juce::PropertiesFil
     const int stored = prefs_->getIntValue("zoom", 0);
     // Size the window was last given, otherwise one from the display, not remembered (prototype).
     zoom_ = stored >= kZoomMin && stored <= kZoomMax ? stored : autoZoom();
-    // Smooth pixels by default (Options > Pixels, D-331; default again since the eleventh DAW test, item 130, D-339).
+    // Smooth pixels by default (Settings > Pixels, D-331; default again since the eleventh DAW test, item 130, D-339).
     cache_.setSharp(prefs_->getValue("pixels", "smooth") == "sharp");
     processor_.dropHostNotes();  // notes received while the window was closed: stale
     processor_.dropLearnMidi();  // likewise for learned messages (the window reads the map again and gives it back)
@@ -186,6 +186,35 @@ void StymEditor::resized() {
     repaint();
 }
 
+void StymEditor::parentHierarchyChanged() { applyRenderer(); }
+
+// Windows (D-420): JUCE 8 shows a window through Direct2D by default, which uploads the whole image of the desktop to
+// the graphics card at each paint, the image being drawn by the CPU (render). JUCE's software renderer copies only the
+// repainted areas; it is the default. With Direct2D, Indus saw a copy of the standalone application's window flicker
+// at the top right of the Windows desktop for a few seconds (24/10/2026 22:27). In a host, the window is the
+// plugin's own (JUCE's wrapper), never the host's.
+void StymEditor::applyRenderer() {
+#if JUCE_WINDOWS
+    juce::ComponentPeer* peer = getPeer();
+    if (peer == nullptr) return;
+    const bool direct2d = prefs_->getValue("renderer", "software") == "direct2d";
+    const int engine = peer->getAvailableRenderingEngines().indexOf(direct2d ? "Direct2D" : "Software Renderer");
+    if (engine >= 0 && engine != peer->getCurrentRenderingEngine()) {
+        peer->setCurrentRenderingEngine(engine);
+        image_ = {};  // drawn again whole at the next paint
+        repaint();
+    }
+#endif
+}
+
+bool StymEditor::rendererChoice() const {
+#if JUCE_WINDOWS
+    return true;
+#else
+    return false;
+#endif
+}
+
 juce::AffineTransform StymEditor::toScreen() const noexcept {
     return juce::AffineTransform::scale(float(getWidth()) / float(MainWindow::kWidth),
                                         float(getHeight()) / float(MainWindow::kHeight));
@@ -198,6 +227,10 @@ void StymEditor::paint(juce::Graphics& g) {
     const int w = std::max(1, int(std::lround(float(getWidth()) * s)));
     const int h = std::max(1, int(std::lround(float(getHeight()) * s)));
     if (image_.getWidth() != w || image_.getHeight() != h) render(w, h);
+    // A component spanning part of a screen pixel (1150 px at 125 %: 1437.5) leaves the image's last column or row
+    // partly covered: black below it, as below a desktop of other proportions, rather than what lay there (D-461).
+    if (std::abs(float(w) - float(getWidth()) * s) > 1e-3f || std::abs(float(h) - float(getHeight()) * s) > 1e-3f)
+        g.fillAll(juce::Colours::black);
     g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
     g.drawImageTransformed(image_, juce::AffineTransform::scale(float(getWidth()) / float(w),
                                                                 float(getHeight()) / float(h)));
@@ -469,6 +502,12 @@ void StymEditor::quit() {
     juce::JUCEApplicationBase::quit();
 }
 
+bool StymEditor::askQuit() {
+    if (!standalone()) return false;
+    window_->requestQuit();
+    return true;
+}
+
 bool StymEditor::hasAudioSettings() const {
 #if JucePlugin_Build_Standalone
     return standalone() && standaloneHolder() != nullptr;
@@ -522,8 +561,8 @@ void StymEditor::loadDigidrum(int slot) {
             self->processor_.editExtras([&](NonParamState& s) {
                 DigidrumSlotState& d = s.digiSlots[size_t(slot)];
                 d.name = name;
-                d.play.loopStart = 0;
-                d.play.loopEnd = uint32_t(data.size());
+                d.play.start = 0;
+                d.play.end = uint32_t(data.size());
                 d.source = std::move(source);
                 s.digidrums[size_t(slot)] = std::move(data);
             });
@@ -621,7 +660,13 @@ void StymEditor::loadDmaSample(int slot) {
                     settings.stereo ? std::span<const float>{buf.getReadPointer(ch - 1), size_t(len)} : std::span<const float>{};
                 data = toDmaSample(left, right, reader->sampleRate, rate);
             }
-            self->processor_.editExtras([&](NonParamState& s) { s.dmaSamples[size_t(slot)] = std::move(data); });
+            // Name taken from the file (D-445).
+            const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
+            self->processor_.editExtras([&](NonParamState& s) {
+                s.dmaSamples[size_t(slot)] = std::move(data);
+                s.dma.slots[size_t(slot)].start = s.dma.slots[size_t(slot)].end = 0;  // the whole sample (D-444)
+                s.dmaNames[size_t(slot)] = name;
+            });
         });
 }
 
@@ -631,10 +676,12 @@ std::string StymEditor::preference(std::string_view key, std::string_view fallba
 
 void StymEditor::setPreference(std::string_view key, std::string_view value) {
     prefs_->setValue(str(key), str(value));
-    if (key == "pixels") {  // Options > Pixels (D-331): the whole desktop drawn again
+    if (key == "pixels") {  // Settings > Pixels (D-331): the whole desktop drawn again
         cache_.setSharp(value == "sharp");
         image_ = {};
         repaint();
+    } else if (key == "renderer") {  // Settings > Renderer (Windows, D-420)
+        applyRenderer();
     }
 }
 
@@ -735,6 +782,17 @@ std::string StymEditor::digidrumLibrary() const {
 
 void StymEditor::setDigidrumLibrary(const std::string& json) {
     const juce::File f = prefs_->getFile().getSiblingFile("Digidrums.json");
+    f.getParentDirectory().createDirectory();
+    f.replaceWithText(str(json));
+}
+
+std::string StymEditor::dmaLibrary() const {
+    const juce::File f = prefs_->getFile().getSiblingFile("DMA.json");
+    return f.existsAsFile() ? f.loadFileAsString().toStdString() : std::string();
+}
+
+void StymEditor::setDmaLibrary(const std::string& json) {
+    const juce::File f = prefs_->getFile().getSiblingFile("DMA.json");
     f.getParentDirectory().createDirectory();
     f.replaceWithText(str(json));
 }

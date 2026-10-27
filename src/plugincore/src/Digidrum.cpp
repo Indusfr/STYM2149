@@ -71,23 +71,22 @@ std::vector<int8_t> toDigidrumSource(std::span<const float> channel, double samp
     return out;
 }
 
+uint8_t digidrumNibble(int8_t source, DigiConvert mode) noexcept {
+    // -128 counts as -127, so that v stays within -1..1.
+    const double v = std::max(-1.0, source / 127.0);
+    if (mode == DigiConvert::Linear) return uint8_t(std::clamp(std::floor(v * 7.5 + 7.5 + 0.5), 0.0, 15.0));
+    // The source mapped to 0..1, like the levels; on a tie, the lower level wins.
+    const auto& lv = ymLevels();
+    const double target = (v + 1) / 2;
+    int best = 0;
+    for (int n = 1; n < 16; ++n)
+        if (std::abs(lv[size_t(n)] - target) < std::abs(lv[size_t(best)] - target)) best = n;
+    return uint8_t(best);
+}
+
 std::vector<uint8_t> digidrumNibbles(std::span<const int8_t> source, DigiConvert mode) {
     std::vector<uint8_t> out(source.size());
-    const auto& lv = ymLevels();
-    for (size_t i = 0; i < source.size(); ++i) {
-        // -128 counts as -127, so that v stays within -1..1.
-        const double v = std::max(-1.0, source[i] / 127.0);
-        if (mode == DigiConvert::Linear) {
-            out[i] = uint8_t(std::clamp(std::floor(v * 7.5 + 7.5 + 0.5), 0.0, 15.0));
-            continue;
-        }
-        // The source mapped to 0..1, like the levels; on a tie, the lower level wins.
-        const double target = (v + 1) / 2;
-        int best = 0;
-        for (int n = 1; n < 16; ++n)
-            if (std::abs(lv[size_t(n)] - target) < std::abs(lv[size_t(best)] - target)) best = n;
-        out[i] = uint8_t(best);
-    }
+    for (size_t i = 0; i < source.size(); ++i) out[i] = digidrumNibble(source[i], mode);
     return out;
 }
 
@@ -106,6 +105,12 @@ void digiNormalize(std::vector<int8_t>& s) noexcept {
 }
 
 void digiReverse(std::vector<int8_t>& s) noexcept { std::reverse(s.begin(), s.end()); }
+
+ymengine::DigidrumSlot digidrumEngineSlot(const DigidrumSlotState& s) noexcept {
+    ymengine::DigidrumSlot p = s.play;
+    p.rest = digidrumNibble(0, s.convert);
+    return p;
+}
 
 // The gain goes from 1 on the first sample down to 1/n on the last one.
 void digiFadeOut(std::vector<int8_t>& s) noexcept {

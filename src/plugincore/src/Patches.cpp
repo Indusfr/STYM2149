@@ -71,7 +71,14 @@ void putSequences(Value& p, const ymengine::TrackPatch& t) {
     if (t.link) p.set("link", Value(int(t.link)));
     if (t.pitchMatrix != def.pitchMatrix) p.set("pitchMatrix", Value(int(t.pitchMatrix)));
     if (!allZero(t.sidWave)) p.set("sidWave", list(t.sidWave));  // timer waves (B6, D-151)
-    if (t.sidWaveLen) p.set("sidWaveLen", Value(int(t.sidWaveLen)));
+    if (t.sidWaveLen != def.sidWaveLen) p.set("sidWaveLen", Value(int(t.sidWaveLen)));
+    if (t.sidWavePhase != def.sidWavePhase) p.set("sidWavePhase", Value(int(t.sidWavePhase)));     // D-405
+    if (t.sidWavePeriod != def.sidWavePeriod) p.set("sidWavePeriod", Value(int(t.sidWavePeriod)));  // D-406
+    if (t.sidWidth != def.sidWidth) p.set("sidWidth", Value(int(t.sidWidth)));  // width of the Square (D-408)
+    // The form of the SID wave (D-411), always beside the keys of the wave: without it, those keys are read as the
+    // patches written before it (getSequences).
+    if (t.sidForm != def.sidForm || p.find("sidWave") || p.find("sidWaveLen") || p.find("sidWidth"))
+        p.set("sidForm", Value(int(t.sidForm)));
     if (!allZero(t.buzzShapes)) p.set("buzzSteps", list(t.buzzShapes));
     if (t.buzzLen) p.set("buzzLen", Value(int(t.buzzLen)));
     if (t.envTuned) p.set("envTuned", Value(1));  // buzzer (B7, D-152)
@@ -120,9 +127,38 @@ void getSequences(const Value& p, ymengine::TrackPatch& t) {
                                         0.0, 65535.0));
     readList(p, "sidWave", t.sidWave, 0);
     readList(p, "buzzSteps", t.buzzShapes, 0);
-    auto count = [&](std::string_view key) { return uint8_t(std::clamp(finite(std::round(num(p, key, 0)), 0), 0.0, 255.0)); };
-    t.sidWaveLen = count("sidWaveLen");
+    auto count = [&](std::string_view key, double fallback = 0) {
+        return uint8_t(std::clamp(finite(std::round(num(p, key, fallback)), fallback), 0.0, 255.0));
+    };
+    // The form of the SID wave (D-411). A patch without it was written before: Steps 0 or 1 (or none) was the plain
+    // square, whose width counted sixteenths of its period (D-408), 8 being half and half; Steps 2 or more played the
+    // bars, a Sine when sidWaveSine was lit (D-402), one cycle over the 16 bars without its period (D-406), drawn on
+    // the chip's levels: the Bounce now (D-414). As in a project (State.cpp), another width becomes the Square of 16
+    // Steps, the same sound.
+    using ymengine::SidForm;
+    const bool form = p.find("sidForm");
+    const bool sine = !form && num(p, "sidWaveSine", 0) != 0;
+    t.sidWaveLen = count("sidWaveLen", form ? def.sidWaveLen : 0);
     t.buzzLen = count("buzzLen");
+    t.sidWavePhase = uint8_t(std::clamp(finite(std::round(num(p, "sidWavePhase", def.sidWavePhase)), def.sidWavePhase),
+                                        0.0, double(ymengine::kSidWaveSteps - 1)));
+    const double period = sine ? ymengine::kSidWaveSteps : def.sidWavePeriod;
+    t.sidWavePeriod = uint8_t(std::clamp(finite(std::round(num(p, "sidWavePeriod", period)), period),
+                                         double(ymengine::kSidWavePeriodMin), double(ymengine::kSidWaveSteps)));
+    t.sidWidth = uint8_t(std::clamp(finite(std::round(num(p, "sidWidth", def.sidWidth)), def.sidWidth), 1.0,
+                                    double(ymengine::kSidWidthMax)));
+    if (form)
+        t.sidForm = ymengine::sidFormOf(count("sidForm"));
+    else {
+        if (t.sidWaveLen >= 2) t.sidForm = sine ? SidForm::Bounce : SidForm::Custom;
+        else if (p.find("sidWidth") && t.sidWidth != 2 * ymengine::kSidWidth) {
+            t.sidForm = SidForm::Square;
+            t.sidWaveLen = uint8_t(ymengine::kSidWaveSteps);
+        } else t.sidForm = SidForm::Base;
+        if (t.sidForm != SidForm::Square) t.sidWidth = def.sidWidth;
+    }
+    t.sidWaveLen = uint8_t(t.sidWaveLen < 2 ? ymengine::kSidSquareSteps
+                                            : std::min<int>(t.sidWaveLen, ymengine::kSidWaveSteps));
     t.envTuned = num(p, "envTuned", 0) != 0;
     t.envRatioN = uint8_t(std::clamp(finite(std::round(num(p, "envN", 1)), 1), 1.0, 255.0));
     t.envRatioD = uint8_t(std::clamp(finite(std::round(num(p, "envD", 1)), 1), 1.0, 255.0));
@@ -165,8 +201,7 @@ const Value& member(const Value& e, std::string_view key) {
 }  // namespace
 
 bool inPatch(Track f) noexcept {
-    return f != Track::On && f != Track::Pan && f != Track::Mute && f != Track::Solo && f != Track::Send &&
-           f != Track::Count;
+    return f != Track::On && !mixerOnly(f) && f != Track::Count;
 }
 
 PatchEntry snapPatch(const std::string& name, const ParamValues& v, const NonParamState& state, int track) {
@@ -336,10 +371,11 @@ std::string dumpPatchLibrary(const std::vector<PatchEntry>& patches) {
     doc.set("patches", std::move(list));
     // Keys that STYM2149 adds to the patch of the prototype (M6: sequences, timer waves, buzzer, DMA; vibrato Off;
     // LFO; echo).
-    static constexpr std::array<std::string_view, 24> kStymKeys = {
+    static constexpr std::array<std::string_view, 29> kStymKeys = {
         "seqPer", "seqNP", "seqMix", "seqGen", "seqFix", "fixNote", "detune", "analog", "hardSync", "link",
-        "pitchMatrix", "sidWave", "sidWaveLen", "buzzSteps", "buzzLen", "envTuned", "envN", "envD", "envFine",
-        "ymPad", "dmaSlot", "vibOn", "lfo", "echo"};
+        "pitchMatrix", "sidWave", "sidWaveLen", "sidWaveSine", "sidWavePhase", "sidWavePeriod", "sidWidth",
+        "sidForm", "buzzSteps", "buzzLen", "envTuned", "envN", "envD", "envFine", "ymPad", "dmaSlot", "vibOn", "lfo",
+        "echo"};
     const bool ext = std::any_of(patches.begin(), patches.end(), [](const PatchEntry& e) {
         const Value* p = e.isObject() ? e.find("patch") : nullptr;
         return p && p->isObject() &&

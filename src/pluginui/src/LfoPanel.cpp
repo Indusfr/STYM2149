@@ -135,17 +135,20 @@ std::string LfoPanel::divisionText(int division) {
     return kDivisions[size_t(std::clamp(division, 0, ymengine::kLfoDivisions - 1))];
 }
 
-std::string LfoPanel::depthText(LfoTarget target, double depth) {
-    const std::string n = std::to_string(int(std::lround(depth)));
+std::string LfoPanel::depthUnit(LfoTarget target) {
     switch (target) {
     case LfoTarget::Volume:
-    case LfoTarget::NoisePeriod: return n;
+    case LfoTarget::NoisePeriod: return {};
     case LfoTarget::EnvPeriod:
     case LfoTarget::SidRatio:
-    case LfoTarget::Pitch: return n + "c";
-    case LfoTarget::Pan: return n + "%";
+    case LfoTarget::Pitch: return "c";
+    case LfoTarget::Pan: return "%";
     }
-    return n;
+    return {};
+}
+
+std::string LfoPanel::depthText(LfoTarget target, double depth) {
+    return std::to_string(int(std::lround(depth))) + depthUnit(target);
 }
 
 int LfoPanel::divisionOf(std::string_view text) {
@@ -168,6 +171,7 @@ void LfoPanel::build() {
     depth_.setTip("LFO depth on either side: volume steps, noise period steps, cents or percent of pan");
     for (gemui::ValueField* f : {&ratev_, &depthv_}) f->setPx(14);
     ratev_.setWholeText(true);  // a division (1/8T) as well as a number
+    ratev_.setUnit(" Hz");      // out of the reverse video, as the depth's unit (D-464)
     ratev_.setTip("Click to type a rate in Hz, or a division (1/8T)");
     div_.setTip(kDivTip);
 }
@@ -345,6 +349,7 @@ void LfoPanel::refresh() {
         depth_.setRange(0, depthMax(l.target), 1);
         depth_.setValue(l.depth);
     }
+    depthv_.setUnit(depthUnit(l.target));
     if (!depthv_.editing()) depthv_.setText(depthText(l.target, l.depth));
 }
 

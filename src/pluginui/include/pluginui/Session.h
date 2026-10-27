@@ -48,7 +48,11 @@ struct TrackOrnament {
     uint8_t link = 0;
     uint16_t pitchMatrix = ymengine::kPitchMatrixDefault;
     std::array<uint8_t, ymengine::kSidWaveSteps> sidWave{};  // timer waves (B6, D-151)
-    uint8_t sidWaveLen = 0;
+    uint8_t sidWaveLen = ymengine::kSidSquareSteps;
+    ymengine::SidForm sidForm = ymengine::SidForm::Base;  // D-411
+    uint8_t sidWavePhase = ymengine::kSidWavePhase;       // D-405
+    uint8_t sidWavePeriod = ymengine::kSidWavePeriod;     // D-406
+    uint8_t sidWidth = ymengine::kSidWidth;               // D-408
     std::array<uint8_t, ymengine::kBuzzSteps> buzzShapes{};
     uint8_t buzzLen = 0;
     bool envTuned = false;  // buzzer (B7, D-152)
@@ -60,11 +64,12 @@ struct TrackOrnament {
 
     bool operator==(const TrackOrnament&) const = default;
     static TrackOrnament of(const ymengine::TrackPatch& p) {
-        return {p.ornamentOn,  p.ornamentLength, p.ornamentLoop, p.ornamentRate, p.ornamentPitch,
-                p.ornamentNoise, p.ornamentVolume, p.rows,       p.fixedNote,    p.detuneCents,
-                p.analogCents, p.hardSync,       p.link,         p.pitchMatrix,  p.sidWave,
-                p.sidWaveLen,  p.buzzShapes,     p.buzzLen,      p.envTuned,     p.envRatioN,
-                p.envRatioD,   p.envFineCents,   p.ymPad,        p.lfo,          p.echo};
+        return {p.ornamentOn,   p.ornamentLength, p.ornamentLoop,  p.ornamentRate, p.ornamentPitch,
+                p.ornamentNoise, p.ornamentVolume, p.rows,          p.fixedNote,    p.detuneCents,
+                p.analogCents,  p.hardSync,       p.link,          p.pitchMatrix,  p.sidWave,
+                p.sidWaveLen,   p.sidForm,        p.sidWavePhase,  p.sidWavePeriod, p.sidWidth,
+                p.buzzShapes,   p.buzzLen,        p.envTuned,      p.envRatioN,    p.envRatioD,
+                p.envFineCents, p.ymPad,          p.lfo,           p.echo};
     }
     void applyTo(ymengine::TrackPatch& p) const {
         p.ornamentOn = on;
@@ -83,6 +88,10 @@ struct TrackOrnament {
         p.pitchMatrix = pitchMatrix;
         p.sidWave = sidWave;
         p.sidWaveLen = sidWaveLen;
+        p.sidForm = sidForm;
+        p.sidWavePhase = sidWavePhase;
+        p.sidWavePeriod = sidWavePeriod;
+        p.sidWidth = sidWidth;
         p.buzzShapes = buzzShapes;
         p.buzzLen = buzzLen;
         p.envTuned = envTuned;
@@ -96,14 +105,15 @@ struct TrackOrnament {
 };
 
 // Undo step (undoEntry, songUndoEntry, chanUndoEntry, mixUndoEntry, kitUndoEntry of the prototype; Dma: DMA track of
-// the STE, M6, D-153; Digi: a Digidrum slot of the editor, M6, D-154; Import: import of a MIDI file, M7, D-170).
+// the STE, M6, D-153; Digi: a Digidrum slot of the editor, M6, D-154; Import: import of a MIDI file, M7, D-170; Grid:
+// a resolution change that fits the notes, D-448).
 struct UndoEntry {
-    enum class Kind : uint8_t { Pattern, Song, Track, Mix, Kit, Dma, Digi, Import };
+    enum class Kind : uint8_t { Pattern, Song, Track, Mix, Kit, Dma, Digi, Import, Grid };
     Kind kind = Kind::Pattern;
     int index = 0;                    // pattern (Pattern), track (Track), kept sample (Dma, -1: none), Digidrum
-                                      // slot (Digi) or number of replaced patterns (Import)
+                                      // slot (Digi), number of replaced patterns (Import) or resolution (Grid)
     ymseq::Pattern pattern;           // Pattern
-    ymseq::Song song;                 // Song, Import
+    ymseq::Song song;                 // Song, Import, Grid
     std::vector<float> params;        // Track: parameters of the track; Mix: level, pan, mute, solo and send of
                                       // each track; Import: On and Generator of the tracks,
                                       // FreeTempo, then (XM) Computer and VblRate
@@ -112,18 +122,20 @@ struct UndoEntry {
     ymengine::KitParams kit;          // Kit: the eight instruments of the Chipdrum kit
     ymengine::DmaParams dma;          // Dma, Import XM: settings of the track and of its samples
     std::vector<int8_t> dmaBytes;     // Dma: bytes of sample `index`
+    std::array<std::string, ymengine::kDmaSlots> dmaNames;  // Dma, Import XM: names of the samples (D-445)
     plugin::DigidrumSlotState digi;   // Digi: settings of slot `index` (and its source if digiBytes)
     std::vector<uint8_t> digiNibbles; // Digi: 4-bit values played (if digiBytes)
     bool digiBytes = false;           // Digi: the step keeps the source and the values (otherwise settings only)
-    std::vector<ymseq::Pattern> patterns;  // Import: patterns 0 to index-1
+    std::vector<ymseq::Pattern> patterns;  // Import: patterns 0 to index-1; Grid: all of them
     std::bitset<ymseq::kPatterns> used;    // Import: created patterns
+    std::array<int, ymseq::kTracks> lengths{};  // Grid: own lengths of the tracks (ymseq::TrackSeq::length)
     int current = 0;                       // Import: current pattern
     // Import XM (B5, D-166): instruments and DMA slots 0 to slots-1, sequencer rate (timing, speed).
     bool xm = false;
     int slots = 0;
     std::vector<plugin::Instrument> instruments;
     std::vector<std::vector<int8_t>> dmaSamples;
-    ymengine::SeqTiming timing = ymengine::SeqTiming::Bpm;
+    ymengine::SeqTiming timing = ymengine::SeqTiming::Bpm;  // Import XM, Grid
     uint8_t speed = 6;
 
     // Same kind, same index and same content in the fields that kind uses (patterns by content, sameContent). The
@@ -135,14 +147,20 @@ struct UndoEntry {
         case Kind::Song: return song == o.song;
         case Kind::Mix: return params == o.params;
         case Kind::Kit: return kit == o.kit;
-        case Kind::Dma: return dma == o.dma && dmaBytes == o.dmaBytes;
+        case Kind::Dma: return dma == o.dma && dmaBytes == o.dmaBytes && dmaNames == o.dmaNames;
         case Kind::Digi:
             return digiBytes == o.digiBytes && digi == o.digi && digiNibbles == o.digiNibbles;
         case Kind::Import:
             if (song != o.song || params != o.params || used != o.used || current != o.current ||
                 patterns.size() != o.patterns.size() || xm != o.xm || slots != o.slots ||
-                instruments != o.instruments || dma != o.dma || dmaSamples != o.dmaSamples || timing != o.timing ||
-                speed != o.speed)
+                instruments != o.instruments || dma != o.dma || dmaSamples != o.dmaSamples || dmaNames != o.dmaNames ||
+                timing != o.timing || speed != o.speed)
+                return false;
+            for (size_t i = 0; i < patterns.size(); ++i)
+                if (!patterns[i].sameContent(o.patterns[i])) return false;
+            return true;
+        case Kind::Grid:
+            if (song != o.song || lengths != o.lengths || timing != o.timing || patterns.size() != o.patterns.size())
                 return false;
             for (size_t i = 0; i < patterns.size(); ++i)
                 if (!patterns[i].sameContent(o.patterns[i])) return false;

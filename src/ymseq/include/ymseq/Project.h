@@ -65,6 +65,13 @@ public:
     // octave 0 is read and rewritten correctly and the chord voices follow the root.
     void transposePattern(int idx, int semis, const std::bitset<kTracks>& drumTracks);
 
+    // The sequencer at a resolution num / den times finer, the notes keeping their time (D-448): every created
+    // pattern (fitLane on each track, its BPM row and its length, 1-256), the tracks' own lengths (1-64) and the Rest
+    // and Note-off entries of the Song (1-256 steps).
+    void fitResolution(int num, int den);
+    // A created pattern holds a note (root or chord voice) on one of its tracks.
+    bool hasNotes() const noexcept;
+
     // Empties track t of the current pattern if it is stored empty (after an edit).
     void compact() noexcept { cur().compact(); }
 };

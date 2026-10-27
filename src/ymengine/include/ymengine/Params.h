@@ -24,15 +24,37 @@ inline constexpr double kDigidrumRateMin = 2000, kDigidrumRateMax = 20000;
 inline constexpr double kDigidrumCentsMax = 100;  // fine tune of a slot, ± cents
 inline constexpr int kInstruments = 32;       // instruments of the project, $01 to $20 (M6, D-147)
 
-// Playback of a Digidrum slot (M6, B9, D-154): rate at the root note, fine tune, sustain loop (replayed from
-// loopStart to loopEnd, end excluded, while the note is held; on release, the sample plays to the end). The
-// defaults play like the prototype: 7 800 Hz for C4, without loop.
+// Part of a sample of n values (or frames) that a slot plays, from start to end (end excluded): its Start and End
+// (D-443, D-444), End 0 or past a shorter sample meaning its end, a Start not before that end meaning its beginning.
+struct SampleSpan {
+    uint32_t start = 0, end = 0;
+    uint32_t size() const noexcept { return end - start; }
+};
+inline SampleSpan sampleSpan(uint32_t start, uint32_t end, uint32_t n) noexcept {
+    const uint32_t e = end > 0 && end <= n ? end : n;
+    return {start < e ? start : 0, e};
+}
+// The same part once the n values are reversed (Reverse tool, D-450): Start and End mirrored; the whole sample stays
+// the whole sample (Start 0, End 0).
+inline void mirrorSpan(uint32_t& start, uint32_t& end, uint32_t n) noexcept {
+    const SampleSpan p = sampleSpan(start, end, n);
+    if (p.start == 0 && p.end == n) return;
+    start = n - p.end;
+    end = n - p.start;
+}
+
+// Playback of a Digidrum slot (M6, B9, D-154, D-443): rate at the root note, fine tune, the part played (Start to
+// End, sampleSpan) and its sustain loop (Start to End replayed while the note is held; on release, the part plays on
+// to End). The defaults play like the prototype: 7 800 Hz for C4, the whole sample, without loop.
 struct DigidrumSlot {
     double rateHz = kDigidrumRate;
     uint8_t root = 60;
     double cents = 0;  // -100 to 100
     bool loop = false;
-    uint32_t loopStart = 0, loopEnd = 0;
+    uint32_t start = 0, end = 0;  // values; end 0: to the end of the sample
+    // Value of silence, a source byte 0 once converted (8 for Linear): the editor's preview centres on its level, so
+    // that it starts and ends without a click (D-455). Set from the conversion when the slot goes to the engine.
+    uint8_t rest = 8;
     bool operator==(const DigidrumSlot&) const = default;
 };
 
@@ -75,6 +97,21 @@ inline constexpr int kGrooveMax = 15;
 // 4-bit volume in 3-channel mode (the only one possible on the chip). Volume: 4-bit volume in all modes. Off: ignored.
 enum class VelocityMode : uint8_t { Accent, Volume, Off };
 
+// What the modulation wheel and the pressure of a note (aftertouch) drive, from nothing at rest to the full effect
+// at the top (D-432; other targets than the vibrato: Indus, 25/10/2026 20:47): nothing, the depth of its vibrato
+// (GlobalParams::expressCents at the top), its 4-bit volume (raised towards 15), its envelope frequency (up to an
+// octave higher: Sync Buzzer and the Env sources) or the depth of the LFO of its track (none at rest). Where the wheel
+// and the pressure drive the same target, the higher of the two plays.
+enum class ExpressTarget : uint8_t { Off, Vibrato, Volume, Envelope, Lfo };
+// What the pitch bend of a track drives (D-432, Indus 25/10/2026 20:51): the pitch of its notes, their 4-bit volume
+// (the centre leaves it, raised towards 15 up, lowered towards 0 down) or their envelope frequency (by the semitones of
+// the bend, the note unchanged: Sync Buzzer and the Env sources). The bend of an MPE note stays on its pitch.
+enum class BendTarget : uint8_t { Pitch, Volume, Envelope };
+// What the MPE slide (CC74) of a note drives (D-432, Indus 25/10/2026 20:42): its 4-bit volume (64 leaves it, raised
+// towards 15 above, lowered towards 0 below), its envelope frequency (up to an octave either way: Sync Buzzer and the
+// Env sources) or the depth of its vibrato (that of the wheel at the top, none from the middle down).
+enum class SlideTarget : uint8_t { Volume, Envelope, Vibrato };
+
 // Instrument sequences (M6, B2, D-148): rows of the Modulation table specific to STYM2149, played with the rows
 // of the prototype (same run, same length, same loop, same cadence). A value of 0 changes nothing.
 struct SeqRows {
@@ -112,6 +149,22 @@ static_assert(kPitchMatrixDefault == (pitchBit(PitchSource::Table, PitchTarget::
 inline constexpr int kDetuneMaxCents = 100, kAnalogMaxCents = 50;
 // Timer waves (M6, B6, D-151): steps of the programmable SID wave and of the Sync Buzzer.
 inline constexpr int kSidWaveSteps = 16, kBuzzSteps = 8;
+// Phase of the Sine-SID by default, in bars (24/10/2026, D-405), and its period, in bars (D-406: 8 by default, two
+// cycles over the 16 bars; 2 to 16): the sine of sineSidWave().
+inline constexpr int kSidWavePhase = 8;
+inline constexpr int kSidWavePeriod = 8, kSidWavePeriodMin = 2;
+// Forms of the SID wave, from its menu (24/10/2026, D-411): Base, the prototype's square (two interrupts per period,
+// toggled at each); Square, a square of Steps interrupts per period, the note's volume over the first sidWidth of them
+// (D-408: 1 to Steps - 1; 4 by default, half and half); Sine, a Sine-SID drawn in the bars (D-401); Custom, the bars
+// drawn; Bounce, the Sine-SID on the scale of the chip's levels (Indus, 18:41, D-414; after Custom so that the values
+// already saved keep their form, before it in the menu). Steps: 8 by default (Indus, 17:47).
+enum class SidForm : uint8_t { Base, Square, Sine, Custom, Bounce };
+inline constexpr int kSidForms = 5, kSidSquareSteps = 8;
+// The forms drawn as a Sine-SID, which a bar moved shifts and Period sets (D-405, D-406, D-414).
+constexpr bool sineForm(SidForm f) noexcept { return f == SidForm::Sine || f == SidForm::Bounce; }
+// The form saved as `v`; a value of a later version plays its bars, as Custom.
+constexpr SidForm sidFormOf(int v) noexcept { return v >= 0 && v < kSidForms ? SidForm(v) : SidForm::Custom; }
+inline constexpr int kSidWidth = 4, kSidWidthMax = kSidWaveSteps - 1;
 // Buzzer (M6, B7, D-152): N / D ratio of the tuned envelope, fine tune in cents.
 inline constexpr int kEnvRatioMax = 16, kEnvFineMax = 100;
 
@@ -196,7 +249,7 @@ struct TrackPatch {
     uint16_t envPeriod = 12800;            // R11-R12 (400 × 32)
     uint8_t envShape = 8;                  // R13
     Generator generator = Generator::Chip;
-    double sidRatio = 1.0;                 // SID timer frequency = frequency of the note × ratio (0.25 to 8)
+    double sidRatio = 1.0;                 // pitch of the SID wave = note × ratio (0.25 to 8; 1 plays the note, D-426)
     uint8_t sidMinVolume = 0;              // low volume of the SID wave
     uint8_t digidrumSlot = 0;              // slot played on the keyboard (0 to 7)
     double vibratoCents = 0;               // 0 to 200
@@ -219,12 +272,21 @@ struct TrackPatch {
     bool hardSync = false;                 // square (16-channel) and timer restarted on tied notes too
     uint8_t link = 0;                      // instrument chained at the end of a table in Hold (1 to 32), 0: none
     uint16_t pitchMatrix = kPitchMatrixDefault;
-    // Timer waves (M6, B6, D-151). SID: volumes 0 to 15 played one per interrupt over sidWaveLen steps (2 to 16),
-    // scaled by the volume of the note; 0: the square wave of the prototype (volume of the note, low volume). Sync
-    // Buzzer: R13 shapes written in turn at each restart (buzzLen from 1 to 8); a step at 0, or buzzLen at 0:
-    // the shape of the track.
+    // Timer waves (M6, B6, D-151). SID, by its form (D-411): Base, the square wave of the prototype (volume of the
+    // note, low volume); Square, over sidWaveLen steps (its Steps, 2 to 16) the volume of the note on the first
+    // sidWidth of them (1 to Steps - 1, D-408), the low volume on the others; Sine, Bounce and Custom, the volumes 0 to
+    // 15 of sidWave played one per interrupt over sidWaveLen steps, scaled by the volume of the note. Each form keeps
+    // the settings of the others. Sync Buzzer: R13 shapes written in turn at each restart (buzzLen from 1 to 8); a step
+    // at 0, or buzzLen at 0: the shape of the track.
     std::array<uint8_t, kSidWaveSteps> sidWave{};
-    uint8_t sidWaveLen = 0;
+    uint8_t sidWaveLen = kSidSquareSteps;
+    SidForm sidForm = SidForm::Base;
+    // Sine and Bounce (24/10/2026, D-402, D-414): the bars stay a Sine-SID of sidWavePeriod bars (2 to 16, D-406) at
+    // sidWavePhase (0 to 15, D-405), which a bar moved changes (sineSidWavePhase). Read by the editor only: the engine
+    // plays sidWave.
+    uint8_t sidWavePhase = kSidWavePhase;
+    uint8_t sidWavePeriod = kSidWavePeriod;
+    uint8_t sidWidth = kSidWidth;  // width of the Square, in steps (D-408, D-411)
     std::array<uint8_t, kBuzzSteps> buzzShapes{};
     uint8_t buzzLen = 0;
     // Buzzer (M6, B7, D-152). Tuned envelope: the envelope period follows the note, the envelope plays the note ×
@@ -268,6 +330,11 @@ struct TrackMix {
     double pan = 0;                // -1 to 1 (16-channel only: the 3-channel mode is mono like the ST)
     bool mute = false, solo = false;
     double send = 0;               // send to the delay, 0 to 1, after the fader and the pan (D-299)
+    // Right side of a stereo DMA sample (D-459): its own fader (levelR, unless link: level), mute and solo. The left
+    // side and any other sound take level, mute and solo.
+    bool link = true;
+    double levelR = 0.75;
+    bool muteR = false, soloR = false;
 };
 
 // Sequencer settings of a track.
@@ -310,11 +377,22 @@ struct GlobalParams {
     bool softClip = true;                      // tanh saturation of the output, like the prototype (D-049)
     DelayParams delay;                         // D-299
     uint32_t vblHz = 50;                       // replay tick: 50, 60, 70, 100 or 200 Hz
+    // Frequency of A4, from which every note is tuned (kA4MinHz to kA4MaxHz of Pitch.h; D-429).
+    double a4Hz = 440.0;
     std::array<uint8_t, 2> digidrumChannel = {2, 2};  // channel taken by the Digidrum track of each chip (0 = A)
     int focusTrack = 0;                        // track played on the keyboard
     bool layer = false;                        // play all the active tracks in layers
     TimerMode timer = TimerMode::Mfp;
     VelocityMode velocity = VelocityMode::Accent;
+    // MIDI expression (D-432): what the bend, the wheel, the pressure and the MPE slide drive; the semitones of a bend
+    // at its end (Bend range: the whole way of the Volume target); the vibrato of the others at their top, in cents
+    // (Wheel depth).
+    BendTarget bendTarget = BendTarget::Pitch;
+    double bendRange = 2;
+    ExpressTarget wheelTarget = ExpressTarget::Vibrato;
+    ExpressTarget aftertouch = ExpressTarget::Vibrato;
+    SlideTarget mpeSlide = SlideTarget::Volume;
+    double expressCents = 50;
     uint32_t irqJitterCpuCycles = 0;           // interrupt jitter in 68000 cycles (0 = none); amplitude TO CONFIRM
     ArpClock arpClock = ArpClock::Hz;
     // Half pulses (48 per quarter note) per arpeggio step: 48, 24, 16, 12, 8, 6, 4, 3 or 2 (1/4 to 1/64, Tick),

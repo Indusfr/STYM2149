@@ -148,6 +148,40 @@ TEST_CASE("Host sync: start at 0, one step per sixteenth note at the tempo of th
     CHECK(std::fabs(st[5].samples - 4800) < 1e-9);
 }
 
+TEST_CASE("Host sync: 1/64, sixteen steps per quarter note of the host (D-422)", "[engine][seq][host]") {
+    Rig r(SeqClock::Host);
+    r.g.resolution = 7;
+    r.global();
+    r.pattern(0, 64);
+    r.t.playing = true;
+    r.render(24000 + 100);
+    const auto st = r.steps();
+    REQUIRE(st.size() == 17);
+    for (int k = 0; k < 17; ++k) {
+        INFO("step " << k);
+        CHECK(st[size_t(k)].stepAbs == k);
+        CHECK(st[size_t(k)].sample == uint64_t(1500 * k));
+        CHECK(std::fabs(st[size_t(k)].samples - 1500) < 1e-9);
+    }
+}
+
+TEST_CASE("Host sync: 1/32T, twelve steps per quarter note of the host (D-433)", "[engine][seq][host]") {
+    Rig r(SeqClock::Host);
+    r.g.resolution = 8;
+    r.global();
+    r.pattern(0, 64);
+    r.t.playing = true;
+    r.render(24000 + 100);
+    const auto st = r.steps();
+    REQUIRE(st.size() == 13);
+    for (int k = 0; k < 13; ++k) {
+        INFO("step " << k);
+        CHECK(st[size_t(k)].stepAbs == k);
+        CHECK(st[size_t(k)].sample == uint64_t(2000 * k));
+        CHECK(std::fabs(st[size_t(k)].samples - 2000) < 1e-9);
+    }
+}
+
 TEST_CASE("Host sync: start in the middle of a step, playback resumes at the next step", "[engine][seq][host]") {
     Rig r(SeqClock::Host);
     r.pattern(0, 16);

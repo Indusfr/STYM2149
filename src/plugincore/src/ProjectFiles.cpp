@@ -25,9 +25,10 @@ constexpr std::string_view kApp = "STYM2149";
 // Rows of a track: LANEKEYS of the prototype (rows 0 to 15 of the state, then the chord voices in the order of
 // POLYKEYS: pat2-pat6, oct2-oct6, dur2-dur6), then INS and the CMD rows of STYM2149: "cmd" holds the Xyz (and, in a
 // file written before D-330, every kind of command, each going to the row of its kind), then one key per kind
-// ("cmd" followed by its letter; D-330, D-338; "cmdL", "cmdM" and "cmdJ" since the twelfth DAW test). Xyz and Pxy are
-// retired (D-340, D-344): "cmd" and "cmdP" are no longer written, an Xyz or a Pxy read is dropped. The "afl" flags and
-// the Txx of a file written before the twelfth DAW test become Jxx and the "bpm" row of the pattern (items 144, 150).
+// ("cmd" followed by its letter; D-330, D-338; "cmdL", "cmdM" and "cmdJ" since the twelfth DAW test, "cmdG", "cmdK"
+// and "cmdQ" since D-393 and D-394). Xyz and Pxy are retired (D-340, D-344): "cmd" and "cmdP" are no longer written,
+// an Xyz or a Pxy read is dropped. The "afl" flags and the Txx of a file written before the twelfth DAW test become Jxx
+// and the "bpm" row of the pattern (items 144, 150).
 struct LaneKey {
     std::string_view key;
     int row;
@@ -42,13 +43,14 @@ constexpr std::array<LaneKey, 31> kLaneKeys = {{
     {"oct5", chordRow(5, 1)}, {"oct6", chordRow(6, 1)}, {"dur2", chordRow(2, 2)}, {"dur3", chordRow(3, 2)},
     {"dur4", chordRow(4, 2)}, {"dur5", chordRow(5, 2)}, {"dur6", chordRow(6, 2)},
 }};
-constexpr std::array<LaneKey, 19> kStymLaneKeys = {{
+constexpr std::array<LaneKey, 22> kStymLaneKeys = {{
     {"ins", 31},  {"cmd", 32},  {"cmdS", 33}, {"cmdR", 34}, {"cmdZ", 35}, {"cmdT", 36}, {"cmdV", 37},
     {"cmdA", 38}, {"cmdP", 39}, {"cmdD", 40}, {"cmdC", 41}, {"cmdB", 42}, {"cmdN", 43}, {"cmdE", 44},
-    {"cmdO", 45}, {"cmdF", 46}, {"cmdL", 47}, {"cmdM", 48}, {"cmdJ", 49},
+    {"cmdO", 45}, {"cmdF", 46}, {"cmdL", 47}, {"cmdM", 48}, {"cmdJ", 49}, {"cmdG", 50}, {"cmdK", 51},
+    {"cmdQ", 52},
 }};
 static_assert(int(ymseq::Row::Ton) == 15 && int(ymseq::Row::Ins) == 16 && int(ymseq::Row::CmdArp) == 17 &&
-              int(ymseq::Row::CmdArpeggiator) == 34 && kLaneRows == 50);
+              int(ymseq::Row::CmdNoiseCurve) == 37 && kLaneRows == 53);
 
 // Kit: keys of the prototype (KIT) carried by the fields a, b, dec and noise of DrumParams, then vol.
 struct KitKeys {

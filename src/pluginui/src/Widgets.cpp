@@ -470,12 +470,42 @@ void AdsrCurve::setShape(const Shape& s) {
     repaint();
 }
 
-void AdsrCurve::setLive(int stage, double level) {
-    // Level changes of 2 % or less within the same stage do not repaint.
-    if (stage == stage_ && (stage < 0 || std::fabs(level - level_) <= 0.02)) return;
-    stage_ = stage;
-    level_ = level;
+void AdsrCurve::setLive(std::span<const LivePoint> points) {
+    std::vector<LivePoint> next;
+    for (const LivePoint& pt : points)
+        if (pt.stage > 0) next.push_back(pt);
+    // Level changes of 2 % or less of each point within the same stage do not repaint.
+    const bool same = next.size() == live_.size() &&
+                      std::equal(next.begin(), next.end(), live_.begin(), [](const LivePoint& a, const LivePoint& b) {
+                          return a.stage == b.stage && std::fabs(a.level - b.level) <= 0.02;
+                      });
+    if (same) return;
+    live_ = std::move(next);
     repaint();
+}
+
+double AdsrCurve::liveTime(const Shape& s, int stage, double level) noexcept {
+    constexpr double HOLD = kHoldMs;
+    const double a = s.attackMs, d0 = s.decayMs, r = s.releaseMs;
+    const double sus = std::clamp(s.sustain, 0.0, 1.0), lv = std::clamp(level, 0.0, 1.0);
+    const double t1 = a, t2 = a + d0, t3 = t2 + HOLD;
+    // On the decay line: the time where it crosses the level.
+    auto onDecay = [&] { return t1 + (d0 > 0 && sus < 1 ? (1 - lv) / (1 - sus) * d0 : 0); };
+    switch (stage) {
+    case 1: return a > 0 ? lv * a : 0;
+    case 2: return onDecay();
+    case 3: return t2 + HOLD / 2;
+    case 4:
+        // A note released before its sustain falls from a level above it: the point goes on down the decay line,
+        // which crosses that level, then takes the release line at the sustain level (Indus, 24/10/2026 09:11).
+        // A level at the sustain's (within rounding) is on the release line. With no sustain (S = 0 %), the release
+        // line lies at level 0 and a released note left before its sustain (from the sustain, it stops at once): its
+        // point goes down the decay line to its end, where the note stops. Under 0.5 % it jumped to the end of the
+        // release line for its last milliseconds (Indus, 24/10/2026 14:58).
+        if (sus <= 0 || lv > sus + 0.005) return onDecay();
+        return t3 + (r <= 0 ? 0 : std::max(0.0, 1 - lv / sus) * r);
+    default: return -1;
+    }
 }
 
 void AdsrCurve::paint(Painter& p) {
@@ -485,7 +515,7 @@ void AdsrCurve::paint(Painter& p) {
     const int ox = snap(box().x), oy = snap(box().y);
     // Margins in canvas pixels (top and bottom, left and right, the letters' strip at the bottom) and the time drawn
     // for the sustain, in ms. The time axis spans A + D + HOLD + R; the level axis runs from BOT (0) up to PAD (1).
-    constexpr double PAD = 5, PADX = 12, LAB = 11, HOLD = 400;
+    constexpr double PAD = 5, PADX = 12, LAB = 11, HOLD = kHoldMs;
     const Shape& s = shape_;
     const double a = s.attackMs, d0 = s.decayMs, r = s.releaseMs;
     const double sus = std::clamp(s.sustain, 0.0, 1.0);
@@ -555,16 +585,13 @@ void AdsrCurve::paint(Painter& p) {
     letter(t2, t3, "S");
     letter(t3, t4, "R");
 
-    // Position of the followed voice: the point stops on the plateau as long as the note holds.
-    // The time is found back from the level, as if each segment were a straight line: attack 0 → 1, decay 1 → S,
-    // the middle of the plateau for the sustain, release S → 0.
-    if (stage_ > 0 && !s.off) {
-        const double lv = std::clamp(level_, 0.0, 1.0);
-        double t = -1;
-        if (stage_ == 1) t = a > 0 ? lv * a : 0;
-        else if (stage_ == 2) t = t1 + (d0 > 0 && sus < 1 ? (1 - lv) / (1 - sus) * d0 : 0);
-        else if (stage_ == 3) t = t2 + HOLD / 2;
-        else if (stage_ == 4) t = t3 + (r > 0 && sus > 0 ? (1 - lv / sus) * r : 0);
+    // Position of each voice sounding (D-403), the newest drawn last, over the others: the point stops on the plateau
+    // as long as the note holds. The time is found back from the level, as if each segment were a straight line:
+    // attack 0 → 1, decay 1 → S, the middle of the plateau for the sustain, release S → 0 (above S, the decay line:
+    // liveTime).
+    for (auto it = live_.rbegin(); it != live_.rend() && !s.off; ++it) {
+        const double lv = std::clamp(it->level, 0.0, 1.0);
+        const double t = liveTime(s, it->stage, lv);
         if (t >= 0) {
             const int x = rnd(X(std::clamp(t, 0.0, total))), y = rnd(Y(lv));
             p.fill({ox + x - 1, oy + int(PAD), 3, int(BOT - PAD)}, colors::kGreen);
@@ -580,13 +607,13 @@ void AdsrCurve::paint(Painter& p) {
 
 namespace {
 
-// Line of text of a waveform, in the GEM 6×6 font at the screen's pixels (third DAW test, items 23 and 30, D-222):
-// written over the canvas, which is stretched to the widget, at the place and on the baseline it had in the canvas,
-// on a white band so that the waveform under it does not bite into the letters. While it is too wide, the clause after
-// its last ", " or " / " goes, then the characters that do not fit.
-void drawCaption(Painter& p, const Rect& r, const Canvas& canvas, std::string text, int baseline) {
+// Line of text of a waveform, in the GEM 6×6 font at the screen's pixels (third DAW test, items 23 and 30, D-222): at
+// the place and on the baseline it has in the design (kW × kH, stretched to the inside of the box), on a white band so
+// that the drawing under it does not bite into the letters. While it is too wide, the clause after its last ", " or
+// " / " goes, then the characters that do not fit.
+void drawCaption(Painter& p, const Rect& r, int designW, int designH, std::string text, int baseline) {
     const Rect in = r.inset(2);
-    const double x = in.x + 8.0 * in.w / canvas.width();
+    const double x = in.x + 8.0 * in.w / designW;
     const double advance = Font::advance(10, gemui::Face::kSmall);
     const size_t fit = size_t(std::max(0.0, std::floor((in.right() - 2 - x) / advance)));
     while (text.size() > fit) {
@@ -599,7 +626,7 @@ void drawCaption(Painter& p, const Rect& r, const Canvas& canvas, std::string te
         }
         text.resize(cut);
     }
-    const int y = in.y + int(std::lround(double(baseline) * in.h / canvas.height()));
+    const int y = in.y + int(std::lround(double(baseline) * in.h / designH));
     // Glyphs: the 6 rows up to the baseline; the band leaves 2 px around them, 1 px under.
     const int left = int(std::floor(x)) - 2;
     const int w = int(std::ceil(x + Font::width(text, 10, 0, gemui::Face::kSmall))) + 1 - left;
@@ -607,38 +634,90 @@ void drawCaption(Painter& p, const Rect& r, const Canvas& canvas, std::string te
     p.textAt(text, x, y, 10, colors::kBlack, 0, gemui::Face::kSmall);
 }
 
+// Row v of the design (designH rows) in the inside of the box.
+int rowIn(const Rect& in, int designH, double v) { return in.y + int(std::lround(v * in.h / designH)); }
+
+// Part of the inside of the box between rows top and bottom of the design (bottom excluded).
+Rect bandIn(const Rect& in, int designH, int top, int bottom) {
+    const int t = rowIn(in, designH, top);
+    return {in.x, t, in.w, rowIn(in, designH, bottom) - t};
+}
+
+// Empty slot: the 352 × 8 frame at row y0 of the design (columns 4 to 356 of 360), in the inside of the box.
+void drawEmptyFrame(Painter& p, const Rect& in, int designH, int y0) {
+    const int x0 = in.x + int(std::lround(4.0 * in.w / 360)), x1 = in.x + int(std::lround(356.0 * in.w / 360));
+    const int t = rowIn(in, designH, y0), b = rowIn(in, designH, y0 + 8);
+    p.frame({x0, t, x1 - x0 + 1, b - t + 1}, 1, colors::kBlack);
+}
+
+// Column of sample i of n in `area`, the one drawWave draws it in.
+int columnOf(const Rect& area, size_t n, size_t i) noexcept {
+    const size_t w = size_t(std::max(1, area.w));
+    const size_t c = n >= w ? i * w / n : (2 * i + 1) * w / (2 * n);
+    return area.x + int(std::min(c, w - 1));
+}
+
+// A sample drawn over the columns of `area` at the painter's pixels (26/10/2026, D-447): before, a canvas of 360
+// columns stretched into the box dropped or doubled columns and rows (a third of them in the GENERATOR frame), and its
+// columns did not join, so the curve looked chopped. Now, with at least as many samples as columns, column x covers its
+// samples, [n x / w, n (x + 1) / w), and the last one of the column before, from the lowest to the highest: the
+// columns join where the wave jumps. With fewer samples, a line joins each sample to the next one (anti-aliased by
+// the plugin's painter, D-214). level(i): height of sample i, 0 at the bottom of the area and 1 at its top;
+// played(a, b): whether samples [a, b) are inside the part played (black), otherwise grey.
+template <class Level, class Played>
+void drawWave(Painter& p, const Rect& area, size_t n, Level level, Played played) {
+    if (n == 0 || area.empty()) return;
+    const auto y = [&area](double v) {
+        return area.y + int(std::lround((1 - std::clamp(v, 0.0, 1.0)) * (area.h - 1)));
+    };
+    const auto ink = [&played](size_t a, size_t b) { return played(a, b) ? colors::kBlack : colors::kGreyDisabled; };
+    const size_t w = size_t(area.w);
+    if (n == 1) {
+        p.fill({area.x, y(level(0)), area.w, 1}, ink(0, 1));
+    } else if (n < w) {
+        for (size_t i = 0; i + 1 < n; ++i)
+            p.line({columnOf(area, n, i), y(level(i))}, {columnOf(area, n, i + 1), y(level(i + 1))}, ink(i, i + 1));
+    } else {
+        for (size_t x = 0; x < w; ++x) {
+            const size_t a = n * x / w, b = std::max(a + 1, n * (x + 1) / w);
+            double lo = level(a), hi = lo;
+            for (size_t i = a ? a - 1 : 0; i < b; ++i) {
+                lo = std::min(lo, level(i));
+                hi = std::max(hi, level(i));
+            }
+            const int top = y(hi);
+            p.fill({area.x + int(x), top, 1, y(lo) - top + 1}, ink(a, b));
+        }
+    }
+}
+
+// The part played (D-443, D-444) of n samples, under the sample: grey lines at Start and End across `area` and the
+// row above it, joined along that row when the part loops. Nothing when the part is not valid, or is the whole sample
+// without a loop.
+void drawPart(Painter& p, const Rect& area, size_t n, uint32_t start, uint32_t end, bool loop) {
+    if (end <= start || end > n || (start == 0 && end == n && !loop)) return;
+    const int xa = columnOf(area, n, start), xb = columnOf(area, n, end - 1);
+    p.fill({xa, area.y - 1, 1, area.h + 1}, colors::kHint);
+    p.fill({xb, area.y - 1, 1, area.h + 1}, colors::kHint);
+    if (loop) p.fill({xa, area.y - 1, xb - xa + 1, 1}, colors::kHint);
+}
+
 }  // namespace
 
 DrumWave::DrumWave() { setSample(0, {}); }
 
-void DrumWave::setSample(int slot, std::span<const uint8_t> data, double rateHz) {
-    canvas_.clear(colors::kWhite);
+void DrumWave::setSample(int slot, std::span<const uint8_t> data, double rateHz, std::string_view name) {
+    nibbles_.assign(data.begin(), data.end());
     const std::string head = "slot " + std::to_string(slot + 1) + ": ";
+    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    const std::string named = head + (name.empty() ? "" : std::string(name) + ", ");
     if (data.empty()) {
-        // 352 × 8 frame (strokeRect(4, 20, 352, 8)) and prompt. An empty slot plays nothing: the "built-in DrumNoise"
-        // text of the prototype was wrong (D-029).
-        const int x0 = 4, y0 = 20, x1 = 4 + 352, y1 = 20 + 8;
-        canvas_.line(x0, y0, x1, y0, colors::kBlack);
-        canvas_.line(x0, y1, x1, y1, colors::kBlack);
-        canvas_.line(x0, y0, x0, y1, colors::kBlack);
-        canvas_.line(x1, y0, x1, y1, colors::kBlack);
+        // An empty slot plays nothing: the "built-in DrumNoise" text of the prototype was wrong (D-029).
         caption_ = head + "empty";
         baseline_ = 14;
     } else {
-        // One value every n / 360 samples (at least every sample), 0-15 mapped from y 46 up to y 2; each value drawn
-        // as a 2 px horizontal step, joined to the previous one.
-        const int n = int(data.size());
-        const int step = std::max(1, n / 360);
-        int px = 0, py = 0;
-        for (int x = 0; x < 360; ++x) {
-            const int v = data[size_t(std::min(n - 1, x * step))];
-            const int y = int(std::floor(48 - 2 - v * (48 - 4) / 15.0));
-            if (x > 0) canvas_.line(px, py, x, y, colors::kBlack);
-            canvas_.line(x, y, x + 1, y, colors::kBlack);
-            px = x + 1;
-            py = y;
-        }
-        caption_ = head + std::to_string(n) + " smp @ " + std::to_string(std::lround(rateHz)) + " Hz / 4-bit";
+        caption_ = named + std::to_string(data.size()) + " smp @ " + std::to_string(std::lround(rateHz)) +
+                   " Hz / 4-bit";
         baseline_ = 10;
     }
     repaint();
@@ -646,9 +725,17 @@ void DrumWave::setSample(int slot, std::span<const uint8_t> data, double rateHz)
 
 void DrumWave::paint(Painter& p) {
     const Rect r = bounds();
+    const Rect in = r.inset(2);
     p.frame(r, 2, colors::kBlack);
-    canvas_.blit(p, r.inset(2));
-    drawCaption(p, r, canvas_, caption_, baseline_);
+    p.fill(in, colors::kWhite);
+    if (nibbles_.empty()) {
+        drawEmptyFrame(p, in, kH, 20);  // strokeRect(4, 20, 352, 8) of the prototype
+    } else {
+        // The 4-bit values (0 at the bottom, 15 at the top) under the line of text, rows 13 to 46 of the design.
+        drawWave(p, bandIn(in, kH, 13, 47), nibbles_.size(), [this](size_t i) { return nibbles_[i] / 15.0; },
+                 [](size_t, size_t) { return true; });
+    }
+    drawCaption(p, r, kW, kH, caption_, baseline_);
 }
 
 // ------------------------------------------------------------------------------------------- DmaWave
@@ -658,61 +745,75 @@ DmaWave::DmaWave(bool loads) : loads_(loads) {
     setSample(0, {}, 25033, false);
 }
 
-// Called at each refresh of the main window or the DMA window: the drawing is redone only when the sample, its slot,
-// rate or format changed (the sample is kept for that comparison).
-void DmaWave::setSample(int slot, std::span<const int8_t> data, double rateHz, bool stereo) {
-    if (slot == slot_ && rateHz == rate_ && stereo == stereo_ && std::equal(data.begin(), data.end(), bytes_.begin(), bytes_.end()))
+// Called at each refresh of the main window or the DMA window: the widget is repainted only when the sample, its slot,
+// rate, format, part or name changed (the sample is kept for that comparison and for paint).
+void DmaWave::setSample(int slot, std::span<const int8_t> data, double rateHz, bool stereo, bool loop, uint32_t start,
+                        uint32_t end, std::string_view name) {
+    if (slot == slot_ && rateHz == rate_ && stereo == stereo_ && loop == loop_ && start == start_ && end == end_ &&
+        name == name_ && std::equal(data.begin(), data.end(), bytes_.begin(), bytes_.end()))
         return;
     slot_ = slot;
     rate_ = rateHz;
     stereo_ = stereo;
+    loop_ = loop;
+    start_ = start;
+    end_ = end;
+    name_ = name;
     bytes_.assign(data.begin(), data.end());
     repaint();
-    canvas_.clear(colors::kWhite);
     const std::string head = "sample " + std::to_string(slot + 1) + ": ";
+    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    const std::string named = head + (name.empty() ? "" : name_ + ", ");
     if (data.empty()) {
-        const int x0 = 4, y0 = 24, x1 = 4 + 352, y1 = 24 + 8;
-        canvas_.line(x0, y0, x1, y0, colors::kBlack);
-        canvas_.line(x0, y1, x1, y1, colors::kBlack);
-        canvas_.line(x0, y0, x0, y1, colors::kBlack);
-        canvas_.line(x1, y0, x1, y1, colors::kBlack);
         caption_ = head + (loads_ ? "empty - click to load a file" : "empty");
         baseline_ = 16;
         return;
     }
-    const int ch = stereo ? 2 : 1;
-    const size_t frames = data.size() / size_t(ch);
-    // One row per channel under the line of text: from 14 to 54 (mono) or two of 20 px.
-    const int top = 14, h = 40 / ch;
-    // Each column covers frames [a, b) of the sample (at least one) and draws a vertical line from its lowest to its
-    // highest byte; ±128 spans half the row less a pixel. Stereo bytes are interleaved, left first.
-    for (int c = 0; c < ch; ++c) {
-        const int mid = top + c * h + h / 2;
-        canvas_.line(0, mid, 359, mid, colors::kHint);
-        for (int x = 0; x < 360 && frames > 0; ++x) {
-            const size_t a = frames * size_t(x) / 360, b = std::max(a + 1, frames * size_t(x + 1) / 360);
-            int lo = 127, hi = -128;
-            for (size_t i = a; i < b && i < frames; ++i) {
-                const int v = data[i * size_t(ch) + size_t(c)];
-                lo = std::min(lo, v);
-                hi = std::max(hi, v);
-            }
-            const int ya = mid - int(std::lround(hi * (h / 2 - 1) / 128.0));
-            const int yb = mid - int(std::lround(lo * (h / 2 - 1) / 128.0));
-            canvas_.line(x, ya, x, yb, colors::kBlack);
-        }
-    }
-    caption_ = head + std::to_string(data.size()) + " bytes, " +
+    const size_t frames = data.size() / (stereo ? 2 : 1);
+    const bool part = end > start && end <= frames;
+    caption_ = named + std::to_string(data.size()) + " bytes, " +
                gemui::formatDecimal("%.2f s", double(frames) / rateHz) + gemui::formatDecimal(" at %.0f Hz, ", rateHz) +
-               (stereo ? "stereo" : "mono");
+               (stereo ? "stereo" : "mono") + (loop && part ? ", loop" : "");
     baseline_ = 10;
 }
 
 void DmaWave::paint(Painter& p) {
     const Rect r = bounds();
+    const Rect in = r.inset(2);
     p.frame(r, 2, colors::kBlack);
-    canvas_.blit(p, r.inset(2));
-    drawCaption(p, r, canvas_, caption_, baseline_);
+    p.fill(in, colors::kWhite);
+    const int ch = stereo_ ? 2 : 1;
+    const size_t frames = bytes_.size() / size_t(ch);
+    if (frames == 0) {
+        drawEmptyFrame(p, in, kH, 24);
+    } else {
+        // Rows 14 to 54 of the design under the line of text: one band per channel (the left one at the top), 1 px
+        // apart; ±128 spans the band around its middle line. The part played first, under the sample.
+        const Rect all = bandIn(in, kH, 14, 55);
+        drawPart(p, all, frames, start_, end_, loop_);
+        const bool part = end_ > start_ && end_ <= frames;
+        const int bh = all.h / ch;
+        for (int c = 0; c < ch; ++c) {
+            const Rect band{all.x, all.y + c * bh, all.w, bh - (ch > 1 ? 1 : 0)};
+            const int mid = band.y + int(std::lround((1 - 128 / 255.0) * (band.h - 1)));
+            p.fill({band.x, mid, band.w, 1}, colors::kHint);
+            // Stereo bytes are interleaved, left first.
+            drawWave(
+                p, band, frames, [&](size_t i) { return (bytes_[i * size_t(ch) + size_t(c)] + 128) / 255.0; },
+                [&](size_t a, size_t b) { return !part || (b > start_ && a < end_); });
+            // In stereo, L or R at the top right of the band, on white like the line of text (D-456): the end of a
+            // sample is usually quieter than its start.
+            if (ch > 1) {
+                const std::string mark = c == 0 ? "L" : "R";
+                const double w = Font::width(mark, 10, 0, gemui::Face::kSmall);
+                const double x = in.right() - 3 - w;
+                const int y = band.y + 7;
+                p.fill(Rect{int(std::floor(x)) - 2, y - 7, int(std::ceil(w)) + 4, 9}.intersect(band), colors::kWhite);
+                p.textAt(mark, x, y, 10, colors::kBlack, 0, gemui::Face::kSmall);
+            }
+        }
+    }
+    drawCaption(p, r, kW, kH, caption_, baseline_);
 }
 
 void DmaWave::mouseUp(const gemui::MouseEvent& e) {
@@ -726,61 +827,52 @@ DigiWave::DigiWave() {
     setSample(0, {}, 7800, false, 0, 0);
 }
 
-void DigiWave::setSample(int slot, std::span<const uint8_t> data, double rateHz, bool loop, uint32_t loopStart,
-                         uint32_t loopEnd) {
-    if (slot == slot_ && rateHz == rate_ && loop == loop_ && loopStart == loopStart_ && loopEnd == loopEnd_ &&
+void DigiWave::setSample(int slot, std::span<const uint8_t> data, double rateHz, bool loop, uint32_t start,
+                         uint32_t end, std::string_view name) {
+    if (slot == slot_ && rateHz == rate_ && loop == loop_ && start == start_ && end == end_ && name == name_ &&
         std::equal(data.begin(), data.end(), nibbles_.begin(), nibbles_.end()))
         return;
     slot_ = slot;
     rate_ = rateHz;
     loop_ = loop;
-    loopStart_ = loopStart;
-    loopEnd_ = loopEnd;
+    start_ = start;
+    end_ = end;
+    name_ = name;
     nibbles_.assign(data.begin(), data.end());
     repaint();
-    canvas_.clear(colors::kWhite);
     const std::string head = "sample " + std::to_string(slot + 1) + ": ";
+    // The name first (D-445): the clauses after it go first when the line is too wide (drawCaption).
+    const std::string named = head + (name.empty() ? "" : name_ + ", ");
     if (data.empty()) {
-        const int x0 = 4, y0 = 32, x1 = 4 + 352, y1 = 32 + 8;
-        canvas_.line(x0, y0, x1, y0, colors::kBlack);
-        canvas_.line(x0, y1, x1, y1, colors::kBlack);
-        canvas_.line(x0, y0, x0, y1, colors::kBlack);
-        canvas_.line(x1, y0, x1, y1, colors::kBlack);
         caption_ = head + "empty - click to load a file";
         baseline_ = 24;
         return;
     }
     const size_t n = data.size();
-    // Values from 0 (y 69) to 15 (y 15), 54 px for 15 levels; the loop first, under the sample.
-    auto yOf = [](int v) { return 69 - v * 54 / 15; };
-    auto xOf = [n](uint32_t i) { return int(std::min<size_t>(359, size_t(i) * 360 / n)); };
-    if (loop && loopEnd > loopStart && loopEnd <= n) {
-        const int xa = xOf(loopStart), xb = xOf(loopEnd - 1);
-        canvas_.line(xa, 14, xa, 70, colors::kHint);
-        canvas_.line(xb, 14, xb, 70, colors::kHint);
-        canvas_.line(xa, 14, xb, 14, colors::kHint);
-    }
-    for (int x = 0; x < 360; ++x) {
-        const size_t a = n * size_t(x) / 360, b = std::max(a + 1, n * size_t(x + 1) / 360);
-        int lo = 15, hi = 0;
-        for (size_t i = a; i < b && i < n; ++i) {
-            lo = std::min<int>(lo, data[i]);
-            hi = std::max<int>(hi, data[i]);
-        }
-        if (a >= n) break;
-        canvas_.line(x, yOf(hi), x, yOf(lo), colors::kBlack);
-    }
-    caption_ = head + std::to_string(n) + " values, " + gemui::formatDecimal("%.2f s", double(n) / rateHz) +
-               gemui::formatDecimal(" at %.0f Hz", rateHz) +
-               (loop && loopEnd > loopStart && loopEnd <= n ? ", loop" : "");
+    const bool part = end > start && end <= n;
+    caption_ = named + std::to_string(n) + " values, " + gemui::formatDecimal("%.2f s", double(n) / rateHz) +
+               gemui::formatDecimal(" at %.0f Hz", rateHz) + (loop && part ? ", loop" : "");
     baseline_ = 10;
 }
 
 void DigiWave::paint(Painter& p) {
     const Rect r = bounds();
+    const Rect in = r.inset(2);
     p.frame(r, 2, colors::kBlack);
-    canvas_.blit(p, r.inset(2));
-    drawCaption(p, r, canvas_, caption_, baseline_);
+    p.fill(in, colors::kWhite);
+    const size_t n = nibbles_.size();
+    if (n == 0) {
+        drawEmptyFrame(p, in, kH, 32);
+    } else {
+        // Values from 0 (bottom) to 15 (top) on rows 15 to 69 of the design; the part played first, under the sample
+        // (a valid part: the values outside it grey).
+        const Rect area = bandIn(in, kH, 15, 70);
+        drawPart(p, area, n, start_, end_, loop_);
+        const bool part = end_ > start_ && end_ <= n;
+        drawWave(p, area, n, [this](size_t i) { return nibbles_[i] / 15.0; },
+                 [&](size_t a, size_t b) { return !part || (b > start_ && a < end_); });
+    }
+    drawCaption(p, r, kW, kH, caption_, baseline_);
 }
 
 void DigiWave::mouseUp(const gemui::MouseEvent& e) {
@@ -814,7 +906,7 @@ void SidWaveGrid::paint(Painter& p) {
     const Font::LineBox lb = Font::lineBox("0", 9);
     const int baseline = snap(r.y + kBarH + kGap + std::floor((kDigitH - lb.height()) / 2) + lb.ascent);
     for (int c = 0; c < kSteps; ++c) {
-        const bool dead = c >= st_.length;
+        const bool dead = c >= st_.length;  // beyond Steps (Base: its two steps, D-411)
         auto shade = [dead](Color k) { return dead ? gemui::mix(k, colors::kWhite, kWaveDeadAlpha) : k; };
         const Rect cr = cellRect(c);
         p.fill(cr, colors::kWhite);
@@ -849,7 +941,7 @@ int SidWaveGrid::valueAt(double y) const noexcept {
 
 void SidWaveGrid::mouseDown(const gemui::MouseEvent& e) {
     const int c = stepAt(e.pos);
-    if (c < 0) return;
+    if (c < 0 || st_.square) return;
     if (e.button == gemui::MouseButton::Right) {  // its slider (D-285), or the step returns to 0
         if (onMenu) onMenu(c, cellRect(c));
         else if (onSet) onSet(c, 0);
@@ -873,6 +965,7 @@ void SidWaveGrid::mouseUp(const gemui::MouseEvent&) { painting_ = false; }
 bool SidWaveGrid::mouseWheel(const gemui::WheelEvent& e) {
     const int c = stepAt(e.pos);
     if (c < 0 || e.dy == 0) return false;
+    if (st_.square) return true;
     const int v = std::clamp(st_.wave[size_t(c)] + (e.dy < 0 ? 1 : -1), 0, 15);
     if (v == st_.wave[size_t(c)]) return true;
     if (onWheel) onWheel(c, v);
@@ -881,14 +974,15 @@ bool SidWaveGrid::mouseWheel(const gemui::WheelEvent& e) {
 }
 
 gemui::Pointer SidWaveGrid::pointerAt(Point p) const noexcept {
-    return stepAt(p) >= 0 ? gemui::Pointer::Hand : gemui::Pointer::Arrow;
+    return stepAt(p) >= 0 && !st_.square ? gemui::Pointer::Hand : gemui::Pointer::Arrow;
 }
 
 std::string SidWaveGrid::tipAt(Point p) const {
     const int c = stepAt(p);
     if (c < 0) return {};
     const std::string head = "Step " + std::to_string(c + 1) + ": volume " + std::to_string(st_.wave[size_t(c)]);
-    if (st_.length == 0) return head + ". Square wave: set Steps to 2 or more to play this wave.";
+    if (st_.square)
+        return head + ". Square wave: the note's volume, then SID min vol. Choose Custom in the menu to draw a wave.";
     if (c >= st_.length) return head + " (after the wave end). Drag to draw, wheel to adjust.";
     return head + ". Drag to draw, wheel to adjust, right click for a slider.";
 }

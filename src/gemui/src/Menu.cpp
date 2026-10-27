@@ -15,6 +15,7 @@ namespace {
 
 constexpr int kPx = 14;            // .gemmenu .gmi: font-size 14px
 constexpr int kPadX = 14, kPadY = 3;
+constexpr int kFrame = 2;          // .gemmenu: 2 px black border, laid on the rule of the button it opens from
 constexpr int kIconRowH = 16 + 2 * kPadY;
 constexpr int kSepH = 3 + 2 + 3;   // .gmsep: 2 px rule, 3 px margins
 constexpr int kKeyGap = 32;        // .gmrow: gap 32px
@@ -145,11 +146,12 @@ MenuList& MenuList::place(Desktop& d, std::vector<MenuItem> items, int checked, 
     const Size size = m->arrange(maxH);
     const double w = size.w, h = size.h;
     // Below the anchor; moved left when it would leave the desktop's right edge, opened above the anchor when it
-    // would leave the bottom.
+    // would leave the bottom. Under a button, as under the bar, the menu's frame lies on the button's rule, with no
+    // gap (GEM; 6 px lower in the prototype, 24/10/2026).
     double x = anchor.x;
-    double y = fromBar ? anchor.bottom() : anchor.bottom() + 6;
+    double y = fromBar ? anchor.bottom() : anchor.bottom() - kFrame;
     if (x + w > d.width() - 4) x = d.width() - w - 4;
-    if (y + h > d.height() - 4) y = std::max(4.0, anchor.y - h - 2);
+    if (y + h > d.height() - 4) y = std::max(4.0, anchor.y - h + kFrame);
     m->setBox({x, y, w, h});
     // The rows were laid out inside the frame: move them to the desktop, rounded edge by edge like the box.
     for (Row& r : m->rows_)
@@ -312,7 +314,7 @@ std::string MenuList::tipAt(Point p) const {
 void MenuList::paint(Painter& p) {
     const Rect b = bounds();
     p.fill(b, colors::kWhite);
-    p.frame(b, 2, colors::kBlack);
+    p.frame(b, kFrame, colors::kBlack);
     for (int i = 0; i < int(rows_.size()); ++i) {
         const Row& row = rows_[size_t(i)];
         const MenuItem& it = items_[size_t(row.item)];

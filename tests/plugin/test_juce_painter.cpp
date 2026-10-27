@@ -9,6 +9,7 @@
 
 #include "JucePainter.h"
 #include "gemui/Font.h"
+#include "pluginui/IconData.h"
 
 using namespace stym;
 using namespace stym::plugin;
@@ -182,6 +183,67 @@ TEST_CASE("JucePainter: sharp pixels, letters and icons without anti-aliasing at
                 grey += v != 0xFF000000u && v != 0xFFFFFFFFu;
             }
         CHECK(grey > 0);
+    }
+}
+
+TEST_CASE("JucePainter: the Atari logo, its pixels at 1, its outline filled at other scales, without anti-aliasing "
+          "in sharp pixels (24/10/2026, D-404)",
+          "[jucepainter]") {
+    const gemui::Bitmap& f = pluginui::icons::kFuji;
+    REQUIRE(f.outline);
+    // Area of the outline in pixels: the shoelace formula on each polygon, whatever way it turns.
+    double area = 0;
+    size_t first = 0;
+    for (const uint16_t end : f.outline->ends) {
+        double twice = 0;
+        for (size_t k = first; k < end; ++k) {
+            const size_t j = k == first ? end - 1 : k - 1;
+            twice += double(f.outline->xy[2 * j]) * f.outline->xy[2 * k + 1] -
+                     double(f.outline->xy[2 * k]) * f.outline->xy[2 * j + 1];
+        }
+        area += std::abs(twice) / 2;
+        first = end;
+    }
+    for (const double d : {1.0, 1.25, 1.5625, 2.0}) {
+        for (const bool sharp : {false, true}) {
+            INFO("d = " << d << ", sharp = " << sharp);
+            juce::Image image = canvas(d, 32, 24);
+            JucePainter::Cache cache;
+            cache.setScale(d);
+            cache.setSharp(sharp);
+            {
+                JucePainter p(image, {0, 0, 32, 24}, cache, image.getBounds());
+                p.fill({0, 0, 32, 24}, colors::kWhite);
+                p.bitmap(f, 5, 4, colors::kBlack);
+            }
+            // Coverage of each screen pixel, its centre inside the outline or not.
+            const int ox = int(std::floor(5 * d + 0.5)), oy = int(std::floor(4 * d + 0.5));
+            double ink = 0;
+            int grey = 0, centres = 0;
+            for (int y = 0; y < image.getHeight(); ++y)
+                for (int x = 0; x < image.getWidth(); ++x) {
+                    const uint32_t v = argb(image, x, y);
+                    ink += (255 - double(v & 0xFF)) / 255;
+                    grey += v != 0xFF000000u && v != 0xFFFFFFFFu;
+                    centres += (v == 0xFF000000u) != f.outline->inside((x - ox + 0.5) / d, (y - oy + 0.5) / d);
+                }
+            if (d == 1) {
+                // The bits themselves, as the framebuffer draws them.
+                int differ = 0;
+                for (int y = 0; y < f.h; ++y)
+                    for (int x = 0; x < f.w; ++x) differ += (argb(image, ox + x, oy + y) == 0xFF000000u) != f.at(x, y);
+                CHECK(differ == 0);
+                CHECK(grey == 0);
+            } else if (sharp) {
+                // Sharp pixels (D-331): black or white, black where the pixel's centre lies inside.
+                CHECK(grey == 0);
+                CHECK(centres == 0);
+            } else {
+                // Grey edges along the curves, as much ink as the outline covers.
+                CHECK(grey > 0);
+                CHECK(std::abs(ink - area * d * d) < 0.02 * area * d * d);
+            }
+        }
     }
 }
 

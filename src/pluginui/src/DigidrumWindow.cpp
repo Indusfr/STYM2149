@@ -74,35 +74,42 @@ void DigidrumWindow::build() {
     rootv_.setWholeText(true);  // a note name: C#4, Sol3 or a MIDI number
     rootv_.setTip("Click to type a note (C#4, Sol3) or a MIDI note number");
     finev_.setPadChars(1);
+    ratev_.setUnit(" Hz");  // the units stay in normal video under the pointer (D-451)
+    finev_.setUnit(" ct");
     load_.setTip("Load an audio file into this slot (first channel, resampled to the rate, 3 s at most)");
-    play_.setTip("Play this slot once at its rate, through the chip's volume table");
+    play_.setTip("Play this slot's part at its rate, through the chip's volume table: once, or with Loop on in a loop "
+                 "until Play or Loop is clicked again");
     play_.setId("digPlay");
-    clear_.setTip("Empty this slot (name, sample and loop)");
-    loop_.setTip("Loop from Start to End while the note is held; at note off the sample plays to its end");
-    start_.setTip("First value of the loop");
-    end_.setTip("End of the loop (the value after its last one)");
+    clear_.setTip("Empty this slot (name, sample, Start, End and Loop)");
+    loop_.setTip("Repeat the part from Start to End while the note is held; at note off it plays on to End");
+    start_.setTip("First value played (and of the loop)");
+    end_.setTip("End of the part played (the value after its last one)");
     start_.setId("digStart");
     end_.setId("digEnd");
     linear_.setTip("Linear 4-bit values, as the prototype: round(v x 7.5 + 7.5)");
     ym_.setTip("4-bit values matched to the chip's measured output levels (the sample keeps its shape)");
     normalize_.setTip("Raise the 8-bit source to full scale");
-    reverse_.setTip("Reverse the sample");
+    reverse_.setTip("Reverse the sample: it plays from its end");
     fade_.setTip("Fade the sample out to its end");
+    sign_.setTip("Flip the top bit of each byte (signed <-> unsigned)");
     gainDown_.setTip("Lower the 8-bit source by 3 dB");
     gainUp_.setTip("Raise the 8-bit source by 3 dB (clipped)");
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{
              &hint_,   &hint2_,  &sep_,     &labSlot_,  &labName_, &name_,      &labRate_,  &rate_,   &ratev_,
              &labRoot_, &root_,  &rootv_,   &labFine_,  &fine_,    &finev_,     &banksBtn_, &labSample_, &wave_,
              &load_,   &play_,   &clear_,   &loop_,     &labStart_, &start_,    &startv_,   &labEnd_, &end_,
-             &endv_,   &labConvert_, &linear_, &ym_,    &labTools_, &normalize_, &reverse_, &fade_,   &gainDown_,
-             &gainUp_})
+             &endv_,   &labConvert_, &linear_, &ym_,    &labTools_, &normalize_, &reverse_, &fade_,   &sign_,
+             &gainDown_, &gainUp_})
         add(*w);
     for (auto& b : slots_) add(b);
     for (auto& b : presets_) add(b);
 }
 
 void DigidrumWindow::wire() {
-    onClose = [this] { m_.syncWindowButtons(); };
+    onClose = [this] {
+        stopPreview();  // a loop never plays on behind a closed window (D-449)
+        m_.syncWindowButtons();
+    };
     for (int k = 0; k < ymengine::kDigidrumSlots; ++k) slots_[size_t(k)].onClick = [this, k] { selectSlot(k); };
     name_.onClick = [this] { rename(); };
     banksBtn_.onClick = [this] { banksMenu(); };
@@ -131,32 +138,33 @@ void DigidrumWindow::wire() {
     finev_.onCommit = typeInto(fine_);
     startv_.onCommit = typeInto(start_);
     endv_.onCommit = typeInto(end_);
-    // Loop: Start stays before End (at least one value).
-    bindSlider(start_, startArmed_, [](DigidrumSlotState& s, double v) {
-        const uint32_t end = s.play.loopEnd;
-        s.play.loopStart = uint32_t(std::clamp(v, 0.0, end ? double(end - 1) : 0.0));
+    // The part played (D-443), with or without Loop: Start stays before End (at least one value). End 0 (never set) or
+    // past a shorter sample is its end (sampleSpan): a moved Start writes End too.
+    bindSlider(start_, startArmed_, [this](DigidrumSlotState& s, double v) {
+        const ymengine::SampleSpan part = ymengine::sampleSpan(s.play.start, s.play.end, uint32_t(nibbles().size()));
+        s.play.end = part.end;
+        s.play.start = uint32_t(std::clamp(v, 0.0, part.end ? double(part.end - 1) : 0.0));
     });
     bindSlider(end_, endArmed_, [this](DigidrumSlotState& s, double v) {
         const double len = double(nibbles().size());
-        s.play.loopEnd = uint32_t(std::clamp(v, std::min(len, double(s.play.loopStart) + 1), len));
+        const ymengine::SampleSpan part = ymengine::sampleSpan(s.play.start, s.play.end, uint32_t(len));
+        s.play.start = part.start;
+        s.play.end = uint32_t(std::clamp(v, std::min(len, double(part.start) + 1), len));
     });
-    // Loop on without a valid End (never set, or past a shorter sample): the loop covers the whole sample.
-    loop_.onClick = [this] {
-        const uint32_t len = uint32_t(nibbles().size());
-        edit([len](DigidrumSlotState& s) {
-            s.play.loop = !s.play.loop;
-            if (s.play.loop && (s.play.loopEnd == 0 || s.play.loopEnd > len)) {
-                s.play.loopEnd = len;
-                s.play.loopStart = std::min(s.play.loopStart, len ? len - 1 : 0);
-            }
-        });
-    };
+    loop_.onClick = [this] { edit([](DigidrumSlotState& s) { s.play.loop = !s.play.loop; }); };
 
     // Loading goes through the host (file dialog, audio decoding), asynchronous and without an undo step; the preview
     // is a command to the engine on the audio thread.
     wave_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
     load_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
-    play_.onClick = [this] { m_.host_.seqCommand(Host::SeqCommand::DigiPreview, slot()); };
+    // With Loop on, Play starts the part in a loop and a click while it loops stops it, as does Loop switched off
+    // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once (D-449).
+    play_.onClick = [this] {
+        if (looping()) return stopPreview();
+        m_.host_.seqCommand(Host::SeqCommand::DigiPreview, slot());
+        previewing_ = slot();
+        play_.setOn(looping());
+    };
     clear_.onClick = [this] {
         editBytes([](DigidrumSlotState& s, std::vector<int8_t>& src) {
             src.clear();
@@ -176,18 +184,35 @@ void DigidrumWindow::wire() {
     normalize_.onClick = [this] {
         editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::digiNormalize(src); });
     };
+    // Reverse mirrors Start and End, so that the part played stays the same sound read backwards (D-450).
     reverse_.onClick = [this] {
-        editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::digiReverse(src); });
+        editBytes([](DigidrumSlotState& s, std::vector<int8_t>& src) {
+            plugin::digiReverse(src);
+            ymengine::mirrorSpan(s.play.start, s.play.end, uint32_t(src.size()));
+        });
     };
     fade_.onClick = [this] {
         editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::digiFadeOut(src); });
     };
-    gainDown_.onClick = [this] {
-        editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::dmaGain(src, -kGainDb); });
+    sign_.onClick = [this] {
+        editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::dmaSign(src); });
     };
-    gainUp_.onClick = [this] {
-        editBytes([](DigidrumSlotState&, std::vector<int8_t>& src) { plugin::dmaGain(src, kGainDb); });
-    };
+    gainDown_.onClick = [this] { gain(-kGainDb); };
+    gainUp_.onClick = [this] { gain(kGainDb); };
+}
+
+// Gain steps in a row (D-453): the run's total from the source before its first step, so that a step down gives back
+// the peaks a step up clipped.
+void DigidrumWindow::gain(double db) {
+    const DigidrumSlotState& s0 = state();
+    const std::vector<int8_t> now = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source;
+    const std::vector<int8_t> from = gainRun_.step(slot(), now, db);
+    const double total = gainRun_.total();
+    editBytes([&](DigidrumSlotState&, std::vector<int8_t>& src) {
+        src = from;
+        plugin::dmaGain(src, total);
+    });
+    gainRun_.gave(state().source);
 }
 
 // While a slider is held, MainWindow::dragging_ points to it so that refresh() does not move it under the pointer;
@@ -225,6 +250,21 @@ void DigidrumWindow::selectSlot(int k) {
     refresh();
 }
 
+bool DigidrumWindow::looping() const noexcept { return previewing_ == slot() && state().play.loop; }
+
+void DigidrumWindow::stopPreview() {
+    if (previewing_ < 0) return;
+    m_.host_.seqCommand(Host::SeqCommand::DigiPreview, previewing_, 1);
+    previewing_ = -1;
+    play_.setOn(false);
+}
+
+void DigidrumWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
+    if (t.digiPreview == previewing_) return;
+    previewing_ = t.digiPreview;
+    if (isOpen()) play_.setOn(looping());
+}
+
 const DigidrumSlotState& DigidrumWindow::state() const noexcept { return m_.extras_.digiSlots[size_t(slot())]; }
 const std::vector<uint8_t>& DigidrumWindow::nibbles() const noexcept { return m_.extras_.digidrums[size_t(slot())]; }
 
@@ -258,13 +298,13 @@ void DigidrumWindow::editBytes(const std::function<void(DigidrumSlotState&, std:
     std::vector<int8_t> src = src0;
     fn(s, src);
     std::vector<uint8_t> n = plugin::digidrumNibbles(src, s.convert);
-    // Loop within the new length: End at most the length, Start before End; an empty slot has no loop.
+    // Start and End within the new length: End at most the length, Start before End; an empty slot has no loop.
     const auto len = uint32_t(n.size());
-    s.play.loopEnd = std::min(s.play.loopEnd, len);
-    s.play.loopStart = std::min(s.play.loopStart, s.play.loopEnd ? s.play.loopEnd - 1 : 0);
+    s.play.end = std::min(s.play.end, len);
+    s.play.start = std::min(s.play.start, s.play.end ? s.play.end - 1 : 0);
     if (len == 0) {
         s.play.loop = false;
-        s.play.loopStart = s.play.loopEnd = 0;
+        s.play.start = s.play.end = 0;
     }
     if (s == s0 && src == src0 && n == nibbles()) return;
     s.source = std::move(src);
@@ -444,7 +484,8 @@ void DigidrumWindow::refresh() {
         b.setTip(tip);
     }
     name_.setText(s.name.empty() ? std::string("(none)") : s.name);
-    wave_.setSample(k, n, s.play.rateHz, s.play.loop, s.play.loopStart, s.play.loopEnd);
+    const ymengine::SampleSpan part = ymengine::sampleSpan(s.play.start, s.play.end, uint32_t(n.size()));
+    wave_.setSample(k, n, s.play.rateHz, s.play.loop, part.start, part.end, s.name);
 
     if (m_.dragging_ != &rate_) rate_.setValue(s.play.rateHz);
     char buf[32];
@@ -457,24 +498,24 @@ void DigidrumWindow::refresh() {
     if (!finev_.editing()) finev_.setText(signedText(int(std::lround(s.play.cents))) + " ct");
 
     // Start runs over the values (0 to length - 1), End over the positions after them (1 to length); the ranges keep
-    // at least one step for an empty slot.
+    // at least one step for an empty slot. They set the part played with or without Loop (Indus, 26/10/2026, D-443).
     const bool has = !n.empty();
     const double len = double(n.size());
     start_.setRange(0, std::max(1.0, len - 1), 1);
     end_.setRange(std::min(1.0, len), std::max(1.0, len), 1);
-    if (m_.dragging_ != &start_) start_.setValue(s.play.loopStart);
-    if (m_.dragging_ != &end_) end_.setValue(s.play.loopEnd);
-    if (!startv_.editing()) startv_.setText(std::to_string(s.play.loopStart));
-    if (!endv_.editing()) endv_.setText(std::to_string(s.play.loopEnd));
+    if (m_.dragging_ != &start_) start_.setValue(part.start);
+    if (m_.dragging_ != &end_) end_.setValue(part.end);
+    if (!startv_.editing()) startv_.setText(std::to_string(part.start));
+    if (!endv_.editing()) endv_.setText(std::to_string(part.end));
     loop_.setOn(s.play.loop);
+    play_.setOn(looping());
     loop_.setEnabled(has);
-    const bool loopEdit = has && s.play.loop;
-    for (gemui::Slider* sl : {&start_, &end_}) sl->setEnabled(loopEdit);
-    for (gemui::Label* l : {&labStart_, &labEnd_}) l->setDim(!loopEdit);
-    for (gemui::ValueField* f : {&startv_, &endv_}) f->setDim(!loopEdit);
+    for (gemui::Slider* sl : {&start_, &end_}) sl->setEnabled(has);
+    for (gemui::Label* l : {&labStart_, &labEnd_}) l->setDim(!has);
+    for (gemui::ValueField* f : {&startv_, &endv_}) f->setDim(!has);
     linear_.setOn(s.convert == DigiConvert::Linear);
     ym_.setOn(s.convert == DigiConvert::YmLevels);
-    for (Button* b : {&play_, &clear_, &linear_, &ym_, &normalize_, &reverse_, &fade_, &gainDown_, &gainUp_})
+    for (Button* b : {&play_, &clear_, &linear_, &ym_, &normalize_, &reverse_, &fade_, &sign_, &gainDown_, &gainUp_})
         b->setEnabled(has);
     labTools_.setDim(!has);
     labConvert_.setDim(!has);
@@ -528,8 +569,8 @@ void DigidrumWindow::layout() {
     std::vector<FlexItem> bk = {btn(banksBtn_)};
     y1 += flexRow(x, y1, col1, bk, kGap, false);
 
-    // Sample column: its label, with Load, Play and Clear flush right on the same line; the 360 × 72 drawing; the loop
-    // rows, End's slider under Start's; conversion and tools.
+    // Sample column: its label, with Load, Play and Clear flush right on the same line; the 360 × 72 drawing; Loop,
+    // Start and End, End's slider under Start's; conversion and tools.
     double y2 = y0;
     labSample_.setBox({x2, y2 + 2, labSample_.naturalWidth(), 16});
     std::vector<FlexItem> io = {btn(load_), btn(play_), btn(clear_)};
@@ -547,7 +588,7 @@ void DigidrumWindow::layout() {
     y2 += flexRow(x2, y2, col2, cv, 4, false) + 6;
     std::vector<FlexItem> tl = {lab(labTools_, lw2), btn(normalize_), btn(reverse_), btn(fade_)};
     y2 += flexRow(x2, y2, col2, tl, 4, false) + 6;
-    std::vector<FlexItem> gn = {btn(gainDown_), btn(gainUp_)};
+    std::vector<FlexItem> gn = {btn(sign_), btn(gainDown_), btn(gainUp_)};
     gn.front().marginLeft = lw2 + 4;
     y2 += flexRow(x2, y2, col2, gn, 4, false);
     y = std::max(y1, y2);
@@ -579,9 +620,10 @@ std::optional<Rect> DigidrumWindow::rectOf(std::string_view id) const {
                            {"digRate", &rate_},         {"digRoot", &root_},        {"digFine", &fine_},
                            {"digLoop", &loop_},         {"digStart", &start_},      {"digEnd", &end_},
                            {"digLinear", &linear_},     {"digYm", &ym_},            {"digNormalize", &normalize_},
-                           {"digReverse", &reverse_},   {"digFade", &fade_},        {"digGainDown", &gainDown_},
-                           {"digGainUp", &gainUp_},    {"digRateV", &ratev_},      {"digRootV", &rootv_},
-                           {"digFineV", &finev_},       {"digStartV", &startv_},    {"digEndV", &endv_}};
+                           {"digReverse", &reverse_},   {"digFade", &fade_},        {"digSign", &sign_},
+                           {"digGainDown", &gainDown_}, {"digGainUp", &gainUp_},    {"digRateV", &ratev_},
+                           {"digRootV", &rootv_},       {"digFineV", &finev_},      {"digStartV", &startv_},
+                           {"digEndV", &endv_}};
     for (const Named& n : named)
         if (id == n.id) return n.w->visible() ? std::optional<Rect>(n.w->bounds()) : std::nullopt;
     return std::nullopt;

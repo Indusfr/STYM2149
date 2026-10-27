@@ -45,8 +45,12 @@ constexpr std::array<const char*, ymengine::kSeqGens> kGenNames = {"Note's gener
 constexpr std::array<const char*, ymengine::kSeqGens> kGenChars = {"", "C", "S", "B"};  // drawn in a GEN cell
 // Pitch matrix: button labels and tooltip names of the targets (columns) and of the sources (rows).
 constexpr std::array<const char*, 3> kTargets = {"Sq", "Tm", "Bz"};
-constexpr std::array<const char*, 3> kTargetNames = {"the square (tone period)", "the timer (SID, Sync Buzzer)",
+constexpr std::array<const char*, 3> kTargetNames = {"the square (tone period)",
+                                                     "the timer (SID, Sync Buzzer) and the DMA sample",
                                                      "the envelope period (buzzer)"};
+// A DMA track plays its sample (D-463): the Sq and Bz columns move nothing on it.
+constexpr std::array<const char*, 3> kDmaTargetOff = {"A DMA track has no square: the Tm column moves its sample", "",
+                                                      "A DMA track has no envelope: the Tm column moves its sample"};
 constexpr std::array<const char*, 3> kSourceNames = {"Table pitch (ARP, PER, FIX)", "Slides", "Vibrato"};
 
 // Baseline of a line of text of `px` in a line box of `lineH`, as ModulationWindow.cpp computes it.
@@ -120,10 +124,12 @@ void SeqRowsGrid::paint(gemui::Painter& p) {
     for (int k = 0; k < kRowCount; ++k) {
         const Row row = Row(k);
         const int top = r.y + rowTop(row);
+        const bool off = !st_.off[size_t(k)].empty();  // greyed row (D-463): label and cells faded
         const double tw = Font::width(kRowNames[size_t(k)], 9, 0, Face::kSmall);
-        p.textAt(kRowNames[size_t(k)], r.x + kLabelW - 2 - tw, baselineIn(top, 9, 9), 9, colors::kBlack, 0, Face::kSmall);
+        const Color ink = shadeOf(off)(colors::kBlack);
+        p.textAt(kRowNames[size_t(k)], r.x + kLabelW - 2 - tw, baselineIn(top, 9, 9), 9, ink, 0, Face::kSmall);
         for (int c = 0; c < kSteps; ++c) {
-            const bool dead = c >= st_.length || !st_.live;
+            const bool dead = c >= st_.length || !st_.live || off;
             const auto shade = shadeOf(dead);
             const Rect cr = cellRect(row, c);
             const int v = value(st_.rows, row, c);
@@ -203,7 +209,7 @@ void SeqRowsGrid::mouseDown(const gemui::MouseEvent& e) {
     Row row{};
     int c = 0;
     if (!cellAt(e.pos, &row, &c)) return;
-    if (row == Row::Out) return;
+    if (row == Row::Out || !st_.off[size_t(row)].empty()) return;
     if (e.button == gemui::MouseButton::Right) {
         // PER and NP: a slider (D-272); the other rows return to 0, the sound of the note.
         if (row == Row::Period || row == Row::Noise) {
@@ -265,6 +271,7 @@ bool SeqRowsGrid::mouseWheel(const gemui::WheelEvent& e) {
     Row row{};
     int c = 0;
     if (!cellAt(e.pos, &row, &c) || e.dy == 0 || row == Row::Fix || row == Row::Out) return false;
+    if (!st_.off[size_t(row)].empty()) return true;  // greyed row (D-463): the notch is taken, nothing changes
     const int dir = e.dy < 0 ? 1 : -1;
     const int stepBy = row == Row::Period && e.mods.shift ? 10 : 1;
     const int v = std::clamp(value(st_.rows, row, c) + dir * stepBy, minValue(row), maxValue(row));
@@ -277,13 +284,15 @@ bool SeqRowsGrid::mouseWheel(const gemui::WheelEvent& e) {
 gemui::Pointer SeqRowsGrid::pointerAt(gemui::Point p) const noexcept {
     Row row{};
     int c = 0;
-    return cellAt(p, &row, &c) && row != Row::Out ? gemui::Pointer::Hand : gemui::Pointer::Arrow;
+    return cellAt(p, &row, &c) && row != Row::Out && st_.off[size_t(row)].empty() ? gemui::Pointer::Hand
+                                                                                   : gemui::Pointer::Arrow;
 }
 
 std::string SeqRowsGrid::tipAt(gemui::Point p) const {
     Row row{};
     int c = 0;
     if (!cellAt(p, &row, &c)) return {};
+    if (!st_.off[size_t(row)].empty()) return st_.off[size_t(row)];
     const int v = value(st_.rows, row, c);
     const std::string step = std::to_string(c + 1);
     switch (row) {
@@ -301,11 +310,12 @@ std::string SeqRowsGrid::tipAt(gemui::Point p) const {
     case Row::Fix: return "FIX step " + step + ": " + (v ? "plays the fixed note" : "plays the note") + ". Click to toggle.";
     case Row::Out: {
         // YM-Tracker preview: period, nearest note and deviation in cents, frequency. The frequency is clock / 16 /
-        // period (the inverse of ymengine::tonePeriodFor), the note 69 + 12 × log2(f / 440) (A4 = MIDI 69 at 440 Hz).
+        // period (the inverse of ymengine::tonePeriodFor), the note 69 + 12 × log2(f / A4) (A4 = MIDI 69 at the Tuning
+        // A4, 440 Hz by default, D-429).
         const ymseq::NoteNames names = st_.latin ? ymseq::NoteNames::Latin : ymseq::NoteNames::English;
         const int tp = std::max<int>(1, st_.periods[size_t(c)]);
         const double hz = st_.clockHz / 16 / tp;
-        const double n = 69 + 12 * std::log2(hz / 440);
+        const double n = 69 + 12 * std::log2(hz / st_.a4Hz);
         const int near = int(std::lround(n));
         char buf[64];
         std::snprintf(buf, sizeof buf, "period %d ($%03X), ", tp, unsigned(tp));
@@ -331,14 +341,12 @@ void SequencesPanel::build() {
     det_.setTip("Detune the whole sound, in cents");
     ana_.setRange(0, ymengine::kAnalogMaxCents, 1);
     ana_.setTip("Analog: random pitch offset drawn at each note, up to this many cents");
-    sync_.setTip("Hard sync: restart the square (16 voices) and the timer on tied and slid notes too");
     link_.setTip("Instrument that takes over when a Hold table ends");
     for (int s = 0; s < 3; ++s)
         for (int t = 0; t < 3; ++t) {
             Button& b = mx_[size_t(s * 3 + t)];
             b.setText(kTargets[size_t(t)]);
-            b.setPadding(2, 6);
-            b.setTip(std::string(kSourceNames[size_t(s)]) + " moves " + kTargetNames[size_t(t)]);
+            b.setPadding(2, 6);  // the tooltips follow the track (refresh)
         }
     vibMin_.setRange(-ymengine::kPeriodDeltaMax, ymengine::kPeriodDeltaMax, 1);
     vibMax_.setRange(-ymengine::kPeriodDeltaMax, ymengine::kPeriodDeltaMax, 1);
@@ -355,6 +363,7 @@ void SequencesPanel::build() {
     vibWrite_.setTip("Write the vibrato table into the PER row, over the table length");
     // Typed values (sixth DAW test, item 77, D-275); the fixed note by its name.
     for (gemui::ValueField* f : {&fixv_, &detv_, &anav_, &minv_, &maxv_, &cycv_, &rampv_}) f->setPx(14);
+    for (gemui::ValueField* f : {&detv_, &anav_}) f->setUnit("c");  // out of the reverse video (D-464)
     fixv_.setWholeText(true);
     fixv_.setTip("Click to type a note (C#4, Sol3) or a MIDI note number");
 }
@@ -474,6 +483,7 @@ std::array<int8_t, ymengine::kOrnamentSteps> SequencesPanel::vibratoTable(int lo
 // ------------------------------------------------------------------------------------------- state
 
 bool SequencesPanel::drum() const noexcept { return m_.drumTrack(); }
+bool SequencesPanel::dma() const noexcept { return m_.generator() == int(ymengine::Generator::Dma); }
 const ymengine::TrackPatch& SequencesPanel::patch() const noexcept { return m_.extras_.tracks[size_t(m_.cur_)].patch; }
 
 // No test of a percussion track here: on one, the settings are disabled and the rows hidden (refresh, placeRows).
@@ -537,22 +547,41 @@ void SequencesPanel::refresh() {
     const bool dr = drum();
     const ymengine::TrackPatch& p = patch();
     const bool lv = p.ornamentOn && !dr;
-    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&fix_, &det_, &ana_, &sync_, &link_, &vibMin_,
-                                                                  &vibMax_, &vibCyc_, &vibRamp_, &vibWrite_})
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&fix_, &det_, &ana_, &link_, &vibMin_, &vibMax_,
+                                                                  &vibCyc_, &vibRamp_, &vibWrite_})
         w->setEnabled(!dr);
     for (gemui::ValueField* f : {&fixv_, &detv_, &anav_, &minv_, &maxv_, &cycv_, &rampv_}) f->setEditable(!dr);
-    for (auto& b : mx_) b.setEnabled(!dr);
+    // A DMA track plays its sample (Indus, 26/10/2026, D-463): the table pitch, PER, FIX, the slides and the vibrato
+    // move it through the timer column, VOL its level; the noise, the mixer, the generator, the square, the envelope
+    // and the hard sync are greyed, their tooltips saying why.
+    const bool dm = dma();
+    sync_.setEnabled(!dr && !dm);
+    sync_.setTip(dm ? "Hard sync: a DMA track plays a sample, with no square or timer to restart"
+                    : "Hard sync: restart the square (16 voices) and the timer on tied and slid notes too");
+    for (int k = 0; k < 9; ++k) {
+        const int t = k % 3;
+        const bool off = dm && t != 1;
+        mx_[size_t(k)].setEnabled(!dr && !off);
+        mx_[size_t(k)].setTip(off ? std::string(kDmaTargetOff[size_t(t)])
+                                  : std::string(kSourceNames[size_t(k / 3)]) + " moves " + kTargetNames[size_t(t)]);
+    }
 
     SeqRowsGrid::State st;
     st.rows = p.rows;
     st.length = p.ornamentLength;
     st.live = lv;
+    if (dm) {
+        st.off[size_t(Row::Noise)] = "NP: a DMA track plays a sample, without noise";
+        st.off[size_t(Row::Mix)] = "MIX: a DMA track plays a sample, without the chip's mixer";
+        st.off[size_t(Row::Gen)] = "GEN: a DMA track keeps its sample";
+    }
     // OUT preview: the period that each step of the table gives the reference note, and that of the note alone, at
     // the chip clock of the parameters.
     const ymcore::MasterClock clock = plugin::chipClock(m_.values_);
+    st.a4Hz = double(m_.pv(plugin::Global::A4Hz));
     for (int s = 0; s < SeqRowsGrid::kSteps; ++s)
-        st.periods[size_t(s)] = ymengine::tablePeriod(p, st.refNote, s, clock);
-    st.notePeriod = ymengine::tonePeriodFor(ymengine::noteHz(st.refNote), clock);
+        st.periods[size_t(s)] = ymengine::tablePeriod(p, st.refNote, s, clock, st.a4Hz);
+    st.notePeriod = ymengine::tonePeriodFor(ymengine::noteHz(st.refNote, st.a4Hz), clock);
     st.clockHz = clock.hz();
     st.latin = m_.host_.preference("noteNames", "0") == "1";
     grid_.setState(st);
@@ -660,6 +689,14 @@ const gemui::Slider* SequencesPanel::slider(std::string_view id) const noexcept 
     if (id == "seqxVibMax") return &vibMax_;
     if (id == "seqxVibCycles") return &vibCyc_;
     if (id == "seqxVibRamp") return &vibRamp_;
+    return nullptr;
+}
+
+const gemui::Button* SequencesPanel::button(std::string_view id) const noexcept {
+    if (id == "seqxSync") return &sync_;
+    if (id == "seqxLink") return &link_;
+    if (id == "seqxVibWrite") return &vibWrite_;
+    if (id.size() == 7 && id.substr(0, 6) == "seqxMx" && id[6] >= '0' && id[6] <= '8') return &mx_[size_t(id[6] - '0')];
     return nullptr;
 }
 

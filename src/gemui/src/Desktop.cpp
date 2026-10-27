@@ -77,6 +77,7 @@ Desktop::~Desktop() {
     while (!popups_.empty()) {
         std::unique_ptr<Widget> w = std::move(popups_.back());
         popups_.pop_back();
+        popupLevel_.pop_back();
     }
     if (root_) root_->owner_ = nullptr;
 }
@@ -98,6 +99,7 @@ Widget& Desktop::openPopup(std::unique_ptr<Widget> popup) {
     hideTip();
     adopt(*popup);
     popups_.push_back(std::move(popup));
+    popupLevel_.push_back(modals_.size());
     updateHover(mouse_);
     return *popups_.back();
 }
@@ -112,6 +114,7 @@ void Desktop::closePopup(Widget& popup) {
         // Destroy outside the vector: the destructor calls forget() and invalidate() back.
         std::unique_ptr<Widget> w = std::move(popups_.back());
         popups_.pop_back();
+        popupLevel_.pop_back();
         overlays_.erase(std::remove(overlays_.begin(), overlays_.end(), w.get()), overlays_.end());
         w.reset();
     }
@@ -142,8 +145,16 @@ Widget& Desktop::openModal(std::unique_ptr<Widget> modal, bool keepPopups) {
 }
 
 void Desktop::closeModal(Widget& modal) {
-    const auto it = std::find_if(modals_.begin(), modals_.end(), [&](const auto& p) { return p.get() == &modal; });
+    auto it = std::find_if(modals_.begin(), modals_.end(), [&](const auto& p) { return p.get() == &modal; });
     if (it == modals_.end()) return;
+    // The menus opened over the box (or over those above it) close first: their entries act on it.
+    const size_t level = size_t(it - modals_.begin());
+    for (size_t i = 0; i < popups_.size(); ++i)
+        if (popupLevel_[i] > level) {
+            closePopup(*popups_[i]);
+            break;
+        }
+    it = modals_.begin() + std::ptrdiff_t(level);
     std::unique_ptr<Widget> w = std::move(*it);
     modals_.erase(it);
     w.reset();
@@ -189,15 +200,23 @@ Widget* Desktop::find(Widget& w, Point p) const {
     return (w.acceptsMouse() || w.blocksMouse()) && w.hit(p) ? &w : nullptr;
 }
 
+size_t Desktop::firstActivePopup() const noexcept {
+    size_t i = popups_.size();
+    while (i > 0 && activePopup(i - 1)) --i;
+    return i;
+}
+
 bool Desktop::insidePopups(Point p) const {
-    return std::any_of(popups_.begin(), popups_.end(), [&](const auto& w) { return w->visible() && w->hit(p); });
+    for (size_t i = firstActivePopup(); i < popups_.size(); ++i)
+        if (popups_[i]->visible() && popups_[i]->hit(p)) return true;
+    return false;
 }
 
 Widget* Desktop::target(Point p) const {
-    if (!modals_.empty()) return find(*modals_.back(), p);
-    for (auto it = popups_.rbegin(); it != popups_.rend(); ++it)
-        if (Widget* f = find(**it, p)) return f;
+    for (size_t i = popups_.size(); i-- > firstActivePopup();)
+        if (Widget* f = find(*popups_[i], p)) return f;
     if (insidePopups(p)) return nullptr;  // background of a menu: nothing below
+    if (!modals_.empty()) return find(*modals_.back(), p);
     return root_ ? find(*root_, p) : nullptr;
 }
 
@@ -225,13 +244,16 @@ void Desktop::mouseDown(Point p, MouseButton b, Modifiers m) {
     cancel(tipTimer_);
     // A press outside the menus closes them; the press then goes to what is below (as in the prototype). A value field
     // of a popup being typed into confirms first, as a press elsewhere does (closing would only forget it).
-    if (modals_.empty() && !popups_.empty() && !insidePopups(p)) {
-        if (std::any_of(popups_.begin(), popups_.end(), [this](const auto& w) { return within(focus_, w.get()); }))
+    // Over a modal box, the menus opened over it close the same way, the press going to the box.
+    const size_t active = firstActivePopup();
+    if (active < popups_.size() && !insidePopups(p)) {
+        if (std::any_of(popups_.begin() + std::ptrdiff_t(active), popups_.end(),
+                        [this](const auto& w) { return within(focus_, w.get()); }))
             setKeyFocus(nullptr);
-        closePopups();
+        closePopup(*popups_[active]);
     }
     // A press on a popup below an overlay closes the overlay (and what was opened after it).
-    for (size_t i = popups_.size(); modals_.empty() && i-- > 0;) {
+    for (size_t i = popups_.size(); i-- > firstActivePopup();) {
         if (std::find(overlays_.begin(), overlays_.end(), popups_[i].get()) == overlays_.end()) continue;
         bool hit = false;
         for (size_t j = i; j < popups_.size() && !hit; ++j) hit = popups_[j]->visible() && popups_[j]->hit(p);
@@ -315,15 +337,16 @@ Pointer Desktop::pointer() const noexcept {
 
 bool Desktop::keyDown(const KeyEvent& e) {
     hideTip();
+    // Esc closes the menus first, those over a modal box included.
+    if (firstActivePopup() < popups_.size() && e.key == Key::Escape) {
+        closePopup(*popups_[firstActivePopup()]);
+        return true;
+    }
     if (!modals_.empty()) {
         Widget& top = *modals_.back();
         for (Widget* w = focus_ && within(focus_, &top) ? focus_ : &top; w; w = w->parent())
             if (w->keyDown(e)) return true;
         return true;  // a modal box keeps the keyboard
-    }
-    if (!popups_.empty() && e.key == Key::Escape) {
-        closePopups();
-        return true;
     }
     for (Widget* w = focus_; w; w = w->parent())
         if (w->keyDown(e)) return true;
@@ -396,10 +419,10 @@ void Desktop::armTip() {
     std::string text;
     if (tipsOn_ && !capture_) {
         Widget* t = nullptr;
-        if (!modals_.empty()) t = tipTarget(*modals_.back(), mouse_);
-        else {
-            for (auto it = popups_.rbegin(); !t && it != popups_.rend(); ++it) t = tipTarget(**it, mouse_);
-            if (!t && !insidePopups(mouse_) && root_) t = tipTarget(*root_, mouse_);
+        for (size_t i = popups_.size(); !t && i-- > firstActivePopup();) t = tipTarget(*popups_[i], mouse_);
+        if (!t && !insidePopups(mouse_)) {
+            if (!modals_.empty()) t = tipTarget(*modals_.back(), mouse_);
+            else if (root_) t = tipTarget(*root_, mouse_);
         }
         if (t) text = t->tipAt(mouse_);
     }
@@ -516,16 +539,18 @@ const std::vector<Rect>& Desktop::takePending() noexcept {
     return painted_;
 }
 
-// Layers from the bottom: the root and its windows, the menus, then each modal box over its own veil, and the
-// tooltip on top of everything.
+// Layers from the bottom: the root and its windows, the menus, then each modal box over its own veil with the menus
+// opened over it, and the tooltip on top of everything.
 void Desktop::draw(Painter& p, const Rect& r) {
     p.setClip(r);
     if (root_) paintTree(p, *root_);
     else p.fill(r, colors::kBlack);
-    for (auto& w : popups_) paintTree(p, *w);
-    for (auto& w : modals_) {
-        p.shade(r, colors::kBlack, 0.25);  // veil rgba(0, 0, 0, 0.25) below each box
-        paintTree(p, *w);
+    for (size_t level = 0, i = 0; level <= modals_.size(); ++level) {
+        if (level > 0) {
+            p.shade(r, colors::kBlack, 0.25);  // veil rgba(0, 0, 0, 0.25) below each box
+            paintTree(p, *modals_[level - 1]);
+        }
+        for (; i < popups_.size() && popupLevel_[i] <= level; ++i) paintTree(p, *popups_[i]);
     }
     if (tipShown_) paintTooltip(p);
 }

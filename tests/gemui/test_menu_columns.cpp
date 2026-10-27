@@ -161,7 +161,7 @@ TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop heigh
     SECTION("200 px: the height never goes under 120 px; eight columns above the anchor") {
         Desktop d(1272, 200);
         const MenuList& m = MenuList::open(d, chordItems(), -1, kChordAnchor, false, true);
-        CHECK(m.bounds() == Rect{94, 152, 865, 104});
+        CHECK(m.bounds() == Rect{94, 156, 865, 104});
         checkColumns(m, {{96, 98, "Major", 5},
                          {194, 105, "Augmented", 5},
                          {299, 112, "Half-dim 7", 5},
@@ -183,7 +183,7 @@ TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside t
     Desktop d(1272, 400);
     // Anchor near the right edge: the menu is pulled left, 4 px from the edge.
     const MenuList& m = MenuList::open(d, chordItems(), -1, Box{1200, 300, 60, 24}, false, true);
-    CHECK(m.bounds() == Rect{1272 - 340 - 4, 300 - 264 - 2, 340, 264});
+    CHECK(m.bounds() == Rect{1272 - 340 - 4, 300 - 264 + 2, 340, 264});
     CHECK(m.bounds().x >= 4);
     CHECK(m.bounds().y >= 4);
     CHECK(m.bounds().right() <= d.width() - 4);
@@ -199,7 +199,7 @@ TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside t
     // Anchor near the bottom: the menu goes above it, never over the top margin.
     Desktop low(1272, 400);
     const MenuList& m2 = MenuList::open(low, chordItems(), -1, Box{94, 380, 80, 16}, false, true);
-    CHECK(m2.bounds() == Rect{94, 380 - 264 - 2, 340, 264});
+    CHECK(m2.bounds() == Rect{94, 380 - 264 + 2, 340, 264});
     const MenuList& m3 = MenuList::open(low, chordItems(), -1, Box{94, 150, 80, 24}, false, true);
     CHECK(m3.bounds().y == 4);
 }

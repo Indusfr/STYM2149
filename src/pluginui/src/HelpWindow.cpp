@@ -62,8 +62,8 @@ constexpr Row kSeqRows[] = {
 };
 constexpr Row kSeqView[] = {
     {"Signature", "bar length; accents and metronome follow it"},
-    {"Resolution", "value of one step, from 1/4 down to 1/32, plus triplets"},
-    {"Note", "length written when placing a note, from 1/1 to 1/16 and dotted"},
+    {"Resolution", "value of one step, from 1/4 down to 1/64, plus triplets"},
+    {"Note", "length written when placing a note, from 1/1 to 1/64, dotted or triplet"},
     {"Ghost", "show the notes of the other channels behind the grid"},
     {"Overview", "whole pattern at a glance; click or drag it to move the view"},
     {"Scale + Snap", "grey out-of-scale rows, or force notes into the scale"},
@@ -111,6 +111,7 @@ constexpr Row kMore[] = {
     {"Enter", "write the step at the table cursor"},
     {"Delete", "clear the step at the Modulation cursor"},
     {"N", "toggle NSE at the Modulation cursor"},
+    {"Tab / Shift + Tab", "next / previous open window to the front"},  // D-389
     {"^N", "new project (File > New)"},
 };
 
@@ -222,12 +223,13 @@ void HelpWindow::build() {
     Layout l = layOut(paneW - 2 * kPad);
     if (l.height > maxH) l = layOut(paneW - gemui::ScrollPane::kBar - 2 * kPad);
     const double paneH = std::min(l.height, maxH);
-    place({double(kX), double(kY), double(kW), kInset + gemui::TitleBar::kHeight + paneH + kInset});
     pane_.setBox({double(kX + kInset), double(kY + kInset + gemui::TitleBar::kHeight), paneW, paneH});
     pane_.setContentSize(int(l.width), int(l.height));
     const gemui::Point o = pane_.contentOrigin();
     text_.setBox({double(o.x), double(o.y), l.width, l.height});
     text_.setLayout(std::move(l));
+    // Last: place() may move the window and its content to keep it on the desktop (D-460).
+    place({double(kX), double(kY), double(kW), kInset + gemui::TitleBar::kHeight + paneH + kInset});
 }
 
 void HelpWindow::show() { open(); }

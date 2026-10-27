@@ -46,6 +46,14 @@ std::string number(double v, bool sign) {
     return (sign && n > 0 ? "+" : "") + std::to_string(n);
 }
 
+// A typed value (D-300, D-415): its first number, rounded and clamped to the slider's range; nothing when the text
+// holds none.
+std::optional<double> typedValue(const gemui::Slider& s, const std::string& text) {
+    const auto typed = gemui::typedNumber(text);
+    if (!typed) return std::nullopt;
+    return std::clamp(std::round(*typed), s.min(), s.max());
+}
+
 }  // namespace
 
 // ------------------------------------------------------------------------------------------- MiniScope
@@ -130,11 +138,12 @@ void MixerWindow::build() {
     // Prototype ids of the sliders that MIDI learn can learn (D-146): volume and pan.
     for (size_t i = 0; i < strips_.size(); ++i) {
         strips_[i].fader.setId("mixFad" + std::to_string(i));
+        strips_[i].faderR.setId("mixFadR" + std::to_string(i));  // D-459
         strips_[i].pan.setId("mixPan" + std::to_string(i));
     }
     auto style = [this](Strip& s) {
         // .mstrip .btn: 11 px, margins 1 px / 4 px, 22 px at least.
-        for (gemui::Button* b : {&s.label, &s.mute, &s.solo}) {
+        for (gemui::Button* b : {&s.label, &s.mute, &s.solo, &s.muteR, &s.soloR, &s.link}) {
             b->setPx(11);
             b->setPadding(1, 4);
             b->setMinWidth(22);
@@ -143,14 +152,20 @@ void MixerWindow::build() {
         s.label.setFace(gemui::Face::kSmall);
         s.fader.setVertical(true);
         s.fader.setRange(0, 100, 1);
+        s.faderR.setVertical(true);
+        s.faderR.setRange(0, 100, 1);
+        s.faderR.setTip("Volume of the right side (both with Link)");
+        s.muteR.setTip("Mute the right side of the stereo sample");
+        s.soloR.setTip("Solo the right side of the stereo sample");
+        s.link.setTip("Link: one Volume for both sides; off: a level for each");
         s.pan.setRange(-100, 100, 1);
         s.pan.setTip("Pan");
         s.send.setArrows(false);  // like the pan (D-297)
         s.send.setRange(0, 100, 1);
         s.send.setTip("Send to the delay, after the fader (Edit > Effects)");
-        for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&s.label, &s.scope, &s.fader, &s.vu, &s.pan,
-                                                                      &s.send, &s.faderVal, &s.panVal, &s.sendVal,
-                                                                      &s.mute, &s.solo})
+        for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{
+                 &s.label, &s.scope, &s.scopeR, &s.fader, &s.faderR, &s.vu, &s.vuR, &s.pan, &s.send, &s.faderVal,
+                 &s.faderRVal, &s.panVal, &s.sendVal, &s.mute, &s.solo, &s.muteR, &s.soloR, &s.link})
             add(*w);
     };
     for (Strip& s : strips_) style(s);
@@ -169,14 +184,18 @@ void MixerWindow::build() {
                                                                   &master2Lab_, &master2_, &masterPan_, &masterVal_,
                                                                   &master2Val_, &masterPanVal_, &link_})
         add(*w);
-    // Values (D-300): 6×6 font, centred under their slider.
-    std::vector<gemui::Label*> values = {&masterVal_, &master2Val_, &masterPanVal_};
-    for (Strip& s : strips_) values.insert(values.end(), {&s.faderVal, &s.panVal, &s.sendVal});
-    for (gemui::Label* l : values) {
-        l->setPx(int(kValueH));
-        l->setFace(gemui::Face::kSmall);
-        l->setAlign(gemui::Label::Align::Center);
+    // Values (D-300): 6×6 font, centred under their slider, typed in place (D-415). Their field is as wide as the
+    // widest value of the slider (3 characters for a level, 4 for a pan) or as their text, plus a pixel on each side.
+    std::vector<gemui::ValueField*> values = {&masterVal_, &master2Val_, &masterPanVal_};
+    for (Strip& s : strips_) values.insert(values.end(), {&s.faderVal, &s.faderRVal, &s.panVal, &s.sendVal});
+    for (gemui::ValueField* f : values) {
+        f->setPx(int(kValueH));
+        f->setFace(gemui::Face::kSmall);
+        f->setCentered(true);
+        f->setMinChars(3);
     }
+    masterPanVal_.setMinChars(4);
+    for (Strip& s : strips_) s.panVal.setMinChars(4);
     add(outLab_);
     add(outRLab_);
     add(outL_);
@@ -189,6 +208,7 @@ void MixerWindow::wire() {
         Strip& s = strips_[size_t(i)];
         s.label.onClick = [this, i] { m_.focusTrack(i); };  // focusCh
         s.scope.onClick = [this, i] { m_.openScope(i); };
+        s.scopeR.onClick = [this, i] { m_.openScope(i); };
         // One undo step at the first move of each drag (fArm, pArm). A chip channel in 3 channels: its Volume. The
         // gesture start arms the step, then calls the one of bindSlider (which marks the slider as held).
         m_.bindSlider(s.fader, [this, i](double v) {
@@ -237,34 +257,68 @@ void MixerWindow::wire() {
         };
         s.mute.onClick = [this, i] { toggle(i, Track::Mute); };
         s.solo.onClick = [this, i] { toggle(i, Track::Solo); };
-        // Right click (D-300): typed value or default, one undo step like a drag.
-        s.fader.onContext = [this, i](gemui::Point at) {
+        // The right side of a stereo sample (D-459): its fader, M, S, and Link, one undo step each like the others.
+        m_.bindSlider(s.faderR, [this, i](double v) {
+            Strip& st = strips_[size_t(i)];
+            if (st.faderRArmed) {
+                pushUndo();
+                st.faderRArmed = false;
+            }
+            setRight(i, v);
+        });
+        s.faderR.onGestureStart = [this, i, start = s.faderR.onGestureStart] {
+            strips_[size_t(i)].faderRArmed = true;
+            start();
+        };
+        s.muteR.onClick = [this, i] { toggle(i, Track::MuteR); };
+        s.soloR.onClick = [this, i] { toggle(i, Track::SoloR); };
+        s.link.onClick = [this, i] {
+            // Unlinked, the right side keeps its level (the Volume); linked again, it follows the Volume.
+            pushUndo();
+            const bool on = m_.iv(i, Track::Link) != 0;
+            if (on) m_.set(paramIndex(i, Track::LevelR), float(m_.iv(i, Track::Level)));
+            m_.set(paramIndex(i, Track::Link), on ? 0.0f : 1.0f);
+        };
+        // Right click (D-300): typed value or default; a click on the value under the slider types it in place
+        // (D-415). One undo step, like a drag.
+        const auto fader = [this, i](double v) {
+            const bool volume = !panned(i);
+            if (volume) pushTrackUndo(i);
+            else pushUndo();
+            m_.set(paramIndex(i, volume ? Track::Volume : Track::Level), float(v));
+        };
+        const auto pan = [this, i](double v) {
+            pushUndo();
+            m_.set(paramIndex(i, Track::Pan), float(v));
+        };
+        const auto send = [this, i](double v) {
+            pushUndo();
+            m_.set(paramIndex(i, Track::Send), float(v));
+        };
+        const auto faderR = [this, i](double v) {
+            pushUndo();
+            setRight(i, v);
+        };
+        s.fader.onContext = [this, i, fader](gemui::Point at) {
             sliderMenu(
                 strips_[size_t(i)].fader, at, "Volume",
-                [this, i] { return paramIndex(i, panned(i) ? Track::Level : Track::Volume); },
-                [this, i](double v) {
-                    const bool volume = !panned(i);
-                    if (volume) pushTrackUndo(i);
-                    else pushUndo();
-                    m_.set(paramIndex(i, volume ? Track::Volume : Track::Level), float(v));
-                });
+                [this, i] { return paramIndex(i, panned(i) ? Track::Level : Track::Volume); }, fader);
         };
-        s.pan.onContext = [this, i](gemui::Point at) {
+        s.pan.onContext = [this, i, pan](gemui::Point at) {
+            sliderMenu(strips_[size_t(i)].pan, at, "Pan", [i] { return paramIndex(i, Track::Pan); }, pan);
+        };
+        s.send.onContext = [this, i, send](gemui::Point at) {
+            sliderMenu(strips_[size_t(i)].send, at, "Send", [i] { return paramIndex(i, Track::Send); }, send);
+        };
+        s.faderR.onContext = [this, i, faderR](gemui::Point at) {
             sliderMenu(
-                strips_[size_t(i)].pan, at, "Pan", [i] { return paramIndex(i, Track::Pan); },
-                [this, i](double v) {
-                    pushUndo();
-                    m_.set(paramIndex(i, Track::Pan), float(v));
-                });
+                strips_[size_t(i)].faderR, at, "Volume R",
+                [this, i] { return paramIndex(i, m_.iv(i, Track::Link) != 0 ? Track::Level : Track::LevelR); }, faderR);
         };
-        s.send.onContext = [this, i](gemui::Point at) {
-            sliderMenu(
-                strips_[size_t(i)].send, at, "Send", [i] { return paramIndex(i, Track::Send); },
-                [this, i](double v) {
-                    pushUndo();
-                    m_.set(paramIndex(i, Track::Send), float(v));
-                });
-        };
+        typeUnder(s.faderVal, s.fader, fader);
+        typeUnder(s.faderRVal, s.faderR, faderR);
+        typeUnder(s.panVal, s.pan, pan);
+        typeUnder(s.sendVal, s.send, send);
     }
     // Master: the level of the SYSTEM frame, without an undo step like it; with two Masters, the left output's or chip
     // 1's, the second fader beside it, the balance and Link (D-284), without an undo step either.
@@ -288,12 +342,20 @@ void MixerWindow::wire() {
             masterPan_, at, "Balance", [] { return paramIndex(Global::MasterPan); },
             [this](double v) { m_.set(paramIndex(Global::MasterPan), float(v)); });
     };
+    typeUnder(masterVal_, master_, [this](double v) { setMaster(false, v); });
+    typeUnder(master2Val_, master2_, [this](double v) { setMaster(true, v); });
+    typeUnder(masterPanVal_, masterPan_, [this](double v) { m_.set(paramIndex(Global::MasterPan), float(v)); });
     link_.onClick = [this] {
         // Unlinked, the second Master keeps its level (that of Master); linked again, it follows Master.
         const bool on = m_.iv(Global::MasterLink) != 0;
         if (on) m_.set(paramIndex(Global::Master2), float(m_.iv(Global::Master)));
         m_.set(paramIndex(Global::MasterLink), on ? 0.0f : 1.0f);
     };
+}
+
+void MixerWindow::setRight(int track, double v) {
+    // Linked, the right side's fader sets the Volume, which the engine plays on both sides (D-459).
+    m_.set(paramIndex(track, m_.iv(track, Track::Link) != 0 ? Track::Level : Track::LevelR), float(v));
 }
 
 void MixerWindow::setMaster(bool right, double v) {
@@ -326,11 +388,19 @@ void MixerWindow::typeValue(gemui::Slider& s, const std::string& name, std::func
     gemui::Alert::open(m_.desk_, std::move(spec), [&s, apply](int button, const std::string& text) {
         if (button != gemui::Alert::kPromptOk) return;
         // Nothing typed: nothing changes. Out of range: clamped.
-        const auto typed = gemui::typedNumber(text);
-        if (!typed) return;
-        const double v = std::clamp(std::round(*typed), s.min(), s.max());
-        if (v != s.value()) apply(v);
+        const auto v = typedValue(s, text);
+        if (v && *v != s.value()) apply(*v);
     });
+}
+
+// The same as the Value... box; a text without a number is refused, the field showing the value again.
+void MixerWindow::typeUnder(gemui::ValueField& f, gemui::Slider& s, std::function<void(double)> apply) {
+    f.onCommit = [&s, apply = std::move(apply)](const std::string& text) {
+        const auto v = typedValue(s, text);
+        if (!v) return false;
+        if (*v != s.value()) apply(*v);
+        return true;
+    };
 }
 
 // ------------------------------------------------------------------------------------------- state
@@ -360,12 +430,17 @@ bool MixerWindow::stereoOut() const noexcept { return !m_.mode3() || m_.ste(); }
 bool MixerWindow::perChip() const noexcept { return m_.mode3() && m_.chips() == 2; }
 bool MixerWindow::twoMasters() const noexcept { return stereoOut() || perChip(); }
 bool MixerWindow::panned(int track) const noexcept { return !m_.mode3() || m_.dmaTrack(track); }
+bool MixerWindow::stereo(int track) const noexcept {
+    return plugin::effectiveGenerator(m_.values_, track) == ymengine::Generator::Dma &&
+           m_.extras_.dma.slots[size_t(m_.dmaSlot(track))].stereo;
+}
 
 void MixerWindow::show() {
     // openMixer: strips rebuilt (held peaks and VU meters at zero), window in front.
     for (Strip& s : strips_) {
-        s.hold = 0;
+        s.hold = s.holdR = 0;
         s.vu.setLevel(0, 0, false);
+        s.vuR.setLevel(0, 0, false);
     }
     outHold_ = {};
     outL_.setLevel(0, 0, false);
@@ -398,7 +473,20 @@ void MixerWindow::refresh() {
                                 : "Volume: the channel's 4-bit volume, the same as in the SOURCE frame");
         s.mute.setOn(m_.iv(i, Track::Mute) != 0);
         s.solo.setOn(m_.iv(i, Track::Solo) != 0);
+        // A stereo sample (D-457, D-459): the right side's fader, M and S, and Link; the first ones are the left
+        // side's.
+        s.stereo = i < n && stereo(i);
+        const bool linked = m_.iv(i, Track::Link) != 0;
+        if (m_.dragging_ != &s.faderR) s.faderR.setValue(m_.iv(i, linked ? Track::Level : Track::LevelR));
+        s.muteR.setOn(m_.iv(i, Track::MuteR) != 0);
+        s.soloR.setOn(m_.iv(i, Track::SoloR) != 0);
+        s.link.setOn(linked);
+        if (s.stereo) s.fader.setTip("Volume of the left side (both with Link)");
+        s.mute.setTip(s.stereo ? "Mute the left side of the stereo sample" : "");
+        s.solo.setTip(s.stereo ? "Solo the left side of the stereo sample" : "");
+        // While a value is typed (D-415), its field keeps the input and shows the new value once it ends.
         s.faderVal.setText(number(s.fader.value(), false));
+        s.faderRVal.setText(number(s.faderR.value(), false));
         s.faderVal.setDim(!s.fader.enabled());
         s.panVal.setText("Pan " + number(s.pan.value(), true));  // named like the send (ninth DAW test, D-310)
         s.sendVal.setText("Send " + number(s.send.value(), false));
@@ -427,8 +515,9 @@ void MixerWindow::refresh() {
         // buildMixer: the number of strips changes with the mode.
         mode3_ = m3;
         for (Strip& s : strips_) {
-            s.hold = 0;
+            s.hold = s.holdR = 0;
             s.vu.setLevel(0, 0, false);
+            s.vuR.setLevel(0, 0, false);
         }
     }
     layout();
@@ -443,13 +532,31 @@ void MixerWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
     if (!isOpen()) return;
     const double fall = 50.0 / 30.0 * double(steps);
     const int n = strips();
+    auto meter = [fall](VuMeter& vu, double& hold, double pk) {
+        const double p = vuPct(pk);
+        hold = p > hold ? p : std::max(0.0, hold - fall);
+        vu.setLevel(p, hold, pk >= 0.999);
+    };
     for (int i = 0; i < n; ++i) {
         Strip& s = strips_[size_t(i)];
-        const double pk = t.peak[size_t(i)];
-        const double p = vuPct(pk);
-        s.hold = p > s.hold ? p : std::max(0.0, s.hold - fall);
-        s.vu.setLevel(p, s.hold, pk >= 0.999);
-        s.scope.setPoints(t.trackScope[size_t(i)]);
+        const double pl = t.peak[size_t(i)], pr = t.peakR[size_t(i)];
+        const auto& mean = t.trackScope[size_t(i)];
+        if (!s.stereo) {
+            meter(s.vu, s.hold, std::max(pl, pr));
+            s.scope.setPoints(mean);
+            continue;
+        }
+        // A stereo sample (D-457): each side its meter and its oscilloscope, mean ∓ half difference.
+        meter(s.vu, s.hold, pl);
+        meter(s.vuR, s.holdR, pr);
+        const auto& side = t.trackSide[size_t(i)];
+        std::array<float, plugin::kTrackScopePoints> left{}, right{};
+        for (size_t j = 0; j < left.size(); ++j) {
+            left[j] = mean[j] - side[j];
+            right[j] = mean[j] + side[j];
+        }
+        s.scope.setPoints(left);
+        s.scopeR.setPoints(right);
     }
     const bool mono = !stereoOut();
     for (int k = 0; k < 2; ++k) {
@@ -476,10 +583,11 @@ const gemui::Slider* MixerWindow::slider(std::string_view id) const noexcept {
     return nullptr;
 }
 
-const VuMeter& MixerWindow::meter(int strip) const noexcept {
+const VuMeter& MixerWindow::meter(int strip, bool right) const noexcept {
     if (strip == -1) return outL_;
     if (strip == -2) return outR_;
-    return strips_[size_t(std::clamp(strip, 0, plugin::kTracks - 1))].vu;
+    const Strip& s = strips_[size_t(std::clamp(strip, 0, plugin::kTracks - 1))];
+    return right ? s.vuR : s.vu;
 }
 
 // ------------------------------------------------------------------------------------------- layout
@@ -499,14 +607,28 @@ void MixerWindow::layout() {
     const bool panRow = !m3 || dma;
     const double panRows = panRow ? kPanH + kValueH + 2 * kGap : 0;
     const double sendRows = m3 ? 0 : kPanH + kValueH + 2 * kGap;  // Send of the delay: 16 channels (D-299)
+    // A stereo sample (D-459): Link on a row under S, the other strips as tall.
+    bool anyStereo = false;
+    for (int i = 0; i < n; ++i) anyStereo = anyStereo || strips_[size_t(i)].stereo;
+    const double linkRow = anyStereo ? kLabelH + kGap : 0;
     // Label, scope, fader row, its value, pan and send rows, M and S, and the 5 gaps between the fixed items.
-    const double stripH = kLabelH + kScopeH + kRowH + kValueH + panRows + sendRows + 2 * kLabelH + 5 * kGap;
+    const double stripH = kLabelH + kScopeH + kRowH + kValueH + panRows + sendRows + 2 * kLabelH + 5 * kGap + linkRow;
     const double y0 = top + kPad;
     double sx = x0;
+    // A value centred at c (D-300), as wide as its field (D-415).
+    auto under = [&](gemui::ValueField& v, double c, double y) {
+        const double w = v.naturalWidth() + 2;
+        v.setBox({c - w / 2, y, w, kValueH});
+    };
     auto put = [&](Strip& s, bool on, bool pan, double minW) {
         for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&s.label, &s.scope, &s.fader, &s.vu,
                                                                       &s.faderVal, &s.mute, &s.solo})
             w->setVisible(on);
+        for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&s.scopeR, &s.vuR, &s.faderR, &s.faderRVal,
+                                                                      &s.muteR, &s.soloR, &s.link})
+            w->setVisible(on && s.stereo);
+        s.scope.setTip(s.stereo ? "Left side of the stereo sample" : "");
+        s.scopeR.setTip("Right side of the stereo sample");
         s.pan.setVisible(on && pan);
         s.panVal.setVisible(on && pan);
         s.send.setVisible(on && !m3);
@@ -518,20 +640,35 @@ void MixerWindow::layout() {
         double y = y0;
         s.label.setBox({c - lw / 2, y, lw, kLabelH});
         y += kLabelH + kGap;
-        s.scope.setBox({c - 15, y, 30, kScopeH});
+        // A stereo sample (D-457): the left and right sides' oscilloscopes side by side, sharing their frame's line.
+        if (s.stereo) {
+            s.scope.setBox({c - 29, y, 30, kScopeH});
+            s.scopeR.setBox({c - 1, y, 30, kScopeH});
+        } else {
+            s.scope.setBox({c - 15, y, 30, kScopeH});
+        }
         y += kScopeH + kGap;
         // .vrow: 26 px .vwrap (slider rotated by 20 px, 16 px slider track in the middle), gap 3, 7 px .vu: 36 px
-        // centred on the strip.
-        const double rx = c - 18;
-        s.fader.setBox({rx + 3 + 2, y, 16, kRowH});
-        s.vu.setBox({rx + 29, y, 7, kRowH});
+        // centred on the strip. A stereo sample (D-459): each side its fader and its meter 3 px apart, the right side
+        // 4 px further, 56 px; each value under its fader and meter.
+        const double lc = c - 15, rc = c + 15;  // centres of the left and right sides
+        if (s.stereo) {
+            s.fader.setBox({c - 28, y, 16, kRowH});
+            s.vu.setBox({c - 9, y, 7, kRowH});
+            s.faderR.setBox({c + 2, y, 16, kRowH});
+            s.vuR.setBox({c + 21, y, 7, kRowH});
+        } else {
+            s.fader.setBox({c - 13, y, 16, kRowH});
+            s.vu.setBox({c + 11, y, 7, kRowH});
+        }
         y += kRowH + kGap;
-        s.faderVal.setBox({c - sw / 2, y, sw, kValueH});
+        under(s.faderVal, s.stereo ? lc : c, y);
+        if (s.stereo) under(s.faderRVal, rc, y);
         y += kValueH + kGap;
         if (pan) {
             s.pan.setBox({c - kStripW16 / 2, y, kStripW16, kPanH});
             y += kPanH + kGap;
-            s.panVal.setBox({c - kStripW16 / 2, y, kStripW16, kValueH});
+            under(s.panVal, c, y);
             y += kValueH + kGap;
         } else if (panRow) {
             y += panRows;  // YM channel next to the DMA tracks: M and S aligned with theirs
@@ -539,17 +676,25 @@ void MixerWindow::layout() {
         if (!m3) {
             s.send.setBox({c - kStripW16 / 2, y, kStripW16, kPanH});
             y += kPanH + kGap;
-            s.sendVal.setBox({c - kStripW16 / 2, y, kStripW16, kValueH});
+            under(s.sendVal, c, y);
             y += kValueH + kGap;
         }
+        // M and S, each side's under its fader with a stereo sample, then Link (D-459).
+        const double mc = s.stereo ? lc : c;
         const double mw = s.mute.naturalWidth(), smw = s.solo.naturalWidth();
-        s.mute.setBox({c - mw / 2, y, mw, kLabelH});
+        s.mute.setBox({mc - mw / 2, y, mw, kLabelH});
+        if (s.stereo) s.muteR.setBox({rc - s.muteR.naturalWidth() / 2, y, s.muteR.naturalWidth(), kLabelH});
         y += kLabelH + kGap;
-        s.solo.setBox({c - smw / 2, y, smw, kLabelH});
+        s.solo.setBox({mc - smw / 2, y, smw, kLabelH});
+        if (s.stereo) s.soloR.setBox({rc - s.soloR.naturalWidth() / 2, y, s.soloR.naturalWidth(), kLabelH});
+        y += kLabelH + kGap;
+        if (s.stereo) s.link.setBox({c - s.link.naturalWidth() / 2, y, s.link.naturalWidth(), kLabelH});
         sx += sw + kGap;
     };
-    for (int i = 0; i < plugin::kTracks; ++i)
-        put(strips_[size_t(i)], i < n, panned(i), panned(i) ? kStripW16 : base);
+    for (int i = 0; i < plugin::kTracks; ++i) {
+        Strip& s = strips_[size_t(i)];
+        put(s, i < n, panned(i), panned(i) ? kStripW16 : base);
+    }
     // Master (sixth DAW test, item 78, D-276): a 2 px rule, then the label and the fader, at the height of the tracks'.
     // Two Masters (D-284): their faders 4 px apart, their letters (L and R, or 1 and 2 for the chips) on the row of
     // the oscilloscopes, the balance (stereo outputs only) and Link on the rows of the pans and of M.
@@ -570,18 +715,18 @@ void MixerWindow::layout() {
     if (two) {
         master_.setBox({mc - 18, faderY, 16, kRowH});
         master2_.setBox({mc + 2, faderY, 16, kRowH});
-        masterVal_.setBox({mc - 20, valueY, 20, kValueH});
-        master2Val_.setBox({mc, valueY, 20, kValueH});
+        under(masterVal_, mc - 10, valueY);
+        under(master2Val_, mc + 10, valueY);
         const double ly = y0 + kLabelH + kGap + 6, lw = master1Lab_.naturalWidth(), rw = master2Lab_.naturalWidth();
         master1Lab_.setBox({mc - 10 - lw / 2, ly, lw, 11});
         master2Lab_.setBox({mc + 10 - rw / 2, ly, rw, 11});
         const double py = valueY + kValueH + kGap, kw = link_.naturalWidth();
         masterPan_.setBox({mc - kStripW16 / 2, py, kStripW16, kPanH});
-        masterPanVal_.setBox({mc - kStripW16 / 2, py + kPanH + kGap, kStripW16, kValueH});
+        under(masterPanVal_, mc, py + kPanH + kGap);
         link_.setBox({mc - kw / 2, py + (panRow ? panRows : 0) + sendRows, kw, kLabelH});  // on the row of M
     } else {
         master_.setBox({mc - 8, faderY, 16, kRowH});
-        masterVal_.setBox({mc - colW / 2, valueY, colW, kValueH});
+        under(masterVal_, mc, valueY);
     }
     sx = mc + colW / 2 + kGap;
     const double stripsW = sx - kGap - x0;
@@ -611,12 +756,13 @@ void MixerWindow::layout() {
     repaint();
 }
 
-const gemui::Label* MixerWindow::valueLabel(std::string_view id) const {
+const gemui::ValueField* MixerWindow::valueField(std::string_view id) const {
     if (id == "mixMasterVal") return &masterVal_;
     if (id == "mixMaster2Val") return &master2Val_;
     if (id == "mixMasterPanVal") return &masterPanVal_;
     using Prefix = std::pair<std::string_view, int>;
-    for (const auto& [prefix, k] : {Prefix{"mixFadVal", 0}, Prefix{"mixPanVal", 1}, Prefix{"mixSendVal", 2}}) {
+    for (const auto& [prefix, k] :
+         {Prefix{"mixFadVal", 0}, Prefix{"mixPanVal", 1}, Prefix{"mixSendVal", 2}, Prefix{"mixFadRVal", 3}}) {
         if (id.substr(0, prefix.size()) != prefix) continue;
         const std::string_view num = id.substr(prefix.size());
         const auto digit = [](char c) { return c >= '0' && c <= '9'; };
@@ -624,13 +770,13 @@ const gemui::Label* MixerWindow::valueLabel(std::string_view id) const {
         const int i = std::stoi(std::string(num));
         if (i >= plugin::kTracks) return nullptr;
         const Strip& s = strips_[size_t(i)];
-        return k == 2 ? &s.sendVal : k == 1 ? &s.panVal : &s.faderVal;
+        return k == 3 ? &s.faderRVal : k == 2 ? &s.sendVal : k == 1 ? &s.panVal : &s.faderVal;
     }
     return nullptr;
 }
 
 std::string MixerWindow::valueText(std::string_view id) const {
-    const gemui::Label* v = valueLabel(id);
+    const gemui::ValueField* v = valueField(id);
     return v ? v->text() : std::string();
 }
 
@@ -642,7 +788,8 @@ std::optional<Rect> MixerWindow::rectOf(std::string_view id) const {
     if (id == "mixSep") return masterSep_.bounds();
     if (id == "mixMasterLab") return masterLab_.bounds();
     if (id == "mixMaster") return master_.bounds();
-    if (const gemui::Label* v = valueLabel(id)) return v->visible() ? std::optional<Rect>(v->bounds()) : std::nullopt;
+    if (const gemui::ValueField* v = valueField(id))
+        return v->visible() ? std::optional<Rect>(v->bounds()) : std::nullopt;
     const std::pair<std::string_view, const gemui::Widget*> stereo[] = {{"mixMaster2", &master2_},
                                                                         {"mixMasterPan", &masterPan_},
                                                                         {"mixLink", &link_},
@@ -664,13 +811,19 @@ std::optional<Rect> MixerWindow::rectOf(std::string_view id) const {
     };
     static constexpr Part parts[] = {
         {"mixLab", [](const Strip& s) -> const gemui::Widget* { return &s.label; }},
+        {"mixScopeR", [](const Strip& s) -> const gemui::Widget* { return &s.scopeR; }},  // before mixScope
         {"mixScope", [](const Strip& s) -> const gemui::Widget* { return &s.scope; }},
+        {"mixFadR", [](const Strip& s) -> const gemui::Widget* { return &s.faderR; }},  // before mixFad (D-459)
         {"mixFad", [](const Strip& s) -> const gemui::Widget* { return &s.fader; }},
+        {"mixVuR", [](const Strip& s) -> const gemui::Widget* { return &s.vuR; }},  // before mixVu
         {"mixVu", [](const Strip& s) -> const gemui::Widget* { return &s.vu; }},
         {"mixPan", [](const Strip& s) -> const gemui::Widget* { return &s.pan; }},
         {"mixSend", [](const Strip& s) -> const gemui::Widget* { return &s.send; }},
+        {"mixMuteR", [](const Strip& s) -> const gemui::Widget* { return &s.muteR; }},  // before mixMute
         {"mixMute", [](const Strip& s) -> const gemui::Widget* { return &s.mute; }},
+        {"mixSoloR", [](const Strip& s) -> const gemui::Widget* { return &s.soloR; }},  // before mixSolo
         {"mixSolo", [](const Strip& s) -> const gemui::Widget* { return &s.solo; }},
+        {"mixLink", [](const Strip& s) -> const gemui::Widget* { return &s.link; }},  // "mixLink" alone: the Masters
     };
     for (const Part& p : parts) {
         if (id.substr(0, p.prefix.size()) != p.prefix) continue;

@@ -24,6 +24,7 @@ namespace {
 class TestHost : public pluginui::Host {
 public:
     bool audioSettings = false;  // the standalone application's audio and MIDI window
+    bool renderers = false;      // Settings > Renderer (Windows, D-420)
     int audioOpened = 0;
     plugin::ParamValues values = plugin::defaultValues();
     plugin::NonParamState state;
@@ -67,6 +68,7 @@ public:
     std::string version() const override { return "test"; }
     void quit() override {}
     bool hasAudioSettings() const override { return audioSettings; }
+    bool rendererChoice() const override { return renderers; }
     void openAudioSettings() override { ++audioOpened; }
     void loadDigidrum(int) override {}
     std::string preference(std::string_view key, std::string_view fallback) const override {
@@ -141,33 +143,60 @@ TEST_CASE("Options: one Audio/MIDI settings entry, greyed out in a host (second 
     CHECK(h.audioOpened == 1);
 }
 
-TEST_CASE("Options > Pixels: Smooth by default, Sharp stored as a preference (items 123 and 130, D-331, D-339)",
+TEST_CASE("Settings > Pixels: Smooth by default, Sharp stored as a preference (items 123 and 130, D-331, D-339, "
+          "D-430)",
           "[ui][menu]") {
     TestHost h;
     MainWindow w(h);
-    auto pixels = [&w]() -> gemui::MenuItem {
-        w.openMenu(3);
-        const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
-        REQUIRE(m);
-        const std::vector<gemui::MenuItem> items = m->items();
-        w.desktop().closePopups();
-        for (const gemui::MenuItem& it : items)
-            if (it.label == "Pixels") return it;
-        FAIL("no Pixels entry");
-        return {};
-    };
-    gemui::MenuItem p = pixels();
-    REQUIRE(p.sub.size() == 2);
-    CHECK(p.sub[0].label == "Sharp");
-    CHECK(p.sub[1].label == "Smooth");
-    CHECK(p.subMarks);
-    CHECK(p.subCur == 1);
-    p.sub[0].pick();
+    pluginui::SettingsWindow& s = w.settingsWindow();
+    s.show();
+    int cur = -1;
+    std::vector<gemui::MenuItem> p = s.items("setPixels", cur);
+    REQUIRE(p.size() == 2);
+    CHECK(p[0].label == "Sharp");
+    CHECK(p[1].label == "Smooth");
+    CHECK(cur == 1);
+    CHECK(s.button("setPixels")->text() == "Smooth");
+    p[0].pick();
     CHECK(h.prefs["pixels"] == "sharp");
-    CHECK(pixels().subCur == 0);
-    pixels().sub[1].pick();
+    s.items("setPixels", cur);
+    CHECK(cur == 0);
+    CHECK(s.button("setPixels")->text() == "Sharp");
+    s.items("setPixels", cur)[1].pick();
     CHECK(h.prefs["pixels"] == "smooth");
-    CHECK(pixels().subCur == 1);
+    CHECK(s.button("setPixels")->text() == "Smooth");
+}
+
+TEST_CASE("Settings > Renderer: on Windows only, Software by default, Direct2D stored as a preference (D-420, D-430)",
+          "[ui][menu]") {
+    TestHost h;
+    {
+        MainWindow w(h);  // macOS, Linux: no choice, the setting greyed out
+        w.settingsWindow().show();
+        const gemui::Button* b = w.settingsWindow().button("setRenderer");
+        REQUIRE(b);
+        CHECK_FALSE(b->enabled());
+        CHECK(b->tip() == "Renderer: Windows only");
+        CHECK(b->text() == "Software");
+    }
+    h.renderers = true;
+    MainWindow w(h);
+    pluginui::SettingsWindow& s = w.settingsWindow();
+    s.show();
+    CHECK(s.button("setRenderer")->enabled());
+    int cur = -1;
+    std::vector<gemui::MenuItem> r = s.items("setRenderer", cur);
+    REQUIRE(r.size() == 2);
+    CHECK(r[0].label == "Software");
+    CHECK(r[1].label == "Direct2D");
+    CHECK(cur == 0);
+    r[1].pick();
+    CHECK(h.prefs["renderer"] == "direct2d");
+    s.items("setRenderer", cur);
+    CHECK(cur == 1);
+    CHECK(s.button("setRenderer")->text() == "Direct2D");
+    s.items("setRenderer", cur)[0].pick();
+    CHECK(h.prefs["renderer"] == "software");
 }
 
 TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as a preference, what follows moves up "
@@ -183,7 +212,7 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
         w.desktop().closePopups();
         for (size_t i = 0; i < items.size(); ++i)
             if (items[i].label == "Oscilloscope") {
-                CHECK(items[i - 1].label == "Pixels");
+                CHECK(items[i - 1].separator);  // VBL frequency went to the Settings window (D-441)
                 return items[i];
             }
         FAIL("no Oscilloscope entry");
@@ -216,6 +245,106 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
     CHECK(*w.rectOf("regs") == regs);
 }
 
+TEST_CASE("Options > Register monitor: shown by default, hidden as a preference like the oscilloscope, what follows "
+          "moves up (D-436)",
+          "[ui][menu]") {
+    TestHost h;
+    MainWindow w(h);
+    auto regs = [&w]() -> gemui::MenuItem {
+        w.openMenu(3);
+        const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+        REQUIRE(m);
+        const std::vector<gemui::MenuItem> items = m->items();
+        w.desktop().closePopups();
+        for (size_t i = 0; i < items.size(); ++i)
+            if (items[i].label == "Register monitor") {
+                CHECK(items[i - 1].label == "Oscilloscope");
+                return items[i];
+            }
+        FAIL("no Register monitor entry");
+        return {};
+    };
+    gemui::MenuItem r = regs();
+    REQUIRE(r.sub.size() == 2);
+    CHECK(r.sub[0].label == "On");
+    CHECK(r.sub[1].label == "Off");
+    CHECK(r.subMarks);
+    CHECK(r.subCur == 0);
+    REQUIRE(w.rectOf("regs"));
+    REQUIRE(w.rectOf("regInfo"));
+    const gemui::Rect scope = *w.rectOf("scope"), kbd = *w.rectOf("kbd"), btn = *w.rectOf("kbdMapBtn"),
+                      bottom = *w.rectOf("mainBottom");
+    r.sub[1].pick();
+    CHECK(h.prefs["mainRegs"] == "0");
+    CHECK(regs().subCur == 1);
+    CHECK_FALSE(w.rectOf("regs"));
+    CHECK_FALSE(w.rectOf("regInfo"));
+    CHECK(*w.rectOf("scope") == scope);  // the oscilloscope stays where it is
+    CHECK(w.rectOf("kbd")->y == kbd.y - 50);  // the monitor's 40 px and its 10 px margin
+    CHECK(w.rectOf("kbdMapBtn")->y == btn.y - 50);
+    CHECK(w.rectOf("mainBottom")->y == bottom.y - 50);
+    // Kept for the next opening; with the oscilloscope hidden too, both heights.
+    {
+        MainWindow w2(h);
+        CHECK_FALSE(w2.rectOf("regs"));
+        CHECK(w2.rectOf("kbd")->y == kbd.y - 50);
+    }
+    {
+        h.prefs["mainScope"] = "0";
+        MainWindow w2(h);
+        CHECK(w2.rectOf("kbd")->y == kbd.y - 150);
+        h.prefs["mainScope"] = "1";
+    }
+    regs().sub[0].pick();
+    CHECK(h.prefs["mainRegs"] == "1");
+    CHECK(w.rectOf("regs"));
+    CHECK(*w.rectOf("kbd") == kbd);
+}
+
+TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden as a preference, nothing moves "
+          "(D-442)",
+          "[ui][menu]") {
+    // Indus, 26/10/2026 04:05: the Note line (TP and Hz) in the Options menu, as the oscilloscope and the register
+    // monitor.
+    TestHost h;
+    MainWindow w(h);
+    auto note = [&w]() -> gemui::MenuItem {
+        w.openMenu(3);
+        const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+        REQUIRE(m);
+        const std::vector<gemui::MenuItem> items = m->items();
+        w.desktop().closePopups();
+        for (size_t i = 0; i < items.size(); ++i)
+            if (items[i].label == "Note monitor") {
+                CHECK(items[i - 1].label == "Register monitor");
+                return items[i];
+            }
+        FAIL("no Note monitor entry");
+        return {};
+    };
+    gemui::MenuItem n = note();
+    REQUIRE(n.sub.size() == 2);
+    CHECK(n.sub[0].label == "On");
+    CHECK(n.sub[1].label == "Off");
+    CHECK(n.subMarks);
+    CHECK(n.subCur == 0);
+    REQUIRE(w.rectOf("noteRow"));
+    const gemui::Rect row = *w.rectOf("noteRow"), regs = *w.rectOf("regs"), bottom = *w.rectOf("mainBottom");
+    n.sub[1].pick();
+    CHECK(h.prefs["mainNote"] == "0");
+    CHECK(note().subCur == 1);
+    CHECK_FALSE(w.rectOf("noteRow"));
+    CHECK(*w.rectOf("regs") == regs);
+    CHECK(*w.rectOf("mainBottom") == bottom);
+    {
+        MainWindow w2(h);  // kept for the next opening
+        CHECK_FALSE(w2.rectOf("noteRow"));
+    }
+    note().sub[0].pick();
+    CHECK(h.prefs["mainNote"] == "1");
+    CHECK(*w.rectOf("noteRow") == row);
+}
+
 TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without acting", "[ui][learn]") {
     TestHost h;
     // Noise in the source, so that the noise period slider is in use (greyed out otherwise, D-253).
@@ -230,7 +359,7 @@ TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without ac
     options(w, 1);
     REQUIRE(w.midiLearn());
     CHECK(w.learnBadge() == "MIDI learn: click a slider or button, then move a control...");
-    CHECK(w.rectOf("learnBadge") == gemui::Rect{8, 908, 504, 28});  // box of the prototype at 100 %
+    CHECK(w.rectOf("learnBadge") == gemui::Rect{8, 948, 504, 28});  // box of the prototype at 100 %
 
     // Slider: armed, its value does not move.
     const float np = h.p(0, Track::NoisePeriod);

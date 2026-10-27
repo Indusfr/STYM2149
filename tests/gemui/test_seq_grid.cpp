@@ -14,6 +14,9 @@
 #include <vector>
 
 #include "UiHost.h"
+#include "gemui/Controls.h"
+#include "gemui/Menu.h"
+#include "pluginui/IconData.h"
 #include "plugincore/Parameters.h"
 #include "pluginui/SeqWindow.h"
 #include "ymseq/Pattern.h"
@@ -308,13 +311,13 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     REQUIRE(r);
     // Its line alone under it: no legend (twelfth DAW test, item 151, D-360).
     CHECK_FALSE(w.rectOf("seqHint"));
-    // Canvas as wide as the grid (38 + 64 × 17 px), 104 px high, in a 2 px frame.
-    CHECK(r->w == 1130);
+    // Canvas as wide as the grid (38 + 64 × 18 px, D-458), 104 px high, in a 2 px frame.
+    CHECK(r->w == 1194);
     CHECK(r->h == 108);
     w.desktop().paint();
-    // x = step / 256 × 1126; y = 104 − (note − 23) / 97 × 104, two pixels high.
-    CHECK(mapPixel(w, 37, 71) == gemui::colors::kBlack);  // step 8, note 53
-    CHECK(mapPixel(w, 72, 69) == kMapOther);              // step 16, note 55
+    // x = step / 256 × 1190; y = 104 − (note − 23) / 97 × 104, two pixels high.
+    CHECK(mapPixel(w, 39, 71) == gemui::colors::kBlack);  // step 8, note 53
+    CHECK(mapPixel(w, 76, 69) == kMapOther);              // step 16, note 55
     CHECK(mapPixel(w, 150, 30) == gemui::colors::kWhite);
     CHECK(mapPixel(w, 500, 10) == kMapOut);               // after step 64
     CHECK(mapPixel(w, 100, 63) == kMapView);              // top of the view frame (C3 to C4, steps 1-64)
@@ -329,13 +332,13 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     w.tick(10);
     REQUIRE(grid(w).playStep() == 20);
     w.desktop().paint();
-    CHECK(mapPixel(w, 90, 30) == gemui::colors::kGreen);
+    CHECK(mapPixel(w, 95, 30) == gemui::colors::kGreen);
     st.playing = false;
     st.step = -1;
     h.publish(st);
     w.tick(20);
     w.desktop().paint();
-    CHECK(mapPixel(w, 90, 30) == gemui::colors::kWhite);
+    CHECK(mapPixel(w, 95, 30) == gemui::colors::kWhite);
 
     // A note written in the grid shows on the map (refreshSeqGrid redraws the overview).
     CHECK(mapPixel(w, 10, 67) == gemui::colors::kWhite);
@@ -346,10 +349,11 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     CHECK(mapPixel(w, 10, 67) == gemui::colors::kBlack);
 
     // Click and drag move the view: steps across, pitch up and down (the view centred on the pointer).
-    setSteps(h, w, 256);  // the scroll row appears above the map
+    const int top = w.sequencer().bounds().y;
+    setSteps(h, w, 256);  // the scroll row appears above the map (the window may move up, D-458)
     const auto r2 = w.rectOf("overMap");
     REQUIRE(r2);
-    CHECK(r2->y > r->y);
+    CHECK(r2->y - w.sequencer().bounds().y > r->y - top);
     r = r2;
     // The view frame follows the scroll bar.
     w.desktop().paint();
@@ -359,17 +363,17 @@ TEST_CASE("Overview map: notes, out-of-pattern area, view frame and play head on
     press(w, {sc->right() - 1 - gemui::Slider::kArrow, sc->y + sc->h / 2});
     REQUIRE(h.editor.viewStart == 192);
     w.desktop().paint();
-    CHECK(mapPixel(w, 845, 70) == kMapView);  // left side of the frame at step 192
+    CHECK(mapPixel(w, 893, 70) == kMapView);  // left side of the frame at step 192
     CHECK(mapPixel(w, 1, 70) == gemui::colors::kWhite);
-    w.desktop().mouseMove({r->x + 565, r->y + 27}, {});
-    w.desktop().mouseDown({r->x + 565, r->y + 27}, gemui::MouseButton::Left, {});
+    w.desktop().mouseMove({r->x + 597, r->y + 27}, {});
+    w.desktop().mouseDown({r->x + 597, r->y + 27}, gemui::MouseButton::Left, {});
     CHECK(h.editor.viewStart == 96);       // round(0.5 × 256 − 32)
     CHECK(h.editor.viewAbsBase == 90);     // round(120 − 0.25 × 97) − 6
     CHECK(scrollText(w) == "97-160");
     const auto* tr = dynamic_cast<const gemui::Slider*>(w.sequencer().widgetOf("seqTr"));
     REQUIRE(tr);
     CHECK(tr->value() == 90);
-    w.desktop().mouseDrag({r->x + 847, r->y + 81}, {});
+    w.desktop().mouseDrag({r->x + 895, r->y + 81}, {});
     CHECK(h.editor.viewStart == 160);
     CHECK(h.editor.viewAbsBase == 41);
     w.desktop().mouseDrag({r->x + r->w + 40, r->y - 30}, {});  // clamped
@@ -395,20 +399,20 @@ TEST_CASE("Overview map with a drum track: 26 px band, separator, the pitch of t
     REQUIRE(w.rectOf("overMap"));
     w.desktop().paint();
     // Melodic area 78 px high: note 53 at y = 78 − 30 / 97 × 78.
-    CHECK(mapPixel(w, 37, 53) == gemui::colors::kBlack);
+    CHECK(mapPixel(w, 39, 53) == gemui::colors::kBlack);
     CHECK(mapPixel(w, 300, 78) == gemui::colors::kBlack);  // separator
-    CHECK(mapPixel(w, 107, 90) == kMapOther);              // fourth drum, step 24
-    CHECK(mapPixel(w, 107, 70) == gemui::colors::kWhite);
+    CHECK(mapPixel(w, 114, 90) == kMapOther);              // fourth drum, step 24
+    CHECK(mapPixel(w, 114, 70) == gemui::colors::kWhite);
 
     // Drum track focused: its hit in black; a click moves the steps only.
     h.p(Global::FocusTrack) = 3;
     w.tick(0);
     w.desktop().paint();
-    CHECK(mapPixel(w, 107, 90) == gemui::colors::kBlack);
+    CHECK(mapPixel(w, 114, 90) == gemui::colors::kBlack);
     const int base = h.editor.viewAbsBase;
     const auto r = w.rectOf("overMap");  // the grid of a drum track is shorter: the map moved up
     REQUIRE(r);
-    press(w, {r->x + 565, r->y + 10});
+    press(w, {r->x + 597, r->y + 10});
     CHECK(h.editor.viewStart == 96);
     CHECK(h.editor.viewAbsBase == base);
 }
@@ -563,6 +567,63 @@ TEST_CASE("Piano roll: a click removes a note even when another note follows it 
     CHECK(noteStartAt(lane(), 1) < 0);
     CHECK(lane().pat[2] == 2);
     CHECK(noteLen(lane(), 2) == 2);
+}
+
+TEST_CASE("Note length: the values that are not a whole number of steps are greyed, Step written instead (D-425)",
+          "[ui][seq][pianoroll]") {
+    UiHost h;
+    h.state.global.resolution = 3;  // 1/32
+    h.editor.figure = 10;           // 1/16.: three steps at 1/32
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    auto lane = [&h]() -> const ymseq::Lane& { return h.state.seq.cur().lane(0); };
+    const auto* fig = dynamic_cast<const gemui::Button*>(w.sequencer().widgetOf("seqFig"));
+    REQUIRE(fig);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[10]);
+    click(w, "seqFig");
+    REQUIRE(topMenu(w));
+    CHECK(topMenu(w)->checked() == 10);
+    CHECK(!topMenu(w)->items()[12].disabled);
+    CHECK(topMenu(w)->items()[8].disabled);  // 1/64: half a step of 1/32
+    w.desktop().closePopups();
+
+    // At 1/16 the dotted sixteenth lasts a step and a half: greyed with the other values that do not fit, their
+    // length unrounded; the Note button and the check mark go to Step, and a note is written one step long.
+    h.editExtras([](plugin::NonParamState& s) { s.global.resolution = 2; });
+    w.tick(0);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[5]);
+    click(w, "seqFig");
+    const std::vector<std::string> l = menuLabels(w);
+    REQUIRE(l.size() == 18);
+    CHECK(l[6] == "1/16 1 step");
+    CHECK(l[7] == "1/32 0.5 step");
+    CHECK(l[8] == "1/64 0.25 step");
+    CHECK(l[11] == "1/8. 3 steps");
+    CHECK(l[12] == "1/16. 1.5 steps");
+    CHECK(l[14] == "1/4T 2.67 steps");
+    CHECK(l[16] == "1/16T 0.67 step");
+    CHECK(l[17] == "1/32T 0.33 step");  // D-433
+    const std::vector<gemui::MenuItem>& it = topMenu(w)->items();
+    for (size_t k : {size_t(0), size_t(2), size_t(6), size_t(10), size_t(11)}) CHECK(!it[k].disabled);
+    for (size_t k : {size_t(7), size_t(8), size_t(12), size_t(14), size_t(15), size_t(16), size_t(17)})
+        CHECK(it[k].disabled);
+    CHECK(it[7].why == "Shorter than one step of 1/16");
+    CHECK(it[12].why == "Lasts 1.5 steps of 1/16: not a whole number");
+    CHECK(topMenu(w)->checked() == 0);
+    pickItem(w, 8);  // a greyed value cannot be chosen
+    CHECK(h.editor.figure == 10);
+    w.desktop().closePopups();
+    press(w, cell(w, 0, 12));
+    CHECK(lane().pat[0] == 0);
+    CHECK(noteLen(lane(), 0) == 1);  // rounded, the dotted sixteenth would have been two steps
+
+    // The choice is kept: back at 1/32, the dotted sixteenth is written again.
+    CHECK(h.editor.figure == 10);
+    h.editExtras([](plugin::NonParamState& s) { s.global.resolution = 3; });
+    w.tick(0);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[10]);
+    press(w, cell(w, 4, 10));
+    CHECK(noteLen(lane(), 4) == 3);
 }
 
 TEST_CASE("Piano roll: with the Move tool, a click on a note leaves it whole (D-293)", "[ui][seq][pianoroll]") {
@@ -985,7 +1046,7 @@ TEST_CASE("Piano roll: in 3 channels, the held part of a chord voice is greyed l
 
 // ---------------------------------------------------------------- twelfth DAW test
 
-TEST_CASE("Piano roll: the edge of a note stretches it with the Move and Draw tools (item 141)",
+TEST_CASE("Piano roll: the edge of a note stretches it with the Draw tool alone (item 141, D-381)",
           "[ui][seq][pianoroll]") {
     for (const int tool : {0, 1}) {
         CAPTURE(tool);
@@ -996,13 +1057,24 @@ TEST_CASE("Piano roll: the edge of a note stretches it with the Move and Draw to
         w.sequencer().show();
         w.tick(0);
         auto lane = [&h]() -> const ymseq::Lane& { return h.state.seq.cur().lane(0); };
-        // The outer part of the end steps shows the resize pointer; their middle keeps the pointer of the tool.
         const gemui::Rect last = grid(w).noteRect(3, 5), first = grid(w).noteRect(2, 5);
         const gemui::Point end{last.x + last.w - 2, last.y + last.h / 2};
         const gemui::Point start{first.x + 1, first.y + first.h / 2};
+        if (!tool) {  // Move (bug of 24/10/2026): no resize pointer, the edge moves the whole note
+            CHECK(grid(w).pointerAt(end) == gemui::Pointer::Move);
+            CHECK(grid(w).pointerAt(start) == gemui::Pointer::Move);
+            dragPath(w, {end, cell(w, 4, 5), cell(w, 5, 5)});
+            CHECK(lane().pat[2] == -1);
+            CHECK(lane().pat[4] == 7);
+            CHECK(lane().tie[4] == 1);
+            CHECK(lane().tie[5] == 1);
+            CHECK(lane().tie[6] == 0);
+            continue;
+        }
+        // The outer part of the end steps shows the resize pointer; their middle keeps the pointer of the tool.
         CHECK(grid(w).pointerAt(end) == gemui::Pointer::ResizeH);
         CHECK(grid(w).pointerAt(start) == gemui::Pointer::ResizeH);
-        CHECK(grid(w).pointerAt(centre(last)) == (tool ? gemui::Pointer::Pencil : gemui::Pointer::Move));
+        CHECK(grid(w).pointerAt(centre(last)) == gemui::Pointer::Pencil);
         CHECK(grid(w).pointerAt({first.x + first.w - 2, first.y + first.h / 2}) != gemui::Pointer::ResizeH);
         // Its end pulled to step 6.
         dragPath(w, {end, cell(w, 4, 5), cell(w, 6, 5)});
@@ -1030,6 +1102,31 @@ TEST_CASE("Piano roll: the edge of a note stretches it with the Move and Draw to
     const ymseq::Lane a = clickAt(true), b = clickAt(false);
     CHECK(a.pat == b.pat);
     CHECK(a.tie == b.tie);
+}
+
+TEST_CASE("Piano roll: with the Draw tool, a note held under the button shows the hand until the release (D-383)",
+          "[ui][seq][pianoroll]") {
+    UiHost h;
+    h.editor.tool = 1;
+    putNote(h.state.seq.cur().edit(0), 2, 7, 2);  // G (row 5), steps 2 and 3
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    w.tick(0);
+    const gemui::Point p = centre(grid(w).noteRect(2, 5));
+    w.desktop().mouseMove(p, {});
+    CHECK(w.desktop().pointer() == gemui::Pointer::Pencil);
+    w.desktop().mouseDown(p, gemui::MouseButton::Left, {});
+    CHECK(w.desktop().pointer() == gemui::Pointer::Hand);
+    w.desktop().mouseDrag(cell(w, 5, 5), {});
+    CHECK(w.desktop().pointer() == gemui::Pointer::Hand);
+    w.desktop().mouseUp(cell(w, 5, 5), {});
+    CHECK(h.state.seq.cur().lane(0).pat[5] == 7);  // moved
+    CHECK(w.desktop().pointer() == gemui::Pointer::Pencil);
+    // On an empty cell the pencil draws: no hand.
+    w.desktop().mouseMove(cell(w, 9, 8), {});
+    w.desktop().mouseDown(cell(w, 9, 8), gemui::MouseButton::Left, {});
+    CHECK(w.desktop().pointer() == gemui::Pointer::Pencil);
+    w.desktop().mouseUp(cell(w, 9, 8), {});
 }
 
 TEST_CASE("Piano roll: a drag from a selected note moves the whole selection (item 147)", "[ui][seq][pianoroll]") {

@@ -153,14 +153,35 @@ bool Pattern::migrateTempo() {
     return any;
 }
 
+namespace {
+
+// Whether a note tied (TIE, not SLD) from an earlier step of the track can go on through step s: tied from a step
+// before it, or from the end of the loop when the steps from 0 to s are all tied.
+bool tieCrosses(const ymengine::SeqLane& l, int s) {
+    if (l.pat[size_t(s)] >= 0 || !l.tie[size_t(s)]) return false;
+    for (int k = s - 1; k >= 0; --k) {
+        if (l.pat[size_t(k)] >= 0) return l.tie[size_t(k)] && !l.slide[size_t(k)];
+        if (!l.tie[size_t(k)]) return false;
+    }
+    return true;
+}
+
+}  // namespace
+
 bool migrateArpFlags(ymengine::SeqLane& l) {
     if (std::none_of(l.afl.begin(), l.afl.end(), [](uint8_t f) { return f != 0; })) return false;
     using ymengine::SeqCmd;
-    if (!l.afl[0]) l.setCmd(0, ymengine::seqCmd(SeqCmd::Arpeggiator, 0));
+    // The switch that the Jxx written so far leave; at step 0, that of the end of the loop, unknown.
+    enum { Off, On, Unknown } on = Unknown;
     for (int s = 0; s < kSteps; ++s) {
-        const bool on = l.afl[size_t(s)] != 0, before = s > 0 && l.afl[size_t(s - 1)] != 0;
-        if (on && !before) l.setCmd(s, ymengine::seqCmd(SeqCmd::Arpeggiator, 1));
-        if (!on && before) l.setCmd(s, ymengine::seqCmd(SeqCmd::Arpeggiator, 0));
+        const bool lit = l.afl[size_t(s)] != 0;
+        if (lit && on != On) {
+            l.setCmd(s, ymengine::seqCmd(SeqCmd::Arpeggiator, 1));
+            on = On;
+        } else if (!lit && on != Off && !tieCrosses(l, s)) {  // an unlit flag left the arpeggio of a tied note running
+            l.setCmd(s, ymengine::seqCmd(SeqCmd::Arpeggiator, 0));
+            on = Off;
+        }
     }
     l.afl.fill(0);
     return true;

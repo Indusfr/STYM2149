@@ -1,5 +1,5 @@
-// STYM2149 — pictograms of the prototype rasterised without antialiasing (Fuji logo, R13 envelope shapes, tools,
-// transport, note figures and cursors of the sequencer)
+// STYM2149 — pictograms of the prototype rasterised without antialiasing (R13 envelope shapes, tools, transport,
+// note figures and cursors of the sequencer)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -9,6 +9,7 @@
 // The prototype draws these pictograms as antialiased SVG (paths and 1.6 px strokes). The style guide
 // (STYM2149_SPEC.md §6.1) forbids antialiasing: each SVG is rasterised by Chromium with shape-rendering="crispEdges"
 // (a pixel is lit when its centre is inside the shape), at its display size, then written as bits (bit 7 = column 0).
+// The Atari logo of the menu bar no longer comes from the prototype: tools/fuji/fuji.py writes it (24/10/2026, D-404).
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -20,9 +21,6 @@ if (!html) {
 }
 const src = readFileSync(html, 'utf8');
 
-// Fuji logo of the menu bar (span#mFuji).
-const fujiMatch = src.match(/<span class="fuji" id="mFuji">(<svg[^]*?<\/svg>)/);
-if (!fujiMatch) throw new Error('Fuji logo not found');
 // Envelope shapes (SHAPE_SVG array).
 const shapeBlock = src.match(/const SHAPE_SVG = \[([^]*?)\];/);
 if (!shapeBlock) throw new Error('SHAPE_SVG not found');
@@ -46,8 +44,17 @@ const transport = literal(/const ICONS = (\{[^]*?\n\});/, 'ICONS');
 // it is rasterised.
 const figSrc = src.match(/const NG = \{[^]*?\n\};\nfunction figIcon\(kind\)\{[^]*?\n\}/);
 if (!figSrc) throw new Error('figIcon not found');
-const figIcon = new Function(figSrc[0] + '\nreturn figIcon;')();
-const figNames = ['Step', '1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/4.', '1/8.', '1/16.', '1/4T', '1/8T', '1/16T'];
+// The sixty-fourth note of the 1/64 resolution (D-422), which the prototype does not draw: its four flags from the
+// top of the box, the head and the stem one unit lower (14 instead of 13), the last flag clear of the head.
+const { figIcon: protoFigIcon, NG } = new Function(figSrc[0] + '\nreturn { figIcon, NG };')();
+// The thirty-second-note triplet of the 1/32T resolution (D-433), which it does not draw either: its 1/32 with the "3"
+// of its triplets.
+const figIcon = kind => kind === '1/32T' ? protoFigIcon('1/32').replace('</svg>', NG.tri() + '</svg>')
+  : kind !== '1/64' ? protoFigIcon(kind)
+  : '<svg viewBox="0 0 22 18" xmlns="http://www.w3.org/2000/svg">' + NG.head(7, 14) +
+    '<rect x="9.4" y="0" width="1.3" height="14"/>' + NG.flag(7, 11, 4) + '</svg>';
+const figNames = ['Step', '1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64', '1/4.', '1/8.', '1/16.', '1/4T', '1/8T',
+                  '1/16T', '1/32T'];
 const sized = (svg, n, h = n) => svg.replace('<svg', `<svg width='${n}' height='${h}'`);
 const seqIcons = [
   ...tools.map(([id, , svg]) => ['kTool_' + id, sized(svg, 15)]),
@@ -114,7 +121,7 @@ const rasters = await page.evaluate(async (svgs) => {
     out.push({ w, h, rows, grey });
   }
   return out;
-}, [fujiMatch[1], ...shapes, ...seqIcons.map(i => i[1])]);
+}, [...shapes, ...seqIcons.map(i => i[1])]);
 const cursorRasters = await page.evaluate(async (svgs) => {
   const out = [];
   for (const s of svgs) {
@@ -146,7 +153,7 @@ const cursorRasters = await page.evaluate(async (svgs) => {
 }, cursors.map(([, c]) => c.svg));
 await browser.close();
 
-const names = ['kFuji', ...shapes.map((_, i) => 'kShape' + i), ...seqIcons.map(i => i[0])];
+const names = [...shapes.map((_, i) => 'kShape' + i), ...seqIcons.map(i => i[0])];
 rasters.forEach((r, i) => {
   if (r.grey) throw new Error(names[i] + ': antialiased (' + r.grey + ' grey pixels), crispEdges ignored');
 });
@@ -188,10 +195,9 @@ const emit = (name, r) => {
   for (let y = 0; y < r.h; y++) lines.push('    ' + b.slice(y * per, (y + 1) * per).map(hex).join(', ') + ',');
   lines.push('};');
 };
-emit('kFujiBits', rasters[0]);
-rasters.slice(1, 17).forEach((r, i) => emit('kShape' + i.toString(16).toUpperCase() + 'Bits', r));
+rasters.slice(0, 16).forEach((r, i) => emit('kShape' + i.toString(16).toUpperCase() + 'Bits', r));
 const camel = id => id.split('_').map((w, i) => i ? w[0].toUpperCase() + w.slice(1) : w).join('');
-seqIcons.forEach(([id], i) => emit(camel(id) + 'Bits', rasters[17 + i]));
+seqIcons.forEach(([id], i) => emit(camel(id) + 'Bits', rasters[16 + i]));
 cursors.forEach(([id], i) => {
   emit(id + 'Ink', cursorRasters[i].ink);
   emit(id + 'Mask', cursorRasters[i].mask);
@@ -199,17 +205,16 @@ cursors.forEach(([id], i) => {
 lines.push('');
 lines.push('}  // namespace');
 lines.push('');
-const f = rasters[0], s = rasters[1];
-lines.push(`const gemui::Bitmap kFuji{${f.w}, ${f.h}, kFujiBits};`);
+const s = rasters[0];
 lines.push('const std::array<gemui::Bitmap, 16> kShapes = {{');
 for (let i = 0; i < 16; i++) lines.push(`    {${s.w}, ${s.h}, kShape${i.toString(16).toUpperCase()}Bits},`);
 lines.push('}};');
 seqIcons.forEach(([id], i) => {
   if (id.startsWith('kFig_')) return;
-  const r = rasters[17 + i];
+  const r = rasters[16 + i];
   lines.push(`const gemui::Bitmap ${camel(id)}{${r.w}, ${r.h}, ${camel(id)}Bits};`);
 });
-const figs = seqIcons.map(([id], i) => [id, rasters[17 + i]]).filter(([id]) => id.startsWith('kFig_'));
+const figs = seqIcons.map(([id], i) => [id, rasters[16 + i]]).filter(([id]) => id.startsWith('kFig_'));
 lines.push(`const std::array<gemui::Bitmap, ${figs.length}> kFigures = {{`);
 for (const [id, r] of figs) lines.push(`    {${r.w}, ${r.h}, ${camel(id)}Bits},`);
 lines.push('}};');

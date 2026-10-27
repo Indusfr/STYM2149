@@ -52,7 +52,7 @@ Run once, with `STYM2149.exe` from the same installer.
 | # | Step | Expected |
 |---|---|---|
 | S1 | **Devices.** Options > Audio/MIDI settings: pick the sound card and a MIDI keyboard, play. | Sound and MIDI work; after quitting and relaunching, the same devices are selected. |
-| S2 | **Session kept.** Write a pattern, set Options > Zoom to 150 % and Options > Tooltips > Language to Français. Quit with File > Quit > OK, relaunch. Then do the same with the window's close box. | Both times the pattern, the zoom and the tooltip language come back: the app saves its state when it quits and reopens it (P415), and the preferences are not lost. |
+| S2 | **Session kept.** Write a pattern, resize the window and set Language to Français in Options > Settings. Quit with File > Quit > OK, relaunch. Then do the same with the window's close box. | Both times the pattern, the window size and the tooltip language come back: the app saves its state when it quits and reopens it (P415), and the preferences are not lost. |
 | S3 | **Files.** Look in `%APPDATA%\STYM2149`. | `Preferences.settings` (zoom, tooltip language...) and `STYM2149.settings` (devices and session of the app) are both there. |
 | S4 | **MIDI clock** (needs a program or device that sends MIDI clock, for example a DAW's MIDI clock output through a virtual MIDI port; skip if none). Pick that port as MIDI input, set Clock to MIDI ext (main window, SYSTEM), press Play in the Step Sequencer, then start, stop and continue the clock source at two tempos. | The BPM slider is greyed; the sequencer waits for Start, follows the source's tempo, stops and continues with it (D-188). |
 

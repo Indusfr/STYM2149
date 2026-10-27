@@ -22,16 +22,17 @@ using namespace stym;
 namespace {
 // Tolerated deviation per channel (out of 255): absorbs the blending roundings of the opacity groups.
 constexpr int kTolerance = 4;
-// Reference area of the budgets: the M4 desktop (1016 × 944). The desktop widened to 1272 px (D-067) only adds
-// background columns, always identical: measuring the deviations against the whole image would loosen the test by a
-// quarter.
+// Reference area of the budgets: the M4 desktop (1016 × 944). The desktop widened to 1272 px (D-067), then to
+// 1344 × 984 (D-461), only adds background, always identical: measuring the deviations against the whole image would
+// loosen the test by more than a third.
 constexpr long kBudgetArea = 1016L * 944L;
 }  // namespace
 
 TEST_CASE("Windows match the prototype's screenshots (deviation < 1 %, 2 % for a floating window)", "[visual]") {
     // orn, orn_on (D-240), menu_source (D-246), arp_midi (D-290), sync (D-297), mixer, mixer_3ch and mixer_scope
-    // (D-300), menu_file, menu_edit, menu_options and menu_fuji (D-302) in the STYM2149 scenes.
-    REQUIRE(gemshot::sceneNames().size() == 33);
+    // (D-300), menu_file, menu_edit, menu_options and menu_fuji (D-302), seq and seq_demo (D-458) in the STYM2149
+    // scenes.
+    REQUIRE(gemshot::sceneNames().size() == 31);
     for (const std::string& name : gemshot::sceneNames()) {
         CAPTURE(name);
         tools::Image ref;
@@ -148,8 +149,11 @@ TEST_CASE("Windows specific to STYM2149 identical to their reference rendering",
     // deviation is a change to review.
     // arp_midi (D-290), lfo_shapes (D-291), mixer_dual (D-284), sync (D-297), mixer, mixer_3ch, mixer_scope (D-300),
     // echo_delay, echo_3ch (D-299), desk, menu_file, menu_edit, menu_options, menu_fuji (D-302, D-303), echo_buzzer3
-    // (D-316), seq_cmd_box (D-330), seq_cmd_plugin, seq_env_menu (D-342, D-347)
-    REQUIRE(gemshot::stymSceneNames().size() == 47);
+    // (D-316), seq_cmd_box (D-330), seq_cmd_plugin, seq_env_menu (D-342, D-347), seq_step_sid, seq_step_buzzer,
+    // seq_step_source, seq_step_env (D-392), seq_vol_slide (D-393), seq_cmd_curve (D-394), sid_square, sid_sine (D-406
+    // to D-408), sid_form_menu (D-411), sid_bounce (D-414), mixer_type (D-415), regs_off (D-436),
+    // settings_discard (D-437), note_off (D-442), seq_fit (D-448), seq and seq_demo (D-458), orn_dma (D-463)
+    REQUIRE(gemshot::stymSceneNames().size() == 66);
     for (const std::string& name : gemshot::stymSceneNames()) {
         CAPTURE(name);
         tools::Image ref;

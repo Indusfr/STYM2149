@@ -1,13 +1,14 @@
-// STYM2149 — Options > Sound engine: entries greyed out according to the machine (STE hardware with Computer ST,
-// D-206; ZX Spectrum and Amstrad CPC clocks and Free timer in Authentic 3ch, D-207; Custom clock outside 16 ch,
-// D-237), with their reason, values already chosen kept and listed by the CHIP monitor; the Custom clock's prompt box,
-// in MHz (D-239); no Arp division (D-357).
+// STYM2149 — Sound engine settings, in the Settings window since D-430 (Options > Sound engine before): entries
+// greyed out according to the machine (STE hardware with Computer ST, D-206; ZX Spectrum and Amstrad CPC clocks and
+// Free timer in Authentic 3ch, D-207; Custom clock outside 16 ch, D-237), with their reason, values already chosen
+// kept and listed by the CHIP monitor; the Custom clock's prompt box, in MHz (D-239); no Arp division (D-357).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "UiHost.h"
@@ -38,13 +39,15 @@ int indexOf(const std::vector<gemui::MenuItem>& items, const std::string& label)
     return -1;
 }
 
-// Entries of Options > Sound engine, as the menu builds them.
+// The settings of the former Options > Sound engine submenu, from the Settings window (D-430): the SOUND ENGINE frame
+// (Tuning A4 aside, a typed value) and the MIDI frame, each as the submenu that held it.
 std::vector<gemui::MenuItem> soundEngine(pluginui::MainWindow& w) {
-    w.openMenu(3);
-    const auto& items = topList(w).items();
-    std::vector<gemui::MenuItem> sub = items[size_t(indexOf(items, "Sound engine"))].sub;
-    w.desktop().closePopups();
-    return sub;
+    std::vector<gemui::MenuItem> out;
+    for (const std::string_view id : pluginui::SettingsWindow::menuIds()) {
+        out.push_back(setting(w, id));
+        if (id == "setWheel") break;
+    }
+    return out;
 }
 
 const gemui::MenuItem& entry(const std::vector<gemui::MenuItem>& items, const std::string& label) {
@@ -121,22 +124,15 @@ TEST_CASE("Sound engine: STE output chain, bass and treble greyed out with Compu
     CHECK(dma.why == "STE only: set Computer to STE");
     w.desktop().closePopups();
 
-    // Hovering the greyed-out STE bass does not open its submenu; a click neither.
-    w.openMenu(3);
-    {
-        const gemui::MenuList& options = topList(w);
-        const gemui::Rect r = options.itemRect(indexOf(options.items(), "Sound engine"));
-        w.desktop().mouseMove(centre(r), {});
-    }
-    const gemui::MenuList& engine = topList(w);
-    REQUIRE(engine.items().front().label == "Computer");
-    const gemui::Rect bass = engine.itemRect(indexOf(engine.items(), "STE bass"));
-    press(w, centre(bass));
-    CHECK(w.desktop().topPopup() == &engine);
-    CHECK(engine.tipAt(centre(bass)) == "STE only: set Computer to STE");
-    const gemui::Rect clock = engine.itemRect(indexOf(engine.items(), "Chip clock"));
-    w.desktop().mouseMove(centre(clock), {});
-    CHECK(w.desktop().topPopup() != &engine);  // an available submenu opens
+    // A click on the greyed-out STE bass opens no menu, its tooltip tells why; Chip clock opens its own.
+    w.settingsWindow().show();
+    click(w, "setBass");
+    CHECK_FALSE(w.desktop().hasPopups());
+    CHECK(w.settingsWindow().button("setBass")->tip() == "STE only: set Computer to STE");
+    CHECK(w.settingsWindow().button("setBass")->text() == "+4 dB");  // the value chosen before, shown
+    click(w, "setClock");
+    REQUIRE(w.desktop().hasPopups());
+    CHECK(topList(w).items().size() == 4);
     w.desktop().closePopups();
 
     // Computer STE: everything available.
@@ -275,6 +271,7 @@ TEST_CASE("Sound engine: Custom clock typed in MHz in a prompt box, in 16 ch onl
     CHECK(h.p(Global::ChipClockHz) == 2457600.0f);
     CHECK(h.p(Global::ChipClock) == 0.0f);
     CHECK(custom().label == "Custom 2.4576 MHz...");
+    CHECK(w.settingsWindow().button("setClock")->text() == "Custom 2.4576 MHz");  // the entry, without its "..."
     CHECK(plugin::chipClock(h.values).hz() == 2457600.0);
     CHECK(has(chipAlert(w), "Chip clock Custom 2.4576 MHz is not an Atari clock"));
 
@@ -330,7 +327,7 @@ TEST_CASE("Sound engine: Custom clock typed in MHz in a prompt box, in 16 ch onl
     }
 }
 
-TEST_CASE("Sound engine: no Arp division, set in the Arpeggiator window (twelfth DAW test, item 148, D-357)",
+TEST_CASE("Settings: no Arp division, set in the Arpeggiator window (twelfth DAW test, item 148, D-357)",
           "[ui][menu]") {
     UiHost h;
     pluginui::MainWindow w(h);

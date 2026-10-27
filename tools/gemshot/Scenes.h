@@ -69,7 +69,7 @@ struct Dim {
 // plugin reads them from the folder the installers fill. Every scene has them.
 std::vector<pluginui::Host::TextFile> installedLanguages();
 
-// Rendering of a scene (1272 × 944 desktop, empty image if the scene is unknown), its ignored, shifted and dimmed
+// Rendering of a scene (1344 × 984 desktop, empty image if the scene is unknown), its ignored, shifted and dimmed
 // zones.
 struct Shot {
     tools::Image image;

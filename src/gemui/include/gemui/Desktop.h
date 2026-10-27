@@ -7,7 +7,8 @@
 //   (WindowFrame) are stacked: a press in one brings it in front of the others (the prototype's focusWin);
 // - the drop-down menus, owned by the desktop, closed by a press outside them;
 // - the modal boxes (alerts), owned by the desktop, each on a 25 % black veil that covers everything below it (the
-//   prototype's #msgWin); only the last one receives mouse and keyboard.
+//   prototype's #msgWin); only the last one receives mouse and keyboard, apart from the menus opened over it (a menu of
+//   a box, such as the Curve menu of the Commands box), which come above it until they close.
 // The desktop only knows logical pixels and a time in milliseconds given by the caller (tick): it does not depend on
 // any window system.
 // Cycle of the host (StymEditor, gemshot, the tests), all on one thread: it forwards the input events, calls tick()
@@ -46,7 +47,9 @@ public:
     void setWorkTop(int y) noexcept { workTop_ = y; }
     int workTop() const noexcept { return workTop_; }
 
-    // Drop-down menus: the desktop takes the menu and shows it above those already open; closing destroys it.
+    // Drop-down menus: the desktop takes the menu and shows it above those already open; closing destroys it. A menu
+    // opened while a modal box is open lies over that box and takes the mouse before it (24/10/2026, D-394); closing
+    // the box closes it.
     Widget& openPopup(std::unique_ptr<Widget> popup);
     void closePopup(Widget& popup);  // also closes those opened after it
     void closePopups();
@@ -161,7 +164,12 @@ private:
     Widget* target(Point p) const;
     // Widget whose tooltip shows at p (a disabled widget still shows its own).
     Widget* tipTarget(Widget& w, Point p) const;
+    // Over the open menus that take the mouse: those over the top modal box, or all of them without a box.
     bool insidePopups(Point p) const;
+    // Menu i is over the top modal box (or there is none): it takes the mouse and Esc.
+    bool activePopup(size_t i) const noexcept { return popupLevel_[i] == modals_.size(); }
+    // First of those (popups_.size() if none): they are the last ones opened.
+    size_t firstActivePopup() const noexcept;
     // Sends mouseExit / mouseEnter when the widget under the pointer (or holding the mouse) changes.
     void updateHover(Point p);
     void hideTip();
@@ -176,6 +184,7 @@ private:
     Widget* root_ = nullptr;
     int workTop_ = 0;
     std::vector<std::unique_ptr<Widget>> popups_, modals_;
+    std::vector<size_t> popupLevel_;  // for each menu, the number of modal boxes open when it opened
     std::vector<const Widget*> overlays_;
     std::vector<Timer> timers_;
     TimerId nextTimer_ = 1;

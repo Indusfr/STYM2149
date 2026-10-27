@@ -131,80 +131,88 @@ TEST_CASE("Digidrum: slot settings brought back into their ranges", "[digidrum][
     d.rateHz = 1e9;
     d.root = 200;
     d.cents = -500;
-    d.loopStart = 900000;
-    d.loopEnd = 800000;
+    d.start = 900000;
+    d.end = 800000;
     e.setDigidrumSlot(1, d);
     const ymengine::DigidrumSlot& g = e.digidrumSlot(1);
     CHECK(g.rateHz == ymengine::kDigidrumRateMax);
     CHECK(g.root == 127);
     CHECK(g.cents == -ymengine::kDigidrumCentsMax);
-    CHECK(g.loopEnd == Engine::kMaxUserSample);
-    CHECK(g.loopStart == g.loopEnd);
+    CHECK(g.end == Engine::kMaxUserSample);
+    CHECK(g.start == g.end);
     d.rateHz = NAN;
     e.setDigidrumSlot(1, d);
     CHECK(e.digidrumSlot(1).rateHz == ymengine::kDigidrumRate);
     CHECK(e.digidrumSlot(0) == ymengine::DigidrumSlot{});
 }
 
-TEST_CASE("Digidrum: loop held while the note is held, then the sample plays to the end", "[digidrum][engine]") {
+TEST_CASE("Digidrum: Start to End looped while the note is held, then played on to End (D-154, D-443)",
+          "[digidrum][engine]") {
     Rig rig;
     const uint8_t sample[] = {1, 2, 3, 4, 5, 6};
     rig.e.setUserSample(0, sample);
     ymengine::DigidrumSlot d;
     d.loop = true;
-    d.loopStart = 2;
-    d.loopEnd = 5;  // values 3, 4, 5
+    d.start = 2;
+    d.end = 5;  // values 3, 4, 5
     rig.e.setDigidrumSlot(0, d);
     rig.e.noteOn(0, 60, 127);
     rig.run(4800);  // about 780 timer steps
     const std::vector<int> held = rig.volumes();
     REQUIRE(held.size() > 100);
-    CHECK(std::vector<int>(held.begin(), held.begin() + 9) == std::vector<int>{1, 2, 3, 4, 5, 3, 4, 5, 3});
-    for (size_t i = 2; i < held.size(); ++i) {
+    CHECK(std::vector<int>(held.begin(), held.begin() + 7) == std::vector<int>{3, 4, 5, 3, 4, 5, 3});
+    for (size_t i = 0; i < held.size(); ++i) {
         INFO(i);
         CHECK(held[i] >= 3);
         CHECK(held[i] <= 5);
     }
-    // End of the note: the loop stops, the sample plays up to 6, then the channel goes silent.
+    // End of the note: the loop stops, the part plays on to End (5, not the 6 after it), then the channel goes silent.
     const size_t mark = rig.log.size();
     rig.e.noteOff(0, 60);
     rig.run(4800);
     const std::vector<int> tail = rig.volumes(mark);
     REQUIRE(tail.size() >= 2);
-    REQUIRE(tail.size() <= 5);
-    CHECK(tail[tail.size() - 2] == 6);
+    REQUIRE(tail.size() <= 4);
+    CHECK(tail[tail.size() - 2] == 5);
     CHECK(tail.back() == 0);
     CHECK(rig.e.activeVoices() == 0);
 }
 
-TEST_CASE("Digidrum: invalid or cut loop, the sample plays once", "[digidrum][engine]") {
+TEST_CASE("Digidrum: Start and End, the part played without Loop (D-443)", "[digidrum][engine]") {
     const uint8_t sample[] = {1, 2, 3, 4};
-    for (const auto& [start, end] : {std::pair<uint32_t, uint32_t>{2, 2}, {1, 9}, {0, 0}}) {
+    struct Case {
+        uint32_t start, end;
+        std::vector<int> played;
+    };
+    // End 0 or past the sample: to its end; Start not before End: from the beginning.
+    const Case cases[] = {{1, 3, {2, 3, 0}}, {0, 0, {1, 2, 3, 4, 0}}, {2, 9, {3, 4, 0}}, {2, 2, {1, 2, 0}},
+                          {3, 4, {4, 0}}};
+    for (const Case& c : cases) {
         Rig rig;
         rig.e.setUserSample(0, sample);
         ymengine::DigidrumSlot d;
-        d.loop = true;
-        d.loopStart = start;
-        d.loopEnd = end;
+        d.start = c.start;
+        d.end = c.end;
         rig.e.setDigidrumSlot(0, d);
         rig.e.noteOn(0, 60, 127);
         rig.run(4800);
-        INFO(start << " " << end);
-        CHECK(rig.volumes() == std::vector<int>{1, 2, 3, 4, 0});
+        INFO(c.start << " " << c.end);
+        CHECK(rig.volumes() == c.played);
     }
-    // Loop defined but Loop off: once.
+    // Loop on with End never set: the whole sample loops.
     Rig rig;
     rig.e.setUserSample(0, sample);
     ymengine::DigidrumSlot d;
-    d.loopStart = 1;
-    d.loopEnd = 3;
+    d.loop = true;
     rig.e.setDigidrumSlot(0, d);
     rig.e.noteOn(0, 60, 127);
     rig.run(4800);
-    CHECK(rig.volumes() == std::vector<int>{1, 2, 3, 4, 0});
+    const std::vector<int> held = rig.volumes();
+    REQUIRE(held.size() > 8);
+    CHECK(std::vector<int>(held.begin(), held.begin() + 8) == std::vector<int>{1, 2, 3, 4, 1, 2, 3, 4});
 }
 
-TEST_CASE("Digidrum: preview of a slot at its rate, through the level table of the chip", "[digidrum][engine]") {
+TEST_CASE("Digidrum: preview at the slot rate from Start to End, through the chip level table", "[digidrum][engine]") {
     Engine e;
     ymengine::EngineConfig c;
     c.render.hostRate = 48000;
@@ -222,11 +230,89 @@ TEST_CASE("Digidrum: preview of a slot at its rate, through the level table of t
     CHECK(peakOf(l, 0, 4700) > 0.2);
     CHECK(peakOf(l, 4900, 9600) < 1e-6);
     CHECK(l == r);
+    // The preview plays the part from Start to End (D-443): 390 values, i.e. 2400 samples.
+    d.start = 195;
+    d.end = 585;
+    e.setDigidrumSlot(4, d);
+    std::fill(l.begin(), l.end(), 0.0f);
+    e.digidrumPreview(0, 4);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(peakOf(l, 0, 2300) > 0.2);
+    CHECK(peakOf(l, 2500, 9600) < 1e-6);
     // Empty slot: nothing.
     std::fill(l.begin(), l.end(), 0.0f);
     e.digidrumPreview(0, 5);
     e.render(l.data(), r.data(), 9600);
     CHECK(peakOf(l, 0, 9600) < 1e-6);
+}
+
+TEST_CASE("Digidrum: the preview starts and ends at the level of silence, without a click (Indus, 26/10/2026, D-455)",
+          "[digidrum][engine]") {
+    Engine e;
+    ymengine::EngineConfig c;
+    c.render.hostRate = 48000;
+    e.prepare(c);
+    // A hit that ends silent: 8 is the Linear value of a source byte 0.
+    std::vector<uint8_t> s(780, 8);
+    for (size_t i = 0; i < 100; ++i) s[i] = uint8_t(i % 2 ? 15 : 0);
+    e.setUserSample(4, s);
+    ymengine::DigidrumSlot d;
+    d.rateHz = 7800;
+    e.setDigidrumSlot(4, d);
+    std::vector<float> l(9600), r(9600);
+    e.digidrumPreview(0, 4);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(peakOf(l, 0, 600) > 0.2);
+    CHECK(peakOf(l, 700, 9600) < 1e-6);  // the silent tail and the end: 0, no step
+    // The rest value follows the conversion.
+    plugin::DigidrumSlotState st;
+    CHECK(plugin::digidrumEngineSlot(st).rest == 8);
+    st.convert = plugin::DigiConvert::YmLevels;
+    st.play.rateHz = 11025;
+    const ymengine::DigidrumSlot ym = plugin::digidrumEngineSlot(st);
+    const int8_t zero = 0;
+    CHECK(ym.rest == plugin::digidrumNibbles(std::span<const int8_t>(&zero, 1), plugin::DigiConvert::YmLevels)[0]);
+    CHECK(ym.rateHz == 11025);
+}
+
+TEST_CASE("Digidrum: with Loop on, the preview repeats the part until stopped or Loop goes off (Indus, 26/10/2026, "
+          "D-449)", "[digidrum][engine]") {
+    Engine e;
+    ymengine::EngineConfig c;
+    c.render.hostRate = 48000;
+    e.prepare(c);
+    std::vector<uint8_t> s(780);
+    for (size_t i = 0; i < s.size(); ++i) s[i] = uint8_t(i % 2 ? 15 : 0);
+    e.setUserSample(4, s);
+    ymengine::DigidrumSlot d;
+    d.rateHz = 7800;
+    d.loop = true;
+    d.start = 195;
+    d.end = 585;  // 390 values: 2400 samples at 48 kHz
+    e.setDigidrumSlot(4, d);
+    std::vector<float> l(9600), r(9600);
+    e.digidrumPreview(0, 4);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(peakOf(l, 9000, 9600) > 0.2);  // four times the part later, it still sounds
+    CHECK(e.digidrumPreviewSlot() == 4);
+    e.digidrumStopPreview(0);
+    std::fill(l.begin(), l.end(), 0.0f);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(peakOf(l, 0, 9600) < 1e-6);
+    CHECK(e.digidrumPreviewSlot() == -1);
+    // Loop switched off while it loops: silent from the next block.
+    e.digidrumPreview(0, 4);
+    e.render(l.data(), r.data(), 4800);
+    d.loop = false;
+    e.setDigidrumSlot(4, d);
+    std::fill(l.begin(), l.end(), 0.0f);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(peakOf(l, 0, 9600) < 1e-6);
+    CHECK(e.digidrumPreviewSlot() == -1);
+    // Loop off: once, as before.
+    e.digidrumPreview(0, 4);
+    e.render(l.data(), r.data(), 9600);
+    CHECK(e.digidrumPreviewSlot() == -1);
 }
 
 // ------------------------------------------------------------------------------------------------ plugin state
@@ -242,8 +328,8 @@ TEST_CASE("Digidrum: DIGS chunk of the state, absent by default, read back ident
     a.play.root = 48;
     a.play.cents = -12.5;
     a.play.loop = true;
-    a.play.loopStart = 10;
-    a.play.loopEnd = 300;
+    a.play.start = 10;
+    a.play.end = 300;
     a.convert = DigiConvert::YmLevels;
     a.source = {1, -2, 3, -128, 127};
     st.extras.digiSlots[7].name = "x";
@@ -263,8 +349,8 @@ TEST_CASE("Digidrum: out-of-range settings brought back, name cleaned", "[digidr
     s.play.rateHz = 100;
     s.play.root = 250;
     s.play.cents = NAN;
-    s.play.loopStart = 70000;
-    s.play.loopEnd = 90000;
+    s.play.start = 70000;
+    s.play.end = 90000;
     s.convert = DigiConvert(7);
     s.source.assign(Engine::kMaxUserSample + 10, 1);
     sanitize(n);
@@ -272,8 +358,8 @@ TEST_CASE("Digidrum: out-of-range settings brought back, name cleaned", "[digidr
     CHECK(s.play.rateHz == ymengine::kDigidrumRateMin);
     CHECK(s.play.root == 127);
     CHECK(s.play.cents == 0);
-    CHECK(s.play.loopEnd == Engine::kMaxUserSample);
-    CHECK(s.play.loopStart == Engine::kMaxUserSample);
+    CHECK(s.play.end == Engine::kMaxUserSample);
+    CHECK(s.play.start == Engine::kMaxUserSample);
     CHECK(s.convert == DigiConvert::YmLevels);
     CHECK(s.source.size() == Engine::kMaxUserSample);
     CHECK(cleanDigidrumName("   ").empty());
@@ -443,8 +529,8 @@ TEST_CASE("Digidrum: named banks, read back identically, tolerant reading", "[di
     CHECK(o.slots[0].play.root == 0);
     CHECK(o.slots[0].play.cents == ymengine::kDigidrumCentsMax);
     CHECK(o.slots[0].play.loop);
-    CHECK(o.slots[0].play.loopEnd == 20);
-    CHECK(o.slots[0].play.loopStart == 20);
+    CHECK(o.slots[0].play.end == 20);
+    CHECK(o.slots[0].play.start == 20);
     CHECK(o.slots[0].convert == DigiConvert::YmLevels);
     CHECK(o.nibbles[0] == std::vector<uint8_t>{0, 1, 15, 15});
     CHECK(o.slots[0].source == std::vector<int8_t>{-1});

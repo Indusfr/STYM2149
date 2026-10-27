@@ -7,7 +7,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
 #include <array>
+#include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -38,9 +40,29 @@ TEST_CASE("ymseq: scales, figures, bars and names", "[ymseq]") {
     // Figures: 1 step for Step, otherwise round(beats × steps per quarter note), at least 1.
     CHECK(figureSteps(0, 2) == 1);
     CHECK(figureSteps(1, 2) == 16);  // whole note in 1/16
-    CHECK(figureSteps(10, 2) == 3);  // quarter-note triplet in 1/16: round(2.67)
+    CHECK(figureSteps(11, 2) == 3);  // quarter-note triplet in 1/16: round(2.67)
     CHECK(figureSteps(6, 0) == 1);   // thirty-second note in 1/4: round(0.125) → 1
-    CHECK(figureSteps(9, 2) == 2);   // dotted sixteenth in 1/16: round(1.5) = 2 (JavaScript rounding)
+    CHECK(figureSteps(10, 2) == 2);  // dotted sixteenth in 1/16: round(1.5) = 2 (JavaScript rounding)
+    // 1/64 (D-422): the figure after 1/32, the resolution after the triplets (index 7, 16 steps per quarter note).
+    CHECK(kFigures[7].name == "1/64");
+    CHECK(kFigures[8].name == "1/4.");
+    CHECK(kResolutions[7].label == "1/64");
+    CHECK(figureSteps(7, 7) == 1);   // sixty-fourth note in 1/64
+    CHECK(figureSteps(6, 7) == 2);   // thirty-second note in 1/64
+    CHECK(figureSteps(1, 7) == 64);  // whole note in 1/64
+    CHECK(figureSteps(7, 2) == 1);   // sixty-fourth note in 1/16: round(0.25) → 1
+    CHECK(beatSteps(2, 7) == 16);
+    CHECK(barSteps(2, 7) == 64);   // 4/4 in 1/64
+    CHECK(barSteps(7, 7) == 48);   // 6/8 in 1/64: 6 × 8
+    // 1/32T (D-433): the last figure and the last resolution (index 8, 12 steps per quarter note).
+    CHECK(kFigures[14].name == "1/32T");
+    CHECK(kResolutions[8].label == "1/32T");
+    CHECK(figureSteps(14, 8) == 1);   // thirty-second-note triplet in 1/32T
+    CHECK(figureSteps(13, 8) == 2);   // sixteenth-note triplet in 1/32T
+    CHECK(figureSteps(3, 8) == 12);   // quarter note in 1/32T
+    CHECK(beatSteps(2, 8) == 12);
+    CHECK(barSteps(2, 8) == 48);   // 4/4 in 1/32T
+    CHECK(barSteps(7, 8) == 36);   // 6/8 in 1/32T: 6 × 6
     CHECK(beatSteps(2, 2) == 4);
     CHECK(beatSteps(7, 2) == 2);  // 6/8: eighth note
     CHECK(barSteps(7, 2) == 12);
@@ -65,6 +87,32 @@ TEST_CASE("ymseq: scales, figures, bars and names", "[ymseq]") {
     CHECK(euclidName(3, 8) == "Tresillo");
     CHECK(euclidName(5, 16) == "Bossa-Nova");
     CHECK(euclidName(4, 16).empty());
+}
+
+TEST_CASE("ymseq: figures that fit a resolution, a whole number of steps (D-425)", "[ymseq]") {
+    // One row per resolution (saved index), one column per figure: Step, 1/1 to 1/64, 1/4. 1/8. 1/16., 1/4T 1/8T 1/16T
+    // 1/32T.
+    const std::array<std::string_view, kResolutionCount> fits = {
+        "111100000000000",  // 1/4
+        "111110001000000",  // 1/8
+        "111111001100000",  // 1/16
+        "111111101110000",  // 1/32
+        "111000000001000",  // 1/4T: a quarter note lasts a step and a half
+        "111100000001100",  // 1/8T
+        "111110001001110",  // 1/16T
+        "111111111110000",  // 1/64
+        "111111001101111",  // 1/32T (D-433): a thirty-second note lasts a step and a half
+    };
+    for (int r = 0; r < kResolutionCount; ++r)
+        for (int f = 0; f < kFigureCount; ++f) {
+            INFO(kResolutions[size_t(r)].label << ", " << kFigures[size_t(f)].name);
+            CHECK(figureFits(f, r) == (fits[size_t(r)][size_t(f)] == '1'));
+            // A figure that fits keeps its length; the menu shows the others unrounded.
+            if (figureFits(f, r)) CHECK(figureSteps(f, r) == int(figureStepsExact(f, r) + 0.5));
+        }
+    CHECK(figureStepsExact(0, 0) == 1);
+    CHECK(figureStepsExact(6, 2) == 0.5);   // thirty-second note in 1/16
+    CHECK(figureStepsExact(10, 2) == 1.5);  // dotted sixteenth in 1/16
 }
 
 TEST_CASE("ymseq: absolute notes and octave 0", "[ymseq]") {
@@ -913,6 +961,34 @@ TEST_CASE("ymseq: ARP flags become Jxx switches and back, Txx of the tracks the 
     REQUIRE(migrateArpFlags(f));
     CHECK(f.cmdAt(SeqCmd::Arpeggiator, 0) == on);
     CHECK(f.cmdAt(SeqCmd::Arpeggiator, 1) == off);
+    // A flagged note tied over steps 4 to 7: the flags let its arpeggio run to its end, so J00 waits for step 8, where
+    // J00 would stop it (D-379); a slid note holds its root at an unlit flag, so J00 stays on the step after the run.
+    for (const bool slid : {false, true}) {
+        CAPTURE(slid);
+        Lane t;
+        t.pat[4] = 5;
+        t.tie[4] = !slid;
+        t.slide[4] = slid;
+        t.tie[5] = t.tie[6] = t.tie[7] = 1;
+        t.afl[4] = 1;
+        t.afl[6] = 1;  // a flag inside the note: the arpeggio is already running
+        REQUIRE(migrateArpFlags(t));
+        CHECK(t.cmdAt(SeqCmd::Arpeggiator, 4) == on);
+        CHECK(t.cmdAt(SeqCmd::Arpeggiator, 5) == (slid ? off : 0));
+        CHECK(t.cmdAt(SeqCmd::Arpeggiator, 6) == (slid ? on : 0));
+        CHECK(t.cmdAt(SeqCmd::Arpeggiator, 7) == (slid ? off : 0));
+        CHECK(t.cmdAt(SeqCmd::Arpeggiator, 8) == (slid ? 0 : off));
+    }
+    // Steps 0 and 1 tied: a note tied from the end of the loop may cross them, so the J00 of step 0 waits for step 2.
+    Lane w0;
+    w0.tie[0] = w0.tie[1] = 1;
+    w0.afl[9] = 1;
+    REQUIRE(migrateArpFlags(w0));
+    CHECK(w0.cmdAt(SeqCmd::Arpeggiator, 0) == 0);
+    CHECK(w0.cmdAt(SeqCmd::Arpeggiator, 1) == 0);
+    CHECK(w0.cmdAt(SeqCmd::Arpeggiator, 2) == off);
+    CHECK(w0.cmdAt(SeqCmd::Arpeggiator, 9) == on);
+    CHECK(w0.cmdAt(SeqCmd::Arpeggiator, 10) == off);
 
     Pattern p;
     p.edit(0).setCmd(4, seqCmd(SeqCmd::Tempo, 0x8c));
@@ -927,4 +1003,83 @@ TEST_CASE("ymseq: ARP flags become Jxx switches and back, Txx of the tracks the 
     CHECK(p.lanes[1] == nullptr);  // emptied
     CHECK(p.lanes[2] == nullptr);
     CHECK_FALSE(p.migrateTempo());
+}
+
+TEST_CASE("ymseq: a resolution change fits the notes to the new grid, keeping their time (Indus, 26/10/2026, D-448)",
+          "[ymseq]") {
+    CHECK(fitStep(4, 1, 2) == 2);   // 1/16 to 1/8
+    CHECK(fitStep(3, 1, 2) == 2);   // half up
+    CHECK(fitStep(3, 2, 1) == 6);   // 1/16 to 1/32
+    CHECK(fitStep(4, 3, 4) == 3);   // 1/16 to 1/8T
+    CHECK(fitStep(16, 3, 4) == 12);
+
+    // 1/16: a note at 0 held 4 steps (VOL 9), one at 4 held 2 with a chord voice of 3 steps, one at 6 (INS 3), a CMD
+    // on a held step (2) and a VOL on an empty one (12).
+    Lane l;
+    l.pat[0] = 0;
+    l.vol[0] = 9;
+    for (int s = 0; s < 4; ++s) l.tie[size_t(s)] = 1;
+    l.pat[4] = 5;
+    l.tie[4] = l.tie[5] = 1;
+    l.vpat[0][4] = 9;
+    l.vdur[0][4] = 3;
+    l.pat[6] = 7;
+    l.ins[6] = 3;
+    l.setCmd(2, stym::ymengine::seqCmd(stym::ymengine::SeqCmd::Retrig, 4));
+    l.vol[12] = 4;
+
+    const Lane half = fitLane(l, 1, 2);
+    CHECK(half.pat[0] == 0);
+    CHECK(half.vol[0] == 9);
+    CHECK(half.tie[0] == 1);
+    CHECK(half.tie[1] == 1);  // 4 steps → 2
+    CHECK(half.pat[2] == 5);
+    CHECK(half.tie[2] == 0);  // 2 steps → 1
+    CHECK(half.vpat[0][2] == 9);
+    CHECK(half.vdur[0][2] == 2);  // ends at fitStep(7) = 4
+    CHECK(half.pat[3] == 7);      // 6 → 3
+    CHECK(half.ins[3] == 3);
+    CHECK(half.cmdAt(stym::ymengine::SeqCmd::Retrig, 1) != 0);  // 2 → 1, on the held step
+    CHECK(half.vol[6] == 4);
+    for (int s = 7; s < kSteps; ++s) CHECK(half.pat[size_t(s)] < 0);
+
+    const Lane twice = fitLane(l, 2, 1);
+    CHECK(twice.pat[0] == 0);
+    for (int s = 0; s < 8; ++s) CHECK(twice.tie[size_t(s)] == 1);
+    CHECK(twice.tie[8] == 1);  // the note at 8 is held 4 steps
+    CHECK(twice.pat[8] == 5);
+    CHECK(twice.tie[11] == 1);
+    CHECK(twice.vdur[0][8] == 6);
+    CHECK(twice.pat[12] == 7);
+    CHECK(twice.tie[13] == 1);  // one step of 1/16: two of 1/32
+    CHECK(twice.tie[14] == 0);
+    CHECK(twice.vol[24] == 4);
+
+    // Two notes on neighbouring steps at 1/16 to 1/8: the first one stays, the other goes with its step.
+    Lane two;
+    two.pat[1] = 1;
+    two.pat[2] = 2;
+    two.vol[2] = 3;
+    const Lane merged = fitLane(two, 1, 2);
+    CHECK(merged.pat[1] == 1);
+    CHECK(merged.vol[1] == 15);
+    CHECK(merged.pat[2] < 0);
+
+    // The project: every created pattern, its BPM row and length, the tracks' own lengths, the Song's rests.
+    Project p;
+    p.cur().steps = 16;
+    p.cur().lanes[0] = std::make_shared<const Lane>(l);
+    p.cur().bpm[8] = 140;
+    p.tracks[1].length = 12;
+    p.song.entries = {SongEntry{0, 1, 0, SongKind::Pattern, 0, false}, SongEntry::rest(SongKind::Rest, 16)};
+    CHECK(p.hasNotes());
+    p.fitResolution(1, 2);
+    CHECK(p.cur().steps == 8);
+    CHECK(p.cur().bpm[4] == 140);
+    CHECK(p.cur().bpm[8] == 0);
+    CHECK(p.cur().lane(0).pat[2] == 5);
+    CHECK(p.tracks[1].length == 6);
+    CHECK(p.tracks[0].length == 0);  // the pattern's length
+    CHECK(p.song.entries[1].arg == 8);
+    CHECK_FALSE(Project().hasNotes());
 }

@@ -81,12 +81,14 @@ struct Rng64 {
 enum class EventType : uint8_t {
     NoteOn, NoteOff, Bend, Wheel, AllOff, ManualOff, PlayerStart, MidiClock, MidiStart, Mix,
     MidiStop, MidiContinue, MidiSongPosition, SeqPlay, SeqStop, SeqQueue, SeqPreview, SeqSongJump, DrumPreview,
-    DigiPreview,  // preview of a Digidrum slot (M6, B9, D-154)
+    DigiPreview, DigiStop,  // preview of a Digidrum slot (M6, B9, D-154)
     DmaPreview, DmaStop,  // preview of a DMA slot (M6, B8, D-153)
     Program,              // Program Change (M6, B10, D-156)
+    Pressure, NotePressure, MpeBend, MpePressure, MpeSlide,  // MIDI expression (D-432)
 };
 // Event of the next render (Impl::push). a, b and value carry its arguments (note and velocity, pattern, slot, Program
-// Change; semitones of a bend, cents of the wheel, accent of a preview); mix: settings of a Mix event.
+// Change, MPE channel; semitones of a bend, cents of the wheel, accent of a preview, pressure, MPE channel of a note);
+// mix: settings of a Mix event.
 struct Event {
     uint32_t offset = 0;  // sample of the block
     uint32_t order = 0;   // rank of arrival: keeps the order of the events at the same sample
@@ -124,11 +126,13 @@ struct Voice {
     uint8_t noisePeriod = 8, volBase = 13, vol4 = 13, shape = 8, sidMin = 0, slot = 0;
     uint16_t envPeriod = 12800;
     double sidRatio = 1, vibCents = 0, vibHz = 6;
-    // Timer waves (D-151): programmable SID wave (0 steps: square) and Sync Buzzer shapes, position in each;
-    // R13 shape of the track (step at 0, other generators).
+    // Timer waves (D-151): programmable SID wave (0 steps: square) and Sync Buzzer shapes, position in each; R13 shape
+    // of the track (step at 0, other generators). Square of the menu (D-411): sqSteps interrupts per period (0: the
+    // prototype's square, toggled at each one), high over the first sqHigh.
     std::array<uint8_t, kSidWaveSteps> sidWave{};
     std::array<uint8_t, kBuzzSteps> buzz{};
     uint8_t sidWaveLen = 0, wavePos = 0, buzzLen = 0, buzzPos = 0, trackShape = 8;
+    uint8_t sqSteps = 0, sqHigh = 1;
     // Buzzer (D-152): tuned envelope (ratio to the frequency of the note, fine tune included; 0: period of the
     // track), YM Pad.
     double envTune = 0;
@@ -192,6 +196,11 @@ struct Voice {
     // envelope frequency, noise period steps upwards) with the factor of the envelope period, and the fine tune of the
     // track in semitones (Fxx).
     double slVol = 0, slEnv = 0, slNoise = 0, slEnvK = 1, cmdFine = 0;
+    // MIDI expression (D-432): MPE member channel of the note (0: none), its own bend in semitones, its pressure (0 to
+    // 1, polyphonic aftertouch or MPE), its MPE slide (CC74, 0 to 1, 0.5 neutral) and the factor of the envelope
+    // period that the wheel, the pressure and the slide give (Envelope targets).
+    uint8_t mpeCh = 0;
+    double mpeBend = 0, press = 0, slide = 0.5, exprEnvK = 1;
     bool ornNoiseOn = false;
     // Instrument sequences (D-148): rows, pitch settings, sound of the note that the GEN, MIX and NP rows
     // replace for the duration of a step.
@@ -214,7 +223,8 @@ struct Voice {
 
     // Effect timer (mode frozen at the attack, D-052). Mfp: the quantised setting and the timer model; Free: next
     // interrupt and period in fractional cycles. nextIrq: cycle of the next interrupt. sidHigh: the SID square is on
-    // its high volume; dpos: position in the sample of a drum (sample, sampleLen).
+    // its high volume; dpos: position in the sample of a drum (sample; sampleLen: its length, or the End of a
+    // Digidrum, D-443).
     bool timerOn = false;
     bool fxStart = false;  // timer started since the last frame of the recorder (RegisterFrame::Effect::restart)
     TimerMode timerMode = TimerMode::Mfp;
@@ -226,7 +236,7 @@ struct Voice {
     uint32_t dpos = 0;
     const uint8_t* sample = nullptr;
     uint32_t sampleLen = 0;
-    // Sustain loop of a Digidrum (D-154): from loopStart to loopEnd while the note is held.
+    // Sustain loop of a Digidrum (D-154): from loopStart to loopEnd (its Start and End, D-443) while the note is held.
     bool looping = false;
     uint32_t loopStart = 0, loopEnd = 0;
     // DMA voice (D-153): 8-bit sample of the bank, read step (frequency of the note / that of the root note),
@@ -237,7 +247,7 @@ struct Voice {
     bool pcmStereo = false, pcmLoop = false;
     double pcmPos = 0, pcmStep = 1, pcmRootHz = 261.6255653005986, pcmNext = 0, pcmPeriod = 1;
     double pcmL = 0, pcmR = 0, pcmGain = 1;
-    uint32_t pcmStart = 0;   // first frame read at the attack (Oxx, D-338)
+    uint32_t pcmStart = 0;   // first frame read at the attack (Start, D-444, then Oxx, D-338); pcmFrames: its End
     uint64_t dmaSerial = 0;  // rank of the start of the DMA voice (DmaFrame of the recorder: the most recent)
 
     // Fade: fadeLen steps of 1 / 48 000 s (D-051), the amplitude fadeAmt losing 1/64 per step.
@@ -252,14 +262,16 @@ struct Voice {
     // Buses of the 16-channel mode: contribution cL + sL × (t − busT) at step t. cM and sM: mono contribution to the
     // separate output of track busTrack.
     double cL = 0, cR = 0, sL = 0, sR = 0, cM = 0, sM = 0;
-    // Mixer meter: contribution seen by the oscilloscope of track meterTrack.
-    double cMeter = 0;
+    // Mixer meter: contribution seen by the oscilloscope of track meterTrack; cMeterD: half the difference of the
+    // right and left sides, a stereo DMA sample's alone (D-457).
+    double cMeter = 0, cMeterD = 0;
     int8_t meterTrack = -1;
     uint64_t busT = 0;
     int busTrack = -1;
     uint8_t idx = 0;      // 5-bit output index of the channel (level in tab1)
     double gainBase = 0;  // accent × drum gain × fade × mixer (without ADSR or panning)
-    double kL = 0, kR = 0;  // gainBase × panning of each bus
+    double gainR = 0;     // gainBase of the right side: that of a stereo DMA sample has its own fader (D-459)
+    double kL = 0, kR = 0;  // gainBase and gainR × panning of each bus
     double gS = 0;  // send of the delay (D-299): the contribution on the send buses is that of the buses × gS
     // Echo of the notes (D-299): entry of the note in the echoes (0: none), rank of the repeat that the voice plays.
     uint32_t echoId = 0;
@@ -303,13 +315,25 @@ struct ChipCache {
 
 // Keyboard arpeggio: idx position in the list of notes (dir: direction in UpDown), cur: step of the table shown
 // (arpStep), lastSrc: held note of the last step (replayed while the last note is released), phase: fraction of a
-// step at the Hz cadence, clockTicks: half pulses counted (D-289).
+// step at the Hz cadence, clockTicks: half pulses counted (D-289), fresh: a key pressed (or a MIDI note) since the
+// last step, which starts a note of its own (D-416).
 struct ArpState {
     int idx = -1, dir = 1, cur = -1;
     int lastSrc = -1;
+    bool fresh = false;
     int track = -1;  // track of the held notes: -1 for keyboard playing, otherwise the targeted focused track
     double phase = 0;
     int clockTicks = 0;
+};
+
+// Curve of a Buzzer or Noise slide (Kxx, Qxx; 16-channel mode, D-394): from cycle start, over len cycles (the steps to
+// the next command of its kind), the offset of the notes goes along the shape of the CRV row by `total` in all (the
+// distance the speed covers there in a straight line); 0: Linear, the speed per frame.
+struct SlideCurveRun {
+    int curve = 0;
+    uint64_t start = 0, len = 1;
+    double total = 0;
+    uint32_t seed = 1;  // Random walk
 };
 
 // Sequencer track during playback (channel fields of the worklet: offIn, cutIn, rt, arp*, polyLeft…). The
@@ -341,6 +365,12 @@ struct LaneState {
     // envelope shape (Exx, 0: that of the sound), each until the next command of its kind; DMA offset of the row in
     // frames (Oxx); countdowns of the delayed step (Dxx, with the rest of the row after it) and of the cut (Cxx).
     int volSpeed = 0, envSpeed = 0, noiseSpeed = 0;
+    SlideCurveRun envCurve, noiseCurve;  // Kxx, Qxx (D-394)
+    // Gxx (D-393): the level of the step glides from vgFrom to vgTo, that of the next step, over vgLen cycles from
+    // cycle vgStart (the step).
+    bool vg = false;
+    double vgFrom = 1, vgTo = 1;
+    uint64_t vgStart = 0, vgLen = 1;
     double fine = 0;
     uint8_t shape = 0;
     uint32_t offset = 0;
@@ -382,7 +412,7 @@ struct SeqState {
     int loopAt = -1, loopCount = 0;
     // MIDI clock: external transport (Start/Stop/Continue), pulses counted, smoothed duration of a pulse.
     bool run = false;
-    int clockCount = 5;  // pulses counted in the current step
+    int clockCount = 10;  // half pulses counted in the current step (D-422)
     // Ticks (D-149): current speed, that of the song at start, changed by Sxx.
     int speed = 6;
     // BPM cadence: tempo set by the last Txx (D-243), 0: none (that of the Song entry or of the song).
@@ -422,20 +452,32 @@ struct Engine::Impl {
     std::array<std::vector<uint8_t>, kDigidrumSlots> user;
     std::array<uint32_t, kDigidrumSlots> userLen{};
     std::array<DigidrumSlot, kDigidrumSlots> digiSlots{};  // rate, root note, fine tune, loop (D-154)
-    // Preview of a Digidrum slot (editor): slot (-1: nothing), position and step per output sample.
+    // Preview of a Digidrum slot (editor): slot (-1: nothing), position and step per output sample; looping: the
+    // slot's Loop was on during the preview, which stops when Loop goes off (D-449).
     int digiPreviewSlot = -1;
     double digiPreviewPos = 0, digiPreviewInc = 0;
+    bool digiPreviewLooping = false;
 
     std::array<Voice, kVoices> voices{};
     std::array<VirtualChannel, kVoices> vch{};  // channel of each voice (16-channel mode)
+    std::array<uint8_t, 128> manualCut{};       // live notes cut by the sequencer, per MIDI note (D-431)
     uint64_t stamp = 0;                         // attacks so far (Voice::age)
     std::array<double, kTracks> bend{};   // pitch bend of each track, in semitones
     std::array<uint8_t, kTracks> program{};  // instrument chosen by Program Change (0: the sound of the track, D-156)
-    std::array<double, kTracks> wheel{};  // wheel of each track, in cents of vibrato
+    std::array<double, kTracks> wheel{};  // wheel of each track, 0 to 1 (D-432)
+    std::array<double, kTracks> press{};  // channel pressure of each track, 0 to 1 (D-432)
+    // MPE member channels 1 to 15 (D-432): the last bend, pressure and slide of each, which its next notes start with.
+    static constexpr int kMpeChannels = 16;
+    struct MpeChannel {
+        double bend = 0, press = 0, slide = 0.5;
+    };
+    std::array<MpeChannel, kMpeChannels> mpe{};
+    int mpeNoteCh = 0;  // MPE channel of the note being attacked (setupVoice)
 
     // Live mixer. panStep: panning of the PAN row of the current step (NaN: that of the mixer); panNow: the panning
     // that panL and panR give, from which the LFO moves a voice (D-257).
     std::array<double, kTracks> live{}, panL{}, panR{}, panStep{}, panNow{};
+    std::array<double, kTracks> liveR{};  // the right side of a stereo DMA sample (D-459), otherwise live
     std::array<double, kTracks> sendNow{};  // send of each track to the delay (D-299)
 
     // Arpeggio played on the keyboard: notes held (velocity per note, list in the order of pressing). heldSrc: track
@@ -527,14 +569,18 @@ struct Engine::Impl {
     std::vector<float> pcmHostL, pcmHostR;
 
     // Mixer meters (takeMeters): peak of a voice per track, oscilloscope of the sum of the voices of the track
-    // (kScopeRate points per second, meterIndex: next point since the start of the time base).
-    std::array<float, kTracks> meterPeak{};
-    std::array<std::array<float, kScopePoints>, kTracks> meterScope{};
+    // (kScopeRate points per second, meterIndex: next point since the start of the time base). A stereo DMA sample
+    // (D-457): meterPeak holds the peaks of the left side, meterPeakR those of the right one (the same for the other
+    // voices), meterScopeD half the difference of the right and left sides, around meterScope (their mean).
+    std::array<float, kTracks> meterPeak{}, meterPeakR{};
+    std::array<std::array<float, kScopePoints>, kTracks> meterScope{}, meterScopeD{};
     uint32_t meterPos = 0;  // place of the next point in meterScope
     uint64_t meterIndex = 0;
     // 16-channel: steps of the voices per bucket (bucket j: seen from point meterIndex + j), level at the last point.
-    std::array<std::vector<double>, kTracks> meterD;
-    std::array<double, kTracks> meterLevel{};
+    // meterDD, meterLevelD: the same for the half differences of stereo samples, on the tracks where meterSide is set.
+    std::array<std::vector<double>, kTracks> meterD, meterDD;
+    std::array<double, kTracks> meterLevel{}, meterLevelD{};
+    std::array<bool, kTracks> meterSide{};
     double meterTickInv = 1;  // 1 / meterTickStep()
     // 16-channel: first step of each bucket for the current render (meterBucket(t) = j ⇔ bucketStart[j] ≤ t <
     // bucketStart[j + 1]), last element without end. The loops of the voices so advance their bucket by comparison.
@@ -559,8 +605,9 @@ struct Engine::Impl {
     static constexpr int64_t kNoPulse = std::numeric_limits<int64_t>::min();
     HostTransport host{};
     int64_t hostPulse = kNoPulse;
-    // MIDI clock: samples until the half pulse between two clocks (0: none), at half the smoothed clock period.
-    double arpHalfIn = 0;
+    // MIDI clock: samples until the half pulse between two clocks (0: none), at half the smoothed clock period: for
+    // the arpeggios of odd division (D-289) and the sequencer at 1/64 (D-422).
+    double halfPulseIn = 0;
     bool clockChanged = false;  // sequencer clock changed: stop at the next block
     // Quantize to VBL: first sample (since the reset) that the sequencer has not yet taken into account.
     uint64_t qFrom = 0;
@@ -581,6 +628,8 @@ struct Engine::Impl {
 
     // ------------------------------------------------------------------------------------------------------
     bool studio() const noexcept { return global.mode == VoiceMode::Studio16; }
+    // Frequency of A4 from which the notes are tuned (Tuning A4, D-429), kept within its range.
+    double a4() const noexcept { return std::isnan(global.a4Hz) ? kA4Hz : std::clamp(global.a4Hz, kA4MinHz, kA4MaxHz); }
     int chipCount() const noexcept { return global.mode == VoiceMode::Dual3 ? 2 : 1; }
     ymcore::MasterClock clock() const noexcept { return config.render.chip.clock; }
     uint32_t hostRate() const noexcept { return config.render.hostRate; }
@@ -603,8 +652,49 @@ struct Engine::Impl {
     int chipOfTrack(int track) const noexcept { return chipCount() < 2 ? 0 : std::min(chipCount() - 1, track >> 2); }
     bool trackOut(int track) const noexcept { return track >= 0 && ((trackMask >> track) & 1u) != 0; }
     static bool hasBus(int track) noexcept { return track >= 0 && track < kTracks; }
-    // Bend of a voice in semitones: the wheel of its track, plus the fine tune of the CMD row (D-338).
-    double bendOf(const Voice& v) const noexcept { return (v.track >= 0 ? bend[size_t(v.track)] : 0.0) + v.cmdFine; }
+    // Bend of a voice in semitones: the wheel of its track (when it drives the pitch, D-432), plus the fine tune of the
+    // CMD row (D-338). An MPE note adds the bend of its channel (D-432).
+    double pitchBendOf(int track) const noexcept {
+        return track >= 0 && global.bendTarget == BendTarget::Pitch ? bend[size_t(track)] : 0.0;
+    }
+    double bendOf(const Voice& v) const noexcept { return pitchBendOf(v.track) + v.cmdFine + v.mpeBend; }
+    // MIDI expression of a voice (D-432): the wheel of its track; its pressure, the higher of its channel's and its
+    // own; what the two give to target t (the higher of those that drive it); whether the wheel, the pressure or the
+    // MPE slide moves it, so that it needs its VBL frames. Drums have none.
+    double wheelOf(const Voice& v) const noexcept { return v.track >= 0 ? wheel[size_t(v.track)] : 0.0; }
+    double pressureOf(const Voice& v) const noexcept {
+        return std::max(v.track >= 0 ? press[size_t(v.track)] : 0.0, v.press);
+    }
+    double expressOf(const Voice& v, ExpressTarget t) const noexcept {
+        if (isDrum(v.gen)) return 0;
+        return std::max(global.wheelTarget == t ? wheelOf(v) : 0.0, global.aftertouch == t ? pressureOf(v) : 0.0);
+    }
+    bool expressive(const Voice& v) const noexcept {
+        if (isDrum(v.gen)) return false;
+        return (global.wheelTarget != ExpressTarget::Off && wheelOf(v) > 0) ||
+               (global.aftertouch != ExpressTarget::Off && pressureOf(v) > 0) || v.slide != 0.5 ||
+               (global.bendTarget != BendTarget::Pitch && v.track >= 0 && bend[size_t(v.track)] != 0);
+    }
+    // Bend of the track of a voice when it drives target t, in semitones.
+    double bendFor(const Voice& v, BendTarget t) const noexcept {
+        return global.bendTarget == t && v.track >= 0 && !isDrum(v.gen) ? bend[size_t(v.track)] : 0.0;
+    }
+    // MPE slide of a voice, -1 to 1 (0 in the middle), for what GlobalParams::mpeSlide says it drives.
+    double slideOf(const Voice& v, SlideTarget t) const noexcept {
+        return global.mpeSlide == t && !isDrum(v.gen) ? std::clamp(v.slide * 2 - 1, -1.0, 1.0) : 0.0;
+    }
+    // Envelope targets, in octaves: up to one higher (half the period) at the top of the wheel or the pressure; the
+    // slide one either way; the bend by its semitones.
+    double exprEnvFactor(const Voice& v) const noexcept {
+        const double s = expressOf(v, ExpressTarget::Envelope) + slideOf(v, SlideTarget::Envelope) +
+                         bendFor(v, BendTarget::Envelope) / 12;
+        return s != 0 ? std::pow(2.0, -s) : 1.0;
+    }
+    // LFO target: its depth from none at rest to the depth of the track at the top.
+    double exprLfoAmount(const Voice& v) const noexcept {
+        const bool driven = global.wheelTarget == ExpressTarget::Lfo || global.aftertouch == ExpressTarget::Lfo;
+        return driven ? expressOf(v, ExpressTarget::Lfo) : 1.0;
+    }
 
     // First internal step of host sample s of the time base, by the rule of ChipRenderer::cycleAtSample (exact ratio
     // in Raw; ceil(s × clk8 / host rate), clk8 the whole steps per second, in RawBox and Retro).
@@ -670,15 +760,17 @@ struct Engine::Impl {
     // Pitch of the note in Hz (bend, detune and analog draw included), without slide: sets the tone period and the
     // rate of the generator (timer frequency, read step of a DMA sample). Returns the frequency.
     double applyPitch(Voice& v) noexcept {
-        const double f = noteHz(double(v.note) + v.fine + bendOf(v) + v.detune + v.analog);
+        const double f = noteHz(double(v.note) + v.fine + bendOf(v) + v.detune + v.analog, a4());
         v.tp = tonePeriodFor(f, clock());
         switch (v.gen) {
         case Generator::Sid: v.timerHz = f * sidRate(v); break;
-        case Generator::SyncBuzzer: v.timerHz = f; break;
+        case Generator::SyncBuzzer: v.timerHz = f * buzzRate(v); break;
         case Generator::Digidrum: {  // pitch of the note, transposed by OCT and TON of the step (D-098)
             // Rate, root note and fine tune of the slot (D-154; defaults: 7 800 Hz for C4).
+            // The Tuning A4 moves it like the other notes (D-429): the slot's rate plays its root note at A4 = 440 Hz.
             const DigidrumSlot& d = digiSlots[v.slot & 7];
-            v.timerHz = d.rateHz * std::pow(2.0, (double(v.note) + v.fine - d.root + d.cents / 100) / 12.0);
+            v.timerHz = d.rateHz * std::pow(2.0, (double(v.note) + v.fine - d.root + d.cents / 100) / 12.0) *
+                        (a4() / kA4Hz);
             if (v.drumTr != 1) v.timerHz *= v.drumTr;
             break;
         }
@@ -791,6 +883,25 @@ struct Engine::Impl {
             }
         return best;
     }
+    // A note played live that still sounds (not released, not fading) on voice v, which a sequencer, chord or echo
+    // note is about to take (Indus, 25/10/2026 19:41, D-431): a key held, or held by Latch, before Play sits on the
+    // voice of a track that the sequencer reserves once it plays. In 16 channels the note moves to a free voice of the
+    // pool and goes on sounding, as a note played during playback would; otherwise (3-channel modes, pool full) it
+    // is cut, and manualCut counts it so that the interface lets its key go.
+    void displaceManual(Voice& v, uint64_t c) noexcept {
+        if (!v.on || v.tag != VoiceTag::Manual || v.fading() || v.stage == 4) return;
+        const int from = int(&v - voices.data());
+        if (studio())
+            for (int i = kLaneVoices + kChordVoices; i < kVoices; ++i) {
+                if (voices[size_t(i)].on) continue;
+                voices[size_t(i)] = v;
+                vch[size_t(i)] = vch[size_t(from)];
+                v.echoId = 0;  // its echo follows the note to its new voice
+                touch(i, c);
+                return;
+            }
+        if (v.note >= 0 && v.note < 128) ++manualCut[size_t(v.note)];
+    }
     // gen ≥ 0: generator imposed by the FX row of the step; drumTr: transposition of the drums of the step (D-098);
     // note: fraction of a semitone possible (track arpeggio on a slid base); patch: sound of an instrument
     // (INS row, D-147) instead of that of the track.
@@ -798,6 +909,7 @@ struct Engine::Impl {
                     double drumTr = 1, const TrackPatch* patch = nullptr) noexcept {
         const TrackPatch& src = patch ? *patch : tracks[size_t(std::clamp(track, 0, kTracks - 1))].patch;
         const bool m3 = !studio();
+        if (tag != VoiceTag::Manual) displaceManual(v, c);
         echoRelease(v);  // the note that the voice played ends here
         const int vol0 = vol;
         if (m3 && level < 1) vol = attenuated(vol, level);
@@ -814,6 +926,12 @@ struct Engine::Impl {
         v.slVol = v.slEnv = v.slNoise = 0;
         v.slEnvK = 1;
         v.cmdFine = lane ? lane->fine : 0;
+        // An MPE note starts with the bend, pressure and slide of its channel (D-432).
+        v.mpeCh = tag == VoiceTag::Manual ? uint8_t(mpeNoteCh) : 0;
+        v.mpeBend = v.mpeCh ? mpe[v.mpeCh].bend : 0;
+        v.press = v.mpeCh ? mpe[v.mpeCh].press : 0;
+        v.slide = v.mpeCh ? mpe[v.mpeCh].slide : 0.5;
+        v.exprEnvK = 1;  // set by the frames of an expressive voice
         v.fadeLen = v.fadeStep = 0;
         v.fadeAmt = 1;
         v.nextFade = kNever;
@@ -907,13 +1025,19 @@ struct Engine::Impl {
             v.sample = user[v.slot].data();
             v.sampleLen = userLen[v.slot];
         }
-        // Sustain loop (D-154): only if it fits in the sample.
-        const DigidrumSlot& ds = digiSlots[v.slot & 7];
-        v.looping = v.gen == Generator::Digidrum && ds.loop && ds.loopEnd > ds.loopStart && ds.loopEnd <= v.sampleLen;
-        v.loopStart = ds.loopStart;
-        v.loopEnd = ds.loopEnd;
+        // Digidrum: the part from Start to End (D-443), its sustain loop (D-154) replaying it while the note is held.
+        v.looping = false;
+        if (v.gen == Generator::Digidrum) {
+            const DigidrumSlot& ds = digiSlots[v.slot & 7];
+            const SampleSpan part = sampleSpan(ds.start, ds.end, v.sampleLen);
+            v.sampleLen = part.end;
+            v.dpos = part.start;
+            v.looping = ds.loop && part.size() > 0;
+            v.loopStart = part.start;
+            v.loopEnd = part.end;
+        }
         // DMA voice (D-153): sample of the track or of the instrument (-1: the one of the rank of the track), first
-        // frame at the step of the attack.
+        // frame at the step of the attack: its part from Start to End (D-444), the Oxx offset counted from Start.
         v.pcm = nullptr;
         v.pcmFrames = 0;
         if (v.gen == Generator::Dma) {
@@ -921,13 +1045,15 @@ struct Engine::Impl {
             const DmaSlot& d = dmaBank.slot(k);
             v.slot = uint8_t(k);
             v.pcm = dmaBank.data(k);
-            v.pcmFrames = dmaBank.frames(k);
+            const SampleSpan part = dmaBank.part(k);
+            v.pcmFrames = part.end;
             v.pcmStereo = d.stereo;
             v.pcmLoop = d.loop;
-            v.pcmRootHz = noteHz(double(d.root));
+            // At A4 = 440 Hz: the Tuning A4 moves the sample too (D-429); Fine plays it higher at its root (D-452).
+            v.pcmRootHz = noteHz(double(d.root)) * std::pow(2.0, -d.cents / 1200);
             v.pcmPeriod = dmaTickHz() / kDmaRateHz[d.rate];  // internal steps per frame of the stream
             v.pcmNext = double(c) / 8.0;
-            v.pcmStart = lane ? lane->offset : 0;  // Oxx (D-338)
+            v.pcmStart = part.start + (lane ? lane->offset : 0);  // Start (D-444), then Oxx (D-338)
             v.pcmPos = double(v.pcmStart);
             v.pcmL = v.pcmR = 0;
             v.pcmGain = 1;
@@ -962,7 +1088,7 @@ struct Engine::Impl {
         // VBL frames: at the attack, then every clock / VBL cycles.
         // The envelope driven by the pitch (matrix) also follows a slide: VBL frames.
         const bool modulated = ornActive(v) || (v.adsrOn && v.adsrChip) || v.vibCents > 0 ||
-                               wheel[size_t(v.track)] > 0 || buzzerFollows(v) || lfoActive(v) || laneSliding(v);
+                               buzzerFollows(v) || lfoActive(v) || laneSliding(v) || expressive(v);
         v.wasMod = false;
         v.vblOn = v.frames != nullptr || (modulated && !isDrum(v.gen));
         v.vblHz = std::max<uint32_t>(1, global.vblHz);
@@ -972,7 +1098,7 @@ struct Engine::Impl {
         startTimer(v, c);
         // Digidrum without a sample: silence (the prototype cuts the voice).
         if (v.gen == Generator::Digidrum && v.sampleLen == 0) v.on = false;
-        if (v.gen == Generator::Dma && v.pcmStart >= v.pcmFrames) v.on = false;  // empty slot, or offset past the end
+        if (v.gen == Generator::Dma && v.pcmStart >= v.pcmFrames) v.on = false;  // empty slot, or offset past End
         // A note whose sound has its echo on schedules its repeats (the repeats themselves have none).
         v.echoId = 0;
         v.echoRep = 0;
@@ -1019,7 +1145,7 @@ struct Engine::Impl {
         if (v.glide > 0) {
             v.tp = tonePeriodFor(slideHz(v, PitchTarget::Square), clock());
             if (v.gen == Generator::Sid) v.timerHz = slideHz(v, PitchTarget::Timer) * sidRate(v);
-            else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer);
+            else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer) * buzzRate(v);
             else if (v.gen == Generator::Dma) v.pcmStep = slideHz(v, PitchTarget::Timer) / v.pcmRootHz;
             tuneEnv(v, v.fTarget);
         } else {
@@ -1034,7 +1160,7 @@ struct Engine::Impl {
     // Slide to note in stepSamples host samples, curve of the CRV row (slcOv), draw seed (Random walk).
     void slideTo(Voice& v, int note, double stepSamples, uint64_t c, uint32_t seed) noexcept {
         stopGlide(v, c);
-        const double f = noteHz(double(note) + bendOf(v) + v.detune + v.analog);
+        const double f = noteHz(double(note) + bendOf(v) + v.detune + v.analog, a4());
         v.note = note;
         v.fine = 0;
         // Slide steps at 16 × VBL in 16-channel mode, at the VBL rate in 3-channel mode (D-052); upd: their number.
@@ -1068,11 +1194,11 @@ struct Engine::Impl {
         const double t = v.glideN ? 1.0 - double(v.glide) / double(v.glideN) : 1.0;
         const double sh = slideShape(t, v.curve, v.seed, global.slideTable);
         v.fCur = (v.f0 > 0 && v.fTarget > 0) ? v.f0 * std::pow(v.fTarget / v.f0, sh) : v.f0 + (v.fTarget - v.f0) * sh;
-        v.fCur = slideQuantize(v.fCur, v.curve, global.scaleMask, global.scaleRoot);
+        v.fCur = slideQuantize(v.fCur, v.curve, global.scaleMask, global.scaleRoot, a4());
         if (v.glide == 0 && v.curve != SlideCurve::Custom) v.fCur = v.fTarget;
         v.tp = tonePeriodFor(slideHz(v, PitchTarget::Square), clock());
         if (v.gen == Generator::Sid) v.timerHz = slideHz(v, PitchTarget::Timer) * sidRate(v);
-        else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer);
+        else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer) * buzzRate(v);
         else if (v.gen == Generator::Dma) v.pcmStep = slideHz(v, PitchTarget::Timer) / v.pcmRootHz;
         retuneTimer(v, c);
         v.nextGlide = v.glide > 0 ? v.glideStart + periodCycles(v.glideIndex + 1, v.glideHz) : kNever;
@@ -1083,6 +1209,40 @@ struct Engine::Impl {
     // frame: chained instrument, step of the table (pitch, noise, volume, sequence rows), Chip ADSR, LFO and vibrato,
     // then the period, timer and envelope period that result (matrixPitch when the pitch is modulated and the
     // matrix is not the default one or a PER or FIX step plays).
+    // A voice without modulation receives its VBL frames from now on (a vibrato starts at phase 0): the wheel, and the
+    // MIDI expression (D-432). Drums have none.
+    void startFrames(Voice& v, uint64_t c) const noexcept {
+        if (v.vblOn || v.frames || isDrum(v.gen) || v.track < 0) return;
+        v.vblOn = true;
+        v.vblHz = std::max<uint32_t>(1, global.vblHz);
+        v.vblStart = c;
+        v.vblIndex = 0;
+        v.nextVbl = c;
+    }
+    // A frame moved by the MIDI expression (D-432). Volume: the wheel and the pressure raise the 4-bit volume towards
+    // 15; the MPE slide and the bend (its whole Bend range) raise it towards 15 above the middle and lower it towards 0
+    // below; the gain of a DMA voice alike, without 4-bit steps. Envelope: the factor of the envelope period.
+    void express(Voice& v) const noexcept {
+        if (isDrum(v.gen)) return;
+        v.exprEnvK = exprEnvFactor(v);
+        const double p = expressOf(v, ExpressTarget::Volume);
+        const double b = global.bendRange > 0 ? bendFor(v, BendTarget::Volume) / global.bendRange : 0.0;
+        const double s = std::clamp(slideOf(v, SlideTarget::Volume) + b, -1.0, 1.0);
+        if (p <= 0 && s == 0) return;
+        double vol = v.vol4, gain = v.pcmGain;
+        vol += (15 - vol) * p;
+        gain += (1 - gain) * p;
+        if (s > 0) {
+            vol += (15 - vol) * s;
+            gain += (1 - gain) * s;
+        } else {
+            vol *= 1 + s;
+            gain *= 1 + s;
+        }
+        v.vol4 = uint8_t(std::clamp(jsRound(vol), 0.0, 15.0));
+        v.pcmGain = std::clamp(gain, 0.0, 1.0);
+    }
+
     void vblEvent(Voice& v, uint64_t c) noexcept {
         ++v.vblIndex;
         v.nextVbl = v.vblStart + periodCycles(v.vblIndex, v.vblHz);
@@ -1105,7 +1265,7 @@ struct Engine::Impl {
             v.chainNext = false;
             relink(v, c);
         }
-        if (v.vblIndex > 1) slideFrame(v);  // not at the attack's frame, as the slides of trackers (tick 0)
+        if (v.vblIndex > 1) slideFrame(v, c);  // not at the attack's frame, as the slides of trackers (tick 0)
         // State before this frame, which an arpeggio note attacked at the same cycle takes over (grabMod).
         v.ornPrevPos = v.ornPos;
         v.ornPrevFrm = v.ornFrm;
@@ -1146,11 +1306,13 @@ struct Engine::Impl {
             v.vol4 = uint8_t(std::clamp(jsRound(v.vol4 + v.slVol), 0.0, 15.0));
             v.pcmGain = std::clamp(v.pcmGain + v.slVol / 15, 0.0, 1.0);
         }
+        express(v);  // wheel, pressure and MPE slide (D-432)
         const bool lfoPitch = lfoActive(v) && (v.lfo.target == LfoTarget::Pitch || v.lfo.target == LfoTarget::SidRatio);
-        // Vibrato of the track (unless a V00 of its lane holds it, D-254), plus that of the wheel (no effect on the
-        // drums).
+        // Vibrato of the track (unless a V00 of its lane holds it, D-254), plus that of the wheel, the pressure or the
+        // MPE slide (from the middle up), up to the Wheel depth: the deepest plays (D-432; no effect on the drums).
         const double own = seq.on && lanes[size_t(v.track)].vibOff ? 0.0 : v.vibCents;
-        const double cents = own + (isDrum(v.gen) ? 0.0 : wheel[size_t(v.track)]);
+        const double expr = std::max(expressOf(v, ExpressTarget::Vibrato), slideOf(v, SlideTarget::Vibrato));
+        const double cents = own + std::max(0.0, expr) * global.expressCents;
         double vib = lfoSemis;  // the LFO's pitch goes with the vibrato
         if (cents > 0) {
             v.vibPhase = std::fmod(v.vibPhase + v.vibHz / v.vblHz, 1.0);
@@ -1165,7 +1327,7 @@ struct Engine::Impl {
             v.tpEff = mod ? uint16_t(std::clamp(jsRound(v.tp * std::pow(2.0, -semis / 12)), 1.0, 4095.0)) : 0;
             if (mod || v.wasMod) {  // the timer follows: buzzer and SID vibrate (and come back when the wheel drops)
                 const double fm = slideHz(v, PitchTarget::Timer) * std::pow(2.0, semis / 12);
-                if (v.gen == Generator::SyncBuzzer) v.timerHz = fm;
+                if (v.gen == Generator::SyncBuzzer) v.timerHz = fm * buzzRate(v);
                 else if (v.gen == Generator::Sid) v.timerHz = fm * sidRate(v);
                 else if (v.gen == Generator::Dma) v.pcmStep = fm / v.pcmRootHz;
                 retuneTimer(v, c);
@@ -1180,24 +1342,44 @@ struct Engine::Impl {
     static bool seqVoice(VoiceTag tag, int track) noexcept {
         return (tag == VoiceTag::Sequencer || tag == VoiceTag::Chord) && track >= 0 && track < kTracks;
     }
-    // Its track has a slide in progress (Axy, Bxy or Nxy with a speed): the voice needs its VBL frames.
+    // Its track has a slide in progress (Axy, Bxy or Nxy with a speed, a Gxx glide): the voice needs its VBL frames.
     bool laneSliding(const Voice& v) const noexcept {
         if (!seqVoice(v.tag, v.track) || isDrum(v.gen)) return false;
         const LaneState& L = lanes[size_t(v.track)];
-        return L.volSpeed || L.envSpeed || L.noiseSpeed;
+        return L.volSpeed || L.envSpeed || L.noiseSpeed || L.vg;
     }
     // One frame of the slides of the track: the offsets of the note move by the speeds (x - y per tick). Bounded:
-    // 4-bit volume ±15 steps, envelope ±8 octaves, noise period ±31.
-    void slideFrame(Voice& v) noexcept {
+    // 4-bit volume ±15 steps, envelope ±8 octaves, noise period ±31. A Gxx glide sets the level that the step has
+    // reached at cycle c, on a straight line to that of the next step (D-393).
+    void slideFrame(Voice& v, uint64_t c) noexcept {
         if (!seqVoice(v.tag, v.track) || isDrum(v.gen)) return;
         constexpr double kMaxSemis = 96;
         const LaneState& L = lanes[size_t(v.track)];
+        if (L.vg) {
+            const double t = std::min(1.0, double(c - std::min(c, L.vgStart)) / double(L.vgLen));
+            setLevel(v, v.track, L.ins, L.vgFrom + (L.vgTo - L.vgFrom) * t);
+        }
         if (L.volSpeed) v.slVol = std::clamp(v.slVol + L.volSpeed * kVolSlideUnit, -15.0, 15.0);
-        if (L.noiseSpeed) v.slNoise = std::clamp(v.slNoise + L.noiseSpeed * kNoiseSlideUnit, -31.0, 31.0);
+        if (L.noiseSpeed) {
+            const double d = L.noiseCurve.curve ? curveStep(L.noiseCurve, v, c) : L.noiseSpeed * kNoiseSlideUnit;
+            v.slNoise = std::clamp(v.slNoise + d, -31.0, 31.0);
+        }
         if (L.envSpeed) {
-            v.slEnv = std::clamp(v.slEnv + L.envSpeed * kPitchSlideUnit, -kMaxSemis, kMaxSemis);
+            const double d = L.envCurve.curve ? curveStep(L.envCurve, v, c) : L.envSpeed * kPitchSlideUnit;
+            v.slEnv = std::clamp(v.slEnv + d, -kMaxSemis, kMaxSemis);
             v.slEnvK = std::pow(2.0, -v.slEnv / 12);  // higher frequency, shorter period
         }
+    }
+
+    // What a curved slide moves in the frame of the voice at cycle c: the share of its distance that the shape adds over
+    // that frame (D-394). As the straight slide adds its speed from the frame at the start of the row, the frame before
+    // the next command lands on the end of the curve.
+    double curveStep(const SlideCurveRun& r, const Voice& v, uint64_t c) const noexcept {
+        const auto at = [&](uint64_t x) {
+            const double t = std::clamp(double(int64_t(x) - int64_t(r.start)) / double(r.len), 0.0, 1.0);
+            return slideShape(t, SlideCurve(r.curve), r.seed, global.slideTable);
+        };
+        return r.total * (at(c + periodCycles(1, std::max<uint32_t>(1, v.vblHz))) - at(c));
     }
 
     // ------------------------------------------------------------------------------------------ LFO (D-257)
@@ -1298,7 +1480,7 @@ struct Engine::Impl {
         }
         // Unit of the offset per target: volume and noise steps, cents (envelope period, SID ratio, pitch), % of pan.
         const size_t t = std::min<size_t>(size_t(v.lfo.target), kLfoTargets - 1);
-        const double d = x * std::min(v.lfo.depth, double(kLfoDepthMax[t]));
+        const double d = x * std::min(v.lfo.depth, double(kLfoDepthMax[t])) * exprLfoAmount(v);  // D-432
         switch (LfoTarget(t)) {
         case LfoTarget::Volume:
             v.vol4 = uint8_t(std::clamp(jsRound(v.vol4 + d), 0.0, 15.0));
@@ -1324,7 +1506,12 @@ struct Engine::Impl {
         v.hardSync = p.hardSync;
         v.detune = std::clamp(p.detuneCents, -double(kDetuneMaxCents), double(kDetuneMaxCents)) / 100;
         v.sidWave = p.sidWave;
-        v.sidWaveLen = p.sidWaveLen >= 2 ? uint8_t(std::min<int>(p.sidWaveLen, kSidWaveSteps)) : 0;
+        // By the form of the SID wave (D-411): the bars of Sine, Bounce and Custom, the Square's steps, Base neither.
+        const uint8_t n = uint8_t(std::clamp<int>(p.sidWaveLen, 2, kSidWaveSteps));
+        const bool bars = sineForm(p.sidForm) || p.sidForm == SidForm::Custom;
+        v.sidWaveLen = bars ? n : 0;
+        v.sqSteps = p.sidForm == SidForm::Square ? n : 0;
+        v.sqHigh = uint8_t(std::clamp<int>(p.sidWidth, 1, n - 1));
         v.buzz = p.buzzShapes;
         v.buzzLen = uint8_t(std::min<int>(p.buzzLen, kBuzzSteps));
         v.trackShape = uint8_t(p.envShape & 15);
@@ -1339,14 +1526,14 @@ struct Engine::Impl {
     // track, which baseEnvPeriod holds.
     void tuneEnv(Voice& v, double hz) const noexcept {
         if (v.envTune <= 0 || v.gen != Generator::SyncBuzzer) return;
-        const uint16_t ep = tunedEnvPeriod(hz * v.envTune, v.trackShape, clock());
+        const uint16_t ep = tunedEnvPeriod(hz * v.envTune * buzzRate(v), v.trackShape, clock());
         if (ep) v.envPeriod = ep;
     }
-    // Envelope period played: the one driven by the pitch (matrix), otherwise that of the voice; moved by the LFO and
-    // by the envelope slide of the CMD row (D-338).
+    // Envelope period played: the one driven by the pitch (matrix), otherwise that of the voice; moved by the LFO, by
+    // the envelope slide of the CMD row (D-338) and by the MPE slide (D-432).
     static uint16_t envOut(const Voice& v) noexcept {
         const uint16_t ep = v.envEff ? v.envEff : v.envPeriod;
-        const double k = v.lfoEnv * v.slEnvK;
+        const double k = v.lfoEnv * v.slEnvK * v.exprEnvK;
         return k == 1 ? ep : uint16_t(std::clamp(jsRound(ep * k), 1.0, 65535.0));
     }
     // Noise period played: that of the voice, moved by the LFO and by the noise slide of the CMD row (up: shorter).
@@ -1354,11 +1541,15 @@ struct Engine::Impl {
         const int d = v.lfoNoise - int(jsRound(v.slNoise));
         return d ? uint8_t(std::clamp(v.noisePeriod + d, 1, 31)) : v.noisePeriod;
     }
-    // SID timer: a programmable wave of n steps goes n / 2 times faster than the square wave (two interrupts per
-    // period), to keep the pitch (D-151); the LFO moves the ratio (D-257).
-    static double sidRate(const Voice& v) noexcept {
-        return v.sidRatio * v.lfoRatio * (v.sidWaveLen ? v.sidWaveLen / 2.0 : 1.0);
+    // SID timer: interrupts in one period of the note, so that ratio 1 plays the note (Indus, 25/10/2026 17:39,
+    // D-426; the prototype played an octave lower): two for the square wave (high, then low), n for a programmable wave
+    // of n steps (D-151) and for the Square of the menu (D-408, D-411). The LFO moves the ratio (D-257).
+    static double sidSteps(const Voice& v) noexcept {
+        return v.sidWaveLen ? double(v.sidWaveLen) : v.sqSteps ? double(v.sqSteps) : 2.0;
     }
+    static double sidRate(const Voice& v) noexcept { return v.sidRatio * v.lfoRatio * sidSteps(v); }
+    // Stepped Sync Buzzer: the n steps fit in one period of the note, so the timer goes n times faster (D-388).
+    static double buzzRate(const Voice& v) noexcept { return v.buzzLen ? double(v.buzzLen) : 1.0; }
     // Stepped Sync Buzzer (D-151): the restart of the attack writes the first step, each interrupt the next one.
     static void nextBuzz(Voice& v) noexcept {
         const uint8_t s = v.buzz[v.buzzPos];
@@ -1378,7 +1569,9 @@ struct Engine::Impl {
         return (v.matrix & (pitchBit(PitchSource::Table, PitchTarget::Buzzer) | pitchBit(PitchSource::Slide, PitchTarget::Buzzer) |
                             pitchBit(PitchSource::Vibrato, PitchTarget::Buzzer))) != 0;
     }
-    double fixedHz(const Voice& v) const noexcept { return noteHz(double(v.fixedNote) + v.detune + v.analog); }
+    double fixedHz(const Voice& v) const noexcept {
+        return noteHz(double(v.fixedNote) + v.detune + v.analog, a4());
+    }
     // Envelope period driven by the pitch: that of the track at the pitch of the note, scaled.
     uint16_t buzzerPeriod(const Voice& v, double semis, double vib, bool fix) const noexcept {
         const double s = (follows(v, PitchSource::Table, PitchTarget::Buzzer) ? semis : 0) +
@@ -1407,7 +1600,7 @@ struct Engine::Impl {
             if (v.gen == Generator::Dma) {
                 v.pcmStep = fm / v.pcmRootHz;
             } else {
-                v.timerHz = v.gen == Generator::Sid ? fm * sidRate(v) : fm;
+                v.timerHz = fm * (v.gen == Generator::Sid ? sidRate(v) : buzzRate(v));
                 retuneTimer(v, c);
             }
         }
@@ -1465,7 +1658,7 @@ struct Engine::Impl {
         v.shape = v.trackShape;
         primeBuzz(v);
         const double f = slideHz(v, PitchTarget::Timer);
-        v.timerHz = g == Generator::Sid ? f * sidRate(v) : (g == Generator::SyncBuzzer ? f : 0);
+        v.timerHz = g == Generator::Sid ? f * sidRate(v) : (g == Generator::SyncBuzzer ? f * buzzRate(v) : 0);
         startTimer(v, c);
     }
     // Hard sync: square (16-channel) and timer restarted.
@@ -1516,7 +1709,7 @@ struct Engine::Impl {
             v.wavePos = 0;
             primeBuzz(v);
         }
-        v.fTarget = noteHz(double(v.note) + v.fine + bendOf(v) + v.detune + v.analog);
+        v.fTarget = noteHz(double(v.note) + v.fine + bendOf(v) + v.detune + v.analog, a4());
         tuneEnv(v, v.fTarget);
         if (v.glide == 0) {
             v.fCur = v.fTarget;
@@ -1530,8 +1723,13 @@ struct Engine::Impl {
     void timerEvent(Voice& v, uint64_t c) noexcept {
         switch (v.gen) {
         case Generator::Sid:
-            if (!v.sidWaveLen) v.sidHigh = !v.sidHigh;
-            else if (++v.wavePos >= v.sidWaveLen) v.wavePos = 0;
+            if (v.sidWaveLen) {
+                if (++v.wavePos >= v.sidWaveLen) v.wavePos = 0;
+            } else if (!v.sqSteps) v.sidHigh = !v.sidHigh;
+            else {  // the Square of the menu (D-408, D-411): high over the first sqHigh of its sqSteps interrupts
+                if (++v.wavePos >= v.sqSteps) v.wavePos = 0;
+                v.sidHigh = v.wavePos < v.sqHigh;
+            }
             break;
         case Generator::SyncBuzzer:
             if (v.buzzLen) nextBuzz(v);
@@ -1643,15 +1841,19 @@ struct Engine::Impl {
     // (pan + 1) × π/4, D-049); a voice without a track is centred (√½).
     void refreshGain(Voice& v) noexcept {
         const double lv = v.track >= 0 ? live[size_t(v.track)] : 1.0;
-        v.gainBase = v.accent * drumGain(v) * v.fadeAmt * lv;
+        const double gain = v.accent * drumGain(v) * v.fadeAmt;
+        v.gainBase = gain * lv;
+        // The right side of a stereo DMA sample: its own fader, mute and solo (D-459).
+        const bool split = v.track >= 0 && v.gen == Generator::Dma && v.pcmStereo;
+        v.gainR = split ? gain * liveR[size_t(v.track)] : v.gainBase;
         if (v.lfoPan != 0 && v.track >= 0) {  // panning moved by the LFO (D-257), same law as refreshLive
             const double ang = (std::clamp(panNow[size_t(v.track)] + v.lfoPan, -1.0, 1.0) + 1) * 0.7853981633974483;
             v.kL = v.gainBase * std::cos(ang);
-            v.kR = v.gainBase * std::sin(ang);
+            v.kR = v.gainR * std::sin(ang);
             return;
         }
         v.kL = v.gainBase * (v.track >= 0 ? panL[size_t(v.track)] : 0.7071067811865476);
-        v.kR = v.gainBase * (v.track >= 0 ? panR[size_t(v.track)] : 0.7071067811865476);
+        v.kR = v.gainR * (v.track >= 0 ? panR[size_t(v.track)] : 0.7071067811865476);
     }
     // Left and right levels of the output of the voice: the table of one channel alone, or the frame of a DMA voice.
     double levelL(const Voice& v) const noexcept { return v.gen == Generator::Dma ? v.pcmL * v.pcmGain : tab1[v.idx]; }
@@ -1695,16 +1897,22 @@ struct Engine::Impl {
         const bool sloped = v.gen != Generator::Dma && adsrRamp(v);
         if (!sloped && v.sL == 0 && v.sR == 0 && v.sM == 0) {
             // Constant level between two changes (usual case): one step on each bus.
-            double cl = 0, cr = 0, lv = 0;
+            double cl = 0, cr = 0, lv = 0, ld = 0;
             if (v.on) {
                 const double a = v.smoothAdsr() ? adsrAt(v, t * 8) : 1.0;  // aRef outside the ramps
                 const double ll = levelL(v) * a, lr = levelR(v) * a;
-                lv = (ll + lr) * 0.5;
+                if (v.gainR == v.gainBase) {
+                    lv = (ll + lr) * 0.5 * v.gainBase;
+                    ld = (lr - ll) * 0.5 * v.gainBase;
+                } else {  // each side of a stereo sample at its own level (D-459)
+                    lv = (ll * v.gainBase + lr * v.gainR) * 0.5;
+                    ld = (lr * v.gainR - ll * v.gainBase) * 0.5;
+                }
                 cl = ll * v.kL;
                 cr = lr * v.kR;
             }
-            meterUpdate(v, t, lv * v.gainBase);
-            if (trackMask) monoUpdate(v, i, t, lv * v.gainBase, 0);
+            meterUpdate(v, t, lv, ld);
+            if (trackMask) monoUpdate(v, i, t, lv, 0);
             if (sendLive) {
                 const double g = sendOf(v);
                 dSL[i] += cl * g - v.cL * v.gS;
@@ -1720,7 +1928,7 @@ struct Engine::Impl {
         }
         // Smooth ADSR ramp, or a slope to cancel: level and slope per internal step (da: ADSR slope × 8 cycles).
         slopeWritten = true;
-        double cl = 0, cr = 0, sl = 0, sr = 0, cm = 0, sm = 0;
+        double cl = 0, cr = 0, sl = 0, sr = 0, cm = 0, sm = 0, dm = 0;
         if (v.on) {
             const double ll = levelL(v), lr = levelR(v), lv = (ll + lr) * 0.5;
             double a = 1, da = 0;
@@ -1732,10 +1940,18 @@ struct Engine::Impl {
             cr = lr * a * v.kR;
             sl = ll * da * v.kL;
             sr = lr * da * v.kR;
-            cm = lv * a * v.gainBase;
-            sm = lv * da * v.gainBase;
+            if (v.gainR == v.gainBase) {
+                cm = lv * a * v.gainBase;
+                sm = lv * da * v.gainBase;
+                dm = (lr - ll) * 0.5 * a * v.gainBase;
+            } else {  // each side of a stereo sample at its own level (D-459)
+                const double mid = (ll * v.gainBase + lr * v.gainR) * 0.5;
+                cm = mid * a;
+                sm = mid * da;
+                dm = (lr * v.gainR - ll * v.gainBase) * 0.5 * a;
+            }
         }
-        meterUpdate(v, t, cm);
+        meterUpdate(v, t, cm, dm);
         if (trackMask) monoUpdate(v, i, t, cm, sm);
         const double dt = double(t - v.busT);
         if (sendLive) sendUpdate(v, i, dt, cl, cr, sl, sr);
@@ -1864,7 +2080,7 @@ struct Engine::Impl {
         double* const dsl = dSL.data();
         double* const dsr = dSR.data();
         double cL = v.cL, cR = v.cR, cMeter = v.cMeter;
-        float peak = meterPeak[o];
+        float peak = 0;
         uint64_t busT = v.busT;
         uint8_t last = v.idx;
         const uint64_t* const bs = bucketStart.data();
@@ -1946,7 +2162,8 @@ struct Engine::Impl {
         v.cR = cR;
         v.cMeter = cMeter;
         v.busT = busT;
-        meterPeak[o] = peak;
+        meterPeak[o] = std::max(meterPeak[o], peak);
+        meterPeakR[o] = std::max(meterPeakR[o], peak);
     }
     // DMA voice (D-153): frames of the sample in steps [a, b), one step on the buses at each frame (at the step
     // that follows the start of the frame: a frame that starts in the last step waits for the next render). The
@@ -1974,6 +2191,7 @@ struct Engine::Impl {
         double* const dl = dL.data();
         double* const dr = dR.data();
         double* const md = meterD[o].data();
+        double* const mdd = meterDD[o].data();
         const uint64_t g0 = genPos;
         const uint64_t* const bs = bucketStart.data();
         size_t bucket = 0;
@@ -1983,7 +2201,7 @@ struct Engine::Impl {
         const bool loop = v.pcmLoop && v.pcmFrames > 0;
         const double from = double(v.pcmStart), span = frames - from;  // the loop resumes at the start read (Oxx)
         constexpr double kScale = DmaBank::kScale / 128.0;
-        const double gain = v.pcmGain, kL = v.kL, kR = v.kR, gb = v.gainBase;
+        const double gain = v.pcmGain, kL = v.kL, kR = v.kR, gb = v.gainBase, gr = v.gainR;
         const double g = sendLive ? v.gS : 0.0;  // send of the delay (D-299)
         double* const dsl = dSL.data();
         double* const dsr = dSR.data();
@@ -1996,9 +2214,17 @@ struct Engine::Impl {
         const double lo = !ramp ? -kInf : v.stage == 2 ? v.sus : v.stage == 4 ? 0.0 : -kInf;
         const double hi = ramp && v.stage == 1 ? 1.0 : kInf;
         double next = v.pcmNext, pos = v.pcmPos, cL = v.cL, cR = v.cR, cMeter = v.cMeter, l = v.pcmL, r = v.pcmR;
-        float peak = meterPeak[o];
+        double cMeterD = v.cMeterD;
+        float peakL = 0, peakR = 0;
         uint64_t t = v.busT;
         bool ended = false;
+        // A mono sample after a stereo one: the half difference of the stereo one leaves the track (D-457).
+        if (!v.pcmStereo && cMeterD != 0) {
+            mdd[meterBucket(a)] -= cMeterD;
+            cMeterD = 0;
+            meterSide[o] = true;
+        }
+        if (v.pcmStereo) meterSide[o] = true;
         // One loop per case (ADSR ramp, stereo sample). In mono, r = l: (l + l) / 2 is l, the level of the
         // oscilloscope is the same to the bit.
         auto play = [&](auto rampTag, auto stereoTag) {
@@ -2025,11 +2251,19 @@ struct Engine::Impl {
                 if constexpr (kRamp) env = std::min(std::max(aRef + aSlope * double(int64_t(t * 8 - aT)), lo), hi);
                 const double ll = l * gain * env;
                 const double lr = kStereo ? r * gain * env : ll;
-                const double cm = kStereo ? (ll + lr) * 0.5 * gb : ll * gb;
-                peak = std::max(peak, float(cm));
+                const double cm = kStereo ? (ll * gb + lr * gr) * 0.5 : ll * gb;  // gr: the right side's (D-459)
                 while (t >= bs[bucket + 1]) ++bucket;  // meterBucket(t)
                 md[bucket] += cm - cMeter;
                 cMeter = cm;
+                if constexpr (kStereo) {  // each side its peak, their half difference around the mean (D-457)
+                    peakL = std::max(peakL, float(ll * gb));
+                    peakR = std::max(peakR, float(lr * gr));
+                    const double dm = (lr * gr - ll * gb) * 0.5;
+                    mdd[bucket] += dm - cMeterD;
+                    cMeterD = dm;
+                } else {
+                    peakL = std::max(peakL, float(cm));
+                }
                 const double cl = ll * kL, cr = lr * kR;
                 const size_t i = size_t(t - g0);
                 dl[i] += cl - cL;
@@ -2055,8 +2289,10 @@ struct Engine::Impl {
         v.cL = cL;
         v.cR = cR;
         v.cMeter = cMeter;
+        v.cMeterD = cMeterD;
         v.busT = t;
-        meterPeak[o] = peak;
+        meterPeak[o] = std::max(meterPeak[o], peakL);
+        meterPeakR[o] = std::max(meterPeakR[o], v.pcmStereo ? peakR : peakL);
         if (ended) {  // end of the sample without loop (pcmFrame)
             v.on = false;
             v.pcmL = v.pcmR = 0;
@@ -2070,7 +2306,7 @@ struct Engine::Impl {
     }
     // Next frame: byte nearest (truncation) to the position, which advances by the read step; at the end, the
     // loop resumes at the start (while the voice sounds), otherwise the voice stops. The start is the first frame
-    // read at the attack (Oxx, D-338), as the STE reloads its frame start address.
+    // read at the attack (Start, D-444, then Oxx, D-338), as the STE reloads its frame start address; the end is End.
     static void pcmFrame(Voice& v) noexcept {
         if (v.pcmPos >= double(v.pcmFrames)) {
             if (!v.pcmLoop || v.pcmFrames <= v.pcmStart) {
@@ -2277,10 +2513,9 @@ struct Engine::Impl {
         for (int i = kDma3Voice; i < kDma3Voice + kDmaTracks; ++i) {
             const Voice& v = voices[size_t(i)];
             if (!v.on || v.gen != Generator::Dma) continue;
-            if (v.track >= 0) {
-                const TrackMix& m = tracks[size_t(v.track)].mix;
-                if (m.mute || (anySolo && !m.solo)) continue;
-            }
+            // A stereo sample is heard while one of its sides is (D-459).
+            if (v.track >= 0 && !heard(v.track, false, anySolo) && !(v.pcmStereo && heard(v.track, true, anySolo)))
+                continue;
             ++d.voices;
             if (!newest || v.dmaSerial > newest->dmaSerial) newest = &v;
             if (v.dmaSerial == cap.dmaSerial) owner = &v;
@@ -2305,7 +2540,11 @@ struct Engine::Impl {
         e.on = true;
         e.gen = v.gen;
         e.value = v.gen == Generator::Sid ? v.vol4 : v.gen == Generator::SyncBuzzer ? uint8_t(v.shape & 15) : v.slot;
-        e.timer = v.timerMode == TimerMode::Mfp ? v.mfpSet : mfpQuantize(timerActualHz(v));
+        // The exports play the SID as its square wave, two interrupts per period: a wave of steps or the Square of the
+        // menu gives the timer of the square at the same pitch, not its own, which is sidSteps() / 2 times faster
+        // (D-408, D-411, D-426).
+        const double steps = v.gen == Generator::Sid ? sidSteps(v) / 2 : 1.0;
+        e.timer = v.timerMode == TimerMode::Mfp && steps == 1 ? v.mfpSet : mfpQuantize(timerActualHz(v) / steps);
         return e;
     }
 
@@ -2348,11 +2587,27 @@ struct Engine::Impl {
     }
 
     // --------------------------------------------------------------------------------------- Live mixer
-    // A solo is on: the other tracks fall silent.
+    // A solo is on (that of either side of a stereo DMA sample, D-459): the other tracks fall silent.
     bool soloed() const noexcept {
         bool any = false;
-        for (int i = 0; i < kTracks; ++i) any |= tracks[size_t(i)].mix.solo;
+        for (int i = 0; i < kTracks; ++i) {
+            const TrackMix& m = tracks[size_t(i)].mix;
+            any |= m.solo || (m.soloR && trackStereo(i));
+        }
         return any;
+    }
+    // DMA track whose sample is stereo: the right side has its own fader, mute and solo (D-459).
+    bool trackStereo(int track) const noexcept {
+        const TrackPatch& p = tracks[size_t(track)].patch;
+        return p.generator == Generator::Dma &&
+               dmaBank.slot(p.dmaSlot >= 0 ? p.dmaSlot & 7 : dmaAutoSlot(track)).stereo;
+    }
+    // A side of the track is heard: not muted, and in the solo if there is one. `right`: the right side of a stereo
+    // DMA sample, the left side elsewhere.
+    bool heard(int track, bool right, bool anySolo) const noexcept {
+        const TrackMix& m = tracks[size_t(track)].mix;
+        if (right && trackStereo(track)) return !m.muteR && (!anySolo || m.soloR);
+        return !m.mute && (!anySolo || m.solo);
     }
     // Level, panning and send of each track: level 0 for a muted track or one outside the solo; the PAN row of the
     // step takes precedence over the mixer; constant-power gains cos and sin of the angle (pan + 1) × π/4.
@@ -2360,14 +2615,28 @@ struct Engine::Impl {
         const bool anySolo = soloed();
         for (int i = 0; i < kTracks; ++i) {
             const TrackMix& m = tracks[size_t(i)].mix;
-            const bool audible = !m.mute && (!anySolo || m.solo);
-            live[size_t(i)] = audible ? std::clamp(m.level, 0.0, 1.0) : 0.0;
+            live[size_t(i)] = heard(i, false, anySolo) ? std::clamp(m.level, 0.0, 1.0) : 0.0;
+            liveR[size_t(i)] = !trackStereo(i)        ? live[size_t(i)]
+                               : heard(i, true, anySolo) ? std::clamp(m.link ? m.level : m.levelR, 0.0, 1.0)
+                                                         : 0.0;
             const double pan = std::isnan(panStep[size_t(i)]) ? m.pan : panStep[size_t(i)];
             panNow[size_t(i)] = std::clamp(pan, -1.0, 1.0);
             const double ang = (panNow[size_t(i)] + 1) * 0.7853981633974483;
             panL[size_t(i)] = std::cos(ang);
             panR[size_t(i)] = std::sin(ang);
             sendNow[size_t(i)] = std::clamp(m.send, 0.0, 1.0);
+        }
+    }
+    // The mixer changed at cycle c: the voices that sound take their new level and panning (3 channels: the mutes of
+    // the chip channels, the DMA voices).
+    void remix(uint64_t c) noexcept {
+        if (studio()) {
+            for (int i = 0; i < kVoices; ++i)
+                if (voices[size_t(i)].on) touch(i, c);
+        } else {
+            updateMutes(c);
+            for (int i = kDma3Voice; i < kDma3Voice + kDmaTracks; ++i)
+                if (voices[size_t(i)].on) touch(i, c);
         }
     }
 
@@ -2778,6 +3047,16 @@ struct Engine::Impl {
             if (v.on && v.tag == VoiceTag::Arp && v.stage == 4 && !v.fading()) return true;
         return false;
     }
+    // Polyphonic arpeggio (24/10/2026, D-416): the arpeggio is one note per key pressed (or MIDI note), not one per
+    // step (Indus, 20:33): its envelope runs on from step to step (the prototype's grabEnv / putEnv), and each key
+    // pressed starts a note of its own from the attack. In 16 channels, on a track whose Voicing is Polyphonic, the
+    // note before then goes on to its release while the new one plays; keys up, the last note walks on through the
+    // arpeggio during its release (19:32), the notes before it ending theirs at their pitch. Otherwise (Monophonic,
+    // 3-channel modes) the note before is cut.
+    bool arpPoly() const noexcept {
+        const int f = std::clamp(global.focusTrack, 0, kTracks - 1);
+        return studio() && !lanePatch(f, liveIns(f)).mono;
+    }
     // Arpeggios played on the half pulses (48 per quarter note, arpPulse; D-289): those of the MIDI clock, or of the
     // host's position when synced to the tempo while it plays in Host sync (D-256). Otherwise a phase at the cadence
     // of arpRate.
@@ -2792,10 +3071,13 @@ struct Engine::Impl {
     }
     // One step of the keyboard arpeggio at cycle c. Table: the last held note plus the offset of the next step.
     // Other modes: the held notes (sorted by pitch, except Order) over 1 to 3 octaves, walked up, down, up and down
-    // without repeating the ends, or at random. Keys up and the last note in its release: the step only retunes it.
+    // without repeating the ends, or at random. Keys up and the last note in its release: the step only retunes it
+    // (in a polyphonic arpeggio, arpPoly, the newest note only).
     void arpTick(uint64_t c) noexcept {
         const TrackArp& a = arpSettings();
+        const bool poly = arpPoly();
         const bool rel = heldCount == 0 && arpReleasing();
+        const bool fresh = std::exchange(arp.fresh, false);
         std::array<int, 128> held{};
         int nh = 0;
         if (heldCount > 0)
@@ -2851,37 +3133,54 @@ struct Engine::Impl {
         }
         arp.lastSrc = srcNote;
         if (rel) {  // release: only the pitch changes
+            uint64_t last = 0;  // polyphonic: the newest note, the others keep their pitch
+            if (poly)
+                for (const Voice& v : voices)
+                    if (v.on && v.tag == VoiceTag::Arp && v.stage == 4 && !v.fading()) last = std::max(last, v.age);
             for (int i = 0; i < kVoices; ++i) {
                 Voice& v = voices[size_t(i)];
-                if (v.on && v.tag == VoiceTag::Arp && v.stage == 4 && !v.fading()) {
+                if (v.on && v.tag == VoiceTag::Arp && v.stage == 4 && !v.fading() && v.age >= last) {
                     retune(v, n, c);
                     touch(i, c);
                 }
             }
             return;
         }
-        // The envelope continues from one note of the arpeggio to the next (grabEnv / putEnv), the modulation too.
+        // The envelope continues from one step of the arpeggio to the next (grabEnv / putEnv), the modulation too
+        // (D-203), until a key is pressed: a new note, from the attack (D-416). The step before is cut (a fade of 8
+        // steps); in a polyphonic arpeggio, the notes before in their release end it, and the note of the keys
+        // pressed before goes on to its release when a key is pressed.
         bool haveEnv = false;
         uint8_t envStage = 0;
         double envVal = 0;
         ModCarry mod;
-        for (const Voice& v : voices)
-            if (v.on && v.tag == VoiceTag::Arp && !v.fading() && v.stage != 4) {
-                if (v.adsrOn) {
-                    haveEnv = true;
-                    envStage = v.stage;
-                    envVal = adsrAt(v, c);
+        if (!fresh)
+            for (const Voice& v : voices)
+                if (v.on && v.tag == VoiceTag::Arp && !v.fading() && v.stage != 4) {
+                    if (v.adsrOn) {
+                        haveEnv = true;
+                        envStage = v.stage;
+                        envVal = adsrAt(v, c);
+                    }
+                    mod = grabMod(v, c);
+                    break;
                 }
-                mod = grabMod(v, c);
-                break;
+        if (poly && fresh) killTag(VoiceTag::Arp, false, c);
+        else if (poly)
+            for (int i = 0; i < kVoices; ++i) {
+                Voice& v = voices[size_t(i)];
+                if (!v.on || v.tag != VoiceTag::Arp || v.fading() || v.stage == 4) continue;
+                hardFade(v, 8, c);
+                touch(i, c);
             }
-        killTag(VoiceTag::Arp, true, c);
+        else killTag(VoiceTag::Arp, true, c);
         const int vel = heldVel[size_t(std::clamp(srcNote, 0, 127))];
+        const uint64_t born = stamp;  // the voices of this step: those attacked from now on
         trigger(n, vel > 0 ? vel : 100, VoiceTag::Arp, c, arp.track);
         if (haveEnv || mod.on)
             for (int i = 0; i < kVoices; ++i) {
                 Voice& v = voices[size_t(i)];
-                if (!v.on || v.tag != VoiceTag::Arp || v.fading()) continue;
+                if (!v.on || v.tag != VoiceTag::Arp || v.fading() || v.age < born) continue;
                 bool put = false;
                 if (haveEnv && v.adsrOn && envStage != 4) {
                     enterStage(v, envStage, envVal, c);
@@ -2899,8 +3198,10 @@ struct Engine::Impl {
         switch (e.type) {
         case EventType::NoteOn: {
             const int note = e.a, vel = e.b, only = e.track;
+            mpeNoteCh = int(e.value);  // MPE member channel (D-432), for the voices this note attacks now
             if (only >= 0 && only != std::clamp(global.focusTrack, 0, kTracks - 1)) {
                 trigger(note, vel, VoiceTag::Manual, c, only);  // routing by channel: track not focused, no arpeggio
+                mpeNoteCh = 0;
                 break;
             }
             bool already = false;
@@ -2909,16 +3210,19 @@ struct Engine::Impl {
             heldSrc[size_t(note)] = int8_t(only);
             arp.track = only;
             if (arpEnabled()) {
+                mpeNoteCh = 0;        // the arpeggio's notes have no MPE channel
                 if (already) return;  // already held: the arpeggio does not change
                 arp.idx = -1;         // the arpeggio restarts from the beginning when a note is added
+                arp.fresh = true;     // a note of its own, from the attack (D-416)
             } else {
                 trigger(note, vel, VoiceTag::Manual, c, only);  // MIDI: a note already held is played again
+                mpeNoteCh = 0;
             }
             if (!already && heldCount < 128) heldList[size_t(heldCount++)] = uint8_t(note);
             break;
         }
         case EventType::NoteOff: {
-            const int note = e.a, only = e.track;
+            const int note = e.a, only = e.track, ch = int(e.value);  // ch: MPE member channel, its note only (D-432)
             // The key leaves the arpeggio when the channel that holds it releases it, even if another track has been
             // focused since (otherwise it would stay held for good).
             if (only < 0 || only == heldSrc[size_t(note)]) {
@@ -2930,6 +3234,7 @@ struct Engine::Impl {
             }
             for (int i = 0; i < kVoices; ++i) {
                 Voice& v = voices[size_t(i)];
+                if (ch && v.mpeCh != ch) continue;
                 // Digidrum in sustain loop: the loop stops, the sample plays to the end (D-154).
                 if (v.on && v.looping && v.note == note && v.tag == VoiceTag::Manual && (only < 0 || v.track == only))
                     v.looping = false;
@@ -2951,6 +3256,10 @@ struct Engine::Impl {
             for (int i = 0; i < kVoices; ++i) {
                 Voice& v = voices[size_t(i)];
                 if (!v.on || (e.track >= 0 && v.track != e.track)) continue;
+                if (global.bendTarget != BendTarget::Pitch) {  // volume or envelope: at the next frame (D-432)
+                    if (expressive(v)) startFrames(v, c);
+                    continue;
+                }
                 bendVoice(v, v.track >= 0 ? bend[size_t(v.track)] - was[size_t(v.track)] : 0.0, c);
                 touch(i, c);
             }
@@ -2959,17 +3268,47 @@ struct Engine::Impl {
         case EventType::Wheel:
             for (int t = 0; t < kTracks; ++t)
                 if (e.track < 0 || e.track == t) wheel[size_t(t)] = std::max(0.0, e.value);
-            // A voice without modulation receives its VBL frames from now on (the vibrato starts at phase 0).
+            for (Voice& v : voices)
+                if (v.on && (e.track < 0 || v.track == e.track) && expressive(v)) startFrames(v, c);
+            break;
+        // MIDI expression (D-432), at the next VBL frame of the voices it moves.
+        case EventType::Pressure:
+            for (int t = 0; t < kTracks; ++t)
+                if (e.track < 0 || e.track == t) press[size_t(t)] = e.value;
+            for (Voice& v : voices)
+                if (v.on && (e.track < 0 || v.track == e.track) && expressive(v)) startFrames(v, c);
+            break;
+        case EventType::NotePressure:
             for (Voice& v : voices) {
-                if (!v.on || v.vblOn || v.frames || isDrum(v.gen) || v.track < 0) continue;
-                if (wheel[size_t(v.track)] <= 0) continue;
-                v.vblOn = true;
-                v.vblHz = std::max<uint32_t>(1, global.vblHz);
-                v.vblStart = c;
-                v.vblIndex = 0;
-                v.nextVbl = c;
+                if (!v.on || v.note != e.a || v.tag != VoiceTag::Manual || v.mpeCh) continue;
+                if (e.track >= 0 && v.track != e.track) continue;
+                v.press = e.value;
+                if (expressive(v)) startFrames(v, c);
             }
             break;
+        case EventType::MpeBend:
+        case EventType::MpePressure:
+        case EventType::MpeSlide: {
+            MpeChannel& ch = mpe[size_t(std::clamp<int>(e.a, 1, kMpeChannels - 1))];
+            if (e.type == EventType::MpeBend) ch.bend = e.value;
+            else if (e.type == EventType::MpePressure) ch.press = e.value;
+            else ch.slide = e.value;
+            for (int i = 0; i < kVoices; ++i) {
+                Voice& v = voices[size_t(i)];
+                if (!v.on || v.mpeCh != e.a) continue;
+                if (e.type == EventType::MpeBend) {
+                    const double d = ch.bend - v.mpeBend;
+                    v.mpeBend = ch.bend;
+                    bendVoice(v, d, c);
+                    touch(i, c);
+                } else {
+                    v.press = ch.press;
+                    v.slide = ch.slide;
+                    if (expressive(v)) startFrames(v, c);
+                }
+            }
+            break;
+        }
         case EventType::AllOff:
             heldCount = 0;  // panic: no held note any more (the arpeggio stops)
             dmaBank.stopPreview();
@@ -2999,22 +3338,23 @@ struct Engine::Impl {
             break;
         case EventType::MidiClock:  // in Host sync, the clock comes from the host transport
             if (global.seqClock == SeqClock::Host) break;
-            // An odd division (1/64) also counts the half pulse between two clocks (D-289); the others count two
-            // half pulses per clock, so their arpeggios fall on the clocks as in the prototype.
-            if (arpHalfIn > 0) arpPulse(c);  // half pulse not played yet (faster clock): never lost
+            // An odd division (1/64) also counts the half pulse between two clocks (D-289), as the sequencer at
+            // 1/64 (D-422); the others count two half pulses per clock, so their arpeggios fall on the clocks as in
+            // the prototype.
+            if (halfPulseIn > 0) halfPulse(c);  // half pulse not played yet (faster clock): never lost
             arpPulse(c, kNoPulse, true, arpHalves() ? 1 : 2);
             seqMidiClock(c);  // sequencer step
-            arpHalfIn = arpHalves() ? seq.spt / 2 : 0;
+            halfPulseIn = arpHalves() || seqHalves() ? seq.spt / 2 : 0;
             break;
         case EventType::MidiStart:
             if (global.seqClock == SeqClock::Host) break;
-            arpHalfIn = 0;
+            halfPulseIn = 0;
             arp.clockTicks = std::max<int>(1, global.arpDivision) - 1;
             arp.idx = -1;
             seqMidiStart();
             break;
         case EventType::MidiStop:
-            arpHalfIn = 0;
+            halfPulseIn = 0;
             seqMidiStop(c);
             break;
         case EventType::MidiContinue:
@@ -3035,8 +3375,10 @@ struct Engine::Impl {
         case EventType::DigiPreview: {
             const int k = std::clamp<int>(e.a, 0, kDigidrumSlots - 1);
             const DigidrumSlot& d = digiSlots[size_t(k)];
-            digiPreviewSlot = userLen[size_t(k)] ? k : -1;
-            digiPreviewPos = 0;
+            const SampleSpan part = sampleSpan(d.start, d.end, userLen[size_t(k)]);  // Start to End (D-443)
+            digiPreviewSlot = part.size() ? k : -1;
+            digiPreviewPos = part.start;
+            digiPreviewLooping = d.loop;
             digiPreviewInc = d.rateHz * std::pow(2.0, d.cents / 1200) / double(hostRate());
             break;
         }
@@ -3044,6 +3386,7 @@ struct Engine::Impl {
             previewSlot = std::clamp<int>(e.a, 0, kDrumSlots - 1);
             previewPos = 0;
             break;
+        case EventType::DigiStop: digiPreviewSlot = -1; break;
         case EventType::DmaStop: dmaBank.stopPreview(); break;
         case EventType::DmaPreview: dmaBank.preview(e.a); break;
         case EventType::Mix: {
@@ -3052,14 +3395,7 @@ struct Engine::Impl {
             tracks[size_t(t)].mix = e.mix;
             refreshLive();
             if (off) laneOff(t, c);  // track switched off: its sequencer notes stop
-            if (studio()) {
-                for (int i = 0; i < kVoices; ++i)
-                    if (voices[size_t(i)].on) touch(i, c);
-            } else {
-                updateMutes(c);
-                for (int i = kDma3Voice; i < kDma3Voice + kDmaTracks; ++i)  // DMA voices: level, panning
-                    if (voices[size_t(i)].on) touch(i, c);
-            }
+            remix(c);
             break;
         }
         }
@@ -3115,16 +3451,30 @@ struct Engine::Impl {
     }
 
     // Preview of a Digidrum slot (editor, D-154): like the preview of the kit, but through the level table of the
-    // chip (one channel alone, tab1 at level 2n + 1), centred between levels 0 and 15 and scaled to ±0.55, to hear
-    // the 4-bit conversion as the chip renders it; once, without loop.
+    // chip (one channel alone, tab1 at level 2n + 1), scaled as levels 0 to 15 over ±0.55, to hear the 4-bit
+    // conversion as the chip renders it. It centres on the level of silence (the slot's rest value), not halfway
+    // between levels 0 and 15: a sample that starts or ends silent starts or ends at 0, without a click (D-455). From
+    // Start to End (D-443), read again at each block. With the slot's Loop on, the part repeats until the preview is
+    // stopped or Loop goes off (D-449); otherwise it plays once.
     void mixDigiPreview(float* left, float* right, uint32_t n, double scale) noexcept {
         if (digiPreviewSlot < 0) return;
-        const uint8_t* s = user[size_t(digiPreviewSlot)].data();
-        const uint32_t len = userLen[size_t(digiPreviewSlot)];
-        const double lo = tab1[1], hi = tab1[31], mid = (lo + hi) / 2, half = (hi - lo) / 2;
+        const size_t slot = size_t(digiPreviewSlot);
+        const DigidrumSlot& d = digiSlots[slot];
+        if (d.loop) digiPreviewLooping = true;
+        else if (digiPreviewLooping) {
+            digiPreviewSlot = -1;
+            return;
+        }
+        const uint8_t* s = user[slot].data();
+        const SampleSpan part = sampleSpan(d.start, d.end, userLen[slot]);
+        const double half = (tab1[31] - tab1[1]) / 2, mid = tab1[size_t(2 * std::min<int>(d.rest, 15) + 1)];
         for (uint32_t i = 0; i < n; ++i) {
-            const auto k = uint32_t(digiPreviewPos);
-            if (k >= len) {
+            auto k = uint32_t(digiPreviewPos);
+            if (k >= part.end && d.loop && part.size()) {
+                digiPreviewPos = part.start + std::fmod(digiPreviewPos - part.end, double(part.size()));
+                k = uint32_t(digiPreviewPos);
+            }
+            if (k >= part.end) {
                 digiPreviewSlot = -1;
                 return;
             }
@@ -3324,19 +3674,29 @@ struct Engine::Impl {
     }
     // 16-channel: peak of the voice and step of its contribution (without panning) in the oscilloscope bucket of
     // its track; the smooth ADSR slopes are only seen at the updates of the voice. A voice that changes track
-    // leaves the old one.
-    void meterUpdate(Voice& v, uint64_t t, double cm) noexcept {
+    // leaves the old one. dm: half the difference of the right and left sides, 0 but for a stereo sample (D-457);
+    // the left side's peak in meterPeak, the right one's in meterPeakR.
+    void meterUpdate(Voice& v, uint64_t t, double cm, double dm = 0) noexcept {
         if (v.meterTrack != v.track) {
-            if (hasBus(v.meterTrack)) meterD[size_t(v.meterTrack)][meterBucket(t)] -= v.cMeter;
-            v.cMeter = 0;
+            if (hasBus(v.meterTrack)) {
+                meterD[size_t(v.meterTrack)][meterBucket(t)] -= v.cMeter;
+                if (v.cMeterD != 0) meterDD[size_t(v.meterTrack)][meterBucket(t)] -= v.cMeterD;
+            }
+            v.cMeter = v.cMeterD = 0;
             v.meterTrack = int8_t(v.track);
         }
         if (!hasBus(v.track)) return;
         const size_t o = size_t(v.track);
-        meterPeak[o] = std::max(meterPeak[o], float(cm));
+        meterPeak[o] = std::max(meterPeak[o], float(cm - dm));
+        meterPeakR[o] = std::max(meterPeakR[o], float(cm + dm));
         if (cm != v.cMeter) {
             meterD[o][meterBucket(t)] += cm - v.cMeter;
             v.cMeter = cm;
+        }
+        if (dm != v.cMeterD) {
+            meterDD[o][meterBucket(t)] += dm - v.cMeterD;
+            v.cMeterD = dm;
+            meterSide[o] = true;
         }
     }
     // 16-channel, after computing steps [genPos, genPos + count): oscilloscope points of these steps, following
@@ -3363,6 +3723,26 @@ struct Engine::Impl {
         // No voice left on the track and no step to come: exact zero (no rounding residue).
         if (!on && std::all_of(d.begin(), d.end(), [](double x) { return x == 0; })) level = 0;
         meterLevel[t] = level;
+        // Half differences of stereo samples (D-457): integrated the same way on a track where one played, until
+        // they are back to zero; zero elsewhere.
+        auto& side = meterScopeD[t];
+        if (!meterSide[t]) {
+            for (size_t j = 0; j < points; ++j) side[(meterPos + j) % kScopePoints] = 0;
+            return;
+        }
+        auto& dd = meterDD[t];
+        double ld = meterLevelD[t];
+        for (size_t j = 0; j < points; ++j) {
+            ld += dd[j];
+            side[(meterPos + j) % kScopePoints] = float(ld);
+        }
+        std::copy(dd.begin() + std::ptrdiff_t(points), dd.end(), dd.begin());
+        std::fill(dd.end() - std::ptrdiff_t(points), dd.end(), 0.0);
+        if (std::all_of(dd.begin(), dd.end(), [](double x) { return x == 0; })) {
+            if (!on) ld = 0;
+            meterSide[t] = ld != 0;
+        }
+        meterLevelD[t] = ld;
     }
     // 3-channel, STE machine (D-153): voices of the DMA tracks on the buses up to the end of the n samples, rendered
     // into pcmHostL and pcmHostR (unit of the buses of the 16-channel mode), with the points of their oscilloscopes
@@ -3404,6 +3784,7 @@ struct Engine::Impl {
             unsigned top = 0;
             for (uint32_t i = 0; i < chipLevelCount; ++i) top = std::max(top, (chipLevels[i] >> shift) & 31u);
             meterPeak[size_t(tr)] = std::max(meterPeak[size_t(tr)], float(tab1[top]));
+            meterPeakR[size_t(tr)] = meterPeak[size_t(tr)];
             auto& scope = meterScope[size_t(tr)];
             for (size_t j = 0; j < points; ++j)
                 scope[(meterPos + j) % kScopePoints] += float(tab1[(chipLevels[meterAt[j]] >> shift) & 31u]);
@@ -3466,8 +3847,9 @@ struct Engine::Impl {
         for (size_t j = 0; j < points; ++j)
             meterAt[j] = uint32_t(std::ceil(double(meterIndex + j) * step) - double(from));
         chipLevelCount = n;
-        for (auto& scope : meterScope)
-            for (size_t j = 0; j < points; ++j) scope[(meterPos + j) % kScopePoints] = 0;
+        for (auto* scopes : {&meterScope, &meterScopeD})
+            for (auto& scope : *scopes)
+                for (size_t j = 0; j < points; ++j) scope[(meterPos + j) % kScopePoints] = 0;
         for (int k = 0; k < 2; ++k) {
             float* o = out.chip[size_t(k)] ? out.chip[size_t(k)] + a : nullptr;
             if (k >= nc) {
@@ -3557,10 +3939,15 @@ struct Engine::Impl {
             wroteT[t] = false;
         }
         meterPeak.fill(0);
+        meterPeakR.fill(0);
         for (auto& scope : meterScope) scope.fill(0);
+        for (auto& scope : meterScopeD) scope.fill(0);
         dmaBank.stopPreview();
         for (auto& d : meterD) std::fill(d.begin(), d.end(), 0.0);
+        for (auto& d : meterDD) std::fill(d.begin(), d.end(), 0.0);
         meterLevel.fill(0);
+        meterLevelD.fill(0);
+        meterSide.fill(false);
         echoClear();
     }
 
@@ -3589,7 +3976,10 @@ struct Engine::Impl {
         restartLfoRuns(0);  // the cycles start again (D-279)
         meterIndex = 0;
         for (auto& d : meterD) std::fill(d.begin(), d.end(), 0.0);
+        for (auto& d : meterDD) std::fill(d.begin(), d.end(), 0.0);
         meterLevel.fill(0);
+        meterLevelD.fill(0);
+        meterSide.fill(false);
     }
 
     // -------------------------------------------------------------------- Sequencer (Sequencer.cpp, M5)
@@ -3602,11 +3992,11 @@ struct Engine::Impl {
     double seqNote(const SeqLane& l, int track, int voice, int s) const noexcept;
     double seqBpm() const noexcept;
     double stepsPerBeat() const noexcept;
-    int clocksPerStep() const noexcept;
-    // Ticks (D-149): cadence in ticks, duration of row `step` in ticks, and in MIDI pulses.
+    int halfPulsesPerStep() const noexcept;
+    // Ticks (D-149): cadence in ticks, duration of row `step` in ticks, and in half MIDI pulses (D-422).
     bool ticksTiming() const noexcept;
     int lineTicks(int step) const noexcept;
-    int lineClocks(int step) const noexcept;
+    int lineHalves(int step) const noexcept;
     double swingFactor(int step) const noexcept;
     double swingAmount() const noexcept;
     double stepPpq(int64_t k) const noexcept;
@@ -3646,13 +4036,15 @@ struct Engine::Impl {
     void laneStep(int i, double stepSamp, uint64_t c) noexcept;
     void heldStep(int i, const SeqLane& l, size_t s, double level, double stepSamp, bool arpOn, uint64_t c) noexcept;
     void relevel(int vi, int track, int ins, double level, uint64_t c) noexcept;
+    void setLevel(Voice& v, int track, int ins, double level) noexcept;
     // Commands of the row (CMD row, D-150): Sxx before the duration of the row, Rxx after its notes.
     uint16_t lineCmd(int i, SeqCmd k) const noexcept;
     void laneSwitches(int i) noexcept;
     void seqSpeedCmd() noexcept;
     void seqTempoCmd() noexcept;
     void laneCmd(int i, double stepSamp, uint64_t c) noexcept;
-    void laneLineCmds(int i, uint64_t c) noexcept;
+    void laneLineCmds(int i, double stepSamp, uint64_t c) noexcept;
+    void armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, uint64_t c) noexcept;
     void cutLine(int i, uint64_t c) noexcept;
     void wakeVbl(Voice& v, uint64_t c) const noexcept;
     template <class F> void forLaneVoices(int i, F&& f) noexcept;
@@ -3663,6 +4055,7 @@ struct Engine::Impl {
     int64_t lanesDue() const noexcept;
     void laneTrigger(int i, double note, double level, int gen, double drumTr, int ins, uint64_t c) noexcept;
     void killLane(int vi, bool hard, uint64_t c) noexcept;
+    bool laneTail(int i, uint64_t c) noexcept;
     void applyMix(int vi, int m, uint64_t c) noexcept;
     void applyMixDef(int vi, int track, int ins, int m, uint64_t c) noexcept;
     void liveFx(int vi, int track, int ins, int fxv, uint64_t c) noexcept;
@@ -3681,7 +4074,13 @@ struct Engine::Impl {
     void arpPulse(uint64_t c, int64_t pulse = kNoPulse, bool lanesToo = true, int weight = 1) noexcept;
     // Half pulses that the clock delivers: all of them for an odd division (1/64), whole clocks otherwise (D-289).
     bool arpHalves() const noexcept { return global.arpDivision % 2 != 0; }
+    // Likewise for the sequencer on the MIDI clock: all of them at the 1/64 resolution, a step lasting a pulse and a
+    // half (D-422); clockWeight: half pulses a clock stands for.
+    bool seqHalves() const noexcept;
+    int clockWeight() const noexcept { return seqHalves() ? 1 : 2; }
+    void halfPulse(uint64_t c) noexcept;
     void seqMidiClock(uint64_t c) noexcept;
+    void seqMidiPulse(uint64_t c, int weight) noexcept;
     void seqMidiStart() noexcept;
     void seqMidiStop(uint64_t c) noexcept;
     void seqSongPosition(int sixteenths) noexcept;

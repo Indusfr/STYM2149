@@ -292,6 +292,30 @@ TEST_CASE("Alert: choice rows below the text, one option picked per row", "[gemu
     CHECK_FALSE(d.topModal());
 }
 
+TEST_CASE("Outline: non-zero winding, a polygon inside another a hole only if it turns the other way (D-404)",
+          "[gemui]") {
+    // A 10 × 10 square, a 4 × 4 square inside it turning the same way, then the other way.
+    static const float same[] = {0, 0, 10, 0, 10, 10, 0, 10, 3, 3, 7, 3, 7, 7, 3, 7};
+    static const float other[] = {0, 0, 10, 0, 10, 10, 0, 10, 3, 3, 3, 7, 7, 7, 7, 3};
+    static const uint16_t ends[] = {4, 8};
+    const Outline a{same, ends}, b{other, ends};
+    CHECK(a.inside(1, 1));
+    CHECK(a.inside(5, 5));
+    CHECK(b.inside(1, 1));
+    CHECK_FALSE(b.inside(5, 5));
+    CHECK_FALSE(a.inside(11, 5));
+    CHECK_FALSE(a.inside(-1, 5));
+    // An edge includes its end of smaller y only: a point on the top edge is inside, on the bottom edge outside.
+    CHECK(a.inside(1, 0));
+    CHECK_FALSE(a.inside(1, 10));
+    // A triangle: its slanted edge cuts the row at x = y.
+    static const float tri[] = {0, 0, 8, 8, 0, 8};
+    static const uint16_t one[] = {3};
+    const Outline t{tri, one};
+    CHECK(t.inside(2.9, 3.5));
+    CHECK_FALSE(t.inside(3.6, 3.5));
+}
+
 TEST_CASE("Colour blend: rounded per channel, an opacity outside [0, 1] at the nearest bound", "[gemui]") {
     const Color a = rgb(0xFF, 0x80, 0x00), b = rgb(0x00, 0x00, 0xFF);
     CHECK(mix(a, b, 0.5) == rgb(0x80, 0x40, 0x80));
@@ -305,9 +329,10 @@ TEST_CASE("Menu: a checked entry is taller", "[gemui]") {
     std::vector<MenuItem> items(2);
     items[0].label = "Chip Voice";
     items[1].label = "SID Voice";
-    // Anchor at a half pixel: edges rounded separately (prototype: menu [565, 182, 163 × …]).
+    // Anchor at a half pixel: edges rounded separately (prototype: menu [565, 182, 163 × …], 6 px lower; its frame
+    // now lies on the button's rule).
     const MenuList& m = MenuList::open(d, items, 0, Box{565, 152, 94, 24}, false);
-    CHECK(m.bounds().y == 182);
+    CHECK(m.bounds().y == 174);
     CHECK(m.bounds().h == 4 + 22 + 20);
     const MenuList& m2 = MenuList::open(d, items, 0, Box{366.5, 152, 94, 24}, false);
     CHECK(m2.bounds().x == 367);
@@ -407,6 +432,45 @@ TEST_CASE("Value field: a shorter mask while typing ends the input instead of wr
     CHECK(g.f.editing());
 }
 
+TEST_CASE("Value field: the unit after the mask's digits stays in normal video under the pointer (D-438)", "[gemui]") {
+    // A white window under a field of nine 8 px cells, "440.00 Hz".
+    struct Paper : Widget {
+        void paint(Painter& p) override { p.fill(bounds(), colors::kWhite); }
+    };
+    Desktop d{400, 300};
+    Paper root;
+    ValueField f;
+    root.setBounds(d.bounds());
+    d.setRoot(&root);
+    root.add(f);
+    f.setBounds({100, 100, 72, 16});
+    f.setMask("999.99 Hz");
+    f.setText("440.00 Hz");
+    // The top row of the field, above the glyphs: black where the field is in reverse video.
+    auto reversed = [&d](int x) { return d.surface().at(x, 100) == colors::kBlack; };
+    d.mouseMove({110, 108}, {});
+    d.paint();
+    // "440.00" reversed; the space and "Hz" stay black on white.
+    for (int x = 100; x < 148; ++x) CHECK(reversed(x));
+    for (int x = 148; x < 172; ++x) CHECK_FALSE(reversed(x));
+    // Without a unit, the whole field reversed, as before.
+    f.setMask("999");
+    f.setText("440");
+    d.paint();
+    for (int x = 100; x < 172; ++x) CHECK(reversed(x));
+    // Without a mask, the unit set for the field (Digidrums' rate and fine tune, D-451).
+    f.setMask("");
+    f.setUnit(" ct");
+    f.setText("-12 ct");
+    d.paint();
+    for (int x = 100; x < 148; ++x) CHECK(reversed(x));  // dashes' cells and "-12"
+    for (int x = 148; x < 172; ++x) CHECK_FALSE(reversed(x));
+    f.setText("Off");  // a text without that unit: reversed whole
+    d.paint();
+    for (int x = 100; x < 172; ++x) CHECK(reversed(x));
+    d.setRoot(nullptr);
+}
+
 TEST_CASE("Value field: hidden while typed into, its input is cancelled and a click opens it again", "[gemui]") {
     FieldRig g;
     g.f.setText("12");
@@ -486,6 +550,102 @@ TEST_CASE("Slider: a press ended by a modal box or by hiding ends the gesture an
     CHECK(ends == 2);
     d.mouseUp({200, 108}, {});
     CHECK(ends == 2);
+    d.setRoot(nullptr);
+}
+
+TEST_CASE("Desktop: a menu opened over a modal box lies over it and takes the mouse and Esc first (D-394)", "[gemui]") {
+    Desktop d(400, 300);
+    Widget root;
+    root.setBounds(d.bounds());
+    d.setRoot(&root);
+    // A black box with a button, as a modal box.
+    struct Black : Widget {
+        Button button{"Up"};
+        Black() { add(button); }
+        void paint(Painter& p) override { p.fill(bounds(), colors::kBlack); }
+        bool blocksMouse() const noexcept override { return true; }
+    };
+    auto box = std::make_unique<Black>();
+    box->setBounds({50, 50, 300, 200});
+    Button* button = &box->button;
+    button->setBounds({60, 60, 60, 24});
+    int clicks = 0, picked = -1;
+    button->onClick = [&] { ++clicks; };
+    Black& modal = static_cast<Black&>(d.openModal(std::move(box)));
+    const auto openMenu = [&] {
+        std::vector<MenuItem> items(2);
+        items[0].label = "Up";
+        items[1].label = "Down";
+        for (int i = 0; i < 2; ++i) items[size_t(i)].pick = [&picked, i] { picked = i; };
+        return &MenuList::open(d, items, 0, button->box(), false);
+    };
+    const auto press = [&](Point p) {
+        d.mouseMove(p, {});
+        d.mouseDown(p, MouseButton::Left, {});
+        d.mouseUp(p, {});
+    };
+
+    // Drawn over the box, not under its veil: the white of the menu, without the 25 % shade.
+    const MenuList* m = openMenu();
+    d.paint();
+    const Rect down = m->itemRect(1);
+    CHECK(d.surface().at(down.right() - 3, down.y + 2) == colors::kWhite);
+    // Its entry takes the press; the box and its button stay.
+    press({down.x + 10, down.y + 10});
+    CHECK(picked == 1);
+    CHECK_FALSE(d.hasPopups());
+    CHECK(d.topModal() == &modal);
+    CHECK(clicks == 0);
+    // Esc closes the menu alone; a second Esc goes to the box.
+    openMenu();
+    KeyEvent esc;
+    esc.key = Key::Escape;
+    CHECK(d.keyDown(esc));
+    CHECK_FALSE(d.hasPopups());
+    CHECK(d.hasModal());
+    // A press on the box outside the menu closes it and reaches the box.
+    openMenu();
+    press({70, 70});
+    CHECK_FALSE(d.hasPopups());
+    CHECK(clicks == 1);
+    // Closing the box closes the menu opened over it.
+    openMenu();
+    d.closeModal(modal);
+    CHECK_FALSE(d.hasPopups());
+    CHECK_FALSE(d.hasModal());
+    d.paint();
+    d.setRoot(nullptr);
+}
+
+TEST_CASE("Desktop: a menu kept under a modal box's veil takes neither the mouse nor Esc", "[gemui]") {
+    Desktop d(400, 300);
+    Widget root;
+    root.setBounds(d.bounds());
+    d.setRoot(&root);
+    std::vector<MenuItem> items(1);
+    int picked = 0;
+    items[0].label = "Entry";
+    items[0].pick = [&] { ++picked; };
+    const MenuList& m = MenuList::open(d, items, kNoMarks, Box{20, 20, 60, 24}, false);
+    const Rect entry = m.itemRect(0);
+    auto box = std::make_unique<Widget>();
+    box->setBounds({200, 200, 100, 50});
+    Widget& modal = d.openModal(std::move(box), true);
+    const Point p{entry.x + 10, entry.y + 10};
+    d.mouseMove(p, {});
+    d.mouseDown(p, MouseButton::Left, {});
+    d.mouseUp(p, {});
+    CHECK(picked == 0);
+    KeyEvent esc;
+    esc.key = Key::Escape;
+    d.keyDown(esc);
+    CHECK(d.hasPopups());  // it comes back once the box is closed
+    d.closeModal(modal);
+    CHECK(d.hasPopups());
+    d.mouseMove(p, {});
+    d.mouseDown(p, MouseButton::Left, {});
+    d.mouseUp(p, {});
+    CHECK(picked == 1);
     d.setRoot(nullptr);
 }
 

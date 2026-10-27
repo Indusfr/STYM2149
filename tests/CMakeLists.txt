@@ -47,6 +47,7 @@ add_executable(stym_unit
   unit/test_instruments.cpp
   unit/test_engine.cpp
   unit/test_engine_m3.cpp
+  unit/test_engine_expression.cpp
   unit/test_plugincore.cpp
   unit/test_ym_player.cpp
   unit/test_proto_engine.cpp
@@ -62,6 +63,7 @@ add_executable(stym_unit
   unit/test_engine_cmd.cpp
   unit/test_engine_ticks.cpp
   unit/test_engine_timerwave.cpp
+  unit/test_engine_pitch.cpp
   unit/test_engine_buzzer.cpp
   unit/test_engine_dma.cpp
   unit/test_engine_recorder.cpp
@@ -108,11 +110,13 @@ add_executable(stym_ui
   gemui/test_xm_menu.cpp
   gemui/test_audio_menu.cpp
   gemui/test_register_menu.cpp
+  gemui/test_settings_window.cpp
   gemui/test_sound_engine_menu.cpp
   gemui/test_tooltip_menu.cpp
   gemui/test_instruments_window.cpp
   gemui/test_seq_window.cpp
   gemui/test_seq_cmd.cpp
+  gemui/test_step_sound.cpp
   gemui/test_seq_daw12.cpp
   gemui/test_seq_ticks.cpp
   gemui/test_sequences_panel.cpp

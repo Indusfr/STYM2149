@@ -14,6 +14,7 @@
 #include "plugincore/Parameters.h"
 #include "pluginui/BuzzerPresets.h"
 #include "pluginui/MainWindow.h"
+#include "ymengine/Pitch.h"
 
 using namespace stym;
 using pluginui::MainWindow;
@@ -152,6 +153,15 @@ void typeValue(MainWindow& w, const std::string& id, std::string_view text) {
 }
 
 // A Sync Buzzer on track 1.
+// Picks a form of the SID wave in its menu (D-411).
+void form(MainWindow& w, const std::string& name) {
+    click(w, "waveForm");
+    const std::vector<std::string> l = labels(w);
+    const auto it = std::find(l.begin(), l.end(), name);
+    REQUIRE(it != l.end());
+    pick(w, int(it - l.begin()));
+}
+
 void syncBuzzer(TestHost& h) {
     h.values[size_t(paramIndex(0, Track::Generator))] = float(ymengine::Generator::SyncBuzzer);
 }
@@ -323,17 +333,29 @@ TEST_CASE("GENERATOR frame of a SID Voice: the SID wave under its settings (sixt
     CHECK_FALSE(w.rectOf("genTuned"));
     CHECK_FALSE(w.rectOf("buzz0"));
     CHECK_FALSE(w.rectOf("timerWave"));
+    // Base, the plain square: the menu alone, no bars and no Steps (Indus, 24/10/2026 20:30, D-417).
+    CHECK(w.rectOf("waveForm"));
+    CHECK_FALSE(w.rectOf("waveGrid"));
+    CHECK_FALSE(w.rectOf("waveSteps"));
+    form(w, "Custom");
+    w.tick(0);
     const gemui::Rect frame = *w.rectOf("genFrame"), grid = *w.rectOf("waveGrid");
     CHECK(grid.w == pluginui::SidWaveGrid::kWidth);
     CHECK(grid.h == pluginui::SidWaveGrid::kHeight);
-    for (const char* id : {"waveGrid", "waveSteps", "waveSquare", "waveSine"}) {
+    // SID min vol ends with Timer ratio (thirteenth DAW test, item 163, D-372); both start at the frame's inner edge.
+    const gemui::Rect ratio = *w.rectOf("ratio"), vmin = *w.rectOf("vmin");
+    CHECK(vmin.x == ratio.x);
+    CHECK(vmin.right() == ratio.right());
+    // The menu of the SID wave's forms above the grid, after its name (D-411), Steps under it.
+    for (const char* id : {"waveGrid", "waveSteps", "waveForm"}) {
         CAPTURE(id);
         const gemui::Rect r = *w.rectOf(id);
         CHECK(r.x > frame.x);
         CHECK(r.right() < frame.right());
         CHECK(r.bottom() < frame.bottom());
-        if (std::string(id) != "waveGrid") CHECK(r.y > grid.bottom());
     }
+    CHECK(w.rectOf("waveForm")->bottom() < grid.y);
+    CHECK(w.rectOf("waveSteps")->y > grid.bottom());
     // A Chip Voice: no SID wave.
     h.values[size_t(paramIndex(0, Track::Generator))] = float(ymengine::Generator::Chip);
     w.tick(10);
@@ -372,14 +394,31 @@ TEST_CASE("GENERATOR frame: N, D, Fine and the Steps of the Sync Buzzer and of t
     undoKey(w);
     CHECK(p.buzzLen == 0);
 
-    // SID wave: the empty wave starts from the square, like a drag of its slider.
+    // SID wave: Steps hidden at Base (D-411, D-417); with Custom, typed, from 2 to 16.
     w.pickGenerator(int(ymengine::Generator::Sid));
+    w.tick(0);
+    CHECK_FALSE(w.rectOf("waveStepsv"));
+    form(w, "Custom");
     w.tick(0);
     typeValue(w, "waveStepsv", "6");
     CHECK(p.sidWaveLen == 6);
-    CHECK(p.sidWave[0] == 15);
-    CHECK(p.sidWave[2] == 15);
-    CHECK(p.sidWave[5] == uint8_t(param(h, Track::SidVmin)));
     typeValue(w, "waveStepsv", "1");
-    CHECK(p.sidWaveLen == 0);  // the square wave
+    CHECK(p.sidWaveLen == 2);
+
+    // Sine keeps the number of Steps and fills the 16 bars, those beyond the Steps faded (Indus, 24/10/2026 11:24,
+    // D-401); from Base, as many as its Period, 8 (D-426).
+    typeValue(w, "waveStepsv", "6");
+    form(w, "Sine");
+    w.tick(0);
+    CHECK(p.sidWaveLen == 6);
+    CHECK(p.sidWave == ymengine::sineSidWave());
+    CHECK(w.sidWave().state().length == 6);
+    CHECK(w.waveFormButton().text() == "Sine");
+    typeValue(w, "waveStepsv", "12");
+    w.tick(0);
+    CHECK(p.sidWaveLen == 12);
+    CHECK(p.sidWave == ymengine::sineSidWave());  // Steps play more of the same sine
+    form(w, "Base");
+    form(w, "Sine");
+    CHECK(p.sidWaveLen == 8);
 }

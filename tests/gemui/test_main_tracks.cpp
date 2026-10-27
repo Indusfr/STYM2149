@@ -1,5 +1,6 @@
-// STYM2149 — gemui tests: main window keyboard Latch (P147), the track tabs' context menu, Copy settings and
-// Paste settings (P230, P231), and tracks switched off from their tabs during playback, heard through the driver.
+// STYM2149 — gemui tests: main window keyboard Latch (P147), a held key let go when the sequencer cuts its note
+// (D-431), the track tabs' context menu, Copy settings and Paste settings (P230, P231), and tracks switched off from
+// their tabs during playback, heard through the driver.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -51,9 +52,11 @@ void tabMenuPick(pluginui::MainWindow& w, int track, int item) {
     pickItem(w, item);
 }
 
-// The Send of the delay goes with the pan: a setting of the Mixer (D-299).
+// The Send of the delay goes with the pan: a setting of the Mixer (D-299), like the right side of a stereo DMA sample
+// (D-459).
 constexpr bool notCopied(Track t) {
-    return t == Track::On || t == Track::Pan || t == Track::Mute || t == Track::Solo || t == Track::Send;
+    return t == Track::On || t == Track::Pan || t == Track::Mute || t == Track::Solo || t == Track::Send ||
+           t == Track::LevelR || t == Track::MuteR || t == Track::SoloR || t == Track::Link;
 }
 
 // The plugin's driver playing what the editor wrote (Free run, separate outputs of tracks 1 to 4), in blocks of 256
@@ -173,6 +176,77 @@ TEST_CASE("Latch: keys stay held until pressed again, one mouse note at a time, 
     CHECK(h.take() == std::vector<Midi>{{kNoteOn, 40, 127}, {kNoteOff, 40, 0}});
 }
 
+TEST_CASE("Latch: a held key lets go when the sequencer cuts its note, and plays again (D-431)", "[ui][kbd][latch]") {
+    // Indus, 25/10/2026 19:41: a latched key stayed lit once the sequencer, started with Space, took its voice.
+    UiHost h;
+    pluginui::MainWindow w(h);
+    const gemui::Point c2 = whiteKey(w, 0);
+    click(w, "kbLatch");
+    mouseDown(w, c2);
+    mouseUp(w, c2);
+    CHECK(h.take() == std::vector<Midi>{{kNoteOn, 36, 127}});
+
+    // The engine reports the note cut: the key lets go (the note off is harmless, the voice already plays another).
+    plugin::EngineStatus t;
+    t.manualCut[36] = 1;
+    h.status = t;
+    w.tick(0);
+    CHECK(h.take() == std::vector<Midi>{{kNoteOff, 36, 0}});
+    // The same counters again: nothing more; a cut note that no key holds: nothing.
+    h.status = t;
+    w.tick(0);
+    t.manualCut[40] = 1;
+    h.status = t;
+    w.tick(0);
+    CHECK(h.take().empty());
+    // The key plays its note again instead of releasing it.
+    mouseDown(w, c2);
+    mouseUp(w, c2);
+    CHECK(h.take() == std::vector<Midi>{{kNoteOn, 36, 127}});
+    // Without Latch too: a key held down whose note was cut lets go, its release then sends nothing.
+    click(w, "kbLatch");
+    CHECK(h.take() == std::vector<Midi>{{kNoteOff, 36, 0}});
+    mouseDown(w, c2);
+    CHECK(h.take() == std::vector<Midi>{{kNoteOn, 36, 127}});
+    t.manualCut[36] = 2;
+    h.status = t;
+    w.tick(0);
+    CHECK(h.take() == std::vector<Midi>{{kNoteOff, 36, 0}});
+    mouseUp(w, c2);
+    CHECK(h.take().empty());
+}
+
+TEST_CASE("SYSTEM Note line: the newest note's period, back to \"-\" once no voice sounds (D-440)", "[ui][note]") {
+    // Indus, 26/10/2026 04:00-04:02: the period stayed shown with no note playing; the line stays, as at launch.
+    UiHost h;
+    pluginui::MainWindow w(h);
+    CHECK(w.noteReadout() == "-");
+    plugin::EngineStatus t;
+    t.noteSerial = 1;
+    t.notePeriod = 284;
+    t.noteSounding = true;
+    h.status = t;
+    w.tick(0);
+    CHECK(w.noteReadout() == "TP=284 -> 440.14 Hz");
+    // The release goes on: the line stays.
+    t.serial = 2;
+    h.status = t;
+    w.tick(0);
+    CHECK(w.noteReadout() == "TP=284 -> 440.14 Hz");
+    // No voice left: "-", the register monitor keeps the last period.
+    t.noteSounding = false;
+    h.status = t;
+    w.tick(0);
+    CHECK(w.noteReadout() == "-");
+    // The next note shows again.
+    t.noteSerial = 2;
+    t.notePeriod = 142;
+    t.noteSounding = true;
+    h.status = t;
+    w.tick(0);
+    CHECK(w.noteReadout() == "TP=142 -> 880.28 Hz");
+}
+
 TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; disabled in 3ch (P230)", "[ui][tracks]") {
     UiHost h;
     pluginui::MainWindow w(h);
@@ -183,7 +257,7 @@ TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; dis
     click(w, "tab2", gemui::MouseButton::Right);
     REQUIRE(menuLabels(w) == std::vector<std::string>{"Copy settings", "Paste settings", "---", "Rename..."});
     const gemui::MenuList* m = topMenu(w);
-    CHECK(m->bounds().y >= tab->bottom());
+    CHECK(m->bounds().y == tab->bottom() - 2);  // its frame on the tab's bottom rule
     CHECK_FALSE(m->items()[3].disabled);
     CHECK(h.p(Global::FocusTrack) == 1.0f);
     CHECK(h.p(2, Track::On) == 0.0f);

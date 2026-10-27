@@ -1,5 +1,5 @@
 // STYM2149 — Ticks timing in the Step Sequencer window (M6, B5, D-149): entries of the Resolution menu, typed speed
-// and groove, button and tempo shown; 100 and 200 Hz replay tick in Options > VBL frequency.
+// and groove, button and tempo shown; 100 and 200 Hz replay tick in Settings > VBL frequency (D-441).
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -11,7 +11,9 @@
 #include "gemui/Controls.h"
 #include "gemui/Menu.h"
 #include "plugincore/Parameters.h"
+#include "pluginui/IconData.h"
 #include "pluginui/MainWindow.h"
+#include "pluginui/SettingsWindow.h"
 
 using namespace stym;
 using pluginui::MainWindow;
@@ -135,16 +137,23 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(text(w, "seqReso") == "1/16");
     CHECK(enabled(w, "bpm"));
 
-    // Resolutions of the prototype (1/16 checked), then below a rule the entries of the Ticks timing.
+    // Resolutions of the prototype (1/16 checked), 1/64 after 1/32 (D-422), 1/32T after 1/16T (D-433), then below a
+    // rule the entries of the Ticks timing.
     click(w, "seqReso");
     std::vector<std::string> l = labels(w);
-    REQUIRE(l.size() == 14);  // then the CMD row preference (D-150)
-    CHECK(l[8] == "---");
-    CHECK(l[9] == "Ticks: Speed ticks per line");
-    CHECK(l[10] == "Speed: 6 ticks...");
-    CHECK(l[11] == "Groove: 0...");
+    REQUIRE(l.size() == 16);  // then the CMD row preference (D-150)
+    CHECK(l[3] == "1/32 thirty-second");
+    CHECK(l[4] == "1/64 sixty-fourth");
+    CHECK(l[5] == "---");
+    CHECK(l[6] == "1/4T triplet");
+    CHECK(l[8] == "1/16T triplet");
+    CHECK(l[9] == "1/32T triplet");
+    CHECK(l[10] == "---");
+    CHECK(l[11] == "Ticks: Speed ticks per line");
+    CHECK(l[12] == "Speed: 6 ticks...");
+    CHECK(l[13] == "Groove: 0...");
     CHECK(menu(w).checked() == 2);
-    pick(w, 9);
+    pick(w, 11);
     CHECK(h.state.global.timing == SeqTiming::Ticks);
     CHECK(h.state.global.resolution == 2);  // kept for the grid and for going back to BPM
     CHECK(text(w, "seqReso") == "Ticks 6");
@@ -153,27 +162,28 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK_FALSE(enabled(w, "swing"));
     CHECK(text(w, "bpmVal") == "ticks 125.00");
 
-    // Speed: brought into 1-31; a text that is not a number changes nothing.
+    // Speed: brought into 1-31; a text that is not a number changes nothing. The check mark is on the Ticks entry,
+    // the tenth plain one (it fell on Groove before D-422, which counts the plain entries only).
     click(w, "seqReso");
     CHECK(menu(w).checked() == 9);
-    pick(w, 10);
+    pick(w, 12);
     answer(w, "3");
     CHECK(h.state.global.speed == 3);
     click(w, "seqReso");
-    pick(w, 10);
+    pick(w, 12);
     answer(w, "99");
     CHECK(h.state.global.speed == 31);
     click(w, "seqReso");
-    pick(w, 10);
+    pick(w, 12);
     answer(w, "x");
     CHECK(h.state.global.speed == 31);
     click(w, "seqReso");
-    pick(w, 10);
+    pick(w, 12);
     answer(w, "6");
 
     // Groove: up to 16 values from 0 to 15; the button marks it with a "+".
     click(w, "seqReso");
-    pick(w, 11);
+    pick(w, 13);
     answer(w, "1 0, 2 20");
     CHECK(h.state.global.grooveLength == 4);
     CHECK(h.state.global.groove[0] == 1);
@@ -181,8 +191,8 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(h.state.global.groove[3] == 15);
     CHECK(text(w, "seqReso") == "Ticks 6+");
     click(w, "seqReso");
-    CHECK(labels(w)[11] == "Groove: 1 0 2 15...");
-    pick(w, 11);
+    CHECK(labels(w)[13] == "Groove: 1 0 2 15...");
+    pick(w, 13);
     answer(w, "");
     CHECK(h.state.global.grooveLength == 1);
     CHECK(h.state.global.groove[0] == 0);
@@ -201,16 +211,179 @@ TEST_CASE("Ticks: Resolution menu, Ticks timing, typed speed and groove", "[ui][
     CHECK(text(w, "seqReso") == "1/32");
     CHECK(enabled(w, "bpm"));
     CHECK(enabled(w, "swing"));
+
+    // 1/64 (D-422): saved as the eighth resolution, shown after 1/32; the check mark follows the order of the menu,
+    // that of a triplet the plain entries (1/4T is the sixth one, after the rule).
+    click(w, "seqReso");
+    pick(w, 4);
+    CHECK(h.state.global.resolution == 7);
+    CHECK(text(w, "seqReso") == "1/64");
+    click(w, "seqReso");
+    CHECK(menu(w).checked() == 4);
+    w.desktop().closePopups();
+    // The Note button draws the sixty-fourth note for Step; the Note menu has 1/64 after 1/32, one step long.
+    const auto* fig = dynamic_cast<const gemui::Button*>(w.sequencer().widgetOf("seqFig"));
+    REQUIRE(fig);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[7]);
+    click(w, "seqFig");
+    l = labels(w);
+    REQUIRE(l.size() == 18);  // 15 figures, 3 rules
+    CHECK(l[7] == "1/32 2 steps");
+    CHECK(l[8] == "1/64 1 step");
+    CHECK(l[9] == "---");
+    CHECK(l[10] == "1/4. 24 steps");
+    CHECK(menu(w).items()[8].icon == &pluginui::icons::kFigures[7]);
+    pick(w, 8);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[7]);
+    click(w, "seqFig");
+    CHECK(menu(w).checked() == 7);
+    pick(w, 0);
+    click(w, "seqReso");
+    pick(w, 6);
+    CHECK(h.state.global.resolution == 4);
+    CHECK(text(w, "seqReso") == "1/4T");
+    click(w, "seqReso");
+    CHECK(menu(w).checked() == 5);
+
+    // 1/32T (D-433): saved as the ninth resolution, shown after 1/16T, twelve steps per quarter note. The Note button
+    // draws the thirty-second-note triplet for Step, the last value of the Note menu, one step long.
+    pick(w, 9);
+    CHECK(h.state.global.resolution == 8);
+    CHECK(text(w, "seqReso") == "1/32T");
+    click(w, "seqReso");
+    CHECK(menu(w).checked() == 8);
+    w.desktop().closePopups();
+    CHECK(fig->icon() == &pluginui::icons::kFigures[14]);
+    click(w, "seqFig");
+    l = labels(w);
+    REQUIRE(l.size() == 18);
+    CHECK(l[4] == "1/4 12 steps");
+    CHECK(l[6] == "1/16 3 steps");
+    CHECK(l[7] == "1/32 1.5 steps");
+    CHECK(l[14] == "1/4T 8 steps");
+    CHECK(l[16] == "1/16T 2 steps");
+    CHECK(l[17] == "1/32T 1 step");
+    CHECK(menu(w).items()[7].disabled);
+    CHECK_FALSE(menu(w).items()[17].disabled);
+    CHECK(menu(w).items()[17].icon == &pluginui::icons::kFigures[14]);
+    pick(w, 16);
+    CHECK(fig->icon() == &pluginui::icons::kFigures[13]);
+    w.desktop().closePopups();
 }
 
-TEST_CASE("Ticks: Options > VBL frequency, 50 to 200 Hz", "[ui][ticks]") {
+TEST_CASE("Ticks: Settings > VBL frequency, 50 to 200 Hz, out of the Options menu (D-441)", "[ui][ticks]") {
+    // Indus, 26/10/2026 04:03: the VBL frequency belongs in the Settings window.
     TestHost h;
     MainWindow w(h);
     w.openMenu(3);
     const auto& items = menu(w).items();
-    const auto it = std::find_if(items.begin(), items.end(), [](const gemui::MenuItem& m) { return m.label == "VBL frequency"; });
-    REQUIRE(it != items.end());
-    std::vector<std::string> sub;
-    for (const auto& m : it->sub) sub.push_back(m.label);
-    CHECK(sub == std::vector<std::string>{"50 Hz (PAL)", "60 Hz (NTSC)", "70 Hz (Monochrome)", "100 Hz", "200 Hz"});
+    const auto vblEntry = [](const gemui::MenuItem& m) { return m.label == "VBL frequency"; };
+    CHECK(std::none_of(items.begin(), items.end(), vblEntry));
+    w.desktop().closePopups();
+    pluginui::SettingsWindow& s = w.settingsWindow();
+    s.show();
+    CHECK(pluginui::SettingsWindow::labelOf("setVbl") == "VBL frequency");
+    int checked = -1;
+    std::vector<gemui::MenuItem> vbl = s.items("setVbl", checked);
+    std::vector<std::string> labels;
+    for (const auto& m : vbl) labels.push_back(m.label);
+    CHECK(labels == std::vector<std::string>{"50 Hz (PAL)", "60 Hz (NTSC)", "70 Hz (Monochrome)", "100 Hz", "200 Hz"});
+    CHECK(checked == 0);
+    REQUIRE(s.button("setVbl"));
+    CHECK(s.button("setVbl")->text() == "50 Hz (PAL)");
+    // Between Timer and Quantize to VBL, in SOUND ENGINE.
+    const gemui::Rect engine = *s.rectOf("setEngine"), r = *s.rectOf("setVbl");
+    CHECK(r.x >= engine.x);
+    CHECK(r.right() <= engine.right());
+    CHECK(r.y > s.rectOf("setTimer")->bottom());
+    CHECK(r.bottom() < s.rectOf("setQuantize")->y);
+    vbl[4].pick();
+    CHECK(h.values[size_t(paramIndex(plugin::Global::VblRate))] == 4.0f);
+    s.refresh();
+    CHECK(s.button("setVbl")->text() == "200 Hz");
+}
+
+namespace {
+
+// Button of the open alert that reads `label`.
+void alertButton(MainWindow& w, const std::string& label) {
+    gemui::Widget* m = w.desktop().topModal();
+    REQUIRE(m);
+    for (gemui::Widget* c : m->children())
+        if (const auto* b = dynamic_cast<const gemui::Button*>(c); b && b->text() == label) {
+            press(w, centre(c->bounds()));
+            return;
+        }
+    FAIL("no button " << label);
+}
+
+bool undoKey(MainWindow& w) {
+    gemui::KeyEvent e;
+    e.key = gemui::Key::Character;
+    e.ch = U'z';
+    e.code = 'Z';
+    e.mods.ctrl = true;
+    return w.desktop().keyDown(e);
+}
+
+}  // namespace
+
+TEST_CASE("Resolution: with notes in the patterns, an alert asks whether they fit the new grid (Indus, 26/10/2026, "
+          "D-448)",
+          "[ui][seq]") {
+    TestHost h;
+    // 1/16: a note at step 4 held 4 steps (beat 2, one beat long), a tempo at step 8, a Rest of 16 steps in the Song.
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    l.pat[4] = 0;
+    for (int s = 4; s < 8; ++s) l.tie[size_t(s)] = 1;
+    h.state.seq.cur().bpm[8] = 140;
+    h.state.seq.song.entries.push_back(ymseq::SongEntry::rest(ymseq::SongKind::Rest, 16));
+    MainWindow w(h);
+    w.sequencer().show();
+    const ymseq::Project& p = h.state.seq;
+
+    // Cancel, the default (Enter): nothing changes.
+    click(w, "seqReso");
+    pick(w, 1);  // 1/8
+    REQUIRE(w.desktop().hasModal());
+    key(w, gemui::Key::Enter);
+    CHECK_FALSE(w.desktop().hasModal());
+    CHECK(h.state.global.resolution == 2);
+
+    // Fit: the note keeps its time, on the steps of 1/8; one undo step gives everything back.
+    click(w, "seqReso");
+    pick(w, 1);
+    alertButton(w, "Fit");
+    CHECK(h.state.global.resolution == 1);
+    CHECK(p.cur().steps == 8);
+    CHECK(p.cur().lane(0).pat[2] == 0);
+    CHECK(p.cur().lane(0).tie[3] == 1);
+    CHECK(p.cur().lane(0).tie[4] == 0);
+    CHECK(p.cur().bpm[4] == 140);
+    CHECK(p.song.entries[0].arg == 8);
+    CHECK(undoKey(w));
+    CHECK(h.state.global.resolution == 2);
+    CHECK(p.cur().steps == 16);
+    CHECK(p.cur().lane(0).pat[4] == 0);
+    CHECK(p.cur().bpm[8] == 140);
+    CHECK(p.song.entries[0].arg == 16);
+
+    // Keep: the note stays on its step, as before.
+    click(w, "seqReso");
+    pick(w, 1);
+    alertButton(w, "Keep");
+    CHECK(h.state.global.resolution == 1);
+    CHECK(p.cur().steps == 16);
+    CHECK(p.cur().lane(0).pat[4] == 0);
+
+    // The same resolution, or no note: no alert.
+    click(w, "seqReso");
+    pick(w, 1);
+    CHECK_FALSE(w.desktop().hasModal());
+    h.editExtras([](plugin::NonParamState& s) { s.seq.cur().lanes[0] = nullptr; });
+    w.tick(0);
+    click(w, "seqReso");
+    pick(w, 2);
+    CHECK_FALSE(w.desktop().hasModal());
+    CHECK(h.state.global.resolution == 2);
 }

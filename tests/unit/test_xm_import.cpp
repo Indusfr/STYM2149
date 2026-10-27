@@ -146,6 +146,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out (D-340
     CHECK(st.dma.slots[0] == ymengine::DmaSlot{0, false, 60, true});
     CHECK(st.dmaSamples[0].size() == 748);  // 1000 frames from 8363 Hz to 6258 Hz
     CHECK(st.dmaSamples[0][0] < 0);
+    CHECK(st.dmaNames[0] == "tone");  // the name of the sample (D-445)
     REQUIRE(st.seq.song.size() == 1);
     CHECK(st.seq.song.entries[0] == ymseq::SongEntry{0, 1, 0, ymseq::SongKind::Pattern, 0, false});
     CHECK(st.seq.used[0]);
@@ -321,9 +322,13 @@ TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track (D-330)", "
                        [](const std::string& n) { return n.starts_with("Speed changes without"); }));
 }
 
-TEST_CASE("XM import: eight instruments at most, the most played", "[xmimport]") {
+TEST_CASE("XM import: eight instruments at most, the most played; names of the DMA slots (D-445)", "[xmimport]") {
     XmModule m = module(1, {64});
-    for (int i = 1; i <= 10; ++i) m.instruments.push_back(instrument("ins" + std::to_string(i), {tone(100)}));
+    for (int i = 1; i <= 10; ++i) {
+        XmSample s = tone(100);
+        if (i % 2) s.name.clear();  // a sample without a name: that of its instrument
+        m.instruments.push_back(instrument("ins" + std::to_string(i), {s}));
+    }
     m.instruments.push_back(instrument("empty", {}));
     int row = 0;
     for (int i = 1; i <= 10; ++i)
@@ -337,6 +342,7 @@ TEST_CASE("XM import: eight instruments at most, the most played", "[xmimport]")
     for (int k = 0; k < 8; ++k) {
         CHECK(st.instruments[size_t(k)].name == "ins" + std::to_string(k + 3));
         CHECK(st.instruments[size_t(k)].patch.dmaSlot == k);
+        CHECK(st.dmaNames[size_t(k)] == ((k + 3) % 2 ? "ins" + std::to_string(k + 3) : std::string("tone")));
     }
     CHECK(st.instruments[9].name == "kept");  // beyond the imported instruments: nothing changes
     const ymseq::Lane& l = st.seq.patterns[0].lane(0);

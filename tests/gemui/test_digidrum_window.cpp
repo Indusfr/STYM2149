@@ -33,7 +33,9 @@ public:
     plugin::NonParamState state;
     uint64_t serial = 1;
     pluginui::EditorSession editor;
-    std::vector<int> loads, previews;
+    std::vector<int> loads, previews, stops;
+    std::optional<plugin::EngineStatus> pending;  // next status read by tick
+    plugin::EngineStatus last;
     std::string library;
 
     float param(int i) const override { return values[size_t(i)]; }
@@ -50,10 +52,15 @@ public:
     void setMidiCapture(const plugin::MidiKeys&, bool) override {}
     bool learnMidi(std::array<uint8_t, 3>&) override { return false; }
     bool hostNote(std::array<uint8_t, 3>&) override { return false; }
-    void seqCommand(SeqCommand c, int a, int, int) override {
-        if (c == SeqCommand::DigiPreview) previews.push_back(a);
+    void seqCommand(SeqCommand c, int a, int b, int) override {
+        if (c == SeqCommand::DigiPreview) (b ? stops : previews).push_back(a);
     }
-    const plugin::EngineStatus* engineStatus() override { return nullptr; }
+    const plugin::EngineStatus* engineStatus() override {
+        if (!pending) return nullptr;
+        last = *pending;
+        pending.reset();
+        return &last;
+    }
     pluginui::EditorSession& session() override { return editor; }
     bool standalone() const override { return true; }
     std::string midiStatus() const override { return "none"; }
@@ -78,8 +85,8 @@ public:
             plugin::DigidrumSlotState& d = s.digiSlots[size_t(k)];
             s.digidrums[size_t(k)] = plugin::digidrumNibbles(src, d.convert);
             d.name = name;
-            d.play.loopStart = 0;
-            d.play.loopEnd = uint32_t(src.size());
+            d.play.start = 0;
+            d.play.end = uint32_t(src.size());
             d.source = std::move(src);
         });
     }
@@ -199,7 +206,7 @@ TEST_CASE("Digidrums: Edit > Samples menu, window and its elements", "[ui][digid
     CHECK(win.bottom() <= MainWindow::kHeight);
     for (const char* id : {"digSlot0", "digSlot7", "digName", "digBanks", "digWave", "digLoad", "digPlay", "digClear",
                            "digRate", "digPreset0", "digPreset2", "digRoot", "digFine", "digLoop", "digStart", "digEnd",
-                           "digLinear", "digYm", "digNormalize", "digReverse", "digFade", "digGainDown",
+                           "digLinear", "digYm", "digNormalize", "digReverse", "digFade", "digSign", "digGainDown",
                            "digGainUp"}) {
         INFO(id);
         const auto r = w.rectOf(id);
@@ -251,9 +258,11 @@ TEST_CASE("Digidrums: loading, listening, Clear and its undo step", "[ui][digidr
     w.tick(0);
     click(w, "digPlay");
     CHECK(h.previews == std::vector<int>{2});
-    CHECK(w.digidrums().slider("digStart")->enabled() == false);  // loop off
+    CHECK(w.digidrums().slider("digStart")->enabled());  // Start and End without Loop (D-443)
+    CHECK_FALSE(w.digidrums().playLit());
 
     click(w, "digClear");
+    CHECK_FALSE(w.digidrums().slider("digStart")->enabled());
     CHECK(h.state.digidrums[2].empty());
     CHECK(h.slot(2).name.empty());
     CHECK(h.slot(2).source.empty());
@@ -266,6 +275,46 @@ TEST_CASE("Digidrums: loading, listening, Clear and its undo step", "[ui][digidr
     CHECK(h.state.digidrums[2].empty());
 }
 
+
+TEST_CASE("Digidrums: with Loop on, Play loops the slot; Play again, Loop or closing stops it (Indus, 26/10/2026, "
+          "D-449)", "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    click(w, "digSlot2");
+    h.loaded(2, wave(300), "snare.wav");
+    w.tick(0);
+    click(w, "digLoop");
+    REQUIRE(h.slot(2).play.loop);
+    // Play lit while the engine loops the slot; a second click stops it.
+    click(w, "digPlay");
+    CHECK(h.previews == std::vector<int>{2});
+    plugin::EngineStatus t;
+    t.digiPreview = 2;
+    h.pending = t;
+    w.tick(0);
+    CHECK(w.digidrums().playLit());
+    click(w, "digPlay");
+    CHECK(h.stops == std::vector<int>{2});
+    CHECK_FALSE(w.digidrums().playLit());
+    t.digiPreview = -1;
+    h.pending = t;
+    w.tick(0);
+    // Loop switched off: Play goes out (the engine stops the loop itself).
+    click(w, "digPlay");
+    t.digiPreview = 2;
+    h.pending = t;
+    w.tick(0);
+    REQUIRE(w.digidrums().playLit());
+    click(w, "digLoop");
+    CHECK_FALSE(w.digidrums().playLit());
+    CHECK(h.stops == std::vector<int>{2});
+    // Closing the window stops the preview.
+    click(w, "digLoop");
+    CHECK(w.digidrums().playLit());
+    w.digidrums().close();
+    CHECK(h.stops == std::vector<int>{2, 2});
+}
 TEST_CASE("Digidrums: name, rate, presets, root note, fine tuning; one step per gesture", "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
@@ -302,31 +351,39 @@ TEST_CASE("Digidrums: name, rate, presets, root note, fine tuning; one step per 
     CHECK(h.slot(0).name.empty());
 }
 
-TEST_CASE("Digidrums: sustain loop, Start before End", "[ui][digidrum]") {
+TEST_CASE("Digidrums: Start and End with or without Loop, Start before End (D-443)", "[ui][digidrum]") {
     TestHost h;
     MainWindow w(h);
     open(h, w);
-    // Slot from before M6: values, no loop (End at 0).
+    // Slot from before M6: values, no loop, End at 0 (the end of the sample, shown as its length).
     h.editExtras([](plugin::NonParamState& s) { s.digidrums[0] = std::vector<uint8_t>(500, 8); });
     w.tick(0);
+    CHECK(w.digidrums().slider("digStart")->enabled());
+    CHECK(w.digidrums().slider("digEnd")->enabled());
+    CHECK(w.digidrums().valueText("digStart") == "0");
+    CHECK(w.digidrums().valueText("digEnd") == "500");
+
+    // Start at the end: brought back to End - 1 (End written); End at the start: brought back to Start + 1.
+    dragSlider(w, "digStart", true);
+    CHECK(h.slot(0).play.start == 499);
+    CHECK(h.slot(0).play.end == 500);
+    CHECK_FALSE(h.slot(0).play.loop);
+    dragSlider(w, "digEnd", false);
+    CHECK(h.slot(0).play.end == 500);
+    dragSlider(w, "digStart", false);
+    CHECK(h.slot(0).play.start == 0);
+    dragSlider(w, "digEnd", false);
+    CHECK(h.slot(0).play.end == 1);
+    CHECK(w.digidrums().valueText("digEnd") == "1");
+    CHECK(h.editor.undo.undoSize() == 3);  // End already at the lowest allowed: no step
+    CHECK(h.slot(0).source.empty());       // settings alone: no source created
+
+    // Loop repeats that part: Start and End stay.
     click(w, "digLoop");
     CHECK(h.slot(0).play.loop);
-    CHECK(h.slot(0).play.loopEnd == 500);
-    CHECK(h.slot(0).play.loopStart == 0);
-    CHECK(w.digidrums().slider("digStart")->enabled());
-    CHECK(h.slot(0).source.empty());  // setting alone: no source created
-
-    // Start at the end: brought back to End - 1; End at the start: brought back to Start + 1.
-    dragSlider(w, "digStart", true);
-    CHECK(h.slot(0).play.loopStart == 499);
-    dragSlider(w, "digEnd", false);
-    CHECK(h.slot(0).play.loopEnd == 500);
-    dragSlider(w, "digStart", false);
-    CHECK(h.slot(0).play.loopStart == 0);
-    dragSlider(w, "digEnd", false);
-    CHECK(h.slot(0).play.loopEnd == 1);
-    CHECK(w.digidrums().valueText("digEnd") == "1");
-    CHECK(h.editor.undo.undoSize() == 4);  // End already at the lowest allowed: no step
+    CHECK(h.slot(0).play.start == 0);
+    CHECK(h.slot(0).play.end == 1);
+    CHECK(h.editor.undo.undoSize() == 4);
 }
 
 TEST_CASE("Digidrums: 4-bit conversion and tools on the source, steps with the bytes", "[ui][digidrum]") {
@@ -373,6 +430,47 @@ TEST_CASE("Digidrums: 4-bit conversion and tools on the source, steps with the b
     undoKey(w);
     CHECK(h.slot(0).convert == DigiConvert::Linear);
     CHECK(h.state.digidrums[0] == std::vector<uint8_t>{0, 4, 8, 11, 15});
+}
+
+TEST_CASE("Digidrums: Sign of the DMA window; Reverse mirrors Start and End (Indus, 26/10/2026, D-450)",
+          "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    click(w, "digSign");  // empty slot: greyed out
+    CHECK(h.editor.undo.undoSize() == 0);
+    h.loaded(0, {-128, -64, 0, 64, 127}, "hit");
+    h.editExtras([](plugin::NonParamState& s) {
+        s.digiSlots[0].play.start = 1;
+        s.digiSlots[0].play.end = 3;
+    });
+    w.tick(0);
+    click(w, "digSign");
+    CHECK(h.slot(0).source == std::vector<int8_t>{0, 64, -128, -64, -1});
+    click(w, "digReverse");
+    CHECK(h.slot(0).source == std::vector<int8_t>{-1, -64, -128, 64, 0});
+    CHECK(h.slot(0).play.start == 2);
+    CHECK(h.slot(0).play.end == 4);
+    CHECK(h.editor.undo.undoSize() == 2);
+    undoKey(w);
+    CHECK(h.slot(0).play.start == 1);
+    CHECK(h.slot(0).play.end == 3);
+    undoKey(w);
+    CHECK(h.slot(0).source == std::vector<int8_t>{-128, -64, 0, 64, 127});
+}
+
+TEST_CASE("Digidrums: -3 dB after a clipped +3 dB gives the source back (D-453)", "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    const std::vector<int8_t> orig = {-128, -64, 0, 64, 127};
+    h.loaded(0, orig, "hit");
+    w.tick(0);
+    click(w, "digGainUp");
+    CHECK(h.slot(0).source.back() == 127);
+    click(w, "digGainDown");
+    CHECK(h.slot(0).source == orig);
+    CHECK(h.state.digidrums[0] == plugin::digidrumNibbles(orig, h.slot(0).convert));
 }
 
 TEST_CASE("Digidrums: slot without a source, the source derived from the values", "[ui][digidrum]") {
@@ -505,7 +603,8 @@ TEST_CASE("Digidrums: Delete and Load act on the bank named in the confirmation,
     CHECK(h.state.digidrums[0].empty());
 }
 
-TEST_CASE("Main window: the Digidrum frame prints the slot's own rate, not always 7800 Hz (P270, D-154)",
+TEST_CASE("Main window: the Digidrum frame prints the slot's name and own rate, not always 7800 Hz (P270, D-154, "
+          "D-445)",
           "[ui][digidrum]") {
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Digidrum);
@@ -514,11 +613,11 @@ TEST_CASE("Main window: the Digidrum frame prints the slot's own rate, not alway
     w.tick(0);
     const auto* frame = findWidget<pluginui::DrumWave>(w);
     REQUIRE(frame != nullptr);
-    CHECK(frame->caption() == "slot 1: 40 smp @ 7800 Hz / 4-bit");
+    CHECK(frame->caption() == "slot 1: kick, 40 smp @ 7800 Hz / 4-bit");
 
     h.editExtras([](plugin::NonParamState& s) { s.digiSlots[0].play.rateHz = 15600; });
     w.tick(100);
-    CHECK(frame->caption() == "slot 1: 40 smp @ 15600 Hz / 4-bit");
+    CHECK(frame->caption() == "slot 1: kick, 40 smp @ 15600 Hz / 4-bit");
 
     h.editExtras([](plugin::NonParamState& s) { s.digidrums[0].clear(); });
     w.tick(200);
@@ -607,7 +706,7 @@ TEST_CASE("Digidrums: rate, root note, fine tuning and loop typed (sixth DAW tes
     w.tick(0);
     click(w, "digLoop");
     type("digStartV", "120");
-    CHECK(h.slot(0).play.loopStart == 120);
+    CHECK(h.slot(0).play.start == 120);
     type("digEndV", "50");  // End stays after Start
-    CHECK(h.slot(0).play.loopEnd == 121);
+    CHECK(h.slot(0).play.end == 121);
 }

@@ -1,6 +1,7 @@
 // STYM2149 — SID wave and Sync Buzzer steps (M6, B6, D-151), in the GENERATOR frame since the sixth DAW test (D-250 to
-// D-252, D-278; the Timer Wave window before): SID wave drawn with the mouse, wheel and right click, Steps (starting
-// from the square wave), Square and Sine; Sync Buzzer steps and their shapes; one undo step per gesture.
+// D-252, D-278; the Timer Wave window before): SID wave drawn with the mouse, wheel and right click, the menu of its
+// forms (Base, Square, Sine, Bounce, Custom, D-411, D-414), Steps, Period and Width; Sync Buzzer steps and their
+// shapes; one undo step per gesture.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -124,6 +125,15 @@ void pick(MainWindow& w, int index) {
     press(w, {r.x + 20, r.y + 10});
 }
 
+// Picks a form of the SID wave in its menu (D-411).
+void form(MainWindow& w, const std::string& name) {
+    click(w, "waveForm");
+    const std::vector<std::string> l = labels(w);
+    const auto it = std::find(l.begin(), l.end(), name);
+    REQUIRE(it != l.end());
+    pick(w, int(it - l.begin()));
+}
+
 // Drag of a slider's thumb to the right (or left) end of its track.
 void dragSlider(MainWindow& w, const char* id, bool toMax) {
     const gemui::Slider* s = w.stepsSlider(id);
@@ -133,6 +143,27 @@ void dragSlider(MainWindow& w, const char* id, bool toMax) {
 }
 
 gemui::Rect col(MainWindow& w, int step) { return w.sidWave().cellRect(step); }
+
+const gemui::ValueField& field(MainWindow& w, std::string_view id) {
+    const auto* f = dynamic_cast<const gemui::ValueField*>(w.widgetOf(id));
+    REQUIRE(f);
+    return *f;
+}
+
+// Clicks a typed value, empties it, types `text` and confirms with Enter (D-264).
+void typeValue(MainWindow& w, const std::string& id, std::string_view text) {
+    click(w, id);
+    REQUIRE(field(w, id).editing());
+    for (int i = 0; i < 8; ++i) key(w, gemui::Key::Backspace);
+    for (char c : text) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    key(w, gemui::Key::Enter);
+    CHECK_FALSE(field(w, id).editing());
+}
 
 void generator(TestHost& h, ymengine::Generator g) {
     h.values[size_t(paramIndex(0, plugin::Track::Generator))] = float(g);
@@ -162,13 +193,14 @@ TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave 
     CHECK(edit[at + 1] == "Samples");
     key(w, gemui::Key::Escape);
 
-    // SID Voice: the SID wave, square by default (faded grid); no buzzer steps.
-    for (const char* id : {"waveGrid", "waveSteps", "waveSquare", "waveSine"}) {
-        INFO(id);
-        CHECK(w.rectOf(id));
-    }
+    // SID Voice: the SID wave, Base by default (the square of the prototype, its two halves), its menu alone (D-417);
+    // no buzzer steps.
+    CHECK(w.rectOf("waveForm"));
+    CHECK_FALSE(w.rectOf("waveGrid"));
+    CHECK_FALSE(w.rectOf("waveSteps"));
     CHECK_FALSE(w.rectOf("buzz0"));
-    CHECK(w.sidWave().state().length == 0);
+    CHECK(w.sidWave().state().length == 2);
+    CHECK(w.sidWave().state().square);
 
     // Sync Buzzer: its steps, the track's shape by default; no SID wave.
     generator(h, ymengine::Generator::SyncBuzzer);
@@ -189,7 +221,8 @@ TEST_CASE("SID wave and Sync Buzzer steps in the GENERATOR frame, no Timer Wave 
     CHECK_FALSE(w.rectOf("buzz0"));
 }
 
-TEST_CASE("SID wave: drawn, Steps from the square wave, Square and Sine; one undo step per gesture",
+TEST_CASE("SID wave: the menu of its forms, Base by default; Custom drawn, Square of Steps steps (Indus, 24/10/2026 "
+          "17:40 to 17:47, D-411, D-412); one undo step per gesture",
           "[ui][timerwave][undo]") {
     TestHost h;
     generator(h, ymengine::Generator::Sid);
@@ -198,12 +231,40 @@ TEST_CASE("SID wave: drawn, Steps from the square wave, Square and Sine; one und
     w.tick(0);
     const ymengine::TrackPatch& p = h.patch();
 
-    // Steps dragged to the end: 16 steps, starting from the track's square wave (8 at full volume, 8 at low volume).
+    // The menu after the name of the SID wave, on its line, Base checked; with Base, the plain square, neither the
+    // bars nor Steps (Indus, 24/10/2026 20:30, D-417), its two steps kept behind: the note's volume, then SID min vol
+    // (4).
+    const gemui::Button* menuButton = &w.waveFormButton();
+    CHECK(menuButton->text() == "Base");
+    CHECK_FALSE(w.rectOf("waveGrid"));
+    CHECK_FALSE(w.rectOf("waveSteps"));
+    const gemui::Slider* steps = w.stepsSlider("waveSteps");
+    REQUIRE(steps);
+    CHECK(steps->value() == 2);
+    CHECK(w.sidWave().state().square);
+    CHECK(w.sidWave().state().wave[0] == 15);
+    CHECK(w.sidWave().state().wave[1] == 4);
+    click(w, "waveForm");
+    CHECK(labels(w) == std::vector<std::string>{"Base", "Square", "Sine", "Bounce", "Custom"});
+    CHECK(menu(w).checked() == 0);
+    key(w, gemui::Key::Escape);
+    CHECK(h.editor.undo.undoSize() == 0);
+
+    // Custom from Base, the bars never drawn: the square played, over the 8 Steps by default (4 at the note's volume,
+    // 4 at SID min vol), to draw from; Steps then sets the bars played, dragged to the end 16.
+    form(w, "Custom");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Custom);
+    CHECK(p.sidWaveLen == 8);
+    for (int k = 0; k < 16; ++k) CHECK(p.sidWave[size_t(k)] == (k < 4 ? 15 : k < 8 ? 4 : 0));
+    CHECK(menuButton->text() == "Custom");
+    CHECK(steps->enabled());
+    CHECK_FALSE(w.sidWave().state().square);
+    CHECK(h.editor.undo.undoSize() == 1);
     dragSlider(w, "waveSteps", true);
     CHECK(p.sidWaveLen == 16);
-    for (int k = 0; k < 16; ++k) CHECK(p.sidWave[size_t(k)] == (k < 8 ? 15 : 4));
     CHECK(w.sidWave().state().length == 16);
-    CHECK(h.editor.undo.undoSize() == 1);
+    CHECK(h.editor.undo.undoSize() == 2);
 
     // Stroke: top of the column 15, bottom 0, a single undo step for three columns.
     const gemui::Rect c0 = col(w, 0);
@@ -211,47 +272,314 @@ TEST_CASE("SID wave: drawn, Steps from the square wave, Square and Sine; one und
     CHECK(p.sidWave[0] == 0);
     CHECK(p.sidWave[1] == 15);
     CHECK(p.sidWave[2] == 8);
-    CHECK(h.editor.undo.undoSize() == 2);
+    CHECK(h.editor.undo.undoSize() == 3);
     // Wheel: one undo step per notch.
     wheel(w, centre(col(w, 2)), -1);
     wheel(w, centre(col(w, 2)), -1);
     CHECK(p.sidWave[2] == 10);
-    CHECK(h.editor.undo.undoSize() == 4);
+    CHECK(h.editor.undo.undoSize() == 5);
     // Right click: the slider of the Modulation window's cells (seventh DAW test, item 84, D-285), 96 px below the
     // step; its bottom is worth 0, one undo step.
-    const gemui::Rect c9 = col(w, 9);
-    press(w, centre(c9), gemui::MouseButton::Right);
+    const gemui::Rect c5 = col(w, 5);
+    press(w, centre(c5), gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
-    CHECK(p.sidWave[9] == 4);
-    const gemui::Point bottom{c9.x + 2 + 4 + 2 + 8, c9.bottom() + 2 + 8 + 95};
+    CHECK(p.sidWave[5] == 4);
+    const gemui::Point bottom{c5.x + 2 + 4 + 2 + 8, c5.bottom() + 2 + 8 + 95};
     press(w, bottom, gemui::MouseButton::Left);
-    CHECK(p.sidWave[9] == 0);
-    CHECK(h.editor.undo.undoSize() == 5);
+    CHECK(p.sidWave[5] == 0);
+    CHECK(h.editor.undo.undoSize() == 6);
     w.desktop().closePopups();
     undoKey(w);
-    CHECK(p.sidWave[9] == 4);
+    CHECK(p.sidWave[5] == 4);
 
-    // Square: the square wave comes back, the volumes are kept; Steps plays them again without overwriting them.
-    click(w, "waveSquare");
-    CHECK(p.sidWaveLen == 0);
-    CHECK(p.sidWave[1] == 15);
-    CHECK(w.sidWave().state().length == 0);
-    dragSlider(w, "waveSteps", true);
+    // Square: its Steps kept (16), the bars drawn kept for Custom. The bars show the square played (Indus, 24/10/2026
+    // 15:43, D-407): the note's volume over the first Width (4) steps, SID min vol over the others; the mouse does
+    // nothing on them.
+    form(w, "Square");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Square);
     CHECK(p.sidWaveLen == 16);
-    CHECK(p.sidWave[0] == 0);
-    CHECK(p.sidWave[2] == 10);
-    // Steps dragged to the left end: the square wave.
-    dragSlider(w, "waveSteps", false);
-    CHECK(p.sidWaveLen == 0);
-
-    // Sine: the 8 volumes of the Sinus-SID, the rest at 0.
-    click(w, "waveSine");
-    CHECK(p.sidWaveLen == 8);
-    const auto sine = ymengine::sineSidWave();
-    for (int k = 0; k < 16; ++k) CHECK(p.sidWave[size_t(k)] == (k < 8 ? sine[size_t(k)] : 0));
-    undoKey(w);
-    CHECK(p.sidWaveLen == 0);
     CHECK(p.sidWave[1] == 15);
+    CHECK(w.sidWave().state().square);
+    CHECK(w.sidWave().state().length == 16);
+    for (int k = 0; k < 16; ++k) CHECK(w.sidWave().state().wave[size_t(k)] == (k < 4 ? 15 : 4));
+    const size_t undos = h.editor.undo.undoSize();
+    const auto kept = p.sidWave;
+    press(w, centre(col(w, 3)));
+    wheel(w, centre(col(w, 12)), -1);
+    press(w, centre(col(w, 12)), gemui::MouseButton::Right);
+    CHECK_FALSE(w.desktop().hasPopups());
+    CHECK(h.editor.undo.undoSize() == undos);
+    CHECK(p.sidWave == kept);
+    CHECK(w.sidWave().tipAt(centre(col(w, 12))).find("Square wave: the note's volume, then SID min vol") !=
+          std::string::npos);
+    // Its Steps work (Indus, 17:47): down to 2, the square of Base; typed 8.
+    CHECK(steps->enabled());
+    dragSlider(w, "waveSteps", false);
+    CHECK(p.sidWaveLen == 2);
+    w.tick(0);
+    CHECK(w.sidWave().state().length == 2);
+    typeValue(w, "waveStepsv", "8");
+    CHECK(p.sidWaveLen == 8);
+
+    // Custom again: the bars drawn come back, over the Steps of the Square.
+    form(w, "Custom");
+    w.tick(0);
+    CHECK_FALSE(w.sidWave().state().square);
+    CHECK(w.sidWave().state().wave == p.sidWave);
+    CHECK(p.sidWave == kept);
+    CHECK(p.sidWaveLen == 8);
+
+    // Base: the bars and Steps hidden, the Steps kept for the other forms.
+    form(w, "Base");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Base);
+    CHECK(p.sidWaveLen == 8);
+    CHECK_FALSE(w.rectOf("waveGrid"));
+    CHECK_FALSE(w.rectOf("waveSteps"));
+    CHECK(steps->value() == 2);
+
+    // Sine from Base: the Sine-SID on the 16 bars (D-401), cycles of 8 (D-406), as many played as its Period: one
+    // cycle in a period of the note, the note played (D-426); undone, Base and the bars back.
+    form(w, "Sine");
+    CHECK(p.sidForm == ymengine::SidForm::Sine);
+    CHECK(p.sidWaveLen == 8);
+    CHECK(p.sidWave == ymengine::sineSidWave());
+    undoKey(w);
+    CHECK(p.sidForm == ymengine::SidForm::Base);
+    CHECK(p.sidWaveLen == 8);
+    CHECK(p.sidWave == kept);
+}
+
+TEST_CASE("SID wave: Sine, a bar moved shifts the sine; Period, 8 by default, shown with Sine, under Steps; Custom "
+          "frees the bars (Indus, 24/10/2026 11:29, 14:07, 15:41, 16:19, 17:43, D-402, D-405, D-406, D-408, D-411)",
+          "[ui][timerwave][undo]") {
+    TestHost h;
+    generator(h, ymengine::Generator::Sid);
+    MainWindow w(h);
+    w.tick(0);
+    const ymengine::TrackPatch& p = h.patch();
+    // Point of column `step` worth volume v (3 px per volume from the bottom of the bar).
+    auto at = [&](int step, int v) {
+        const gemui::Rect c = col(w, step);
+        return gemui::Point{c.x + 5, c.bottom() - 3 * v};
+    };
+    // Period, in place of the Phase slider of D-405: hidden without Sine, at 8.
+    CHECK_FALSE(w.stepsSlider("wavePhase"));
+    const gemui::Slider* period = w.stepsSlider("wavePeriod");
+    REQUIRE(period);
+    CHECK_FALSE(period->showing());
+    CHECK_FALSE(w.rectOf("wavePeriodv"));
+    CHECK(period->value() == 8);
+    CHECK(field(w, "wavePeriodv").text() == "8");
+
+    // Sine: two cycles of 8 bars; Period right under Steps, its slider lined up with Steps' (Indus, 17:42, 17:43).
+    form(w, "Sine");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Sine);
+    CHECK(period->showing());
+    CHECK(period->enabled());
+    const gemui::Rect stepsBox = w.stepsSlider("waveSteps")->bounds();
+    CHECK(period->bounds().y > stepsBox.bottom());
+    CHECK(period->bounds().y - stepsBox.bottom() < 12);
+    CHECK(period->bounds().x == stepsBox.x);
+    CHECK(period->bounds().right() == stepsBox.right());
+    CHECK(p.sidWavePeriod == 8);
+    CHECK(p.sidWave == ymengine::sineSidWave());
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 8));
+    // The slider and its field set the period; the sine follows, between the same volumes.
+    dragSlider(w, "wavePeriod", false);
+    CHECK(p.sidWavePeriod == 2);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 2));
+    typeValue(w, "wavePeriodv", "5");
+    CHECK(p.sidWavePeriod == 5);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 5));
+    typeValue(w, "wavePeriodv", "1");  // brought back into the range of the slider
+    CHECK(p.sidWavePeriod == 2);
+    typeValue(w, "wavePeriodv", "40");
+    CHECK(p.sidWavePeriod == 16);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 16));  // one cycle over the 16 bars, the sine of D-401
+    w.tick(0);
+    CHECK(field(w, "wavePeriodv").text() == "16");
+
+    // At period 16: the 10th bar (6, falling) raised to 8: the sine one bar to the right, its volumes kept.
+    const size_t before = h.editor.undo.undoSize();
+    press(w, at(9, 8));
+    CHECK(p.sidWavePhase == 9);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 16));
+    // The 12th (4 now) dragged down to the trough then to 12: one undo step per gesture.
+    drag(w, {at(11, 4), at(11, 3), at(11, 12)});
+    CHECK(p.sidWave[11] == 12);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, p.sidWavePhase, 16));
+    CHECK(*std::min_element(p.sidWave.begin(), p.sidWave.end()) == 3);
+    CHECK(*std::max_element(p.sidWave.begin(), p.sidWave.end()) == 15);
+    CHECK(h.editor.undo.undoSize() == before + 2);
+    undoKey(w);
+    CHECK(p.sidWavePhase == 9);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 16));
+    // A notch of the wheel moves a bar to the next volume the sine gives it: the 10th from 8 down to 6 (no phase gives
+    // it 7), one bar back to the left.
+    wheel(w, centre(col(w, 9)), 1);
+    CHECK(p.sidWavePhase == 8);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 16));
+    // At period 8, a bar moved shifts the two cycles: the 2nd bar (15) lowered to the volume of the 1st, one bar to
+    // the right.
+    typeValue(w, "wavePeriodv", "8");
+    CHECK(p.sidWave == ymengine::sineSidWave());
+    press(w, at(1, ymengine::sineSidWave()[0]));
+    CHECK(p.sidWavePhase == 9);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 8));
+    CHECK(p.sidWavePeriod == 8);
+
+    // Custom frees the bars as they are: a bar then moves alone, the period hidden and kept.
+    const auto lit = p.sidWave;
+    form(w, "Custom");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Custom);
+    CHECK_FALSE(period->showing());
+    CHECK_FALSE(w.stepsSlider("waveWidth")->showing());  // nor the width of the Square
+    CHECK(p.sidWave == lit);
+    press(w, at(0, 2));
+    CHECK(p.sidWave[0] == 2);
+    CHECK(p.sidWave[1] == lit[1]);
+    CHECK(p.sidWavePhase == 9);
+    CHECK(p.sidWavePeriod == 8);
+    // Sine again: the sine from volume 3 to 15 at the phase and period kept; Square hides the period.
+    form(w, "Sine");
+    CHECK(p.sidWave == lit);
+    CHECK(p.sidForm == ymengine::SidForm::Sine);
+    form(w, "Square");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Square);
+    CHECK_FALSE(period->showing());
+}
+
+TEST_CASE("SID wave: Bounce, the sine of the chip's levels, after Sine in the menu; Period shown with it, a bar moved "
+          "shifts it (Indus, 24/10/2026 18:41, D-414)",
+          "[ui][timerwave][undo]") {
+    TestHost h;
+    generator(h, ymengine::Generator::Sid);
+    MainWindow w(h);
+    w.tick(0);
+    const ymengine::TrackPatch& p = h.patch();
+    auto at = [&](int step, int v) {
+        const gemui::Rect c = col(w, step);
+        return gemui::Point{c.x + 5, c.bottom() - 3 * v};
+    };
+    // From Base, like Sine: one cycle of 8 bars played (D-426), from volume 3 to 15 on the chip's levels; Period
+    // under Steps; one undo step.
+    form(w, "Bounce");
+    w.tick(0);
+    CHECK(p.sidForm == ymengine::SidForm::Bounce);
+    CHECK(w.waveFormButton().text() == "Bounce");
+    CHECK(p.sidWaveLen == 8);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 8, 8, true));
+    CHECK(p.sidWave != ymengine::sineSidWave());
+    CHECK(w.stepsSlider("wavePeriod")->showing());
+    CHECK_FALSE(w.stepsSlider("waveWidth")->showing());
+    CHECK_FALSE(w.sidWave().state().square);
+    CHECK(h.editor.undo.undoSize() == 1);
+    click(w, "waveForm");
+    CHECK(menu(w).checked() == 3);
+    key(w, gemui::Key::Escape);
+    // A bar moved shifts the bounce, as it does the sine: the 2nd (15) lowered to the volume of the 1st, one bar to the
+    // right; Period redraws it.
+    press(w, at(1, p.sidWave[0]));
+    CHECK(p.sidWavePhase == 9);
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 8, true));
+    typeValue(w, "wavePeriodv", "16");
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 16, true));
+    // Sine and Bounce draw their own curve at the phase and period kept.
+    form(w, "Sine");
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 16));
+    form(w, "Bounce");
+    CHECK(p.sidWave == ymengine::sineSidWave(3, 15, 9, 16, true));
+    CHECK(p.sidWaveLen == 8);  // the Steps set from Base, kept
+}
+
+TEST_CASE("SID wave: Width of the Square, in its Steps, half and half by default, drawn in the bars, shown with Square "
+          "where Period is with Sine (Indus, 24/10/2026 16:00 to 17:47, D-408, D-411, D-412)",
+          "[ui][timerwave][undo]") {
+    TestHost h;
+    generator(h, ymengine::Generator::Sid);
+    h.values[size_t(paramIndex(0, plugin::Track::SidVmin))] = 4;
+    MainWindow w(h);
+    w.tick(0);
+    const ymengine::TrackPatch& p = h.patch();
+    // Hidden at Base; with Square, right under Steps, its label before it like Steps', its slider lined up with
+    // Steps'; 4 of the 8 Steps.
+    const gemui::Slider* width = w.stepsSlider("waveWidth");
+    const gemui::Slider* period = w.stepsSlider("wavePeriod");
+    REQUIRE(width);
+    REQUIRE(period);
+    CHECK_FALSE(width->showing());
+    form(w, "Square");
+    w.tick(0);
+    CHECK(width->showing());
+    CHECK_FALSE(period->showing());
+    const gemui::Rect stepsBox = w.stepsSlider("waveSteps")->bounds();
+    CHECK(width->bounds().y > stepsBox.bottom());
+    CHECK(width->bounds().x == stepsBox.x);
+    CHECK(width->bounds().right() == stepsBox.right());
+    const auto widthField = w.rectOf("waveWidthv");
+    CHECK(widthField);
+    CHECK(widthField->x == w.rectOf("waveStepsv")->x);
+    const gemui::Rect place = width->bounds();
+    CHECK(width->enabled());
+    CHECK(width->value() == 4);
+    CHECK(width->max() == 7);
+    CHECK(field(w, "waveWidthv").text() == "4");
+    CHECK(p.sidWidth == 4);
+    CHECK(p.sidWaveLen == 8);
+    for (int k = 0; k < 16; ++k) CHECK(w.sidWave().state().wave[size_t(k)] == (k < 4 ? 15 : 4));
+    // The field and the slider set it, one undo step each, the bars follow: the note's volume over Width steps, up to
+    // Steps - 1.
+    const size_t before = h.editor.undo.undoSize();
+    typeValue(w, "waveWidthv", "3");
+    CHECK(p.sidWidth == 3);
+    w.tick(0);
+    for (int k = 0; k < 16; ++k) CHECK(w.sidWave().state().wave[size_t(k)] == (k < 3 ? 15 : 4));
+    dragSlider(w, "waveWidth", true);
+    CHECK(p.sidWidth == 7);
+    typeValue(w, "waveWidthv", "0");  // brought back into the range of the slider
+    CHECK(p.sidWidth == 1);
+    CHECK(h.editor.undo.undoSize() == before + 3);
+    undoKey(w);
+    CHECK(p.sidWidth == 7);
+    typeValue(w, "waveWidthv", "40");
+    CHECK(p.sidWidth == 7);
+    w.tick(0);
+    CHECK(field(w, "waveWidthv").text() == "7");
+    // 16 Steps: the width kept, its range up to 15; at 2 Steps, one step at the note's volume, the width greyed.
+    dragSlider(w, "waveSteps", true);
+    w.tick(0);
+    CHECK(width->max() == 15);
+    CHECK(p.sidWidth == 7);
+    dragSlider(w, "waveWidth", true);
+    CHECK(p.sidWidth == 15);
+    w.tick(0);
+    for (int k = 0; k < 16; ++k) CHECK(w.sidWave().state().wave[size_t(k)] == (k < 15 ? 15 : 4));
+    dragSlider(w, "waveSteps", false);
+    w.tick(0);
+    CHECK_FALSE(width->enabled());
+    CHECK(width->value() == 1);
+    CHECK(p.sidWidth == 15);
+    CHECK(w.sidWave().state().wave[0] == 15);
+    CHECK(w.sidWave().state().wave[1] == 4);
+    dragSlider(w, "waveSteps", true);
+    // Custom: neither Width nor Period shown, the width kept; Sine: Period in the place of Width.
+    form(w, "Custom");
+    w.tick(0);
+    CHECK_FALSE(width->showing());
+    CHECK_FALSE(period->showing());
+    CHECK_FALSE(w.rectOf("waveWidthv"));
+    CHECK(p.sidWidth == 15);
+    form(w, "Sine");
+    w.tick(0);
+    CHECK(period->showing());
+    CHECK_FALSE(width->showing());
+    CHECK(period->bounds() == place);
+    CHECK(w.rectOf("wavePeriodv") == widthField);
 }
 
 TEST_CASE("Sync Buzzer steps: R13 shapes from the menu, shown by their icon, Trk on right click", "[ui][timerwave]") {
