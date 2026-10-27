@@ -75,7 +75,7 @@ cmake --build build-plugin --parallel --target STYM2149_All STYM2149_CLAP stym_p
 ctest --test-dir build-plugin --output-on-failure -R '^plugin$'   # Linux sans écran : xvfb-run -a ctest ...
 ```
 
-CMake télécharge JUCE 8.0.15 et clap-juce-extensions à des commits vérifiés. Formats : VST3, LV2, CLAP et Standalone sous Linux ; VST3, CLAP et Standalone sous Windows (l'AAX est compilé mais pas encore livré) ; AU, VST3, CLAP et Standalone sous macOS. Fichiers produits dans `build-plugin/src/plugin/STYM2149_artefacts/Release/`. Sous Linux, JUCE demande les paquets de développement d'ALSA, JACK, FreeType, Fontconfig et X11 (liste dans `.github/workflows/ci.yml`) ; sans écran, les tests de l'éditeur demandent Xvfb.
+CMake télécharge JUCE 8.0.15 et clap-juce-extensions à des commits vérifiés. Formats : VST3, LV2, CLAP et Standalone sous Linux ; VST3, CLAP et Standalone sous Windows (l'AAX est compilé mais pas encore livré) ; AU, VST3, CLAP et Standalone sous macOS. Fichiers produits dans `build-plugin/src/plugin/STYM2149_artefacts/Release/`. Sous Linux, JUCE demande les paquets de développement d'ALSA, JACK, FreeType, Fontconfig et X11 ; sans écran, les tests de l'éditeur demandent Xvfb.
 
 Paquets : `packaging/linux/make_tarball.sh` construit l'archive Linux ; `packaging/windows/STYM2149.iss` est le script Inno Setup 6 de l'installateur Windows.
 
