@@ -86,10 +86,6 @@ Paquets : `packaging/linux/make_tarball.sh` construit l'archive Linux ; `packagi
 - `gemshot` : fait le rendu de l'interface en PNG, sans hôte ni JUCE (tests visuels).
 - `tools/proto_capture`, `tools/proto_golden`, `tools/gemfont` : captures de référence, données de parité et polices GEM tirées du prototype et d'EmuTOS.
 
-### Intégration continue
-
-À chaque pull request et à chaque push sur `main`, sur les runners self-hosted du projet : Linux (GCC 11.5) et Windows x64 (MSVC) construisent tout et passent CTest, puis le plugin est vérifié avec pluginval au niveau 10, clap-validator et le validateur VST3 de Steinberg ; Linux ajoute les sanitizers (ASan, UBSan, TSan), RealtimeSanitizer et un benchmark CPU. Les deux construisent leur paquet. macOS ne tourne que sur les tags `v*` ou à la main.
-
 ## Documentation
 
 - [Manuel d'utilisation](docs/MANUAL.fr.md) ([English](docs/MANUAL.md))

@@ -86,10 +86,6 @@ Packages: `packaging/linux/make_tarball.sh` builds the Linux archive; `packaging
 - `gemshot`: renders the interface to PNG without a host or JUCE (visual tests).
 - `tools/proto_capture`, `tools/proto_golden`, `tools/gemfont`: reference captures, parity data and GEM fonts taken from the prototype and EmuTOS.
 
-### Continuous integration
-
-On every pull request and push to `main`, on the project's self-hosted runners: Linux (GCC 11.5) and Windows x64 (MSVC) build everything and run CTest, then the plugin is checked with pluginval at level 10, clap-validator and the Steinberg VST3 validator; Linux adds the sanitizers (ASan, UBSan, TSan), RealtimeSanitizer and a CPU benchmark. Both build their package. macOS runs only on `v*` tags or by hand.
-
 ## Documentation
 
 - [User manual](docs/MANUAL.md) ([français](docs/MANUAL.fr.md))
