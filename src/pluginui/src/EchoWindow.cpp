@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: Effects window (echo of the notes of the focused track, delay of the 16 channels)
+// STYM2149 — pluginui: Effects window (echo of the notes of the focused track, delay of the 16 and 32 channels)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/EchoWindow.h"
@@ -30,7 +30,7 @@ constexpr double kToMargin = 8;  // between Division and To on their row
 constexpr const char* kEchoTip =
     "Echo: play each note of this sound again, quieter each time; Authentic 3 ch plays the repeats on the chip";
 constexpr const char* kDelayTip = "Delay: echoes of the sound of every track, as much as its Send in the Mixer";
-constexpr const char* kDelay3Tip = "Delay: 16 ch only. In 3 ch, the Echo repeats the notes on the chip";
+constexpr const char* kDelay3Tip = "Delay: 16 and 32 ch only. In 3 ch, the Echo repeats the notes on the chip";
 constexpr const char* kEchoBuzzTip =
     "Echo: none for Sync Buzzer in 3 ch, a repeat would restart the shared hardware envelope at full level";
 
@@ -130,6 +130,7 @@ void EchoWindow::build() {
 void EchoWindow::wire() {
     onClose = [this] { m_.syncWindowButtons(); };
     on_.onClick = [this] { editEcho([](TrackEcho& x) { x.on = !x.on; }); };
+    div_.setPopup(true);  // a GEM pop-up button, with its shadow
     div_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int k = 0; k < ymengine::kDelayDivisions; ++k) {
@@ -141,6 +142,7 @@ void EchoWindow::wire() {
         m_.trackPopup(div_, std::move(items), echo().division);
     };
     // To: "Same track" (target -1), then each track of the mode; the checked item is therefore target + 1.
+    to_.setPopup(true);  // a GEM pop-up button, with its shadow
     to_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int t = -1; t < m_.voices(); ++t) {
@@ -181,14 +183,16 @@ void EchoWindow::wire() {
         return v.has_value();
     };
 
-    // Delay: host parameters, 16 channels only. MainWindow::bindSlider opens one host gesture per parameter at the
-    // first move of a slider and closes it at the release; the typed values are in the parameters' units (ms, %, Hz).
+    // Delay: host parameters, 16 and 32 channels only. MainWindow::bindSlider opens one host gesture per parameter at
+    // the first move of a slider and closes it at the release; the typed values are in the parameters' units (ms, %,
+    // Hz).
     auto toggle = [this](Global g) {
         if (studio()) m_.set(g, m_.iv(g) != 0 ? 0.0f : 1.0f);
     };
     delayOn_.onClick = [toggle] { toggle(Global::DelayOn); };
     ping_.onClick = [toggle] { toggle(Global::DelayPingPong); };
     sync_.onClick = [toggle] { toggle(Global::DelaySync); };
+    delDiv_.setPopup(true);  // a GEM pop-up button, with its shadow
     delDiv_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int k = 0; k < ymengine::kDelayDivisions; ++k) {

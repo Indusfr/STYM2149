@@ -24,9 +24,10 @@ std::vector<int8_t> toDmaSample(std::span<const float> left, std::span<const flo
     if (left.empty() || !(sampleRate > 0) || !(targetRate > 0)) return out;
     const bool stereo = !right.empty();
     const double ratio = targetRate / sampleRate;
-    // The 32 KB limit counts bytes: a stereo frame takes two.
-    const size_t maxFrames = ymengine::kDmaMaxBytes / (stereo ? 2 : 1);
-    const size_t n = std::min(maxFrames, size_t(std::floor(double(left.size()) * ratio)));
+    // The whole file (once 32 KB at most, the memory of the Atari now limiting the samples).
+    const double frames = std::floor(double(left.size()) * ratio);
+    if (!std::isfinite(frames)) return out;
+    const auto n = size_t(frames);
     out.resize(n * (stereo ? 2 : 1));
     auto at = [](std::span<const float> c, size_t i) {
         const float v = i < c.size() ? c[i] : 0.0f;
@@ -61,7 +62,7 @@ std::vector<int8_t> dmaResample(std::span<const int8_t> bytes, bool stereo, doub
 }
 
 std::vector<int8_t> dmaRaw(std::span<const uint8_t> bytes, bool stereo) {
-    size_t n = std::min<size_t>(bytes.size(), ymengine::kDmaMaxBytes);
+    size_t n = bytes.size();
     if (stereo) n &= ~size_t(1);
     std::vector<int8_t> out(n);
     for (size_t i = 0; i < n; ++i) out[i] = int8_t(bytes[i]);

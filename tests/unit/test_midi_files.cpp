@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <atomic>
 #include <fstream>
 #include <map>
@@ -176,7 +177,8 @@ TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (i
         INFO("case " << c.id);
         ymseq::Project p;
         p.setSteps(c.steps);
-        for (int t = 0; t < kTracks; ++t) p.tracks[size_t(t)].octave = c.oct[size_t(t)];
+        // The prototype's 16 tracks (tracks 17 to 32 keep their default octave).
+        for (size_t t = 0; t < c.oct.size() && t < size_t(kTracks); ++t) p.tracks[t].octave = c.oct[t];
         // A pattern created beyond those of the import stays.
         p.patterns[31].steps = 5;
         p.used.set(31);
@@ -184,7 +186,8 @@ TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (i
         const ymengine::VoiceMode mode = !c.mode3ch ? ymengine::VoiceMode::Studio16
                                          : c.chips > 1 ? ymengine::VoiceMode::Dual3
                                                        : ymengine::VoiceMode::Authentic3;
-        const std::optional<MidiImport> r = importMidi(c.file, mode, p);
+        // The patterns at the current length, as the prototype made them (the file's length, tested below).
+        const std::optional<MidiImport> r = importMidi(c.file, mode, p, {4, 16, false});
         if (c.null) {
             CHECK_FALSE(r);
             CHECK(p.song == before.song);
@@ -206,7 +209,8 @@ TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (i
         CHECK(midiImportTempo(*r) == float(std::clamp(c.bpm, 60, 240)));
         int on = 0;
         for (int t = 0; t < kTracks; ++t) {
-            CHECK(r->on[size_t(t)] == (c.enabled[size_t(t)] != 0));
+            // The prototype's 16 tracks; tracks 17 to 32 stay off, a MIDI file has 16 channels.
+            CHECK(r->on[size_t(t)] == (size_t(t) < c.enabled.size() && c.enabled[size_t(t)] != 0));
             if (r->on[size_t(t)]) {
                 ++on;
                 CHECK(r->drum[size_t(t)] == (c.effect[size_t(t)] == 4));
@@ -245,6 +249,293 @@ TEST_CASE("MIDI import: patterns, Song, tracks and warning like the prototype (i
         for (const std::string& line : midiImportMessage(*r, "test.mid")) msg += (msg.empty() ? "" : "|") + line;
         CHECK(msg == c.msg);
     }
+}
+
+namespace {
+
+// A format 1 file at 96 ticks per quarter note: one note of channel 1 per (start, end) in sixteenth notes.
+std::vector<uint8_t> sixteenths(const std::vector<std::pair<int, int>>& notes, int channel = 0) {
+    std::vector<ymio::SmfEvent> t;
+    for (const auto& [a, b] : notes) {
+        t.push_back(ymio::smfNoteOn(uint32_t(a * 24), channel, 60, 100));
+        t.push_back(ymio::smfNoteOff(uint32_t(b * 24), channel, 60));
+    }
+    const std::vector<std::vector<ymio::SmfEvent>> tracks = {t};
+    return ymio::writeSmf(96, tracks);
+}
+
+}  // namespace
+
+TEST_CASE("MIDI import: the patterns take the file's length in whole bars", "[midi]") {
+    struct Case {
+        int lastEnd;   // end of the last note, in sixteenth notes
+        int barSteps;  // steps per bar
+        double perQuarter;
+        int patterns, steps, lastSteps;
+        bool truncated;
+    };
+    for (const Case c : {Case{20, 16, 4, 1, 32, 32, false},       // 1 bar and a quarter: 2 bars
+                         Case{64, 16, 4, 1, 64, 64, false},       // 4 bars exactly
+                         Case{3, 16, 4, 1, 16, 16, false},        // shorter than a bar: one bar
+                         Case{40, 12, 4, 1, 48, 48, false},       // 3/4: 4 bars of 12
+                         Case{64, 32, 8, 1, 128, 128, false},     // 1/32: twice the steps
+                         Case{256, 16, 4, 1, 256, 256, false},    // 16 bars: one pattern of 256 steps
+                         Case{600, 16, 4, 3, 256, 96, false},     // 38 bars: 16 + 16 + 6
+                         Case{600, 12, 4, 3, 252, 96, false},     // 3/4: 21 bars of 12 per pattern, then 8
+                         Case{9000, 16, 4, 32, 256, 256, true}})  // beyond 32 patterns: cut
+    {
+        INFO("end " << c.lastEnd << ", bar " << c.barSteps << ", steps per quarter " << c.perQuarter);
+        ymseq::Project p;
+        p.setSteps(16);
+        p.tracks[0].length = 12;  // an own length: the imported track plays the whole pattern
+        const std::vector<uint8_t> f = sixteenths({{0, 1}, {c.lastEnd - 1, c.lastEnd}});
+        const std::optional<MidiImport> r = importMidi(f, ymengine::VoiceMode::Studio16, p, {c.perQuarter, c.barSteps});
+        REQUIRE(r);
+        CHECK(r->patterns == c.patterns);
+        CHECK(r->steps == c.steps);
+        CHECK(r->lastSteps == c.lastSteps);
+        CHECK(r->truncated == c.truncated);
+        REQUIRE(int(p.song.entries.size()) == c.patterns);
+        for (int k = 0; k < c.patterns; ++k)
+            CHECK(p.patterns[size_t(k)].steps == (k == c.patterns - 1 ? c.lastSteps : c.steps));
+        CHECK(p.tracks[0].length == 0);
+        // The last note on its step: in the last pattern, at its place in it.
+        if (!c.truncated) {
+            const int at = int(std::lround((c.lastEnd - 1) * c.perQuarter / 4));
+            const int k = at / c.steps;
+            CHECK(p.patterns[size_t(k)].lane(0).pat[size_t(at - k * c.steps)] == 0);
+        }
+    }
+    // The alert says the last pattern's length when it differs.
+    MidiImport r;
+    r.tracks = 1;
+    r.patterns = 3;
+    r.steps = 256;
+    r.lastSteps = 96;
+    CHECK(midiImportMessage(r, "a.mid")[3] == "1 track, 3 patterns of 256 steps (the last of 96), 120 BPM.");
+    r.patterns = 1;
+    r.steps = r.lastSteps = 64;
+    CHECK(midiImportMessage(r, "a.mid")[3] == "1 track, 1 pattern of 64 steps, 120 BPM.");
+}
+
+namespace {
+
+// Notes C4 on channels 1 to `melodic`, then a GM snare on channel 10, all on step 0.
+std::vector<uint8_t> channels(int melodic) {
+    std::vector<ymio::SmfEvent> t;  // in time order
+    for (int c = 0; c < melodic; ++c) t.push_back(ymio::smfNoteOn(0, c, 60, 100));
+    t.push_back(ymio::smfNoteOn(0, 9, 38, 100));
+    t.push_back(ymio::smfNoteOff(12, 9, 38));
+    for (int c = 0; c < melodic; ++c) t.push_back(ymio::smfNoteOff(24, c, 60));
+    const std::vector<std::vector<ymio::SmfEvent>> tracks = {t};
+    return ymio::writeSmf(96, tracks);
+}
+
+}  // namespace
+
+TEST_CASE("MIDI import: channel 10 played by Chipdrum or Digidrum, the Digidrum track in 3 ch", "[midi]") {
+    using ymengine::Generator;
+    using ymengine::VoiceMode;
+    struct Case {
+        VoiceMode mode;
+        int melodic;
+        Generator drums;
+        int drumTrack;  // -1: channel 10 left out (no track left)
+        int filled;
+    };
+    for (const Case c : {Case{VoiceMode::Studio16, 1, Generator::Chipdrum, 1, 2},
+                         Case{VoiceMode::Studio16, 1, Generator::Digidrum, 1, 2},  // the same track in 32 ch
+                         Case{VoiceMode::Authentic3, 1, Generator::Chipdrum, 1, 2},
+                         Case{VoiceMode::Authentic3, 1, Generator::Digidrum, 3, 2},
+                         Case{VoiceMode::Authentic3, 3, Generator::Chipdrum, -1, 3},  // the chip is full
+                         Case{VoiceMode::Authentic3, 3, Generator::Digidrum, 3, 4},   // all four placed
+                         Case{VoiceMode::Dual3, 6, Generator::Digidrum, 3, 7}}) {
+        CAPTURE(int(c.mode), c.melodic, int(c.drums));
+        ymseq::Project p;
+        MidiImportOptions o;
+        o.drums = c.drums;
+        const std::optional<MidiImport> r = importMidi(channels(c.melodic), c.mode, p, o);
+        REQUIRE(r);
+        CHECK(r->percussion);
+        CHECK(r->tracks == c.filled);
+        for (int t = 0; t < kTracks; ++t) CHECK(r->drum[size_t(t)] == (t == c.drumTrack));
+        if (c.drumTrack >= 0) {
+            CHECK(r->on[size_t(c.drumTrack)]);
+            CHECK(p.patterns[0].lane(c.drumTrack).pat[0] == gmSlot(38));
+        }
+        // The melodic channels on the tracks of the mode, in order.
+        const std::vector<int> tracks = midiImportTracks(c.mode);
+        for (int i = 0; i < std::min(c.melodic, int(tracks.size())); ++i) {
+            CHECK(r->on[size_t(tracks[size_t(i)])]);
+            CHECK(p.patterns[0].lane(tracks[size_t(i)]).pat[0] == 0);
+        }
+    }
+    // Without channel 10.
+    ymseq::Project p;
+    const std::optional<MidiImport> r = importMidi(sixteenths({{0, 4}}), VoiceMode::Authentic3, p, {});
+    REQUIRE(r);
+    CHECK_FALSE(r->percussion);
+    for (bool d : r->drum) CHECK_FALSE(d);
+}
+
+TEST_CASE("MIDI import: a drum part alone, on any channel, on the focused drum track", "[midi]") {
+    using ymengine::VoiceMode;
+    // A drum loop on channel 1 (GM kick, snare, toms), as a DAW writes it.
+    std::vector<ymio::SmfEvent> t;
+    for (const auto& [step, note] : {std::pair{0, 36}, std::pair{4, 38}, std::pair{8, 43}, std::pair{12, 36}}) {
+        t.push_back(ymio::smfNoteOn(uint32_t(step * 24), 0, note, 100));
+        t.push_back(ymio::smfNoteOff(uint32_t(step * 24 + 12), 0, note));
+    }
+    const std::vector<uint8_t> loop = ymio::writeSmf(96, std::vector<std::vector<ymio::SmfEvent>>{t});
+    for (const auto& [mode, focus] : {std::pair{VoiceMode::Studio16, 9}, std::pair{VoiceMode::Authentic3, 3},
+                                      std::pair{VoiceMode::Authentic3, 0}, std::pair{VoiceMode::Dual3, 7}}) {
+        CAPTURE(int(mode), focus);
+        ymseq::Project p;
+        MidiImportOptions o;
+        o.track = focus;
+        o.trackDrums = true;
+        const std::optional<MidiImport> r = importMidi(loop, mode, p, o);
+        REQUIRE(r);
+        CHECK(r->percussion);
+        CHECK(r->tracks == 1);
+        for (int k = 0; k < kTracks; ++k) {
+            CHECK(r->drum[size_t(k)] == (k == focus));
+            CHECK(r->on[size_t(k)] == (k == focus));
+        }
+        // The rows of the kit (GM_SLOT), without ties.
+        const ymseq::Lane& l = p.patterns[0].lane(focus);
+        CHECK(l.pat[0] == gmSlot(36));
+        CHECK(l.pat[4] == gmSlot(38));
+        CHECK(l.pat[8] == gmSlot(43));
+        CHECK(l.pat[12] == gmSlot(36));
+        CHECK(l.pat[1] < 0);
+        for (int s = 0; s < 16; ++s) CHECK(l.tie[size_t(s)] == 0);
+    }
+    // Not a drum track focused: the melodic import of the channel, as before.
+    ymseq::Project p;
+    MidiImportOptions melodic;
+    melodic.track = 4;
+    std::optional<MidiImport> r = importMidi(loop, VoiceMode::Studio16, p, melodic);
+    REQUIRE(r);
+    CHECK_FALSE(r->percussion);
+    CHECK_FALSE(r->drum[4]);
+    CHECK(r->on[4]);
+    CHECK(p.patterns[0].lane(4).pat[0] == 0);  // C
+    // Several channels: channel 10 alone is the drums, the others melodic, whatever the focused track.
+    MidiImportOptions o;
+    o.track = 9;
+    o.trackDrums = true;
+    r = importMidi(channels(1), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(r->drum[1]);
+    CHECK_FALSE(r->drum[9]);
+}
+
+TEST_CASE("MIDI import: the other tracks keep their notes, the Song and the tempo stay", "[midi]") {
+    using ymengine::VoiceMode;
+    // Notes C on tracks 0 and 1 at the steps given, in a pattern of `steps`.
+    auto project = [](int steps, std::initializer_list<int> at) {
+        ymseq::Project p;
+        p.setSteps(steps);
+        for (int t = 0; t < 2; ++t)
+            for (int s : at) p.patterns[0].edit(t).pat[size_t(s)] = int16_t(t);
+        p.patterns[0].bpm[1] = 140;
+        return p;
+    };
+    MidiImportOptions o;
+    o.track = 2;
+
+    // A bar on track 3 (index 2) in a pattern of one bar: tracks 1 and 2 stay, the Song gets one entry.
+    ymseq::Project p = project(16, {0, 4});
+    const ymseq::Project before = p;
+    std::optional<MidiImport> r = importMidi(sixteenths({{0, 1}, {8, 9}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(r->first == 0);
+    CHECK(r->tracks == 1);
+    CHECK(r->kept);
+    CHECK(r->song);
+    for (int t = 0; t < kTracks; ++t) CHECK(r->on[size_t(t)] == (t == 2));
+    CHECK(p.patterns[0].steps == 16);
+    CHECK(p.patterns[0].lane(0) == before.patterns[0].lane(0));
+    CHECK(p.patterns[0].lane(1) == before.patterns[0].lane(1));
+    CHECK(p.patterns[0].lane(2).pat[0] == 0);
+    CHECK(p.patterns[0].lane(2).pat[8] == 0);
+    REQUIRE(p.song.entries.size() == 1);
+    CHECK(p.song.entries[0].pat == 0);
+
+    // Again over it: track 3 replaced, not doubled; the Song, no longer empty, stays.
+    p.song.entries.push_back({0, 2, 0, ymseq::SongKind::Pattern, 0, false});
+    const ymseq::Song song = p.song;
+    r = importMidi(sixteenths({{4, 5}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK_FALSE(r->song);
+    CHECK(p.song == song);
+    CHECK(p.patterns[0].lane(2).pat[0] < 0);
+    CHECK(p.patterns[0].lane(2).pat[4] == 0);
+    CHECK(p.patterns[0].lane(0) == before.patterns[0].lane(0));
+
+    // A shorter part repeats over a longer pattern; the pattern keeps its length.
+    p = project(64, {0, 40});
+    r = importMidi(sixteenths({{0, 1}, {8, 9}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(p.patterns[0].steps == 64);
+    for (int s : {0, 8, 16, 24, 32, 40, 48, 56}) CHECK(p.patterns[0].lane(2).pat[size_t(s)] == 0);
+    CHECK(p.patterns[0].lane(2).pat[4] < 0);
+    CHECK(p.patterns[0].lane(0).pat[40] == 0);
+
+    // A longer part lengthens the pattern; the other tracks and the BPM row repeat their steps over the new ones.
+    p = project(16, {0, 4});
+    r = importMidi(sixteenths({{0, 1}, {31, 32}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(p.patterns[0].steps == 32);
+    for (int t = 0; t < 2; ++t) {
+        CHECK(p.patterns[0].lane(t).pat[16] == t);
+        CHECK(p.patterns[0].lane(t).pat[20] == t);
+        CHECK(p.patterns[0].lane(t).pat[17] < 0);
+    }
+    CHECK(p.patterns[0].bpm[17] == 140);
+    CHECK(p.patterns[0].lane(2).pat[31] == 0);
+
+    // From the current pattern; the patterns before it stay.
+    p = project(16, {0});
+    p.current = 5;
+    p.used.set(5);
+    r = importMidi(sixteenths({{0, 1}, {40, 41}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(r->first == 5);
+    CHECK(r->patterns == 1);
+    CHECK(p.patterns[5].steps == 48);
+    CHECK(p.patterns[5].lane(2).pat[40] == 0);
+    CHECK(p.patterns[0].lane(2).empty());
+    CHECK(p.patterns[0].lane(0).pat[0] == 0);
+    REQUIRE(p.song.entries.size() == 1);
+    CHECK(p.song.entries[0].pat == 5);
+    // Up to the last pattern only: a file longer than the patterns left is cut there.
+    p = ymseq::Project{};
+    p.current = 31;
+    r = importMidi(sixteenths({{0, 1}, {600, 601}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(r->first == 31);
+    CHECK(r->patterns == 1);
+    CHECK(r->truncated);
+
+    // Other tracks empty: nothing kept (the tempo of the file applies).
+    p = ymseq::Project{};
+    r = importMidi(sixteenths({{0, 1}}), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK_FALSE(r->kept);
+
+    // Several channels: their tracks of the mode replaced, the others kept.
+    p = project(16, {0});
+    p.patterns[0].edit(5).pat[3] = 7;
+    r = importMidi(channels(1), VoiceMode::Studio16, p, o);
+    REQUIRE(r);
+    CHECK(r->on[0]);
+    CHECK(r->on[1]);
+    CHECK_FALSE(r->on[5]);
+    CHECK(r->kept);
+    CHECK(p.patterns[0].lane(5).pat[3] == 7);
+    CHECK(p.patterns[0].lane(1).pat[0] == gmSlot(38));
 }
 
 TEST_CASE("MIDI export of a pattern: sequencer notes, gate, tie, velocity, tempo", "[midi][export]") {
@@ -390,7 +681,7 @@ TEST_CASE("MIDI export: chords, repeated hits, slide", "[midi][export]") {
     CHECK((n[4].note == 60 && n[4].start == 192 && n[4].end == 216));  // the slide leads to the next note
     CHECK((n[5].note == 67 && n[5].start == 216 && n[5].end == 228));
     CHECK(n[4].velocity == 127);
-    CHECK(n[5].velocity == 76);  // in 16 channels the arrival takes its own level: 9 / 15 × 127
+    CHECK(n[5].velocity == 76);  // in 32 channels the arrival takes its own level: 9 / 15 × 127
 }
 
 TEST_CASE("MIDI export of a Song: Loop jumps unrolled, Note-off entry", "[midi][export]") {
@@ -426,7 +717,8 @@ TEST_CASE("MIDI export: Ticks timing, equivalent tempo", "[midi][export]") {
     for (int st = 0; st < 4; ++st) note(p.edit(0), st, 60);
     const std::optional<MidiExport> e = exportMidi(OfflineRender::Source::Pattern, pr.v, pr.x);
     REQUIRE(e);
-    CHECK(e->seconds == Catch::Approx(0.48));
+    // The render stops at the sample whose phase reaches the end of the last step.
+    CHECK(e->seconds == Catch::Approx(0.48).margin(1.0 / 48000));
     const auto tempos = metas(e->bytes, 0x51);
     REQUIRE(tempos.size() == 1);
     CHECK(tempos[0] == std::pair<uint32_t, std::vector<uint8_t>>{0, {0x07, 0x53, 0x00}});  // 480 000 µs

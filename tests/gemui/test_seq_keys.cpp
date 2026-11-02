@@ -325,12 +325,18 @@ TEST_CASE("Left and Right: the grid cursor when the grid is open, else the chann
     h.state.seq.cur().steps = 32;
     pluginui::MainWindow w(h);
 
-    // Grid closed: the channel, around the 16 tracks.
+    // Grid closed: the channel, around the 16 tracks of 16 ch, the 32 of 32 ch.
     CHECK(key(w, Key::Right));
     CHECK(h.p(Global::FocusTrack) == 2.0f);
     key(w, Key::Left);
     key(w, Key::Left);
     CHECK(h.p(Global::FocusTrack) == 16.0f);
+    key(w, Key::Right);
+    CHECK(h.p(Global::FocusTrack) == 1.0f);
+    h.p(Global::VoiceMode) = 3;
+    w.tick(0);
+    key(w, Key::Left);
+    CHECK(h.p(Global::FocusTrack) == float(plugin::kTracks));
     key(w, Key::Right);
     CHECK(h.p(Global::FocusTrack) == 1.0f);
     // 3ch: around the four tracks of the chip.

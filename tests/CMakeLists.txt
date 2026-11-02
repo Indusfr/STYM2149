@@ -35,8 +35,25 @@ add_executable(stym_unit
   unit/test_ym_writer.cpp
   unit/test_sndh_writer.cpp
   unit/test_sndh.cpp
+  unit/test_maxym.cpp
   unit/test_xm.cpp
+  unit/test_mod.cpp
+  unit/test_okt.cpp
+  unit/test_s3m.cpp
+  unit/test_ymt.cpp
+  unit/test_ymt_import.cpp
+  unit/test_ymt_export.cpp
   unit/test_xm_import.cpp
+  unit/test_mod_import.cpp
+  unit/test_s3m_okt_import.cpp
+  unit/test_register_import.cpp
+  unit/test_maxym_export.cpp
+  unit/test_maxym_fm.cpp
+  unit/test_maxym_import.cpp
+  unit/test_ttrak.cpp
+  unit/test_ttrak_import.cpp
+  unit/test_ttrak_export.cpp
+  unit/test_ttrak_fm.cpp
   unit/test_mfp.cpp
   unit/test_board.cpp
   unit/test_virtualchannel.cpp
@@ -48,6 +65,7 @@ add_executable(stym_unit
   unit/test_engine.cpp
   unit/test_engine_m3.cpp
   unit/test_engine_expression.cpp
+  unit/test_engine_pads.cpp
   unit/test_plugincore.cpp
   unit/test_ym_player.cpp
   unit/test_proto_engine.cpp
@@ -63,6 +81,7 @@ add_executable(stym_unit
   unit/test_engine_cmd.cpp
   unit/test_engine_ticks.cpp
   unit/test_engine_timerwave.cpp
+  unit/test_engine_fm.cpp
   unit/test_engine_pitch.cpp
   unit/test_engine_buzzer.cpp
   unit/test_engine_dma.cpp
@@ -72,8 +91,10 @@ add_executable(stym_unit
   unit/test_recorder.cpp
   unit/test_ticks_state.cpp
   unit/test_timerwave_state.cpp
+  unit/test_fm_state.cpp
   unit/test_buzzer_state.cpp
   unit/test_dma_state.cpp
+  unit/test_ste_memory.cpp
   unit/test_digidrum_editor.cpp
   unit/test_sequences_state.cpp
   unit/test_lfo_state.cpp
@@ -83,6 +104,11 @@ add_executable(stym_unit
 target_link_libraries(stym_unit PRIVATE ymio ymengine ymseq stym_plugincore stym_testsupport Catch2::Catch2WithMain)
 target_compile_definitions(stym_unit PRIVATE STYM_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data")
 stym_warnings(stym_unit)
+# A PluginState weighs over 100 KB since the 255 sample slots and the state tests keep several of them on
+# the stack: the 1 MB stack of MSVC overflows, so it gets the 8 MB of Linux, as stym_ui.
+if(MSVC)
+  target_link_options(stym_unit PRIVATE /STACK:8388608)
+endif()
 add_test(NAME unit COMMAND stym_unit)
 set_tests_properties(unit PROPERTIES TIMEOUT 600)
 
@@ -96,6 +122,7 @@ add_executable(stym_ui
   gemui/test_help_window.cpp
   gemui/test_menu_columns.cpp
   gemui/test_confirm.cpp
+  gemui/test_info_demo.cpp
   gemui/test_main_tracks.cpp
   gemui/test_main_controls.cpp
   gemui/test_seq_grid.cpp
@@ -108,6 +135,7 @@ add_executable(stym_ui
   gemui/test_file_menu.cpp
   gemui/test_midi_menu.cpp
   gemui/test_xm_menu.cpp
+  gemui/test_register_import_menu.cpp
   gemui/test_audio_menu.cpp
   gemui/test_register_menu.cpp
   gemui/test_settings_window.cpp
@@ -127,12 +155,15 @@ add_executable(stym_ui
   gemui/test_dma_window.cpp
   gemui/test_recorder_window.cpp
   gemui/test_digidrum_window.cpp
+  gemui/test_ste_memory_ui.cpp
   gemui/test_echo_window.cpp
   gemui/test_desktop.cpp
+  gemui/test_ui_language.cpp
   gemui/test_main_rows.cpp
   gemui/test_visual.cpp
   gemui/test_windows.cpp
-  gemui/test_ym_window.cpp)
+  gemui/test_ym_window.cpp
+  gemui/ui_texts_listener.cpp)
 target_link_libraries(stym_ui PRIVATE gemui stym_gemshot_scenes stym_tools_common Catch2::Catch2WithMain)
 target_compile_definitions(stym_ui PRIVATE STYM_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data")
 stym_warnings(stym_ui)
@@ -208,15 +239,21 @@ endif()
 # Plugin processor and editor with JUCE: shared code of the formats, replaced allocation operators.
 if(STYM_BUILD_PLUGIN)
   add_executable(stym_plugin_tests plugin/test_processor.cpp plugin/test_editor.cpp plugin/test_stress.cpp
-    plugin/test_tooltips.cpp plugin/test_juce_painter.cpp)
+    plugin/test_tooltips.cpp plugin/test_ui_language.cpp plugin/test_juce_painter.cpp gemui/ui_texts_listener.cpp)
   # JUCE headers and definitions of the shared code (its modules are linked into it privately, as JUCE recommends).
   target_include_directories(stym_plugin_tests SYSTEM PRIVATE $<TARGET_PROPERTY:STYM2149,INCLUDE_DIRECTORIES>)
   target_include_directories(stym_plugin_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/plugin")
   target_compile_definitions(stym_plugin_tests PRIVATE $<TARGET_PROPERTY:STYM2149,COMPILE_DEFINITIONS>
                              STYM_TEST_DATA="${CMAKE_CURRENT_SOURCE_DIR}/data"
-                             STYM_LANGUAGES_DIR="${PROJECT_SOURCE_DIR}/languages")
+                             STYM_LANGUAGES_DIR="${PROJECT_SOURCE_DIR}/languages"
+                             STYM_TIPCATALOG_DIR="${PROJECT_SOURCE_DIR}/tools/tipcatalog")
   target_link_libraries(stym_plugin_tests PRIVATE STYM2149 stym_plugincore Catch2::Catch2WithMain)
   stym_warnings(stym_plugin_tests)
+  # Each processor of the tests (on the stack) holds several copies of the state, over 100 KB each:
+  # the 1 MB stack of MSVC overflows, so it gets the 8 MB of Linux, as stym_unit.
+  if(MSVC)
+    target_link_options(stym_plugin_tests PRIVATE /STACK:8388608)
+  endif()
   add_test(NAME plugin COMMAND stym_plugin_tests)
   set_tests_properties(plugin PROPERTIES TIMEOUT 600)
 endif()

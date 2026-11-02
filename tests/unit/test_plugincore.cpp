@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -67,7 +68,9 @@ PluginState referenceState() {
     s.extras.global.scaleRoot = 9;
     s.extras.global.slideTable[5] = 0.25f;
     s.extras.kit = ymengine::kKitBanks[7].kit;
-    for (int i = 0; i < 33; ++i) s.extras.digidrums[0].push_back(uint8_t((i * 7) % 16));
+    std::vector<uint8_t> first;
+    for (int i = 0; i < 33; ++i) first.push_back(uint8_t((i * 7) % 16));
+    s.extras.digidrums[0] = first;
     s.extras.digidrums[7] = {15, 0, 15, 0, 7};
     return s;
 }
@@ -130,7 +133,7 @@ bool sameSequencer(const NonParamState& a, const NonParamState& b) {
     const auto &g = a.global, &h = b.global;
     if (g.seqClock != h.seqClock || g.resolution != h.resolution || g.loop != h.loop || g.songMode != h.songMode ||
         g.metronome != h.metronome || g.metronomeLevel != h.metronomeLevel || g.quantizeVbl != h.quantizeVbl ||
-        g.sigNum != h.sigNum || g.sigDen != h.sigDen)
+        g.sigNum != h.sigNum || g.sigDen != h.sigDen || g.cutFade != h.cutFade || g.cutFadeMs != h.cutFadeMs)
         return false;
     const ymseq::Project &p = a.seq, &q = b.seq;
     if (p.current != q.current || p.used != q.used || p.viewBank != q.viewBank || p.bankLast != q.bankLast ||
@@ -196,8 +199,8 @@ std::vector<uint8_t> parm(const std::vector<std::pair<std::string, float>>& entr
 
 // state_v1_m5.bin as it is rewritten now: PARM chunk completed with the Computer parameter (ST or STE machine), the
 // frequency of the Custom clock, Arp Sync, the Master of the stereo outputs, the delay,
-// the Tuning A4 and the MIDI expression, at their defaults, inserted after "gateAll" (index
-// order), parameter count and chunk length updated.
+// the Tuning A4, the MIDI expression, the drum pads and the curves of the controller,
+// at their defaults, inserted after "gateAll" (index order), parameter count and chunk length updated.
 std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
     auto get32 = [&](size_t i) {
         return uint32_t(f[i]) | uint32_t(f[i + 1]) << 8 | uint32_t(f[i + 2]) << 16 | uint32_t(f[i + 3]) << 24;
@@ -217,7 +220,8 @@ std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
         {"delayDivision", 4}, {"delayTime", 375},       {"delayFeedback", 35},  {"delayHiCut", 6000},
         {"delayLevel", 100},  {"delayPingPong", 0},       {"a4Hz", 440},          {"bendTarget", 0},
         {"wheelTarget", 1},   {"aftertouch", 1},        {"mpe", 0},             {"mpeBendRange", 48},
-        {"mpeSlide", 0}};
+        {"mpeSlide", 0},      {"drumPads", 10},         {"velocityCurve", 0},   {"aftertouchCurve", 0},
+        {"masterMono", 0}};
     std::vector<uint8_t> add = parm(added);
     add.erase(add.begin(), add.begin() + 4);  // without the count
     f.insert(f.begin() + std::ptrdiff_t(after), add.begin(), add.end());
@@ -225,29 +229,76 @@ std::vector<uint8_t> withNewParams(std::vector<uint8_t> f) {
     set32(at + 8, get32(at + 8) + uint32_t(added.size()));
     // Sixth DAW test: Vibrato On of each track, after its Gate; then its Send and the right side of a
     // stereo DMA sample.
-    for (int t = 1; t <= kTracks; ++t) {
+    for (int t = 1; t <= 16; ++t) {
         const std::string id = std::string(t < 10 ? "t0" : "t") + std::to_string(t) + "_gate";
         std::vector<uint8_t> key = {uint8_t(id.size()), 0};
         key.insert(key.end(), id.begin(), id.end());
         const auto g = std::search(f.begin(), f.end(), key.begin(), key.end());
         REQUIRE(g != f.end());
         const std::string tr = id.substr(0, 4);
-        const std::vector<std::pair<std::string, float>> fields = {{tr + "vibOn", 1}, {tr + "send", 0},
-                                                                   {tr + "levelR", 75}, {tr + "muteR", 0},
-                                                                   {tr + "soloR", 0},  {tr + "link", 1}};
+        const std::vector<std::pair<std::string, float>> fields = {
+            {tr + "vibOn", 1},  {tr + "send", 0}, {tr + "levelR", 75}, {tr + "muteR", 0},
+            {tr + "soloR", 0},  {tr + "link", 1}, {tr + "mono", 0}};
         std::vector<uint8_t> on = parm(fields);
         on.erase(on.begin(), on.begin() + 4);
         f.insert(g + std::ptrdiff_t(key.size() + 4), on.begin(), on.end());
         set32(at + 4, get32(at + 4) + uint32_t(on.size()));
         set32(at + 8, get32(at + 8) + uint32_t(fields.size()));
     }
-    // Seventh DAW test: the level of the metronome (100 %) at the end of the SEQS chunk.
+    // Tracks 17 to 32: every parameter of each, at its default, after the last one of track 16.
+    {
+        const std::string last = "t16_mono";
+        const auto l = std::search(f.begin(), f.end(), last.begin(), last.end());
+        REQUIRE(l != f.end());
+        std::vector<std::pair<std::string, float>> tracks;
+        for (int i = paramIndex(16, Track(0)); i < kParamCount; ++i)
+            tracks.emplace_back(paramSpecs()[size_t(i)].id, paramSpecs()[size_t(i)].def);
+        std::vector<uint8_t> more = parm(tracks);
+        more.erase(more.begin(), more.begin() + 4);
+        f.insert(l + std::ptrdiff_t(last.size() + 4), more.begin(), more.end());
+        set32(at + 4, get32(at + 4) + uint32_t(more.size()));
+        set32(at + 8, get32(at + 8) + uint32_t(tracks.size()));
+    }
+    // Tracks 17 to 32 in TRKX (a count, then the length and body of each track) and SEQS (the count of the
+    // tracks at byte 15, then their octave and length): their entries as a state at its defaults writes them.
+    {
+        auto le32 = [](const std::vector<uint8_t>& v, size_t i) {
+            return uint32_t(v[i]) | uint32_t(v[i + 1]) << 8 | uint32_t(v[i + 2]) << 16 | uint32_t(v[i + 3]) << 24;
+        };
+        auto body = [&](const std::vector<uint8_t>& v, const char* tag) {  // offset of the chunk's body
+            size_t p = 8;
+            while (p + 8 <= v.size() && std::memcmp(v.data() + p, tag, 4) != 0) p += 8 + le32(v, p + 4);
+            REQUIRE(p + 8 <= v.size());
+            return p + 8;
+        };
+        auto grow = [&](const char* tag, size_t at, std::span<const uint8_t> more) {
+            const size_t b = body(f, tag);
+            f.insert(f.begin() + std::ptrdiff_t(b + at), more.begin(), more.end());
+            set32(b - 4, get32(b - 4) + uint32_t(more.size()));
+        };
+        const std::vector<uint8_t> d = encodeState(PluginState{});
+        const size_t dt = body(d, "TRKX"), ft = body(f, "TRKX");
+        REQUIRE(d[dt] == kTracks);
+        REQUIRE(f[ft] == 16);
+        size_t from = dt + 1;
+        for (int t = 0; t < 16; ++t) from += 4 + le32(d, from);
+        f[ft] = uint8_t(kTracks);
+        grow("TRKX", get32(ft - 4), std::span(d).subspan(from, dt + le32(d, dt - 4) - from));
+        const size_t ds = body(d, "SEQS"), fs = body(f, "SEQS");
+        REQUIRE(d[ds + 15] == kTracks);
+        REQUIRE(f[fs + 15] == 16);
+        f[fs + 15] = uint8_t(kTracks);
+        grow("SEQS", 16 + 16 * 3, std::span(d).subspan(ds + 16 + 16 * 3, 16 * 3));
+    }
+    // Seventh DAW test: the level of the metronome (100 %) at the end of the SEQS chunk; then the length of
+    // the fade of a CUT (5 ms).
     const std::string seqs = "SEQS";
     const auto sq = std::search(f.begin(), f.end(), seqs.begin(), seqs.end());
     REQUIRE(sq != f.end());
     const size_t len = size_t(sq - f.begin()) + 4;
-    f.insert(f.begin() + std::ptrdiff_t(len + 4 + get32(len)), uint8_t(100));
-    set32(len, get32(len) + 1);
+    const std::array<uint8_t, 2> tail = {100, 5};
+    f.insert(f.begin() + std::ptrdiff_t(len + 4 + get32(len)), tail.begin(), tail.end());
+    set32(len, get32(len) + uint32_t(tail.size()));
     return f;
 }
 
@@ -285,7 +336,7 @@ struct Recorder : ParamListener {
 
 TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
     const auto& specs = paramSpecs();
-    REQUIRE(kParamCount == 42 + 16 * 32);
+    REQUIRE(kParamCount == 46 + 32 * 33);  // 16 tracks in earlier versions
     std::set<std::string> ids;
     for (int i = 0; i < kParamCount; ++i) {
         const ParamSpec& s = specs[size_t(i)];
@@ -299,7 +350,9 @@ TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
         // Version of appearance: 2 for the sequencer parameters, 3 for the ST or STE machine, 4 for
         // the frequency of the Custom clock, the Vibrato On of the tracks and Arp Sync, 5 for
         // the Master of the stereo outputs, 6 for the delay and the Send of the tracks, 7 for the
-        // Tuning A4, 8 for the MIDI expression, 9 for the right side of a stereo DMA sample.
+        // Tuning A4, 8 for the MIDI expression, 9 for the right side of a stereo DMA sample, 10
+        // for the channel of the drum pads, 11 for the curves of the controller, 12 for tracks 17 to 32
+        // and the Mono of the tracks and of the Master.
         const bool delay = s.id.starts_with("delay") || s.id.ends_with("_send");
         const bool master = s.id == "master2" || s.id == "masterPan" || s.id == "masterLink";
         const bool m5 = s.id == "freeTempo" || s.id == "swing" || s.id == "gate" || s.id == "gateAll" ||
@@ -310,14 +363,20 @@ TEST_CASE("Parameters: complete table, stable and unique ids", "[plugin]") {
             s.id == "bendTarget" || s.id == "wheelTarget" || s.id == "aftertouch" || s.id.starts_with("mpe");
         const bool right = s.id.ends_with("_levelR") || s.id.ends_with("_muteR") || s.id.ends_with("_soloR") ||
                            s.id.ends_with("_link");
-        const int version =
-            right ? 9 : expr ? 8 : s.id == "a4Hz" ? 7 : delay ? 6 : master ? 5 : daw ? 4 : m6 ? 3 : m5 ? 2 : 1;
+        const bool mono = s.id == "masterMono" || s.id.ends_with("_mono");
+        const int version = s.track >= 16 || mono                               ? 12
+                            : s.id == "velocityCurve" || s.id == "aftertouchCurve" ? 11
+                            : s.id == "drumPads"                                ? 10
+                            : right                                             ? 9
+                            : expr ? 8 : s.id == "a4Hz" ? 7 : delay ? 6 : master ? 5 : daw ? 4 : m6 ? 3 : m5 ? 2 : 1;
         CHECK(s.version == version);
         if (s.kind == ParamKind::Choice) CHECK(s.choices.size() == size_t(s.max) + 1);
     }
     CHECK(findParam("inconnu") == -1);
     CHECK(specs[size_t(idx("t01_level"))].group == "Track 1");
     CHECK(specs[size_t(idx("t16_arpRate"))].name == "T16 Arp Rate");
+    CHECK(specs[size_t(idx("t32_arpRate"))].name == "T32 Arp Rate");
+    CHECK(specs[size_t(idx("t32_link"))].group == "Track 32");
     CHECK(specs[size_t(idx("master"))].group == "Global");
     // Defaults of the prototype (mkCh, GLOB).
     const ParamValues v = defaultValues();
@@ -495,7 +554,7 @@ TEST_CASE("Mapping: roles imposed in 3 channels (fxAllowed), setting kept", "[pl
     v[size_t(idx("t04_generator"))] = 1;  // SID on the Digidrum track of chip 1
     v[size_t(idx("t08_generator"))] = 0;
     v[size_t(idx("t12_generator"))] = 2;
-    CHECK(effectiveGenerator(v, 0) == Generator::Digidrum);  // 16 channels: everything is allowed
+    CHECK(effectiveGenerator(v, 0) == Generator::Digidrum);  // 32 channels: everything is allowed
     CHECK(effectiveGenerator(v, 3) == Generator::Sid);
     v[size_t(idx("voiceMode"))] = 1;  // Authentic 3ch
     CHECK(effectiveGenerator(v, 0) == Generator::Chip);
@@ -523,6 +582,9 @@ TEST_CASE("Mapping: STE machine, DMA tracks and DMA type", "[plugin]") {
     CHECK(toGlobal(v, {}).ste);
     CHECK(effectiveGenerator(v, 1) == Generator::Dma);  // 16 channels, STE: any track
     CHECK(trackCount(v) == 16);
+    v[size_t(idx("voiceMode"))] = 3;  // 32 ch
+    CHECK(trackCount(v) == 32);
+    CHECK(effectiveGenerator(v, 1) == Generator::Dma);
     // Authentic 3ch, STE: tracks 5 to 12 as DMA, whatever their parameter; DMA elsewhere falls back to Chip Voice.
     v[size_t(idx("voiceMode"))] = 1;
     CHECK(trackCount(v) == 12);
@@ -590,14 +652,14 @@ TEST_CASE("Mapping: engine configuration, sinc fallback beyond clk/8", "[plugin]
     CHECK(configKey(v).clock == 3);
 }
 
-TEST_CASE("Mapping: Custom clock, its frequency in 16 ch, 2 MHz in the other modes", "[plugin]") {
+TEST_CASE("Mapping: Custom clock, its frequency in 16 and 32 ch, 2 MHz in the other modes", "[plugin]") {
     ParamValues v = defaultValues();
     const ParamSpec& s = paramSpecs()[size_t(idx("chipClockHz"))];
     CHECK(paramSpecs()[size_t(idx("chipClock"))].choices[0] == "Custom");
     CHECK(s.min == 100000.0f);
     CHECK(s.max == 8000000.0f);
     CHECK_FALSE(s.automatable);
-    // Default: the 2 MHz of the entry the Custom clock replaces, in 16 ch.
+    // Default: the 2 MHz of the entry the Custom clock replaces, in 32 ch.
     CHECK(v[size_t(idx("chipClock"))] == 0.0f);
     CHECK(v[size_t(idx("chipClockHz"))] == 2000000.0f);
     CHECK(configKey(v).hz == 2000000);
@@ -690,7 +752,12 @@ TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     const DecodeResult g = decodeState(golden);
     REQUIRE(g.ok);
     CHECK_FALSE(g.hasSequencer);
-    CHECK(g.state.values == ref.values);
+    // A state from before the Vibrato switch keeps the vibrato of its 16 tracks On, now Off by default.
+    const auto vibOn = [](ParamValues v) {
+        for (int t = 0; t < 16; ++t) v[size_t(paramIndex(t, Track::VibOn))] = 1;
+        return v;
+    };
+    CHECK(g.state.values == vibOn(ref.values));
     CHECK(sameExtras(g.state.extras, ref.extras));
     CHECK(sameSequencer(g.state.extras, NonParamState{}));
 
@@ -706,7 +773,7 @@ TEST_CASE("State: round trip, reference v1 file", "[plugin][state]") {
     REQUIRE(g5.ok);
     CHECK(g5.hasSequencer);
     CHECK(g5.unknownChunks == 0);
-    CHECK(g5.state.values == m5.values);
+    CHECK(g5.state.values == vibOn(m5.values));
     CHECK(sameExtras(g5.state.extras, m5.extras));
     CHECK(sameSequencer(g5.state.extras, m5.extras));
     // Then two more parameters (Computer, Custom clock), written at their
@@ -722,6 +789,18 @@ TEST_CASE("State: level of the metronome kept", "[plugin][state][metronome]") {
         const DecodeResult back = decodeState(encodeState(s));
         REQUIRE(back.ok);
         CHECK(back.state.extras.global.metronomeLevel == level);
+        CHECK(sameSequencer(back.state.extras, s.extras));
+    }
+}
+
+TEST_CASE("State: Fade of the CUT and its length kept", "[plugin][state]") {
+    PluginState s = referenceStateM5();
+    for (const int ms : {1, 20, 100}) {
+        s.extras.global.cutFade = ms != 20;
+        s.extras.global.cutFadeMs = uint8_t(ms);
+        const DecodeResult back = decodeState(encodeState(s));
+        REQUIRE(back.ok);
+        CHECK(back.state.extras.global.cutFadeMs == ms);
         CHECK(sameSequencer(back.state.extras, s.extras));
     }
 }
@@ -772,6 +851,7 @@ TEST_CASE("State: sequencer, cells clamped, unknown rows ignored", "[plugin][sta
     CHECK(x.global.sigNum == 4);  // 4/3 is not a time signature of the prototype: 4/4
     CHECK(x.global.sigDen == 4);
     CHECK(x.global.metronomeLevel == 100);  // no level (older state): full level
+    CHECK(x.global.cutFadeMs == 5);         // no length (older state): 5 ms
     CHECK(x.seq.current == 31);
     CHECK(x.seq.viewBank == 3);
     CHECK(x.seq.used.test(4));
@@ -785,17 +865,17 @@ TEST_CASE("State: sequencer, cells clamped, unknown rows ignored", "[plugin][sta
     CHECK(x.seq.song.entries[0].rep == 1);
 }
 
-TEST_CASE("State: INS row (id 31), clamped to the 32 instruments", "[plugin][state]") {
+TEST_CASE("State: INS row (id 31), clamped to the 127 instruments", "[plugin][state]") {
     PluginState st;
     ymseq::Lane& l = st.extras.seq.patterns[0].edit(1);
     l.pat[0] = 2;
-    l.ins[0] = 32;
+    l.ins[0] = 127;
     l.ins[5] = 3;
     l.vpat[4][7] = 9;  // last row of the chord voices (id 30): distinct from INS
     const DecodeResult back = decodeState(encodeState(st));
     REQUIRE(back.ok);
     const ymseq::Lane& b = back.state.extras.seq.patterns[0].lane(1);
-    CHECK(b.ins[0] == 32);
+    CHECK(b.ins[0] == 127);
     CHECK(b.ins[5] == 3);
     CHECK(b.vpat[4][7] == 9);
     CHECK(b == l);
@@ -803,7 +883,7 @@ TEST_CASE("State: INS row (id 31), clamped to the 32 instruments", "[plugin][sta
     std::vector<uint8_t> s = header(1);
     std::vector<uint8_t> lane = {
         1,                     // one row
-        31, 2, 0, 4, 99, 0, 6, 0xff, 0xff,  // INS: step 4 = 99 → 32, step 6 = -1 → 0 (empty)
+        31, 2, 0, 4, 200, 0, 6, 0xff, 0xff,  // INS: step 4 = 200 → 127, step 6 = -1 → 0 (empty)
     };
     std::vector<uint8_t> pat = {16, 0, 1, 0};
     pat.insert(pat.end(), lane.begin(), lane.end());
@@ -813,7 +893,7 @@ TEST_CASE("State: INS row (id 31), clamped to the 32 instruments", "[plugin][sta
     putChunk(s, "PATN", patn);
     const DecodeResult r = decodeState(s);
     REQUIRE(r.ok);
-    CHECK(r.state.extras.seq.patterns[0].lane(0).ins[4] == 32);
+    CHECK(r.state.extras.seq.patterns[0].lane(0).ins[4] == 127);
     CHECK(r.state.extras.seq.patterns[0].lane(0).ins[6] == 0);
 }
 
@@ -920,6 +1000,24 @@ TEST_CASE("State: track names (NAME chunk, written only if a track is named)", "
     CHECK(cleanTrackName("Hi hats open") == "Hi hats");  // cut after 8 characters, then the space at the end
 }
 
+TEST_CASE("State: instrument of each track (TINS chunk, written only if a track has one)", "[plugin][state]") {
+    PluginState s;
+    const auto plain = encodeState(s);
+    s.extras.trackInstruments[0] = 3;
+    s.extras.trackInstruments[15] = uint8_t(ymengine::kInstruments);
+    const auto withIns = encodeState(s);
+    CHECK(withIns.size() == plain.size() + 8 + 1 + size_t(kTracks));
+    const DecodeResult back = decodeState(withIns);
+    REQUIRE(back.ok);
+    CHECK(back.unknownChunks == 0);
+    CHECK(back.state.extras.trackInstruments == s.extras.trackInstruments);
+    // Out of range: no instrument.
+    s.extras.trackInstruments[4] = uint8_t(ymengine::kInstruments + 1);
+    sanitize(s.extras);
+    CHECK(s.extras.trackInstruments[4] == 0);
+    CHECK(s.extras.trackInstruments[0] == 3);
+}
+
 TEST_CASE("State: unknown, missing and out-of-bounds chunks and parameters; versions", "[plugin][state]") {
     std::vector<uint8_t> s = header(1);
     putChunk(s, "ZZZZ", {1, 2, 3});
@@ -975,7 +1073,7 @@ TEST_CASE("Driver: a host that prepares at 0 Hz gets a playable engine", "[plugi
     for (float x : l) CHECK(std::isfinite(x));
 }
 
-TEST_CASE("Driver: delay parameters and Send of the track reach the engine, 16 ch only",
+TEST_CASE("Driver: delay parameters and Send of the track reach the engine, 16 and 32 ch only",
           "[plugin][driver][delay]") {
     for (const int mode : {0, 1, 2}) {
         CAPTURE(mode);
@@ -1040,7 +1138,82 @@ TEST_CASE("Driver: channel and polyphonic pressure drive the Aftertouch target",
     CHECK(g.d.engine().voice(a).volume == 8);
 }
 
-TEST_CASE("Driver: MPE in 16 ch, one note per member channel, routing of the keyboard",
+TEST_CASE("Mapping: velocity and aftertouch curves", "[plugin]") {
+    for (const Curve c : {Curve::Linear, Curve::Soft, Curve::Hard, Curve::SCurve}) {
+        INFO(int(c));
+        CHECK(curved(c, 0) == 0);
+        CHECK(curved(c, 127) == 127);
+        int last = 0;
+        for (int x = 0; x <= 127; ++x) {  // never down
+            CHECK(curved(c, x) >= last);
+            last = curved(c, x);
+        }
+    }
+    CHECK(curved(Curve::Linear, 64) == 64);
+    CHECK(curved(Curve::Soft, 64) == 90);    // light touches louder
+    CHECK(curved(Curve::Hard, 64) == 32);    // more force for the top
+    CHECK(curved(Curve::SCurve, 64) == 64);  // the middle stays, the ends flatter
+    CHECK(curved(Curve::SCurve, 16) < 16);
+    CHECK(curved(Curve::SCurve, 111) > 111);
+    // Separate settings, Linear by default and not automatable (MIDI settings).
+    ParamValues v = defaultValues();
+    for (const char* id : {"velocityCurve", "aftertouchCurve"}) {
+        INFO(id);
+        CHECK(v[size_t(idx(id))] == 0.0f);
+        CHECK_FALSE(paramSpecs()[size_t(idx(id))].automatable);
+        CHECK(paramSpecs()[size_t(idx(id))].choices.size() == 4);
+    }
+    CHECK(curvedVelocity(v, 64) == 64);
+    v[size_t(idx("velocityCurve"))] = 2;  // Hard
+    CHECK(curvedVelocity(v, 64) == 32);
+    CHECK(curvedVelocity(v, 1) == 1);  // a note-on stays one
+    CHECK(curvedVelocity(v, 0) == 0);
+    CHECK(curvedPressure(v, 64) == 64);  // the aftertouch keeps its own curve
+    v[size_t(idx("aftertouchCurve"))] = 1;  // Soft
+    CHECK(curvedPressure(v, 64) == 90);
+    CHECK(curvedPressure(v, 0) == 0);
+}
+
+TEST_CASE("Driver: the controller's velocity and pressure go through their curves, the screen's not",
+          "[plugin][driver][expression]") {
+    // Velocity, Accent in 32 ch: a gain. The same note at velocity 64 under each curve.
+    auto level = [](int curve, bool screen) {
+        Rig g;
+        g.v[size_t(idx("velocityCurve"))] = float(curve);
+        g.run(512);
+        MidiEvent on = msg(0, 0x90, 60, 64);
+        on.screen = screen;
+        g.run(2400, {on});
+        g.run(4800);
+        return g.energy();
+    };
+    const double linear = level(0, false), soft = level(1, false), hard = level(2, false);
+    CHECK(soft > linear * 1.5);
+    CHECK(hard < linear / 2);
+    CHECK(std::abs(level(2, true) - linear) <= linear * 1e-9);  // the on-screen keyboard plays as it is
+
+    // Aftertouch on Volume, channel pressure 64 on a note at volume 8: Linear 8 + 7 × 64/127; Soft more, Hard less.
+    auto volume = [](int curve) {
+        Rig g;
+        g.v[size_t(idx("aftertouch"))] = 2;  // Volume
+        g.v[size_t(idx("aftertouchCurve"))] = float(curve);
+        g.v[size_t(paramIndex(0, Track::Volume))] = 8;
+        g.run(512);
+        g.run(2400, {msg(0, 0x90, 60, 100)});
+        g.run(2400, {MidiEvent{0, 2, {0xd0, 64, 0}}});
+        g.run(2400);
+        const int a = voiceOf(g.d, 60);
+        REQUIRE(a >= 0);
+        return int(g.d.engine().voice(a).volume);
+    };
+    const int lin = volume(0);
+    CHECK(lin > 8);
+    CHECK(lin < 15);
+    CHECK(volume(1) > lin);
+    CHECK(volume(2) < lin);
+}
+
+TEST_CASE("Driver: MPE in 16 and 32 ch, one note per member channel, routing of the keyboard",
           "[plugin][driver][expression][mpe]") {
     Rig g;
     g.v[size_t(idx("mpe"))] = 1;
@@ -1077,6 +1250,159 @@ TEST_CASE("Driver: MPE in 16 ch, one note per member channel, routing of the key
     const int before = o.d.engine().voice(c).tonePeriod;
     o.run(2400, {msg(0, 0xe1, 0, 0x7f)});
     CHECK(o.d.engine().voice(c).tonePeriod < before);
+}
+
+TEST_CASE("Driver: a MIDI input gone releases the keys it held, MPE channels included",
+          "[plugin][driver][mpe]") {
+    Rig g;
+    g.v[size_t(idx("mpe"))] = 1;
+    g.run(512);
+    // Two keys held on member channels 2 and 3, a third without MPE expression on channel 1 (the master).
+    g.run(2400, {msg(0, 0x91, 69, 100), msg(0, 0x92, 72, 100), msg(0, 0x90, 76, 100)});
+    REQUIRE(voiceOf(g.d, 69) >= 0);
+    REQUIRE(voiceOf(g.d, 72) >= 0);
+    REQUIRE(voiceOf(g.d, 76) >= 0);
+    // The controller is unplugged: no note off ever comes. The standalone application sends KeysOff.
+    MidiEvent gone;
+    gone.command = UiCommand::KeysOff;
+    g.run(2400, {gone});
+    g.run(9600);
+    CHECK(voiceOf(g.d, 69) < 0);
+    CHECK(voiceOf(g.d, 72) < 0);
+    CHECK(voiceOf(g.d, 76) < 0);
+    // Plugged in again: its keys play as before.
+    g.run(2400, {msg(0, 0x94, 69, 100)});
+    CHECK(voiceOf(g.d, 69) >= 0);
+}
+
+TEST_CASE("Driver: drum pads on channel 10, Off plays the channel as the others, none with MPE",
+          "[plugin][driver][pads]") {
+    // Mapping: notes 36 to 51 of the pads' channel (10 by default), 0-based channel as in the MIDI status.
+    ParamValues v = defaultValues();
+    CHECK(drumPadChannel(v) == 10);
+    CHECK(drumPadOf(v, 9, 36) == 0);
+    CHECK(drumPadOf(v, 9, 51) == 15);
+    CHECK(drumPadOf(v, 9, 35) == -1);
+    CHECK(drumPadOf(v, 9, 52) == -1);
+    CHECK(drumPadOf(v, 0, 36) == -1);
+    v[size_t(idx("drumPads"))] = 1;
+    CHECK(drumPadOf(v, 0, 40) == 4);
+    v[size_t(idx("drumPads"))] = 0;
+    CHECK(drumPadOf(v, 9, 36) == -1);
+    v[size_t(idx("drumPads"))] = 10;
+    v[size_t(idx("mpe"))] = 1;
+    CHECK(drumPadChannel(v) == 0);  // MPE in 32 ch: every channel is a note's
+    v[size_t(idx("voiceMode"))] = 1;
+    CHECK(drumPadChannel(v) == 10);  // MPE is 32 ch only
+
+    // Track 2 Chipdrum: a pad of the bottom row plays its sound, one of the top row the Digidrum sample.
+    Rig g;
+    Snapshot s;
+    s.state.digidrums[1] = std::vector<uint8_t>(4000, 12);  // a sample in slot 2
+    g.d.publish(s);
+    g.v[size_t(paramIndex(1, Track::On))] = 1;
+    g.v[size_t(paramIndex(1, Track::Generator))] = 4;
+    g.run(256);
+    g.run(256, {msg(0, 0x99, 38, 100), msg(0, 0x99, 45, 100)});
+    int chip = -1, digi = -1;
+    for (int i = 0; i < ymengine::Engine::kVoices; ++i) {
+        const auto info = g.d.engine().voice(i);
+        if (info.on && info.gen == ymengine::Generator::Chipdrum) chip = i;
+        if (info.on && info.gen == ymengine::Generator::Digidrum) digi = i;
+    }
+    REQUIRE(chip >= 0);
+    REQUIRE(digi >= 0);
+    CHECK(g.d.engine().voice(chip).track == 1);
+    CHECK(g.d.engine().voice(chip).slot == 2);
+    CHECK(g.d.engine().voice(digi).track == 1);
+    CHECK(g.d.engine().voice(digi).slot == 1);
+    // Notes outside the pads and their pressure: nothing.
+    const int before = g.d.engine().activeVoices();
+    g.run(256, {msg(0, 0x99, 60, 100), msg(0, 0x99, 30, 100), msg(0, 0xd9, 100, 0)});
+    CHECK(g.d.engine().activeVoices() == before);
+
+    // Off: channel 10 plays the focused track like any channel.
+    Rig o;
+    o.v[size_t(idx("drumPads"))] = 0;
+    o.run(256);
+    o.run(256, {msg(0, 0x99, 38, 100)});
+    CHECK(voiceOf(o.d, 38) >= 0);
+    CHECK(o.d.engine().voice(voiceOf(o.d, 38)).track == 0);
+    // MPE on: the note of member channel 10.
+    Rig m;
+    m.v[size_t(idx("mpe"))] = 1;
+    m.run(256);
+    m.run(256, {msg(0, 0x99, 38, 100)});
+    CHECK(voiceOf(m.d, 38) >= 0);
+}
+
+TEST_CASE("Driver: keys 36 to 51 play the drum pads on a drum track, whatever their channel",
+          "[plugin][driver][pads]") {
+    // The focused track (track 1) Chipdrum, keys on channel 1: C2 the Kick, D2 the Clap at the notes of their rows
+    // (C3 + sound), G#2 the first Digidrum sample on that track, the only drum track.
+    auto drumVoices = [](const Driver& d) {
+        std::vector<ymengine::Engine::VoiceInfo> out;
+        for (int i = 0; i < ymengine::Engine::kVoices; ++i)
+            if (d.engine().voice(i).on) out.push_back(d.engine().voice(i));
+        return out;
+    };
+    Rig g;
+    Snapshot s;
+    s.state.digidrums[0] = std::vector<uint8_t>(4000, 12);
+    g.d.publish(s);
+    g.v[size_t(paramIndex(0, Track::Generator))] = 4;
+    g.run(256);
+    g.run(256, {msg(0, 0x90, 36, 100), msg(0, 0x90, 38, 100), msg(0, 0x90, 44, 100)});
+    std::vector<ymengine::Engine::VoiceInfo> hits = drumVoices(g.d);
+    REQUIRE(hits.size() == 3);
+    std::sort(hits.begin(), hits.end(), [](const auto& a, const auto& b) { return a.age < b.age; });
+    CHECK(hits[0].gen == ymengine::Generator::Chipdrum);
+    CHECK(hits[0].slot == 0);
+    CHECK(hits[0].note == ymengine::kPadNote);
+    CHECK(hits[1].gen == ymengine::Generator::Chipdrum);
+    CHECK(hits[1].slot == 2);
+    CHECK(hits[1].note == ymengine::kPadNote + 2);
+    CHECK(hits[2].gen == ymengine::Generator::Digidrum);
+    CHECK(hits[2].slot == 0);
+    for (const auto& h : hits) CHECK(h.track == 0);
+    // A key outside 36 to 51 plays the track as before: C4, the Kick by its pitch class, at its own note.
+    g.run(256, {msg(0, 0x90, 60, 100)});
+    REQUIRE(voiceOf(g.d, 60) >= 0);
+    CHECK(g.d.engine().voice(voiceOf(g.d, 60)).slot == 0);
+
+    // A melodic focused track: C2 is a note.
+    Rig m;
+    m.run(256);
+    m.run(256, {msg(0, 0x90, 36, 100)});
+    REQUIRE(voiceOf(m.d, 36) >= 0);
+    CHECK(m.d.engine().voice(voiceOf(m.d, 36)).gen == ymengine::Generator::Chip);
+
+    // Routing by channel: channel 3 reaches track 3, Chipdrum, which plays the pad though track 1 is focused.
+    Rig p;
+    p.v[size_t(idx("midiRouting"))] = 2;
+    p.v[size_t(paramIndex(2, Track::Generator))] = 4;
+    p.run(256);
+    p.run(256, {msg(0, 0x92, 37, 100), msg(0, 0x90, 37, 100)});
+    hits = drumVoices(p.d);
+    REQUIRE(hits.size() == 2);
+    const auto drum = std::find_if(hits.begin(), hits.end(), [](const auto& h) { return h.track == 2; });
+    REQUIRE(drum != hits.end());
+    CHECK(drum->gen == ymengine::Generator::Chipdrum);
+    CHECK(drum->slot == 1);
+    CHECK(voiceOf(p.d, 37) >= 0);  // channel 1 on the melodic track 1: the note
+
+    // Two Chipdrum tracks active: the focused one plays the pads (an earlier version took the first).
+    Rig f;
+    f.v[size_t(idx("focusTrack"))] = 3;
+    for (int t : {0, 2}) {
+        f.v[size_t(paramIndex(t, Track::On))] = 1;
+        f.v[size_t(paramIndex(t, Track::Generator))] = 4;
+    }
+    f.run(256);
+    f.run(256, {msg(0, 0x90, 39, 100), msg(0, 0x99, 40, 100)});
+    hits = drumVoices(f.d);
+    REQUIRE(hits.size() == 2);
+    for (const auto& h : hits) CHECK(h.track == 2);
 }
 
 TEST_CASE("Driver: per-channel routing, the channel's track plays even when inactive", "[plugin][driver]") {
@@ -1251,7 +1577,7 @@ TEST_CASE("Engine status: one envelope point per note sounding on the focused tr
 TEST_CASE("Engine status: a monophonic track shows one envelope point at a time, the newest note's (Indus, "
           "24/10/2026 14:51)",
           "[plugin][engine-status]") {
-    // Voicing Monophonic in 16 channels; any track of the 3-channel modes (one voice per channel, Voicing greyed),
+    // Voicing Monophonic in 32 channels; any track of the 3-channel modes (one voice per channel, Voicing greyed),
     // whose keyboard notes still end their release on the other channels of the chip.
     for (const int mode : {0, 1, 2}) {
         CAPTURE(mode);
@@ -1339,6 +1665,17 @@ TEST_CASE("Driver: controllers of the prototype → parameters, host notified", 
     g.run(256, {msg(0, 0xb0, 72, 127)}, false, &rec);
     CHECK(g.v[size_t(idx("t03_noisePeriod"))] == 31.0f);
     CHECK(g.d.engine().track(2).patch.noisePeriod == 31);
+    // CC 84 takes v / 8 in 16 ch, as in the prototype: 127 is track 16; v / 4 in 32 ch: 127 is track 32;
+    // back to track 3.
+    g.run(256, {msg(0, 0xb0, 84, 127)}, false, &rec);
+    CHECK(g.v[size_t(idx("focusTrack"))] == 16.0f);
+    g.v[size_t(idx("voiceMode"))] = 3;  // 32 ch
+    g.run(256, {msg(0, 0xb0, 84, 127)}, false, &rec);
+    CHECK(g.v[size_t(idx("focusTrack"))] == 32.0f);
+    g.run(256, {msg(0, 0xb0, 84, 9)}, false, &rec);
+    CHECK(g.v[size_t(idx("focusTrack"))] == 3.0f);
+    g.v[size_t(idx("voiceMode"))] = 0;
+    g.run(4096);
     // Sync Buzzer: fast envelope imposed (setEffect), and only if the period is slow.
     g.v[size_t(idx("t03_envPeriod"))] = 12800;
     g.run(256, {msg(0, 0xb0, 76, 3 * 26)}, false, &rec);
@@ -1393,7 +1730,6 @@ TEST_CASE("Driver: Digidrum definition kept from 16 to 3 channels and back", "[p
     s.state.tracks[3].patch.digidrumSlot = 2;  // Digidrum track of chip 1
     s.state.global.digidrumChannel = {1, 0};
     s.state.digidrums[5] = {1, 2, 3, 4};
-    s.sampleVersion[5] = 1;
     g.d.publish(s);
     g.v[size_t(idx("t01_generator"))] = 2;  // Digidrum
     g.v[size_t(idx("t04_generator"))] = 1;  // SID
@@ -1416,7 +1752,7 @@ TEST_CASE("Driver: Digidrum definition kept from 16 to 3 channels and back", "[p
         CHECK(e.track(0).patch.generator == Generator::Chip);
         CHECK(e.track(3).patch.generator == Generator::Digidrum);
         definitionsKept();
-        g.v[size_t(idx("voiceMode"))] = 0;  // 3 → 16 channels: the user's setting comes back
+        g.v[size_t(idx("voiceMode"))] = 0;  // 3 → 32 channels: the user's setting comes back
         g.run(g.d.fadeSamples() + 256);
         REQUIRE(e.global().mode == ymengine::VoiceMode::Studio16);
         CHECK(e.track(0).patch.generator == Generator::Digidrum);
@@ -1439,7 +1775,11 @@ TEST_CASE("Driver: Program Change (Omni, Layer, per channel), replayed on a new 
     std::array<int, kTracks> want{};
     want[2] = 4;
     CHECK(programs() == want);
-    g.run(256, {pc(0, 33)});  // above 32: ignored
+    g.run(256, {pc(0, 127)});  // every Program Change reaches an instrument (127 of them)
+    want[2] = 127;
+    CHECK(programs() == want);
+    g.run(256, {pc(9, 4)});
+    want[2] = 4;
     CHECK(programs() == want);
     // Per channel: the channel's track.
     g.v[size_t(idx("midiRouting"))] = 2;
@@ -1484,7 +1824,8 @@ TEST_CASE("Driver: new clock prepared outside the audio thread, then switch", "[
     CHECK(g.energy() > 1e-3);
 }
 
-TEST_CASE("Driver: Custom clock, a new engine at each frequency, 2 MHz outside 16 ch", "[plugin][driver]") {
+TEST_CASE("Driver: Custom clock, a new engine at each frequency, 2 MHz outside 16 and 32 ch",
+          "[plugin][driver]") {
     Rig g;
     auto settle = [&g] {
         g.run(512);
@@ -1579,7 +1920,6 @@ TEST_CASE("Driver: non-automatable settings published during playback", "[plugin
     s.state.kit = ymengine::kKitBanks[3].kit;
     s.kitVersion = 1;
     s.state.digidrums[2] = {1, 2, 3};
-    s.sampleVersion[2] = 1;
     s.state.tracks[0].patch.ornamentOn = true;
     g.d.publish(s);
     g.run(256);
@@ -1873,8 +2213,8 @@ TEST_CASE("Digidrum: audio file brought to 7800 Hz on 4 bits (loading of the pro
     CHECK(toDigidrum(std::vector<float>(4, 0.0f), 7800.0) == std::vector<uint8_t>(4, 8));
     CHECK(toDigidrum(std::vector<float>(4, 2.0f), 7800.0) == std::vector<uint8_t>(4, 15));
     CHECK(toDigidrum(std::vector<float>(4, -2.0f), 7800.0) == std::vector<uint8_t>(4, 0));
-    // 3 s at most.
-    CHECK(toDigidrum(std::vector<float>(48000 * 10, 0.5f), 48000.0).size() == kDigidrumMaxSamples);
+    // The whole file (once 3 s at most).
+    CHECK(toDigidrum(std::vector<float>(48000 * 10, 0.5f), 48000.0).size() == 78000);
     CHECK(toDigidrum(std::vector<float>(48000, 0.5f), 48000.0).size() == 7800);
     CHECK(toDigidrum({}, 48000.0).empty());
     CHECK(toDigidrum(two, 0.0).empty());

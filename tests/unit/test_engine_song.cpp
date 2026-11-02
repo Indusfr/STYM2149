@@ -270,3 +270,26 @@ TEST_CASE("Extended Song: a Song shortened during a repeat keeps its position in
     CHECK(r.e.seqStatus().songPos == 0);
     CHECK(r.e.seqStatus().playing);
 }
+
+TEST_CASE("Extended Song: a pattern of another length starts at its first step", "[engine][seq][song]") {
+    // Patterns of 4 and 3 steps: the tracks of the second one used to start at the step that the steps played so far
+    // gave in its length (4 mod 3 = 1), as the own length of a track does.
+    for (const SeqClock clock : {SeqClock::Internal, SeqClock::Host}) {
+        Rig r(clock);
+        r.pattern(0, 4);
+        r.pattern(1, 3);
+        for (int s = 0; s < 3; ++s) r.data.patterns[1].lanes[0] = [&] {
+            auto l = std::make_shared<SeqLane>(*r.data.patterns[1].lanes[0]);
+            l->pat[size_t(s)] = int16_t(5 + s);
+            return l;
+        }();
+        r.song({pat(0), pat(1)});
+        if (clock == SeqClock::Host) r.t.playing = true;
+        else r.e.seqPlay(0);
+        r.render(6000 * 11 - 100);
+        std::vector<int> notes;
+        for (const auto& x : r.log)
+            if (x.op == 'T') notes.push_back(int(std::lround(x.x)) % 12);
+        CHECK(notes == std::vector<int>{0, 1, 2, 3, 5, 6, 7, 0, 1, 2, 3});
+    }
+}

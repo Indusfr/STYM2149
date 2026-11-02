@@ -4,7 +4,7 @@
 //
 // Same chain as the floating-point path of ChipRenderer (Raw, RawBox, Retro modes; DC component; board
 // filters), but for a signal supplied by the caller at each internal step instead of a chip: used for the left
-// and right buses of the 16-channel mode (ymengine), where the virtual channels are mixed in floating point.
+// and right buses of the 32-channel mode (ymengine), where the virtual channels are mixed in floating point.
 #pragma once
 #include <cstdint>
 #include <vector>

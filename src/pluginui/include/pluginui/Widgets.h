@@ -1,5 +1,5 @@
 // STYM2149 — pluginui: elements specific to the main window (oscilloscope, register monitor, voice LEDs, keyboard,
-// pads, ADSR curve, Digidrum waveform, SID wave, rule, paragraph)
+// pads, ADSR curve, Digidrum waveform, SID wave, rule, memory gauge, paragraph)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
@@ -7,16 +7,20 @@
 // prototype's canvases are drawn smoothed; here, without anti-aliasing (STYM2149_SPEC.md §6.1): Bresenham lines, same
 // coordinates and same rounding.
 #pragma once
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gemui/Controls.h"
+#include "gemui/Scroll.h"
 #include "gemui/Widget.h"
 
 namespace stym::pluginui {
@@ -49,18 +53,54 @@ private:
     std::vector<gemui::Color> px_;
 };
 
-// canvas#scope: 920 × 90 inside a 2 px line, stretched to 940 × 86 with nearest-neighbour scaling. 2 px black line:
-// rising edge searched in the first half of the samples, then at most 1024 samples across the width,
-// y = 45 - v × 40.5 (drawScope of the prototype).
+// canvas#scope: 920 × 90 inside a 2 px line, stretched to 940 × 86 with nearest-neighbour scaling (a narrower box keeps
+// the 24 px between the box and its canvas). 2 px black line: rising edge searched in the first half of the samples,
+// then at most 1024 samples across the width, y = 45 - v × gain × 40.5 (drawScope of the prototype, gain 1).
+// A stereo source (Indus, 29/10/2026 10:54): the left channel in the left half, the right one in the right
+// half, each with its own rising edge and its own 2 px frame, kSplitGap px of white between the two frames (Indus,
+// 29/10/2026 14:37 and 15:37), and "L" / "R" at their top left; Merge draws (left + right) / 2 across the width instead.
 class Scope : public gemui::Widget {
 public:
+    // Gains of the trace: a single voice at volume 15, at the track's default level and velocity (75 %, 100),
+    // reaches 90 % of the half height: 0.287 on the main output (Master 70 %), 0.591 on a track's oscilloscope; a
+    // louder peak goes off the edge. The prototype's gain was 1.
+    static constexpr double kMainGain = 3.5, kTrackGain = 1.7;
+    // Stereo: each half in a frame of its own, kSplitGap canvas pixels of white between the two frames.
+    static constexpr int kSplitGap = 10;
+    // Width of each half of a stereo trace on a canvas `width` px wide: the left one starts at 0, the right one at
+    // width − splitHalf(width); between them, the 2 px inner edges of the two frames and the gap.
+    static constexpr int splitHalf(int width) noexcept { return (width - 4 - kSplitGap) / 2; }
+
     Scope();
-    // Redraws the trace from samples ordered from oldest to most recent (EngineStatus::scope), ±1 at full scale.
-    void setSamples(std::span<const float> samples);
+    // Box and canvas: the canvas is 24 px narrower than the box (920 in 944), 90 px high.
+    void place(const gemui::Box& b);
+    // Redraws the trace from samples ordered from oldest to most recent, ±1 at full scale: mid = (left + right) / 2,
+    // side = (right − left) / 2 (empty: the same on both sides). trigger: start at the first rising zero
+    // crossing of the first half, at most 1024 samples across (the main output at the host's rate); otherwise every
+    // sample across (a track's 128 points).
+    void setSamples(std::span<const float> mid, std::span<const float> side, double gain, bool trigger);
+    // One trace of the mean even when the source is stereo; redraws the last samples.
+    void setMerge(bool merge);
+    // The source is stereo (MainWindow::scopeStereo): two halves whatever the sound, a centred one too, unless Merge is
+    // on (Indus, 29/10/2026 20:03); a mono source, one trace.
+    void setStereo(bool stereo);
+    bool merged() const noexcept { return merge_; }
+    // The last trace was drawn in two halves, left and right (tests).
+    bool split() const noexcept { return split_; }
+    // Frames of the left and right halves on screen, the gap between them (split).
+    std::pair<gemui::Rect, gemui::Rect> splitFrames() const noexcept;
+    const Canvas& canvas() const noexcept { return canvas_; }
     void paint(gemui::Painter& p) override;
 
 private:
+    void redraw();
+    // One channel across [x0, x0 + w) of the canvas.
+    void trace(std::span<const float> v, int x0, int w);
+
     Canvas canvas_{920, 90};
+    std::vector<float> mid_, side_;
+    double gain_ = kMainGain;
+    bool trigger_ = true, merge_ = false, stereo_ = false, split_ = false;
 };
 
 // .regstrip: 14 columns, 10 px headers in reverse video (R0 TPlo … R13 SHP, then "YM2149F REGISTER MONITOR" across
@@ -82,19 +122,69 @@ private:
     std::string info_ = "-";
 };
 
-// .voices: grid of 8 × 2 LEDs of 12 px (4 px gap), 2 px line, #CC0000 lit, #440000 off; LED without a channel
-// (3-channel mode) at 25 %.
+// .voices: one LED per track, #CC0000 lit, #440000 off; LED without a channel (3-channel mode) at 25 %. The prototype's
+// 16 were a grid of 8 × 2 LEDs of 12 px (4 px gap, 2 px line); the 32 tracks are 16 × 2 LEDs of 6 × 12 px
+// (2 px gap, 1 px line), in the same height.
 class VoiceLeds : public gemui::Widget {
 public:
-    // on: lit LED of each voice (1-8 on the top row, 9-16 below); available: number of voices that have a channel,
-    // the LEDs from that one on are faded.
-    void setState(const std::array<bool, 16>& on, int available);
-    void setAvailable(int available) { setState(on_, available); }
+    static constexpr int kCount = 32;
+    // on: lit LED of each voice; available: number of voices that have a channel, the LEDs from that one on are faded;
+    // shown: 32 in 32 ch, two rows of sixteen narrow LEDs, 1-16 on top; 16 in the other modes, two rows of
+    // eight as in the prototype (Indus, 30/10/2026 02:20).
+    void setState(const std::array<bool, kCount>& on, int available, int shown);
+    void setAvailable(int available, int shown) { setState(on_, available, shown); }
+    int shown() const noexcept { return shown_; }
     void paint(gemui::Painter& p) override;
 
 private:
-    std::array<bool, 16> on_{};
-    int available_ = 16;
+    std::array<bool, kCount> on_{};
+    int available_ = 16, shown_ = 16;
+};
+
+// MIDI monitor of the SYSTEM frame (Options > MIDI monitor): white box with a 2 px line, the messages received
+// from the host one per line in the GEM's 8×8 font, the most recent at the bottom. It keeps the number of lines
+// chosen in Settings, the oldest leaving first, and scrolls back through them with the scroll bar at its right
+// edge or the wheel; scrolled back, the lines shown stay put while new ones arrive. A message may take several lines
+// (a SysEx); one that comes again just after itself is counted on a line under it, "repeated xN". The Clear
+// button of its row empties it (Indus, 28/10/2026 10:20).
+class MidiLog : public gemui::Widget {
+public:
+    static constexpr std::array kKeptChoices = {100, 500, 1000, 5000};  // Settings > MIDI monitor
+    static constexpr int kKeptDefault = 500;
+    // Custom, typed (Indus, 28/10/2026 10:02): 1 to 100 000 lines, about 8 MB at the most (Indus's choice
+    // on the card, 10:20).
+    static constexpr int kKeptMin = 1, kKeptMax = 100000;
+    static constexpr double kLine = 10;  // line pitch of the 8×8 font
+    MidiLog();
+    void setKept(int lines);  // the oldest beyond leave
+    int kept() const noexcept { return kept_; }
+    void push(const std::string& message);  // its lines separated by '\n'
+    void clear();  // every line gone
+    bool empty() const noexcept { return lines_.empty(); }
+    std::vector<std::string> lines() const { return {lines_.begin(), lines_.end()}; }  // oldest first
+    int rows() const noexcept;  // lines the box shows at its height
+    // Lines scrolled back from the most recent (0: the most recent at the bottom), clamped to what is kept.
+    int back() const noexcept { return back_; }
+    void scrollBack(int lines);
+    // Its box and its scroll bar's (the children do not follow setBox).
+    void place(const gemui::Box& b);
+    gemui::ScrollBar& bar() noexcept { return bar_; }
+    const gemui::ScrollBar& bar() const noexcept { return bar_; }
+    bool acceptsMouse() const noexcept override { return true; }  // the wheel
+    bool mouseWheel(const gemui::WheelEvent& e) override;
+    void paint(gemui::Painter& p) override;
+    void paintOver(gemui::Painter& p) override;  // its line over the scroll bar's edges
+
+private:
+    int maxBack() const noexcept { return std::max(0, int(lines_.size()) - rows()); }
+    void syncBar();
+    void addLine(std::string line);
+    std::deque<std::string> lines_;
+    int kept_ = kKeptDefault;
+    int back_ = 0;
+    std::string last_;  // the last message, while its lines are the last ones kept
+    int repeats_ = 0;   // times it came in a row
+    gemui::ScrollBar bar_;
 };
 
 // .kbd: four octaves of white keys (flex, 2 px line at the top and bottom, 1 px on the sides, 9 px name at the
@@ -110,6 +200,7 @@ public:
     int baseOctave() const noexcept { return oct_; }
     // Shows the key of a MIDI note (0-127) as played or not.
     void setHeld(int note, bool held);
+    bool held(int note) const noexcept { return note >= 0 && note < 128 && held_[size_t(note)]; }
     void clearHeld();
     void setNoteNames(const std::array<std::string, 12>& names);
 
@@ -235,7 +326,7 @@ public:
 
 private:
     std::vector<uint8_t> nibbles_;
-    std::string caption_;
+    std::string caption_, name_;
     int baseline_ = 14;  // of the line of text, in the rows of the design
 };
 
@@ -251,10 +342,10 @@ public:
     static constexpr int kW = 360, kH = 56;  // columns and rows of the design, stretched to the box
 
     explicit DmaWave(bool loads = true);  // loads: a click calls onClick (DMA window), otherwise a drawing only
-    // Signed 8-bit bytes of sample `slot` (0-based, shown from 1), interleaved left then right when stereo; rateHz
-    // is the playback rate written in the caption. The part played covers frames start to end - 1 and is drawn
-    // like that of a DigiWave when start < end <= the number of frames; `name` (empty: none) opens the line of text.
-    // Repaints only when something changed.
+    // Signed 8-bit bytes of sample `slot` (0-based; the slot buttons show its number, the caption does not),
+    // interleaved left then right when stereo; rateHz is the playback rate written in the caption. The part played
+    // covers frames start to end - 1 and is drawn like that of a DigiWave when start < end <= the number of
+    // frames; `name` (empty: none) opens the line of text. Repaints only when something changed.
     void setSample(int slot, std::span<const int8_t> bytes, double rateHz, bool stereo, bool loop = false,
                    uint32_t start = 0, uint32_t end = 0, std::string_view name = {});
     std::function<void()> onClick;
@@ -288,9 +379,10 @@ public:
     static constexpr int kW = 360, kH = 72;  // columns and rows of the design, stretched to the box
 
     DigiWave();
-    // 4-bit values (0 to 15) of slot `slot` (0-based, shown from 1); the part played covers values start to end - 1
-    // and is drawn only when start < end <= the number of values (the lines when it is not the whole sample or it
-    // loops); `name` (empty: none) opens the line of text. Repaints only when something changed.
+    // 4-bit values (0 to 15) of slot `slot` (0-based; its number is on the slot buttons, not in the caption);
+    // the part played covers values start to end - 1 and is drawn only when start < end <= the number of values (the
+    // lines when it is not the whole sample or it loops); `name` (empty: none) opens the line of text.
+    // Repaints only when something changed.
     void setSample(int slot, std::span<const uint8_t> nibbles, double rateHz, bool loop, uint32_t start,
                    uint32_t end, std::string_view name = {});
     std::function<void()> onClick;
@@ -314,13 +406,16 @@ private:
 // Bars of the SID wave of a SID Voice, in the GENERATOR frame (formerly in the Timer Wave window): 16 columns
 // of 11 px spaced by 1 px; a bar rises from the bottom by 3 px per volume step (0 to 15), the volume is written in
 // hexadecimal under the column (6×6 text). Beyond the length of the wave, or with the square wave, the columns are
-// faded as in #orngrid.
+// faded as in #orngrid. The FM wave of an FM Voice takes the same grid on another scale: values 0 to 7 (the
+// multiples of the note), 5 px per notch with a 5 px floor, its own tips. In semitones (0 to 127) the values are
+// written in hexadecimal on two digits ($00 to $7F, like the other values; Indus, 01/11/2026 17:52) on two rows, the
+// even steps on the first and the odd steps on the second, so that neighbouring values do not run together.
 class SidWaveGrid : public gemui::Widget {
 public:
     static constexpr int kSteps = 16;  // ymengine::kSidWaveSteps
     static constexpr int kCellW = 11, kGap = 1, kBarH = 47, kDigitH = 9;
     static constexpr int kWidth = kSteps * (kCellW + kGap) - kGap;  // 191
-    static constexpr int kHeight = kBarH + kGap + kDigitH;          // 57
+    static constexpr int kHeight = kBarH + kGap + kDigitH;          // 57, one row of digits
 
     struct State {
         std::array<uint8_t, kSteps> wave{};
@@ -332,6 +427,23 @@ public:
     };
     void setState(const State& s);
     const State& state() const noexcept { return st_; }
+    // Scale of the bars: highest value, pixels per notch, a floor of one notch under value 0 (the FM wave's ½). The
+    // value under each bar: one hexadecimal digit up to 15; beyond (the FM wave in semitones, 0 to 127, whose bar as
+    // high as the column shows 45 and more), two hexadecimal digits on two rows.
+    void setScale(int maxValue, int notchPx, bool floor) noexcept {
+        if (maxValue == max_ && notchPx == notch_ && floor == floor_) return;
+        max_ = maxValue;
+        notch_ = notchPx;
+        floor_ = floor;
+        repaint();
+    }
+    void copyScale(const SidWaveGrid& o) noexcept { setScale(o.max_, o.notch_, o.floor_); }
+    int maxValue() const noexcept { return max_; }
+    // Rows of digits under the bars, and the height of the grid with them (kHeight with one row).
+    int digitRows() const noexcept { return max_ > 15 ? 2 : 1; }
+    int height() const noexcept { return kBarH + kGap + digitRows() * kDigitH; }
+    // Tip of a step, in place of the SID wave's.
+    std::function<std::string(int step, int value)> tipFor;
 
     // Column of a step, on the desktop.
     gemui::Rect cellRect(int step) const noexcept;
@@ -357,12 +469,40 @@ private:
 
     State st_;
     bool painting_ = false;
+    int max_ = 15, notch_ = 3;
+    bool floor_ = false;
 };
 
 // 2 px horizontal rule (#genSep).
 class Rule : public gemui::Widget {
 public:
     void paint(gemui::Painter& p) override;
+};
+
+// Memory of the Atari the samples take, in the Digidrums and DMA windows: a bar inside a 2 px line, black up
+// to the bytes heard out of those the samples can take; red across when samples do not fit (silent); grey in
+// 32-channel mode, which has no limit.
+class MemoryGauge : public gemui::Widget {
+public:
+    // `used` and `total` bytes (SteMemory), out of `budget`; `limited`: a 3-channel mode.
+    void set(uint64_t used, uint64_t total, uint64_t budget, bool limited);
+    void paint(gemui::Painter& p) override;
+
+private:
+    uint64_t used_ = 0, total_ = 0, budget_ = 1;
+    bool limited_ = true;
+};
+
+// Name typed in place (the instrument of the GENERATOR frame): Enter, or a press elsewhere that takes the focus,
+// commits it; the field hidden or detached drops what was typed.
+class NameField : public gemui::TextField {
+public:
+    std::function<void()> onCommit;
+    void focusLost() override {
+        gemui::TextField::focusLost();
+        if (onCommit) onCommit();
+    }
+    void focusDropped() override { gemui::TextField::focusLost(); }
 };
 
 // Block without a drawing of its own whose opacity applies to all its content, like a CSS group (.inert: 40 %). Its
@@ -388,12 +528,15 @@ public:
     const std::string& text() const noexcept { return text_; }
     int lineCount() const;
     double naturalWidth() const;  // "\n": line break (<br>)
+    // The text is a name (a tune's title): measured and drawn as it is, never translated.
+    void setRaw(bool raw);
     void paint(gemui::Painter& p) override;
 
 private:
     std::vector<std::string> lines() const;
     std::string text_;
     double lineHeight_ = 12;
+    bool raw_ = false;
 };
 
 // #learnBadge: MIDI learn banner at the bottom left of the desktop (left 8, bottom 8), in front of the windows

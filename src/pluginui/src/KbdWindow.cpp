@@ -474,6 +474,7 @@ void KbdWindow::wire() {
     };
     octDn_.onClick = [this] { m_.setBaseOctave(m_.baseOct_ - 1); };  // kbdOctShift(-1)
     octUp_.onClick = [this] { m_.setBaseOctave(m_.baseOct_ + 1); };
+    heldSel_.setPopup(true);  // a GEM pop-up button, with its shadow
     heldSel_.onClick = [this] {
         std::vector<gemui::MenuItem> items;
         for (int i = 0; i < 2; ++i) {
@@ -529,13 +530,17 @@ int KbdWindow::drumKind() const noexcept {
     return m_.generator() == int(ymengine::Generator::Chipdrum) ? 1 : 2;
 }
 
-// Bits 0-1: drumKind(); bit 2 + i: Digidrum slot i is empty (its key says "No sample loaded yet").
-int KbdWindow::padSignature() const {
+// [0]: drumKind(); then, for a Digidrum track, one entry per pad: the Digidrum it plays (TrackPatch::digiPads,
+// up to 126) and, in bit 8, whether that one is empty (its key says "No sample loaded yet").
+KbdWindow::PadSignature KbdWindow::padSignature() const {
     const int kind = drumKind();
-    int sig = kind;
+    PadSignature sig{uint16_t(kind)};
     if (kind == 2)
-        for (int i = 0; i < 8; ++i)
-            if (m_.extras_.digidrums[size_t(i)].empty()) sig |= 4 << i;
+        for (int i = 0; i < 8; ++i) {
+            const int d = m_.digiPad(m_.cur_, i);
+            const bool empty = m_.extras_.digidrums[size_t(d)].empty();
+            sig[size_t(1 + i)] = uint16_t(d | (empty ? 0x100 : 0));
+        }
     return sig;
 }
 
@@ -569,12 +574,14 @@ void KbdWindow::buildKeys() {
                 k.kind = TklDrawing::Kind::Note;
                 k.offset = idx;
                 k.pad = pad;
-                k.sub = drum == 1 ? std::string(ymseq::kDrumNames[size_t(pad)]) : "Slot " + n;
-                // The tooltips of the pads of the main window.
+                // The Digidrum the pad plays, with the tooltips of the pads of the main window.
+                const int dig = drum == 2 ? m_.digiPad(m_.cur_, pad) : pad;
+                const std::string dn = std::to_string(dig + 1);
+                k.sub = drum == 1 ? std::string(ymseq::kDrumNames[size_t(pad)]) : "Slot " + dn;
                 k.tip = drum == 1 ? std::string(ymseq::kDrumFullNames[size_t(pad)]) +
                                         ": play it. Shape it in the Drum Kit window (Ctrl+K)."
-                                  : "Digidrum slot " + n + ": play it and select it for editing." +
-                                        (m_.extras_.digidrums[size_t(pad)].empty() ? " No sample loaded yet." : "");
+                                  : "Pad " + n + ": Digidrum " + dn + ": play it and select it for editing." +
+                                        (m_.extras_.digidrums[size_t(dig)].empty() ? " No sample loaded yet." : "");
             } else if (drum && (idx >= 0 || k.code == "KeyZ" || k.code == "KeyX")) {
                 // Dead key.
             } else if (idx >= 0) {
@@ -677,12 +684,12 @@ void KbdWindow::refresh() {
 }
 
 std::string KbdWindow::codeOf(int note) const {
-    if (builtPads_ > 0) {
+    if (const int kind = builtPads_[0]; kind == 1 || kind == 2) {  // 3: not built yet
         // Percussion track: the pad of the note, as the engine plays it (Chipdrum: the note in the octave,
         // Digidrum: the slot of the pad that played it, otherwise the selected slot).
         const int pc = ((note % 12) + 12) % 12;
         int pad = pc % 8;
-        if ((builtPads_ & 3) == 2)  // Digidrum (low bits of padSignature)
+        if (kind == 2)  // Digidrum
             pad = note >= MainWindow::kPadNote && note < MainWindow::kPadNote + 8
                       ? note - MainWindow::kPadNote
                       : int(m_.extras_.tracks[size_t(m_.cur_)].patch.digidrumSlot & 7);

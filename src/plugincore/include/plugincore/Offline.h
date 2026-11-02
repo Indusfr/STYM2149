@@ -39,7 +39,7 @@ public:
     // `trackOutputs`: separate track outputs to prepare (bit n = track n), as in Driver::Setup; a rate below 8000 Hz
     // is raised to 8000 Hz.
     OfflineRender(Source source, uint32_t sampleRate, const ParamValues& values, const NonParamState& extras,
-                  uint16_t trackOutputs = 0);
+                  uint32_t trackOutputs = 0);
     ~OfflineRender();
     OfflineRender(const OfflineRender&) = delete;
     OfflineRender& operator=(const OfflineRender&) = delete;
@@ -58,10 +58,12 @@ public:
     bool finished() const noexcept { return finished_; }
     uint64_t position() const noexcept { return position_; }  // samples rendered since the start
     uint32_t sampleRate() const noexcept { return rate_; }
+    // Register r (0 to 13) of the first chip after the last render (register monitor of the YM Player).
+    uint8_t reg(unsigned r) const noexcept;
     uint32_t latencySamples() const noexcept;
     // Capture of the registers of the chip in 3-channel mode (register exports): one frame per replay tick
     // from the start (Engine::startCapture), written into `frames` which the caller keeps alive, with the DMA sound
-    // of the STE machine in `dma` if it is not empty. To be called before the first render; false in 16 channels.
+    // of the STE machine in `dma` if it is not empty. To be called before the first render; false in 32 channels.
     bool startCapture(std::span<ymengine::RegisterFrame> frames, std::span<ymengine::DmaFrame> dma = {}) noexcept;
     uint32_t capturedFrames() const noexcept;
     uint32_t captureHz() const noexcept;

@@ -79,6 +79,12 @@ void putSequences(Value& p, const ymengine::TrackPatch& t) {
     // patches written before it (getSequences).
     if (t.sidForm != def.sidForm || p.find("sidWave") || p.find("sidWaveLen") || p.find("sidWidth"))
         p.set("sidForm", Value(int(t.sidForm)));
+    if (t.fmWave != def.fmWave || t.fmWaveLen != def.fmWaveLen) {  // FM wave
+        p.set("fmWave", list(t.fmWave));
+        p.set("fmWaveLen", Value(int(t.fmWaveLen)));
+    }
+    if (t.fmScale != def.fmScale) p.set("fmScale", Value(int(t.fmScale)));
+    if (t.fmSemi != def.fmSemi) p.set("fmSemi", list(t.fmSemi));
     if (!allZero(t.buzzShapes)) p.set("buzzSteps", list(t.buzzShapes));
     if (t.buzzLen) p.set("buzzLen", Value(int(t.buzzLen)));
     if (t.envTuned) p.set("envTuned", Value(1));  // buzzer
@@ -159,6 +165,21 @@ void getSequences(const Value& p, ymengine::TrackPatch& t) {
     }
     t.sidWaveLen = uint8_t(t.sidWaveLen < 2 ? ymengine::kSidSquareSteps
                                             : std::min<int>(t.sidWaveLen, ymengine::kSidWaveSteps));
+    // FM wave: both keys or neither, the note and its octave by default.
+    t.fmWave = def.fmWave;
+    t.fmWaveLen = def.fmWaveLen;
+    if (p.find("fmWave")) {
+        readList(p, "fmWave", t.fmWave, 0);
+        for (auto& v : t.fmWave) v = uint8_t(std::min<int>(v, ymengine::kFmMultipleCount - 1));
+        t.fmWaveLen = uint8_t(std::clamp<int>(count("fmWaveLen", def.fmWaveLen), 1, ymengine::kSidWaveSteps));
+    }
+    // Its scale and the wave in semitones: Ratios and the note then its octave by default.
+    t.fmScale = ymengine::fmScaleOf(count("fmScale"));
+    t.fmSemi = def.fmSemi;
+    if (p.find("fmSemi")) {
+        readList(p, "fmSemi", t.fmSemi, 0);
+        for (auto& v : t.fmSemi) v = uint8_t(std::min<int>(v, ymengine::kFmSemitoneMax));
+    }
     t.envTuned = num(p, "envTuned", 0) != 0;
     t.envRatioN = uint8_t(std::clamp(finite(std::round(num(p, "envN", 1)), 1), 1.0, 255.0));
     t.envRatioD = uint8_t(std::clamp(finite(std::round(num(p, "envD", 1)), 1), 1.0, 255.0));
@@ -230,10 +251,14 @@ PatchEntry snapPatch(const std::string& name, const ParamValues& v, const NonPar
     p.set("sidVmin", iv(Track::SidVmin));
     p.set("slot", Value(int(x.patch.digidrumSlot)));
     if (x.patch.dmaSlot >= 0) p.set("dmaSlot", Value(int(x.patch.dmaSlot)));  // DMA sample
+    // Digidrum of each pad, when one is not that of its number.
+    if (x.patch.digiPads != ymengine::TrackPatch{}.digiPads) p.set("digiPads", list(x.patch.digiPads));
     p.set("vibDepth", iv(Track::VibDepth));
     p.set("vibRate", fv(Track::VibRate));
-    // Vibrato Off; On: the patch of the prototype.
-    if (intValue(v, track, Track::VibOn) == 0) p.set("vibOn", Value(0));
+    // Vibrato On/Off when it is not what its absence reads: On with a depth (the prototype's vibrato, which has
+    // no switch), Off without (the default).
+    const int vibOn = intValue(v, track, Track::VibOn);
+    if ((vibOn != 0) != (intValue(v, track, Track::VibDepth) > 0)) p.set("vibOn", Value(vibOn));
     p.set("ornOn", Value(flag(x.patch.ornamentOn)));
     p.set("ornLen", Value(int(x.patch.ornamentLength)));
     p.set("ornLoop", Value(flag(x.patch.ornamentLoop)));
@@ -298,7 +323,7 @@ PatchChange patchChange(const PatchEntry& e, const NonParamState& state, int tra
     set(Track::SidVmin, num(p, "sidVmin", 0));
     set(Track::VibDepth, num(p, "vibDepth", 0));
     set(Track::VibRate, num(p, "vibRate", 6));
-    set(Track::VibOn, num(p, "vibOn", 1));  // vibrato On in older patches
+    set(Track::VibOn, num(p, "vibOn", num(p, "vibDepth", 0) > 0 ? 1 : 0));  // as written above
     set(Track::Attack, num(p, "atk", 0));
     set(Track::Decay, num(p, "dcy", 0));
     set(Track::Sustain, num(p, "sus", 100));
@@ -313,7 +338,9 @@ PatchChange patchChange(const PatchEntry& e, const NonParamState& state, int tra
     ymengine::TrackPatch& t = c.track.patch;
     t.digidrumSlot = uint8_t(toInt(num(p, "slot", 0), 0));
     const double dmaSlot = num(p, "dmaSlot", -1);
-    t.dmaSlot = int8_t(std::isfinite(dmaSlot) ? std::clamp(std::round(dmaSlot), -1.0, double(ymengine::kDmaSlots - 1)) : -1);
+    t.dmaSlot = int16_t(
+        std::isfinite(dmaSlot) ? std::clamp(std::round(dmaSlot), -1.0, double(ymengine::kDmaSlotsMax - 1)) : -1);
+    if (p.find("digiPads")) readList(p, "digiPads", t.digiPads, 0);  // clamped below (sanitize)
     t.ornamentOn = num(p, "ornOn", 0) != 0;
     t.ornamentLength = uint8_t(std::max(1, toInt(num(p, "ornLen", 8), 8)));
     t.ornamentLoop = num(p, "ornLoop", 1) != 0;
@@ -370,12 +397,12 @@ std::string dumpPatchLibrary(const std::vector<PatchEntry>& patches) {
     doc.set("kind", Value("patchlib"));
     doc.set("patches", std::move(list));
     // Keys that STYM2149 adds to the patch of the prototype (sequences, timer waves, buzzer, DMA; vibrato Off;
-    // LFO; echo).
-    static constexpr std::array<std::string_view, 29> kStymKeys = {
+    // LFO; echo; Digidrums of the pads; FM wave and its scale).
+    static constexpr std::array<std::string_view, 34> kStymKeys = {
         "seqPer", "seqNP", "seqMix", "seqGen", "seqFix", "fixNote", "detune", "analog", "hardSync", "link",
         "pitchMatrix", "sidWave", "sidWaveLen", "sidWaveSine", "sidWavePhase", "sidWavePeriod", "sidWidth",
         "sidForm", "buzzSteps", "buzzLen", "envTuned", "envN", "envD", "envFine", "ymPad", "dmaSlot", "vibOn", "lfo",
-        "echo"};
+        "echo", "digiPads", "fmWave", "fmWaveLen", "fmScale", "fmSemi"};
     const bool ext = std::any_of(patches.begin(), patches.end(), [](const PatchEntry& e) {
         const Value* p = e.isObject() ? e.find("patch") : nullptr;
         return p && p->isObject() &&

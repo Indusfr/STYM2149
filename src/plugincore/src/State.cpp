@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <string_view>
+#include <tuple>
 
 #include "plugincore/Instruments.h"
 #include "ymengine/Engine.h"
@@ -27,7 +28,9 @@ constexpr uint32_t kParm = fourcc("PARM"), kTrkx = fourcc("TRKX"), kGlbx = fourc
                    kDigi = fourcc("DIGI"), kName = fourcc("NAME"), kSeqs = fourcc("SEQS"), kPatn = fourcc("PATN"),
                    kSong = fourcc("SONG"), kInst = fourcc("INST"), kTseq = fourcc("TSEQ"),
                    kTimg = fourcc("TIMG"), kDmas = fourcc("DMAS"), kDigs = fourcc("DIGS"),
-                   kRecd = fourcc("RECD"), kSngx = fourcc("SNGX"), kRsyn = fourcc("RSYN");
+                   kRecd = fourcc("RECD"), kSngx = fourcc("SNGX"), kRsyn = fourcc("RSYN"),
+                   kTins = fourcc("TINS"), kStem = fourcc("STEM"), kRfmw = fourcc("RFMW"),
+                   kRfms = fourcc("RFMS");
 
 // Ranges of the kit settings (KITSPEC of the prototype), in the order of the fields a, b, dec, noise, vol of
 // DrumParams. The families without a noise setting (snare, clap, hats) keep it at 0-100, with no effect on the sound.
@@ -146,6 +149,15 @@ private:
     bool ok_ = true;
 };
 
+// Slots a chunk of samples writes (DIGI, DMAS, DIGS): eight, as in earlier versions, or up to the last that `used` finds.
+template <class Slots, class Used>
+int slotsWritten(const Slots& slots, Used used) {
+    int n = 8;
+    for (int k = 0; k < int(slots.size()); ++k)
+        if (used(slots[size_t(k)])) n = std::max(n, k + 1);
+    return n;
+}
+
 // TRKX body of one track. The order of the fields is the format: a new field only goes at the end.
 void writeTrack(Writer& w, const TrackParams& t) {
     const TrackPatch& p = t.patch;
@@ -163,9 +175,15 @@ void writeTrack(Writer& w, const TrackParams& t) {
     w.u8(t.arp.octaves);
     for (int8_t v : t.arp.table) w.i8(v);
     w.u8(t.arp.length);
-    // DMA sample of the track, written only when not default (-1: depending on its position); a field
-    // added after it will have to write it always.
-    if (p.dmaSlot != -1) w.i8(p.dmaSlot);
+    // DMA sample of the track, written only when not default (-1: depending on its position). the
+    // samples past 127 and the Digidrum of each drum row follow it when one of them is not the default; the i8 then
+    // holds -1 for a sample past 127, which an older reader plays as the one of the position.
+    const bool wide = p.dmaSlot > INT8_MAX || p.digiPads != TrackPatch{}.digiPads;
+    if (p.dmaSlot != -1 || wide) w.i8(int8_t(p.dmaSlot > INT8_MAX ? -1 : p.dmaSlot));
+    if (wide) {
+        w.i16(p.dmaSlot);
+        for (uint8_t v : p.digiPads) w.u8(v);
+    }
 }
 
 // Reads the fields present; those missing at the end of the chunk keep their value (default).
@@ -193,6 +211,9 @@ void readTrack(Reader r, TrackParams& t) {
         for (auto& v : t.arp.table) v = r.i8();
     rd(t.arp.length, [](uint8_t v) { return v; });
     if (r.has(1)) p.dmaSlot = r.i8();
+    if (r.has(2)) p.dmaSlot = r.i16();
+    if (r.has(kDigidrumPads))
+        for (auto& v : p.digiPads) v = r.u8();
 }
 
 // Instrument sequences and pitch settings of a track (TSEQ chunk).
@@ -204,7 +225,8 @@ bool defaultSequences(const TrackPatch& p) {
            p.sidWavePhase == d.sidWavePhase && p.sidWavePeriod == d.sidWavePeriod && p.sidWidth == d.sidWidth &&
            p.buzzShapes == d.buzzShapes && p.buzzLen == d.buzzLen &&
            p.envTuned == d.envTuned && p.envRatioN == d.envRatioN && p.envRatioD == d.envRatioD &&
-           p.envFineCents == d.envFineCents && p.ymPad == d.ymPad && p.lfo == d.lfo && p.echo == d.echo;
+           p.envFineCents == d.envFineCents && p.ymPad == d.ymPad && p.lfo == d.lfo && p.echo == d.echo &&
+           p.fmWave == d.fmWave && p.fmWaveLen == d.fmWaveLen && p.fmScale == d.fmScale && p.fmSemi == d.fmSemi;
 }
 
 // TSEQ body of one track, in the order of State.h; a new field only goes at the end.
@@ -245,6 +267,10 @@ void writeSequences(Writer& w, const TrackPatch& p) {
     w.u8(p.sidWavePeriod);                        // its period
     w.u8(p.sidWidth);                             // width of the square wave
     w.u8(uint8_t(p.sidForm));                     // form of the SID wave
+    w.u8(p.fmWaveLen);                            // FM wave: its steps, then the multiple of each
+    for (uint8_t v : p.fmWave) w.u8(v);
+    w.u8(uint8_t(p.fmScale));                     // its scale, then the semitones of each step
+    for (uint8_t v : p.fmSemi) w.u8(v);
 }
 
 // Reads the fields present, like readTrack.
@@ -319,6 +345,14 @@ void readSequences(Reader r, TrackPatch& p) {
     // Steps 2 to 16; 0 or 1, the plain square of a chunk without the form, takes those by default.
     p.sidWaveLen = uint8_t(p.sidWaveLen < 2 ? ymengine::kSidSquareSteps
                                             : std::min<int>(p.sidWaveLen, ymengine::kSidWaveSteps));
+    if (r.has(1 + ymengine::kSidWaveSteps)) {  // FM wave; a chunk without it keeps the note and its octave
+        p.fmWaveLen = r.u8();
+        for (auto& v : p.fmWave) v = r.u8();
+    }
+    if (r.has(1 + ymengine::kSidWaveSteps)) {  // its scale and its wave in semitones; without them, Ratios
+        p.fmScale = ymengine::fmScaleOf(r.u8());
+        for (auto& v : p.fmSemi) v = r.u8();
+    }
 }
 
 // GLBX: channel taken by the Digidrum track of each chip (0 = A to 2 = C), scale of the scale-locked slides (u16
@@ -385,7 +419,7 @@ RowRange rowRange(int id) noexcept {
     case Row::Vol: return {0, 15, 15};
     case Row::Mix: return {0, ymengine::kSeqMixMax, 0};  // Env entries
     case Row::Slt: return {0, 8, 0};
-    case Row::Fx: return {0, 4, 0};
+    case Row::Fx: return {0, ymengine::kSeqFxMax, 0};  // FM Voice, 5
     case Row::Oct: return {-3, 9, 0};
     case Row::Gat: return {0, 100, 0};
     case Row::Pnr: return {0, 201, 0};  // 0, or v·10 + 101 for v from -10 to +10
@@ -467,7 +501,8 @@ void readLane(Reader& r, ymseq::Lane& l) {
 void writeSeqSettings(Writer& w, const GlobalParams& g, const ymseq::Project& p) {
     w.u8(uint8_t(g.seqClock));
     w.u8(g.resolution);
-    w.u8(uint8_t((g.loop ? 1 : 0) | (g.songMode ? 2 : 0) | (g.metronome ? 4 : 0) | (g.quantizeVbl ? 8 : 0)));
+    w.u8(uint8_t((g.loop ? 1 : 0) | (g.songMode ? 2 : 0) | (g.metronome ? 4 : 0) | (g.quantizeVbl ? 8 : 0) |
+                 (g.cutFade ? 16 : 0)));  // Fade of CUT
     w.u8(g.sigNum);
     w.u8(g.sigDen);
     w.u8(uint8_t(p.current));
@@ -480,6 +515,7 @@ void writeSeqSettings(Writer& w, const GlobalParams& g, const ymseq::Project& p)
         w.u16(uint16_t(t.length));
     }
     w.u8(g.metronomeLevel);
+    w.u8(g.cutFadeMs);
 }
 
 void readSeqSettings(Reader r, GlobalParams& g, ymseq::Project& p) {
@@ -491,6 +527,7 @@ void readSeqSettings(Reader r, GlobalParams& g, ymseq::Project& p) {
         g.songMode = (f & 2) != 0;
         g.metronome = (f & 4) != 0;
         g.quantizeVbl = (f & 8) != 0;
+        g.cutFade = (f & 16) != 0;
         g.sigNum = r.u8();
         g.sigDen = r.u8();
     }
@@ -510,6 +547,8 @@ void readSeqSettings(Reader r, GlobalParams& g, ymseq::Project& p) {
         p.tracks[size_t(t)].length = length;
     }
     g.metronomeLevel = r.has(1) ? uint8_t(std::min<int>(r.u8(), 100)) : 100;  // full level before
+    // 5 ms before
+    g.cutFadeMs = uint8_t(r.has(1) ? std::clamp<int>(r.u8(), 1, ymengine::kCutFadeMsMax) : ymengine::kCutFadeMsDefault);
 }
 
 }  // namespace
@@ -553,8 +592,9 @@ std::string cleanTrackName(std::string_view name) {
 
 void sanitize(TrackParams& t) {
     TrackPatch& p = t.patch;
-    p.digidrumSlot = uint8_t(std::min<int>(p.digidrumSlot, kDigidrumSlots - 1));
-    p.dmaSlot = int8_t(std::clamp<int>(p.dmaSlot, -1, kDmaSlots - 1));
+    p.digidrumSlot = uint8_t(std::min<int>(p.digidrumSlot, kDigidrumPads - 1));
+    for (auto& v : p.digiPads) v = uint8_t(std::min<int>(v, kDigidrumSlotsMax - 1));
+    p.dmaSlot = int16_t(std::clamp<int>(p.dmaSlot, -1, kDmaSlotsMax - 1));
     p.ornamentLength = uint8_t(std::clamp<int>(p.ornamentLength, 1, kOrnamentSteps));
     p.ornamentRate = uint8_t(std::clamp<int>(p.ornamentRate, 1, 4));
     for (auto& v : p.ornamentPitch) v = int8_t(std::clamp<int>(v, -12, 12));
@@ -574,6 +614,10 @@ void sanitize(TrackParams& t) {
     p.sidWaveLen = uint8_t(p.sidWaveLen < 2 ? kSidSquareSteps : std::min<int>(p.sidWaveLen, kSidWaveSteps));
     p.sidForm = sidFormOf(int(p.sidForm));
     p.sidWidth = uint8_t(std::clamp<int>(p.sidWidth, 1, kSidWidthMax));
+    for (auto& v : p.fmWave) v = uint8_t(std::min<int>(v, kFmMultipleCount - 1));
+    p.fmWaveLen = uint8_t(std::clamp<int>(p.fmWaveLen, 1, kSidWaveSteps));
+    p.fmScale = fmScaleOf(int(p.fmScale));
+    for (auto& v : p.fmSemi) v = uint8_t(std::min<int>(v, kFmSemitoneMax));
     for (auto& v : p.buzzShapes) v = uint8_t(std::min<int>(v, 15));
     p.buzzLen = uint8_t(std::min<int>(p.buzzLen, kBuzzSteps));
     p.envRatioN = uint8_t(std::clamp<int>(p.envRatioN, 1, kEnvRatioMax));
@@ -616,22 +660,24 @@ void sanitize(NonParamState& s) {
         d.noise = clampFinite(d.noise, rg[3].lo, rg[3].hi, dd.noise);
         d.vol = clampFinite(d.vol, rg[4].lo, rg[4].hi, dd.vol);
     }
-    for (auto& smp : s.digidrums) {
-        if (smp.size() > Engine::kMaxUserSample) smp.resize(Engine::kMaxUserSample);
-        for (auto& v : smp) v = uint8_t(std::min<int>(v, 15));
-    }
+    for (auto& smp : s.digidrums)
+        if (std::any_of(smp.begin(), smp.end(), [](uint8_t v) { return v > 15; })) {
+            std::vector<uint8_t> v = smp.vec();
+            for (auto& x : v) x = uint8_t(std::min<int>(x, 15));
+            smp = std::move(v);
+        }
     for (auto& n : s.trackNames) n = cleanTrackName(n);
+    for (auto& n : s.trackInstruments)
+        if (n > kInstruments) n = 0;
     // DMA bank.
     for (DmaSlot& sl : s.dma.slots) {
         sl.rate = uint8_t(std::min<int>(sl.rate, kDmaRates - 1));
         sl.root = uint8_t(std::min<int>(sl.root, 127));
         sl.cents = std::isfinite(sl.cents) ? std::clamp(sl.cents, -kDmaCentsMax, kDmaCentsMax) : 0.0;
-        sl.end = std::min<uint32_t>(sl.end, kDmaMaxBytes);  // frames; End 0: to the end of the sample
-        sl.start = std::min(sl.start, sl.end > 0 ? sl.end : kDmaMaxBytes);
+        if (sl.end > 0) sl.start = std::min(sl.start, sl.end);  // frames; End 0: to the end of the sample
     }
-    for (auto& smp : s.dmaSamples)
-        if (smp.size() > kDmaMaxBytes) smp.resize(kDmaMaxBytes);
     for (auto& n : s.dmaNames) n = cleanDigidrumName(n);
+    s.steRam = uint8_t(std::min<size_t>(s.steRam, kSteRamKb.size() - 1));
     // Digidrum editor.
     for (DigidrumSlotState& ds : s.digiSlots) {
         ds.name = cleanDigidrumName(ds.name);
@@ -639,10 +685,8 @@ void sanitize(NonParamState& s) {
         p.rateHz = std::isfinite(p.rateHz) ? std::clamp(p.rateHz, kDigidrumRateMin, kDigidrumRateMax) : kDigidrumRate;
         p.root = uint8_t(std::min<int>(p.root, 127));
         p.cents = std::isfinite(p.cents) ? std::clamp(p.cents, -kDigidrumCentsMax, kDigidrumCentsMax) : 0.0;
-        p.end = std::min<uint32_t>(p.end, Engine::kMaxUserSample);
-        p.start = std::min(p.start, p.end > 0 ? p.end : Engine::kMaxUserSample);  // End 0: to the end of the sample
+        if (p.end > 0) p.start = std::min(p.start, p.end);  // End 0: to the end of the sample
         ds.convert = DigiConvert(std::min<int>(int(ds.convert), int(DigiConvert::YmLevels)));
-        if (ds.source.size() > Engine::kMaxUserSample) ds.source.resize(Engine::kMaxUserSample);
     }
     for (Instrument& ins : s.instruments) {
         if (!ins.used) {
@@ -708,39 +752,11 @@ void sanitize(NonParamState& s) {
 
 // Chunks in the order of State.h. The optional ones are written only when they differ from the default, so that a
 // project that does not use a feature gives the same bytes as the version before it.
-std::vector<uint8_t> encodeState(const PluginState& state) {
-    Writer w;
-    w.bytes("STYM");
-    w.u16(kStateVersion);
-    w.u16(0);
-
-    size_t c = w.begin(kParm);
-    w.u32(uint32_t(kParamCount));
-    const auto& specs = paramSpecs();
-    for (int i = 0; i < kParamCount; ++i) {
-        const std::string& id = specs[size_t(i)].id;
-        w.u16(uint16_t(id.size()));
-        w.bytes(id);
-        w.f32(state.values[size_t(i)]);
-    }
-    w.end(c);
-
-    c = w.begin(kTrkx);
-    w.u8(uint8_t(kTracks));
-    for (const TrackParams& t : state.extras.tracks) {
-        const size_t tc = w.size() + 4;
-        w.u32(0);
-        writeTrack(w, t);
-        w.end(tc);
-    }
-    w.end(c);
-
-    c = w.begin(kGlbx);
-    writeGlobal(w, state.extras.global);
-    w.end(c);
-
-    c = w.begin(kKit);
-    for (const DrumParams& d : state.extras.kit.inst) {
+// KIT, PATN (created patterns), SONG and SNGX (extended Song, written only if an entry is special or marks the
+// restart): shared by the state and the binary files.
+void writeKit(Writer& w, const ymengine::KitParams& kit) {
+    const size_t c = w.begin(kKit);
+    for (const DrumParams& d : kit.inst) {
         w.f64(d.a);
         w.f64(d.b);
         w.f64(d.dec);
@@ -748,41 +764,10 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         w.f64(d.vol);
     }
     w.end(c);
+}
 
-    c = w.begin(kDigi);
-    w.u8(uint8_t(kDigidrumSlots));
-    for (const auto& smp : state.extras.digidrums) {
-        const size_t n = std::min<size_t>(smp.size(), Engine::kMaxUserSample);
-        w.u32(uint32_t(n));
-        // Two 4-bit values per byte, the first in the low nibble; an odd count leaves the last high nibble at 0.
-        for (size_t i = 0; i < n; i += 2) {
-            const uint8_t lo = uint8_t(std::min<int>(smp[i], 15));
-            const uint8_t hi = i + 1 < n ? uint8_t(std::min<int>(smp[i + 1], 15)) : 0;
-            w.u8(uint8_t(lo | hi << 4));
-        }
-    }
-    w.end(c);
-
-    // Track names: chunk written only if a track is named (a state without names keeps the older layout).
-    const auto& names = state.extras.trackNames;
-    if (std::any_of(names.begin(), names.end(), [](const std::string& n) { return !n.empty(); })) {
-        c = w.begin(kName);
-        w.u8(uint8_t(kTracks));
-        for (const std::string& n : names) {
-            const std::string clean = cleanTrackName(n);
-            w.u8(uint8_t(clean.size()));
-            w.bytes(clean);
-        }
-        w.end(c);
-    }
-
-    // Sequencer.
-    const ymseq::Project& p = state.extras.seq;
-    c = w.begin(kSeqs);
-    writeSeqSettings(w, state.extras.global, p);
-    w.end(c);
-
-    c = w.begin(kPatn);
+void writePatterns(Writer& w, const ymseq::Project& p) {
+    size_t c = w.begin(kPatn);
     w.u8(uint8_t(p.used.count()));
     for (int i = 0; i < ymseq::kPatterns; ++i) {
         if (!p.used.test(size_t(i))) continue;
@@ -811,8 +796,10 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         w.end(pc);
     }
     w.end(c);
+}
 
-    c = w.begin(kSong);
+void writeSong(Writer& w, const ymseq::Project& p) {
+    size_t c = w.begin(kSong);
     w.u16(uint16_t(std::min<size_t>(p.song.entries.size(), 65535)));
     for (size_t i = 0; i < p.song.entries.size() && i < 65535; ++i) {
         const ymseq::SongEntry& e = p.song.entries[i];
@@ -834,6 +821,101 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         }
         w.end(c);
     }
+}
+
+std::vector<uint8_t> encodeState(const PluginState& state, StateKind kind, bool take) {
+    Writer w;
+    w.bytes("STYM");
+    w.u16(kStateVersion);
+    w.u16(uint16_t(kind));
+    size_t c = 0;
+    const bool all = kind == StateKind::State;
+    const ymseq::Project& p = state.extras.seq;
+    // A pattern, a Song or a kit file: only its chunks.
+    if (!all) {
+        if (kind == StateKind::Kit) writeKit(w, state.extras.kit);
+        if (kind == StateKind::Song) {
+            c = w.begin(kSeqs);
+            writeSeqSettings(w, state.extras.global, p);
+            w.end(c);
+        }
+        if (kind == StateKind::Pattern || kind == StateKind::Song) writePatterns(w, p);
+        if (kind == StateKind::Song) writeSong(w, p);
+        return w.take();
+    }
+
+    c = w.begin(kParm);
+    w.u32(uint32_t(kParamCount));
+    const auto& specs = paramSpecs();
+    for (int i = 0; i < kParamCount; ++i) {
+        const std::string& id = specs[size_t(i)].id;
+        w.u16(uint16_t(id.size()));
+        w.bytes(id);
+        w.f32(state.values[size_t(i)]);
+    }
+    w.end(c);
+
+    c = w.begin(kTrkx);
+    w.u8(uint8_t(kTracks));
+    for (const TrackParams& t : state.extras.tracks) {
+        const size_t tc = w.size() + 4;
+        w.u32(0);
+        writeTrack(w, t);
+        w.end(tc);
+    }
+    w.end(c);
+
+    c = w.begin(kGlbx);
+    writeGlobal(w, state.extras.global);
+    w.end(c);
+
+    writeKit(w, state.extras.kit);
+
+    c = w.begin(kDigi);
+    const int digiCount = slotsWritten(state.extras.digidrums, [](const auto& smp) { return !smp.empty(); });
+    w.u8(uint8_t(digiCount));
+    for (int k = 0; k < digiCount; ++k) {
+        const auto& smp = state.extras.digidrums[size_t(k)];
+        const size_t n = std::min<size_t>(smp.size(), UINT32_MAX);
+        w.u32(uint32_t(n));
+        // Two 4-bit values per byte, the first in the low nibble; an odd count leaves the last high nibble at 0.
+        for (size_t i = 0; i < n; i += 2) {
+            const uint8_t lo = uint8_t(std::min<int>(smp[i], 15));
+            const uint8_t hi = i + 1 < n ? uint8_t(std::min<int>(smp[i + 1], 15)) : 0;
+            w.u8(uint8_t(lo | hi << 4));
+        }
+    }
+    w.end(c);
+
+    // Track names: chunk written only if a track is named (a state without names keeps the older layout).
+    const auto& names = state.extras.trackNames;
+    if (std::any_of(names.begin(), names.end(), [](const std::string& n) { return !n.empty(); })) {
+        c = w.begin(kName);
+        w.u8(uint8_t(kTracks));
+        for (const std::string& n : names) {
+            const std::string clean = cleanTrackName(n);
+            w.u8(uint8_t(clean.size()));
+            w.bytes(clean);
+        }
+        w.end(c);
+    }
+
+    // Instruments of the tracks: chunk written only if a track has one.
+    const auto& tins = state.extras.trackInstruments;
+    if (std::any_of(tins.begin(), tins.end(), [](uint8_t n) { return n != 0; })) {
+        c = w.begin(kTins);
+        w.u8(uint8_t(kTracks));
+        for (const uint8_t n : tins) w.u8(n <= kInstruments ? n : 0);
+        w.end(c);
+    }
+
+    // Sequencer.
+    c = w.begin(kSeqs);
+    writeSeqSettings(w, state.extras.global, p);
+    w.end(c);
+
+    writePatterns(w, p);
+    writeSong(w, p);
 
     // Instruments: chunk written only if an instrument exists (a state without instruments keeps the older layout).
     const auto& inst = state.extras.instruments;
@@ -884,38 +966,44 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
         std::any_of(x.dmaSamples.begin(), x.dmaSamples.end(), [](const auto& v) { return !v.empty(); }) ||
         std::any_of(x.dmaNames.begin(), x.dmaNames.end(), [](const auto& n) { return !n.empty(); })) {
         c = w.begin(kDmas);
-        w.u8(uint8_t(kDmaSlots));
-        for (int k = 0; k < kDmaSlots; ++k) {
+        const int count = std::max({slotsWritten(x.dmaSamples, [](const auto& v) { return !v.empty(); }),
+                                    slotsWritten(x.dmaNames, [](const auto& n) { return !n.empty(); }),
+                                    slotsWritten(x.dma.slots, [](const DmaSlot& sl) { return !(sl == DmaSlot{}); })});
+        w.u8(uint8_t(count));
+        for (int k = 0; k < count; ++k) {
             const DmaSlot& sl = x.dma.slots[size_t(k)];
             w.u8(sl.rate);
             w.u8(sl.stereo ? 1 : 0);
             w.u8(sl.root);
             w.u8(sl.loop ? 1 : 0);
             const auto& smp = x.dmaSamples[size_t(k)];
-            const size_t n = std::min<size_t>(smp.size(), kDmaMaxBytes);
+            const size_t n = std::min<size_t>(smp.size(), UINT32_MAX);
             w.u32(uint32_t(n));
             w.bytes(std::string_view(reinterpret_cast<const char*>(smp.data()), n));
         }
         // After the slots (older readers stop there): Start and End of each slot, in frames.
-        for (const DmaSlot& sl : x.dma.slots) {
-            w.u32(sl.start);
-            w.u32(sl.end);
+        for (int k = 0; k < count; ++k) {
+            w.u32(x.dma.slots[size_t(k)].start);
+            w.u32(x.dma.slots[size_t(k)].end);
         }
         // Then the names of the slots, and their fine tune.
-        for (const std::string& n : x.dmaNames) {
-            const std::string name = cleanDigidrumName(n);
+        for (int k = 0; k < count; ++k) {
+            const std::string name = cleanDigidrumName(x.dmaNames[size_t(k)]);
             w.u8(uint8_t(name.size()));
             w.bytes(name);
         }
-        for (const DmaSlot& sl : x.dma.slots) w.f64(sl.cents);
+        for (int k = 0; k < count; ++k) w.f64(x.dma.slots[size_t(k)].cents);
         w.end(c);
     }
     // Digidrum editor: chunk written only when not default.
     if (std::any_of(x.digiSlots.begin(), x.digiSlots.end(),
                     [](const DigidrumSlotState& slot) { return !(slot == DigidrumSlotState{}); })) {
         c = w.begin(kDigs);
-        w.u8(uint8_t(kDigidrumSlots));
-        for (const DigidrumSlotState& ds : x.digiSlots) {
+        const int count =
+            slotsWritten(x.digiSlots, [](const DigidrumSlotState& ds) { return !(ds == DigidrumSlotState{}); });
+        w.u8(uint8_t(count));
+        for (int k = 0; k < count; ++k) {
+            const DigidrumSlotState& ds = x.digiSlots[size_t(k)];
             const std::string name = cleanDigidrumName(ds.name);
             w.u8(uint8_t(name.size()));
             w.bytes(name);
@@ -926,14 +1014,20 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             w.u32(ds.play.start);
             w.u32(ds.play.end);
             w.u8(uint8_t(ds.convert));
-            const size_t n = std::min<size_t>(ds.source.size(), Engine::kMaxUserSample);
+            const size_t n = std::min<size_t>(ds.source.size(), UINT32_MAX);
             w.u32(uint32_t(n));
             w.bytes(std::string_view(reinterpret_cast<const char*>(ds.source.data()), n));
         }
         w.end(c);
     }
+    // Memory of the Atari: chunk written only when not default.
+    if (x.steRam != kSteRamDefault) {
+        c = w.begin(kStem);
+        w.u8(x.steRam);
+        w.end(c);
+    }
     // Register recorder take: chunk written only if there is one.
-    if (const RegisterTake& t = state.take; !t.empty()) {
+    if (const RegisterTake& t = state.take; take && !t.empty()) {
         c = w.begin(kRecd);
         w.u8(t.chip);
         w.u32(t.frameHz);
@@ -969,6 +1063,41 @@ std::vector<uint8_t> encodeState(const PluginState& state) {
             }
             w.end(c);
         }
+        // Steps of the FM Voice effects, separately for the same reason: frame, channel, 4 bits per step; the
+        // effects in semitones in RFMS, a byte per step.
+        std::vector<std::tuple<uint32_t, uint8_t, uint64_t>> fm;
+        std::vector<std::tuple<uint32_t, uint8_t, std::array<uint8_t, 16>>> semis;
+        for (size_t i = 0; i < n; ++i)
+            for (size_t k = 0; k < t.frames[i].fx.size(); ++k)
+                if (const RegisterFrame::Effect& e = t.frames[i].fx[k]; e.on && e.gen == Generator::Fm) {
+                    if (e.semis) {
+                        semis.emplace_back(uint32_t(i), uint8_t(k), e.wave);
+                        continue;
+                    }
+                    uint64_t packed = 0;
+                    for (size_t s = 0; s < e.wave.size(); ++s) packed |= uint64_t(e.wave[s] & 15) << (4 * s);
+                    fm.emplace_back(uint32_t(i), uint8_t(k), packed);
+                }
+        if (!semis.empty()) {
+            c = w.begin(kRfms);
+            w.u32(uint32_t(semis.size()));
+            for (const auto& [frame, channel, wave] : semis) {
+                w.u32(frame);
+                w.u8(channel);
+                for (uint8_t v : wave) w.u8(v);
+            }
+            w.end(c);
+        }
+        if (!fm.empty()) {
+            c = w.begin(kRfmw);
+            w.u32(uint32_t(fm.size()));
+            for (const auto& [frame, channel, wave] : fm) {
+                w.u32(frame);
+                w.u8(channel);
+                w.u64(wave);
+            }
+            w.end(c);
+        }
     }
     return w.take();
 }
@@ -982,11 +1111,16 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
         return res;
     }
     res.version = r.u16();
-    r.u16();  // flags: none in v1
+    const int head = r.u16();  // flags: bits 0-3, kind of the blob; the others are reserved
     if (!r.ok()) {
         res.error = "truncated header";
         return res;
     }
+    if ((head & 0x0F) >= kStateKinds) {
+        res.error = "unknown kind of STYM2149 file (" + std::to_string(head & 0x0F) + ")";
+        return res;
+    }
+    res.kind = StateKind(head & 0x0F);
     if (res.version == 0 || res.version > kStateVersion) {
         res.error = "state version " + std::to_string(res.version) + " not supported (version " +
                     std::to_string(kStateVersion) + " at most)";
@@ -998,6 +1132,8 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
     PluginState& st = res.state;
     std::vector<ymseq::SongEntry> songx;  // SNGX: kinds of the entries, set on those of SONG at the end
     std::vector<std::pair<uint32_t, uint8_t>> takeSync;  // RSYN: Zxx of the take, set on its frames at the end
+    std::vector<std::tuple<uint32_t, uint8_t, uint64_t>> takeFm;  // RFMW: FM waves of the take, likewise
+    std::vector<std::tuple<uint32_t, uint8_t, std::array<uint8_t, 16>>> takeSemis;  // RFMS: those in semitones
     while (r.left() > 0) {
         const uint32_t tag = r.u32();
         const uint32_t len = r.u32();
@@ -1009,6 +1145,7 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
         Reader b(body);
         if (tag == kParm) {
             const uint32_t count = b.u32();
+            bool vibOn = false;  // a Vibrato On read
             for (uint32_t i = 0; i < count && b.ok(); ++i) {
                 const uint16_t n = b.u16();
                 const auto id = b.take(n);
@@ -1020,11 +1157,17 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                     continue;
                 }
                 st.values[size_t(index)] = clampToSpec(paramSpec(index), v);
+                const int field = (index - kGlobalParams) % kTrackParams;
+                vibOn = vibOn || (index >= kGlobalParams && field == int(Track::VibOn));
             }
             if (!b.ok()) {
                 res.error = "truncated PARM chunk";
                 return res;
             }
+            // A state from before the switch: the vibrato of its 16 tracks always played, which it keeps
+            // although the switch is now Off by default.
+            if (!vibOn)
+                for (int t = 0; t < 16; ++t) st.values[size_t(paramIndex(t, Track::VibOn))] = 1;
         } else if (tag == kTrkx) {
             const int count = b.u8();
             for (int t = 0; t < count && b.ok(); ++t) {
@@ -1050,11 +1193,10 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 const uint32_t n = b.u32();
                 const auto packed = b.take((size_t(n) + 1) / 2);
                 if (!b.ok()) break;
-                if (s >= kDigidrumSlots) continue;
-                auto& smp = st.extras.digidrums[size_t(s)];
-                const size_t keep = std::min<size_t>(n, Engine::kMaxUserSample);
-                smp.resize(keep);
-                for (size_t i = 0; i < keep; ++i) smp[i] = uint8_t((packed[i / 2] >> ((i & 1) * 4)) & 15);
+                if (s >= kDigidrumSlotsMax) continue;
+                std::vector<uint8_t> smp(n);
+                for (size_t i = 0; i < n; ++i) smp[i] = uint8_t((packed[i / 2] >> ((i & 1) * 4)) & 15);
+                st.extras.digidrums[size_t(s)] = std::move(smp);
             }
         } else if (tag == kSeqs) {
             readSeqSettings(b, st.extras.global, st.extras.seq);
@@ -1092,6 +1234,7 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 p.used.set(size_t(idx));
             }
         } else if (tag == kSong) {
+            res.hasSong = true;
             auto& entries = st.extras.seq.song.entries;
             entries.clear();
             const int count = b.u16();
@@ -1134,16 +1277,16 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 const uint32_t n = b.u32();
                 const auto bytes = b.take(n);
                 if (!b.ok()) break;
-                if (k >= kDmaSlots) continue;
+                if (k >= kDmaSlotsMax) continue;
                 d.slots[size_t(k)] = sl;
-                auto& smp = st.extras.dmaSamples[size_t(k)];
-                smp.resize(std::min<size_t>(n, kDmaMaxBytes));
-                if (!smp.empty()) std::memcpy(smp.data(), bytes.data(), smp.size());
+                st.extras.dmaSamples[size_t(k)] =
+                    std::vector<int8_t>(reinterpret_cast<const int8_t*>(bytes.data()),
+                                        reinterpret_cast<const int8_t*>(bytes.data()) + bytes.size());
             }
             // Start and End, absent from older states: the whole sample.
             for (int k = 0; k < count && b.has(8); ++k) {
                 const uint32_t start = b.u32(), end = b.u32();
-                if (k >= kDmaSlots) continue;
+                if (k >= kDmaSlotsMax) continue;
                 d.slots[size_t(k)].start = start;
                 d.slots[size_t(k)].end = end;
             }
@@ -1152,14 +1295,14 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 const uint8_t n = b.u8();
                 const auto text = b.take(n);
                 if (!b.ok()) break;
-                if (k >= kDmaSlots) continue;
+                if (k >= kDmaSlotsMax) continue;
                 st.extras.dmaNames[size_t(k)] =
                     cleanDigidrumName(std::string_view(reinterpret_cast<const char*>(text.data()), text.size()));
             }
             // Fine tune, absent from older states: 0.
             for (int k = 0; k < count && b.has(8); ++k) {
                 const double cents = b.f64();
-                if (k < kDmaSlots) d.slots[size_t(k)].cents = cents;
+                if (k < kDmaSlotsMax) d.slots[size_t(k)].cents = cents;
             }
         } else if (tag == kTseq) {
             const int count = b.u8();
@@ -1170,6 +1313,8 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 if (!b.ok()) break;
                 if (t < kTracks) readSequences(Reader(sb), st.extras.tracks[size_t(t)].patch);
             }
+        } else if (tag == kStem) {
+            if (b.has(1)) st.extras.steRam = b.u8();
         } else if (tag == kDigs) {
             const int count = b.has(1) ? b.u8() : 0;
             for (int k = 0; k < count && b.has(1); ++k) {
@@ -1187,9 +1332,9 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 const uint32_t n = b.u32();
                 const auto src = b.take(n);
                 if (!b.ok()) break;
-                if (k >= kDigidrumSlots) continue;
-                g.source.resize(std::min<size_t>(n, Engine::kMaxUserSample));
-                if (!g.source.empty()) std::memcpy(g.source.data(), src.data(), g.source.size());
+                if (k >= kDigidrumSlotsMax) continue;
+                g.source = std::vector<int8_t>(reinterpret_cast<const int8_t*>(src.data()),
+                                               reinterpret_cast<const int8_t*>(src.data()) + src.size());
                 st.extras.digiSlots[size_t(k)] = std::move(g);
             }
         } else if (tag == kSngx) {
@@ -1211,6 +1356,28 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 const uint32_t frame = b.u32();
                 takeSync.emplace_back(frame, b.u8());
             }
+        } else if (tag == kRfmw) {
+            const uint32_t count = b.u32();
+            takeFm.clear();
+            constexpr size_t kEntryBytes = 4 + 1 + 8;
+            if (!b.ok() || count > kRecorderMaxFrames * 3 || !b.has(size_t(count) * kEntryBytes)) continue;
+            for (uint32_t k = 0; k < count; ++k) {
+                const uint32_t frame = b.u32();
+                const uint8_t channel = b.u8();
+                takeFm.emplace_back(frame, channel, b.u64());
+            }
+        } else if (tag == kRfms) {
+            const uint32_t count = b.u32();
+            takeSemis.clear();
+            constexpr size_t kEntryBytes = 4 + 1 + 16;
+            if (!b.ok() || count > kRecorderMaxFrames * 3 || !b.has(size_t(count) * kEntryBytes)) continue;
+            for (uint32_t k = 0; k < count; ++k) {
+                const uint32_t frame = b.u32();
+                const uint8_t channel = b.u8();
+                std::array<uint8_t, 16> wave{};
+                for (auto& v : wave) v = b.u8();
+                takeSemis.emplace_back(frame, channel, wave);
+            }
         } else if (tag == kRecd) {
             RegisterTake t;
             t.chip = uint8_t(std::min<int>(b.u8(), 1));
@@ -1230,7 +1397,7 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 for (size_t k = 0; k < f.fx.size(); ++k) {
                     RegisterFrame::Effect& e = f.fx[k];
                     const uint8_t gen = b.u8();
-                    e.on = gen <= uint8_t(Generator::Dma);
+                    e.on = gen < uint8_t(kGenerators);
                     e.restart = e.on && (flags & (2u << k)) != 0;
                     e.gen = e.on ? Generator(gen) : Generator::Chip;
                     e.value = b.u8();
@@ -1240,6 +1407,12 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
                 }
             }
             st.take = std::move(t);
+        } else if (tag == kTins) {
+            const int count = b.u8();
+            for (int t = 0; t < count && b.ok(); ++t) {
+                const uint8_t n = b.u8();
+                if (b.ok() && t < kTracks) st.extras.trackInstruments[size_t(t)] = n;
+            }
         } else if (tag == kName) {
             const int count = b.u8();
             for (int t = 0; t < count && b.ok(); ++t) {
@@ -1261,16 +1434,29 @@ DecodeResult decodeState(std::span<const uint8_t> data) {
         }
     for (const auto& [frame, value] : takeSync)  // frames outside the take: ignored
         if (frame < st.take.frames.size()) st.take.frames[frame].sync = value;
+    for (const auto& [frame, channel, wave] : takeFm)  // likewise, and channels without an FM effect
+        if (frame < st.take.frames.size() && channel < 3)
+            if (RegisterFrame::Effect& e = st.take.frames[frame].fx[channel]; e.on && e.gen == Generator::Fm) {
+                // Steps beyond the effect's count read as 0, multiples beyond the table as its last one.
+                e.wave = {};
+                e.semis = false;
+                for (int i = 0; i < std::min<int>(e.value, kSidWaveSteps); ++i)
+                    e.wave[size_t(i)] = uint8_t(std::min<int>(int(wave >> (4 * i) & 15), kFmMultipleCount - 1));
+            }
+    for (const auto& [frame, channel, wave] : takeSemis)  // likewise, semitones up to kFmSemitoneMax
+        if (frame < st.take.frames.size() && channel < 3)
+            if (RegisterFrame::Effect& e = st.take.frames[frame].fx[channel]; e.on && e.gen == Generator::Fm) {
+                e.wave = {};
+                e.semis = true;
+                for (int i = 0; i < std::min<int>(e.value, kSidWaveSteps); ++i)
+                    e.wave[size_t(i)] = uint8_t(std::min<int>(wave[size_t(i)], ymengine::kFmSemitoneMax));
+            }
     sanitize(st.extras);
     res.ok = true;
     return res;
 }
 
-// ---- Rows of a pattern track (PATN chunk, JSON files) ----
-
-int laneCell(const ymseq::Lane& l, int row, int step) noexcept { return cellOf(l, row, step); }
-
-int laneEmpty(int row) noexcept { return rowRange(row).empty; }
+// ---- Rows of a pattern track (PATN chunk) ----
 
 void setLaneCell(ymseq::Lane& l, int row, int step, int value) noexcept {
     if (row < 0 || row >= kLaneRows || step < 0 || step >= ymseq::kSteps) return;

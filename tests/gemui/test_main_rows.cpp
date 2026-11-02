@@ -124,6 +124,11 @@ TEST_CASE("Register monitor: Chip Voice named like the other generators (item 10
     h.p(0, plugin::Track::Generator) = float(ymengine::Generator::Sid);
     w.tick(0);
     CHECK(w.registerInfo() == "CH 1 / SID VOICE / 16CH");
+    h.p(plugin::Global::VoiceMode) = 3;  // 32 ch
+    w.tick(0);
+    CHECK(w.registerInfo() == "CH 1 / SID VOICE / 32CH");
+    h.p(plugin::Global::VoiceMode) = 0;
+    w.tick(0);
     const gemui::Rect info = *w.rectOf("regInfo"), regs = *w.rectOf("regs");
     CHECK(info.right() <= regs.right());
     CHECK(info.bottom() <= regs.bottom());
@@ -137,11 +142,11 @@ TEST_CASE("Window buttons: Effects after Modulation opens the Effects window (it
     CHECK(fx.y == mod.y);
     CHECK(fx.x > mod.right());
     CHECK(seq.x > fx.right());
-    // Still centred over the oscilloscope.
-    const gemui::Rect row = *w.rectOf("winButtons"), scope = *w.rectOf("scope");
-    CHECK(std::abs((row.x - scope.x) - (scope.right() - row.right())) <= 1);
+    // Still centred over the oscilloscope and its buttons, as wide as the register monitor.
+    const gemui::Rect row = *w.rectOf("winButtons"), regs = *w.rectOf("regs");
+    CHECK(std::abs((row.x - regs.x) - (regs.right() - row.right())) <= 1);
     CHECK(byId(w.mainFrame(), "openFxBtn")->tip() ==
-          "Effects: echo of the notes, and the audio delay in 16 ch (Ctrl+F)");
+          "Effects: echo of the notes, and the audio delay in 16 and 32 ch (Ctrl+F)");
     REQUIRE_FALSE(w.echoWindow().isOpen());
     click(w, "openFxBtn");
     CHECK(w.echoWindow().isOpen());

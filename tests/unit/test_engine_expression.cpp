@@ -20,7 +20,7 @@ using ymengine::SlideTarget;
 
 namespace {
 
-// 16-channel engine at 48 kHz; track 0 plays a tone at volume 8, envelope period 12800, no vibrato of its own.
+// 32-channel engine at 48 kHz; track 0 plays a tone at volume 8, envelope period 12800, no vibrato of its own.
 struct Rig {
     Engine e;
     float l[480], r[480];

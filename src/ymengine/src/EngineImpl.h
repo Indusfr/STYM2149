@@ -15,7 +15,7 @@
 //   up to there (at(), eventCycle()).
 // - Voices: a fixed array (Engine::kVoices); each voice keeps its sound frozen at the attack and the cycle of its next
 //   internal event (slide step, VBL frame, timer interrupt, end of ADSR stage, fade step: Voice::nextEvent).
-// - 16-channel mode: each voice runs its VirtualChannel; every change of its output level is written onto the left
+// - 32-channel mode: each voice runs its VirtualChannel; every change of its output level is written onto the left
 //   and right buses as a step (dL, dR) at its internal step, with a change of slope (sL, sR) during a smooth ADSR
 //   ramp. integrateBus sums the steps into one value per internal step (bufL, bufR), which the output chain
 //   (TickStreamOutput) resamples to the host rate: all the voices go through a single resampler per side.
@@ -85,6 +85,8 @@ enum class EventType : uint8_t {
     DmaPreview, DmaStop,  // preview of a DMA slot
     Program,              // Program Change
     Pressure, NotePressure, MpeBend, MpePressure, MpeSlide,  // MIDI expression
+    DrumPad, DrumPadOff,                                      // drum pads
+    KeysOff,                                                  // the MIDI controller is gone
 };
 // Event of the next render (Impl::push). a, b and value carry its arguments (note and velocity, pattern, slot, Program
 // Change, MPE channel; semitones of a bend, cents of the wheel, accent of a preview, pressure, MPE channel of a note);
@@ -109,7 +111,7 @@ struct Wanted {
 };
 
 // One voice (Impl::voices, Engine::kVoices of them): the sound frozen at its attack (setupVoice), its pitch, the
-// cycles of its internal events, and in 16-channel mode its contribution to the buses. A voice is reused by the next
+// cycles of its internal events, and in 32-channel mode its contribution to the buses. A voice is reused by the next
 // note; `on` false: silent and free.
 struct Voice {
     bool on = false;
@@ -133,6 +135,11 @@ struct Voice {
     std::array<uint8_t, kBuzzSteps> buzz{};
     uint8_t sidWaveLen = 0, wavePos = 0, buzzLen = 0, buzzPos = 0, trackShape = 8;
     uint8_t sqSteps = 0, sqHigh = 1;
+    // FM Voice: indices in kFmMultiples, or semitones above the note (fmSemis), one step per interrupt
+    // over fmLen steps (wavePos).
+    std::array<uint8_t, kSidWaveSteps> fmWave{};
+    uint8_t fmLen = 1;
+    bool fmSemis = false;
     // Buzzer: tuned envelope (ratio to the frequency of the note, fine tune included; 0: period of the
     // track), YM Pad.
     double envTune = 0;
@@ -142,7 +149,7 @@ struct Voice {
     std::array<int8_t, kOrnamentSteps> ornPitch{};
     std::array<uint8_t, kOrnamentSteps> ornNoise{};
     std::array<uint8_t, kOrnamentSteps> ornVol{};
-    double accent = 1;     // 16-channel: velocity, audio gain
+    double accent = 1;     // 32-channel: velocity, audio gain
     double digiLevel = 1;  // 3-channel: accent of the digidrums
     std::array<uint8_t, 16> digiMap{};  // 3-channel, digiLevel < 1: sample value → attenuated value
     double drumTr = 1;     // pitch factor of a drum hit from the OCT and TON rows
@@ -191,7 +198,10 @@ struct Voice {
     double lfoPhase = 0, lfoRand = 0, lfoPrev = 0, lfoRandPrev = 0;
     int lfoNoise = 0;
     double lfoEnv = 1, lfoRatio = 1, lfoPan = 0;
-    uint8_t linked = 0;  // chained instrument that sounds (1 to 32), 0: none
+    // Panning of the PAN row kept by a sequencer note that Stop or a jump of the host released (NaN: that of its
+    // track), so that a stereo song does not fold to the centre during the releases.
+    double panHeld = std::numeric_limits<double>::quiet_NaN();
+    uint8_t linked = 0;  // chained instrument that sounds (1 to 127), 0: none
     // Effects of the CMD row: what the slides added since the attack (4-bit volume steps, semitones of the
     // envelope frequency, noise period steps upwards) with the factor of the envelope period, and the fine tune of the
     // track in semitones (Fxx).
@@ -250,16 +260,17 @@ struct Voice {
     uint32_t pcmStart = 0;   // first frame read at the attack (Start, then Oxx); pcmFrames: its End
     uint64_t dmaSerial = 0;  // rank of the start of the DMA voice (DmaFrame of the recorder: the most recent)
 
-    // Fade: fadeLen steps of 1 / 48 000 s, the amplitude fadeAmt losing 1/64 per step.
+    // Fade: fadeLen steps of 1 / 48 000 s, the amplitude fadeAmt losing 1/64 per step; a CUT with Fade takes
+    // steps of 1 / 12 800 s (fadeRate).
     int fadeLen = 0, fadeStep = 0;
     double fadeAmt = 1;
-    uint64_t fadeStart = 0, nextFade = kNever;
+    uint64_t fadeStart = 0, nextFade = kNever, fadeRate = kFadeRate;
 
-    // To pass to the channel: envelope restart (R13), tone reset (16-channel); envRetrig: rewrite of R13 alone
+    // To pass to the channel: envelope restart (R13), tone reset (32-channel); envRetrig: rewrite of R13 alone
     // (Rxx command).
     bool restart = false, toneRestart = false, envRetrig = false;
 
-    // Buses of the 16-channel mode: contribution cL + sL × (t − busT) at step t. cM and sM: mono contribution to the
+    // Buses of the 32-channel mode: contribution cL + sL × (t − busT) at step t. cM and sM: mono contribution to the
     // separate output of track busTrack.
     double cL = 0, cR = 0, sL = 0, sR = 0, cM = 0, sM = 0;
     // Mixer meter: contribution seen by the oscilloscope of track meterTrack; cMeterD: half the difference of the
@@ -291,7 +302,7 @@ struct Voice {
 // level, drumTr: the other arguments of its attack (setupVoice); voice: the voice that plays it. Times in samples.
 struct EchoNote {
     uint32_t id = 0;  // 0: free
-    int src = 0, dst = 0, ins = 0, gen = -1, vol = 0, voice = 0;
+    int src = 0, dst = 0, ins = 0, gen = -1, vol = 0, voice = 0, slot = -1;  // slot: that of a drum pad
     double note = 0, level = 1, drumTr = 1;
     uint64_t start = 0, end = kNever;
     double period = 1;
@@ -326,7 +337,7 @@ struct ArpState {
     int clockTicks = 0;
 };
 
-// Curve of a Buzzer or Noise slide (Kxx, Qxx; 16-channel mode): from cycle start, over len cycles (the steps to
+// Curve of a Buzzer or Noise slide (Kxx, Qxx; 32-channel mode): from cycle start, over len cycles (the steps to
 // the next command of its kind), the offset of the notes goes along the shape of the CRV row by `total` in all (the
 // distance the speed covers there in a straight line); 0: Linear, the speed per frame.
 struct SlideCurveRun {
@@ -436,7 +447,7 @@ struct Click {
 using namespace detail;
 
 // State of an engine, owned by Engine (impl_) and used only from its rendering thread. The functions follow the
-// order of a note's life: ADSR, pitch, timer, fade, attack (setupVoice), internal events, channel state, 16-channel
+// order of a note's life: ADSR, pitch, timer, fade, attack (setupVoice), internal events, channel state, 32-channel
 // buses, 3-channel chips, recorder, mixer, allocation and playing, echo, keyboard arpeggio, events, render.
 struct Engine::Impl {
     EngineConfig config{};
@@ -448,10 +459,11 @@ struct Engine::Impl {
     int previewSlot = -1;
     double previewPos = 0;
     DrumKit kit;
-    // Digidrum samples: 4-bit values, kMaxUserSample allocated per slot by the constructor, userLen of them used.
-    std::array<std::vector<uint8_t>, kDigidrumSlots> user;
-    std::array<uint32_t, kDigidrumSlots> userLen{};
-    std::array<DigidrumSlot, kDigidrumSlots> digiSlots{};  // rate, root note, fine tune, loop
+    // Digidrum samples: 4-bit values read where their owner keeps them (Engine::shareUserSample), or the copy
+    // userOwn kept by setUserSample.
+    std::array<std::span<const uint8_t>, kDigidrumSlotsMax> user{};
+    std::array<std::vector<uint8_t>, kDigidrumSlotsMax> userOwn{};
+    std::array<DigidrumSlot, kDigidrumSlotsMax> digiSlots{};  // rate, root note, fine tune, loop
     // Preview of a Digidrum slot (editor): slot (-1: nothing), position and step per output sample; looping: the
     // slot's Loop was on during the preview, which stops when Loop goes off.
     int digiPreviewSlot = -1;
@@ -459,7 +471,7 @@ struct Engine::Impl {
     bool digiPreviewLooping = false;
 
     std::array<Voice, kVoices> voices{};
-    std::array<VirtualChannel, kVoices> vch{};  // channel of each voice (16-channel mode)
+    std::array<VirtualChannel, kVoices> vch{};  // channel of each voice (32-channel mode)
     std::array<uint8_t, 128> manualCut{};       // live notes cut by the sequencer, per MIDI note
     uint64_t stamp = 0;                         // attacks so far (Voice::age)
     std::array<double, kTracks> bend{};   // pitch bend of each track, in semitones
@@ -473,6 +485,8 @@ struct Engine::Impl {
     };
     std::array<MpeChannel, kMpeChannels> mpe{};
     int mpeNoteCh = 0;  // MPE channel of the note being attacked (setupVoice)
+    // Drum pad being attacked: the generator and the slot it imposes on trigger and setupVoice, or -1.
+    int padGen = -1, padSlot = -1;
 
     // Live mixer. panStep: panning of the PAN row of the current step (NaN: that of the mixer); panNow: the panning
     // that panL and panR give, from which the LFO moves a voice.
@@ -501,9 +515,9 @@ struct Engine::Impl {
     // Time.
     uint64_t samples = 0;  // samples rendered since the reset
     uint64_t base = 0;     // sample where the time base of the current mode starts (outputs reset)
-    uint64_t genPos = 0;   // 16-channel: next internal step to compute
+    uint64_t genPos = 0;   // 32-channel: next internal step to compute
 
-    // 16-channel mode: buses and output.
+    // 32-channel mode: buses and output.
     std::array<double, 128> tab1{};  // level of one channel alone per 5-bit index, 1 = index 31
     // Steps (dL, dR) and changes of slope (sL, sR) written by the voices, indexed by internal step from genPos; the
     // integrated buses (bufL, bufR) from step bufBase, not yet consumed by the output chain; vL, vR: value of the
@@ -514,16 +528,16 @@ struct Engine::Impl {
     double vL = 0, vR = 0, sigL = 0, sigR = 0;
     bool slopeWritten = false;  // a slope has been written in sL / sR since the last render
     ymcore::TickStreamOutput outL, outR;
-    // Separate outputs of the tracks (16-channel): one mono bus per prepared track.
-    uint16_t trackMask = 0;
+    // Separate outputs of the tracks (32-channel): one mono bus per prepared track.
+    uint32_t trackMask = 0;
     std::array<std::vector<double>, kTracks> dT, sT;
     std::array<std::vector<float>, kTracks> bufT;
     std::array<double, kTracks> vT{}, sigT{};
     std::array<bool, kTracks> wroteT{};
     std::array<ymcore::TickStreamOutput, kTracks> outT;
     std::vector<float> scratch;  // output prepared but not wanted in this render
-    // Audio delay, live in 16 channels while it is on: send buses beside the left and right ones, with the
-    // same steps × the send of the track of each voice and the same output chain, joined in silence when the delay
+    // Audio delay, live in 16 and 32 channels while it is on: send buses beside the left and right ones, with
+    // the same steps × the send of the track of each voice and the same output chain, joined in silence when the delay
     // goes live; their output at the host rate (sendL, sendR), the echoes added to the mix before the Master.
     bool sendLive = false;
     std::vector<double> dSL, dSR, sSL, sSR;
@@ -561,9 +575,9 @@ struct Engine::Impl {
     uint64_t dmaSerials = 0;  // starts of the DMA voices
     std::vector<uint16_t> chipLevels;  // 5-bit levels of the channels of the rendered chip, per sample (meters)
 
-    // STE DMA sound: sample bank, DMA voices (Generator::Dma) with the STE machine. 16-channel:
+    // STE DMA sound: sample bank, DMA voices (Generator::Dma) with the STE machine. 32-channel:
     // voices like the others on the buses. 3-channel: the voices of the DMA tracks (kDma3Voice and following) go
-    // through the buses of the 16-channel mode (same chain as the chips: the sum afterwards equals the sum before,
+    // through the buses of the 32-channel mode (same chain as the chips: the sum afterwards equals the sum before,
     // the filters being linear), rendered by pcmHostL and pcmHostR and added to the chips.
     DmaBank dmaBank;
     std::vector<float> pcmHostL, pcmHostR;
@@ -576,13 +590,13 @@ struct Engine::Impl {
     std::array<std::array<float, kScopePoints>, kTracks> meterScope{}, meterScopeD{};
     uint32_t meterPos = 0;  // place of the next point in meterScope
     uint64_t meterIndex = 0;
-    // 16-channel: steps of the voices per bucket (bucket j: seen from point meterIndex + j), level at the last point.
+    // 32-channel: steps of the voices per bucket (bucket j: seen from point meterIndex + j), level at the last point.
     // meterDD, meterLevelD: the same for the half differences of stereo samples, on the tracks where meterSide is set.
     std::array<std::vector<double>, kTracks> meterD, meterDD;
     std::array<double, kTracks> meterLevel{}, meterLevelD{};
     std::array<bool, kTracks> meterSide{};
     double meterTickInv = 1;  // 1 / meterTickStep()
-    // 16-channel: first step of each bucket for the current render (meterBucket(t) = j ⇔ bucketStart[j] ≤ t <
+    // 32-channel: first step of each bucket for the current render (meterBucket(t) = j ⇔ bucketStart[j] ≤ t <
     // bucketStart[j + 1]), last element without end. The loops of the voices so advance their bucket by comparison.
     std::vector<uint64_t> bucketStart;
     // 3-channel: samples of the points of the current render, levels of the channels of the rendered chip.
@@ -627,15 +641,17 @@ struct Engine::Impl {
     uint64_t echoDue = kNever;
 
     // ------------------------------------------------------------------------------------------------------
-    bool studio() const noexcept { return global.mode == VoiceMode::Studio16; }
+    bool studio() const noexcept { return studioMode(global.mode); }
     // Frequency of A4 from which the notes are tuned (Tuning A4), kept within its range.
     double a4() const noexcept { return std::isnan(global.a4Hz) ? kA4Hz : std::clamp(global.a4Hz, kA4MinHz, kA4MaxHz); }
     int chipCount() const noexcept { return global.mode == VoiceMode::Dual3 ? 2 : 1; }
     ymcore::MasterClock clock() const noexcept { return config.render.chip.clock; }
     uint32_t hostRate() const noexcept { return config.render.hostRate; }
-    // Tracks played: 16 in 16-channel mode; in 3-channel mode, four per chip, then the eight DMA tracks with the STE
-    // machine.
-    int trackCount() const noexcept { return studio() ? kTracks : dmaFirst() + (global.ste ? kDmaTracks : 0); }
+    // Tracks played: 16 or 32 in the studio modes; in 3-channel mode, four per chip, then the eight DMA tracks
+    // with the STE machine.
+    int trackCount() const noexcept {
+        return studio() ? studioTracks(global.mode) : dmaFirst() + (global.ste ? kDmaTracks : 0);
+    }
     // DMA tracks in 3-channel mode (STE machine): those that follow the YM tracks, one voice each (kDma3Voice + rank).
     int dmaFirst() const noexcept { return 4 * chipCount(); }
     bool dmaTrack(int track) const noexcept {
@@ -643,7 +659,7 @@ struct Engine::Impl {
     }
     static constexpr int kDma3Voice = 6;
     // Sample played by default (dmaSlot -1): the rank of the DMA track in 3-channel mode, that of the track modulo 8
-    // in 16-channel mode.
+    // in 32-channel mode.
     int dmaAutoSlot(int track) const noexcept { return (studio() ? track : track - dmaFirst()) & 7; }
     double dmaTickHz() const noexcept { return clock().hz() / 8.0; }
     // Steps of the buses at cycle c, never before those already computed (in 3-channel mode, the buses of the DMA
@@ -763,12 +779,13 @@ struct Engine::Impl {
         const double f = noteHz(double(v.note) + v.fine + bendOf(v) + v.detune + v.analog, a4());
         v.tp = tonePeriodFor(f, clock());
         switch (v.gen) {
-        case Generator::Sid: v.timerHz = f * sidRate(v); break;
-        case Generator::SyncBuzzer: v.timerHz = f * buzzRate(v); break;
+        case Generator::Sid:
+        case Generator::Fm:
+        case Generator::SyncBuzzer: v.timerHz = f * timerRate(v); break;
         case Generator::Digidrum: {  // pitch of the note, transposed by OCT and TON of the step
             // Rate, root note and fine tune of the slot (defaults: 7 800 Hz for C4).
             // The Tuning A4 moves it like the other notes: the slot's rate plays its root note at A4 = 440 Hz.
-            const DigidrumSlot& d = digiSlots[v.slot & 7];
+            const DigidrumSlot& d = digiSlots[v.slot];
             v.timerHz = d.rateHz * std::pow(2.0, (double(v.note) + v.fine - d.root + d.cents / 100) / 12.0) *
                         (a4() / kA4Hz);
             if (v.drumTr != 1) v.timerHz *= v.drumTr;
@@ -840,13 +857,15 @@ struct Engine::Impl {
     }
 
     // -------------------------------------------------------------------------------------------- Fade
-    // Fade of len steps (1 to 64) of 1 / 48 000 s; the voice stops at the last one.
-    void startFade(Voice& v, int len, uint64_t c) noexcept {
+    // Fade of len steps (1 to 64) of 1 / rate s (1 / 48 000 s but for a CUT with Fade); the voice stops at the last
+    // one.
+    void startFade(Voice& v, int len, uint64_t c, uint64_t rate = kFadeRate) noexcept {
         v.fadeLen = std::clamp(len, 1, 64);
         v.fadeStep = 0;
         v.fadeAmt = 1;
         v.fadeStart = c;
-        v.nextFade = c + periodCycles(1, kFadeRate);
+        v.fadeRate = rate;
+        v.nextFade = c + periodCycles(1, rate);
     }
     // Release of the note: the release stage of its ADSR, otherwise a fade of fadeLen steps.
     void relVoice(Voice& v, int fadeLen, uint64_t c) noexcept {
@@ -859,15 +878,21 @@ struct Engine::Impl {
         }
     }
     // Hard cut (hard killTag, allOff, manOff): the ADSR freezes, fade of len steps.
-    void hardFade(Voice& v, int len, uint64_t c) noexcept {
+    void hardFade(Voice& v, int len, uint64_t c, uint64_t rate = kFadeRate) noexcept {
         echoRelease(v);
         enterStage(v, 0, adsrAt(v, c), c);
-        startFade(v, len, c);
+        startFade(v, len, c, rate);
+    }
+    // A CUT fades out: Fade on, in 16 and 32 channels, in cutFadeMs (5 ms by default).
+    bool softCut() const noexcept { return global.cutFade && studio(); }
+    // Rate of its 64 steps to silence: 64 steps in cutFadeMs.
+    uint64_t cutFadeRate() const noexcept {
+        return 64000 / uint64_t(std::clamp<int>(global.cutFadeMs, 1, kCutFadeMsMax));
     }
 
     // -------------------------------------------------------------------------------------------- Setup
     // 3-channel: the 4-bit volume whose level is the nearest, in decibels, to that of `vol` × `level`. A
-    // track level or a velocity thus lowers the chip as much as the audio gain lowers a voice in 16-channel mode,
+    // track level or a velocity thus lowers the chip as much as the audio gain lowers a voice in 32-channel mode,
     // where the prototype scaled the 4-bit index (a logarithmic DAC: 10 dB quieter at the default settings).
     int attenuated(int vol, double level) const noexcept {
         vol = std::clamp(vol, 0, 15);
@@ -885,9 +910,9 @@ struct Engine::Impl {
     }
     // A note played live that still sounds (not released, not fading) on voice v, which a sequencer, chord or echo
     // note is about to take (Indus, 25/10/2026 19:41): a key held, or held by Latch, before Play sits on the
-    // voice of a track that the sequencer reserves once it plays. In 16 channels the note moves to a free voice of the
-    // pool and goes on sounding, as a note played during playback would; otherwise (3-channel modes, pool full) it
-    // is cut, and manualCut counts it so that the interface lets its key go.
+    // voice of a track that the sequencer reserves once it plays. In 16 and 32 channels the note moves to a free voice
+    // of the pool and goes on sounding, as a note played during playback would; otherwise (3-channel modes, pool full)
+    // it is cut, and manualCut counts it so that the interface lets its key go.
     void displaceManual(Voice& v, uint64_t c) noexcept {
         if (!v.on || v.tag != VoiceTag::Manual || v.fading() || v.stage == 4) return;
         const int from = int(&v - voices.data());
@@ -919,6 +944,7 @@ struct Engine::Impl {
         v.slcOv = 0;
         v.tag = tag;
         v.track = track;
+        v.panHeld = std::numeric_limits<double>::quiet_NaN();
         v.age = stamp++;
         // CMD row of the track: the slides start again from the note's own values; the fine tune, the
         // envelope shape and the DMA offset of the track's commands apply from the attack.
@@ -1000,12 +1026,18 @@ struct Engine::Impl {
             v.toneOn = v.noiseOn = false;
             if (v.envPeriod > 3200 && v.envTune <= 0) v.envPeriod = 32;  // "EP > 100 → 1" of the prototype, × 32
         }
-        // Slot: the grid row for the sequencer hits, chord voices included.
+        // Slot: the grid row for the sequencer hits, chord voices included; a Digidrum plays the sample chosen
+        // for its row or pad.
         const bool seqHit = tag == VoiceTag::Sequencer || tag == VoiceTag::Chord;
         const int row = (v.note % 12 + 12) % 12 % 8;  // pitch class of the note, folded onto the eight slots
-        v.slot = uint8_t(v.gen == Generator::Digidrum && !seqHit ? (src.digidrumSlot & 7) : row);
+        const int pad = padSlot >= 0                              ? padSlot
+                        : v.gen == Generator::Digidrum && !seqHit ? (src.digidrumSlot & 7)
+                                                                  : row;
+        v.slot = v.gen == Generator::Digidrum
+                     ? uint8_t(std::min<int>(src.digiPads[size_t(pad & 7)], kDigidrumSlotsMax - 1))
+                     : uint8_t(pad);
         v.drumTr = drumTr;
-        // Chipdrum: VBL frames written to the registers in 3-channel mode, a 4-bit sample in 16-channel mode; Digidrum:
+        // Chipdrum: VBL frames written to the registers in 3-channel mode, a 4-bit sample in 32-channel mode; Digidrum:
         // the user sample of the slot.
         v.frames = nullptr;
         v.frameCount = v.framePos = 0;
@@ -1023,12 +1055,12 @@ struct Engine::Impl {
             v.sampleLen = uint32_t(s.size());
         } else if (v.gen == Generator::Digidrum) {
             v.sample = user[v.slot].data();
-            v.sampleLen = userLen[v.slot];
+            v.sampleLen = uint32_t(user[v.slot].size());
         }
         // Digidrum: the part from Start to End, its sustain loop replaying it while the note is held.
         v.looping = false;
         if (v.gen == Generator::Digidrum) {
-            const DigidrumSlot& ds = digiSlots[v.slot & 7];
+            const DigidrumSlot& ds = digiSlots[v.slot];
             const SampleSpan part = sampleSpan(ds.start, ds.end, v.sampleLen);
             v.sampleLen = part.end;
             v.dpos = part.start;
@@ -1041,7 +1073,7 @@ struct Engine::Impl {
         v.pcm = nullptr;
         v.pcmFrames = 0;
         if (v.gen == Generator::Dma) {
-            const int k = src.dmaSlot >= 0 ? (src.dmaSlot & 7) : dmaAutoSlot(track);
+            const int k = src.dmaSlot >= 0 ? std::min<int>(src.dmaSlot, kDmaSlotsMax - 1) : dmaAutoSlot(track);
             const DmaSlot& d = dmaBank.slot(k);
             v.slot = uint8_t(k);
             v.pcm = dmaBank.data(k);
@@ -1144,8 +1176,7 @@ struct Engine::Impl {
         v.fTarget *= k;
         if (v.glide > 0) {
             v.tp = tonePeriodFor(slideHz(v, PitchTarget::Square), clock());
-            if (v.gen == Generator::Sid) v.timerHz = slideHz(v, PitchTarget::Timer) * sidRate(v);
-            else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer) * buzzRate(v);
+            if (pitchedTimer(v.gen)) v.timerHz = slideHz(v, PitchTarget::Timer) * timerRate(v);
             else if (v.gen == Generator::Dma) v.pcmStep = slideHz(v, PitchTarget::Timer) / v.pcmRootHz;
             tuneEnv(v, v.fTarget);
         } else {
@@ -1163,7 +1194,7 @@ struct Engine::Impl {
         const double f = noteHz(double(note) + bendOf(v) + v.detune + v.analog, a4());
         v.note = note;
         v.fine = 0;
-        // Slide steps at 16 × VBL in 16-channel mode, at the VBL rate in 3-channel mode; upd: their number.
+        // Slide steps at 16 × VBL in 32-channel mode, at the VBL rate in 3-channel mode; upd: their number.
         const uint32_t vbl = std::max<uint32_t>(1, global.vblHz);
         v.glideHz = studio() ? vbl * 16 : vbl;
         const double upd = std::max(1.0, jsRound(stepSamples * v.glideHz / hostRate()));
@@ -1197,8 +1228,7 @@ struct Engine::Impl {
         v.fCur = slideQuantize(v.fCur, v.curve, global.scaleMask, global.scaleRoot, a4());
         if (v.glide == 0 && v.curve != SlideCurve::Custom) v.fCur = v.fTarget;
         v.tp = tonePeriodFor(slideHz(v, PitchTarget::Square), clock());
-        if (v.gen == Generator::Sid) v.timerHz = slideHz(v, PitchTarget::Timer) * sidRate(v);
-        else if (v.gen == Generator::SyncBuzzer) v.timerHz = slideHz(v, PitchTarget::Timer) * buzzRate(v);
+        if (pitchedTimer(v.gen)) v.timerHz = slideHz(v, PitchTarget::Timer) * timerRate(v);
         else if (v.gen == Generator::Dma) v.pcmStep = slideHz(v, PitchTarget::Timer) / v.pcmRootHz;
         retuneTimer(v, c);
         v.nextGlide = v.glide > 0 ? v.glideStart + periodCycles(v.glideIndex + 1, v.glideHz) : kNever;
@@ -1327,8 +1357,7 @@ struct Engine::Impl {
             v.tpEff = mod ? uint16_t(std::clamp(jsRound(v.tp * std::pow(2.0, -semis / 12)), 1.0, 4095.0)) : 0;
             if (mod || v.wasMod) {  // the timer follows: buzzer and SID vibrate (and come back when the wheel drops)
                 const double fm = slideHz(v, PitchTarget::Timer) * std::pow(2.0, semis / 12);
-                if (v.gen == Generator::SyncBuzzer) v.timerHz = fm * buzzRate(v);
-                else if (v.gen == Generator::Sid) v.timerHz = fm * sidRate(v);
+                if (pitchedTimer(v.gen)) v.timerHz = fm * timerRate(v);
                 else if (v.gen == Generator::Dma) v.pcmStep = fm / v.pcmRootHz;
                 retuneTimer(v, c);
             }
@@ -1514,6 +1543,11 @@ struct Engine::Impl {
         v.sqHigh = uint8_t(std::clamp<int>(p.sidWidth, 1, n - 1));
         v.buzz = p.buzzShapes;
         v.buzzLen = uint8_t(std::min<int>(p.buzzLen, kBuzzSteps));
+        v.fmSemis = p.fmScale == FmScale::Semitones;  // the wave of its scale
+        for (size_t i = 0; i < v.fmWave.size(); ++i)
+            v.fmWave[i] = v.fmSemis ? uint8_t(std::min<int>(p.fmSemi[i], kFmSemitoneMax))
+                                    : uint8_t(std::min<int>(p.fmWave[i], kFmMultipleCount - 1));
+        v.fmLen = uint8_t(std::clamp<int>(p.fmWaveLen, 1, kSidWaveSteps));
         v.trackShape = uint8_t(p.envShape & 15);
         v.envTune = p.envTuned ? double(std::clamp<int>(p.envRatioN, 1, kEnvRatioMax)) /
                                      std::clamp<int>(p.envRatioD, 1, kEnvRatioMax) *
@@ -1550,6 +1584,22 @@ struct Engine::Impl {
     static double sidRate(const Voice& v) noexcept { return v.sidRatio * v.lfoRatio * sidSteps(v); }
     // Stepped Sync Buzzer: the n steps fit in one period of the note, so the timer goes n times faster.
     static double buzzRate(const Voice& v) noexcept { return v.buzzLen ? double(v.buzzLen) : 1.0; }
+    // FM Voice: like the SID wave, its steps fit in one period of the note at Timer Ratio 1.
+    static double fmRate(const Voice& v) noexcept { return v.sidRatio * v.lfoRatio * double(v.fmLen); }
+    // Generators whose timer follows the pitch of the note, and the timer frequency per Hz of the note.
+    static constexpr bool pitchedTimer(Generator g) noexcept {
+        return g == Generator::Sid || g == Generator::SyncBuzzer || g == Generator::Fm;
+    }
+    static double timerRate(const Voice& v) noexcept {
+        return v.gen == Generator::Sid ? sidRate(v) : v.gen == Generator::Fm ? fmRate(v) : buzzRate(v);
+    }
+    // Tone period of an FM step: the note's period divided by the multiple of the step, or brought the step's
+    // semitones up as maxYMiser does.
+    static uint16_t fmPeriod(uint16_t tp, uint8_t step, bool semis) noexcept {
+        if (semis) return fmSemitonePeriod(tp, step);
+        const double k = kFmMultiples[std::min<size_t>(step, kFmMultiples.size() - 1)];
+        return uint16_t(std::clamp(jsRound(double(tp) / k), 1.0, 4095.0));
+    }
     // Stepped Sync Buzzer: the restart of the attack writes the first step, each interrupt the next one.
     static void nextBuzz(Voice& v) noexcept {
         const uint8_t s = v.buzz[v.buzzPos];
@@ -1589,7 +1639,7 @@ struct Engine::Impl {
         double tp = jsRound(tp0 * std::pow(2.0, -sSq / 12));
         if (tabSq) tp += delta;
         v.tpEff = uint16_t(std::clamp(tp, 1.0, 4095.0));
-        if (v.gen == Generator::SyncBuzzer || v.gen == Generator::Sid || v.gen == Generator::Dma) {
+        if (pitchedTimer(v.gen) || v.gen == Generator::Dma) {
             const bool tabTm = follows(v, PitchSource::Table, PitchTarget::Timer);
             const double sTm = (tabTm ? semis : 0) + (follows(v, PitchSource::Vibrato, PitchTarget::Timer) ? vib : 0);
             double fm = (fix && tabTm ? fixedHz(v) : slideHz(v, PitchTarget::Timer)) * std::pow(2.0, sTm / 12);
@@ -1600,7 +1650,7 @@ struct Engine::Impl {
             if (v.gen == Generator::Dma) {
                 v.pcmStep = fm / v.pcmRootHz;
             } else {
-                v.timerHz = fm * (v.gen == Generator::Sid ? sidRate(v) : buzzRate(v));
+                v.timerHz = fm * timerRate(v);
                 retuneTimer(v, c);
             }
         }
@@ -1610,7 +1660,8 @@ struct Engine::Impl {
     void rowsAt(Voice& v, int op, uint64_t c) noexcept {
         const uint8_t g = v.rows.gen[size_t(op)];
         if ((g || v.genOv) && v.gen != Generator::Dma) {  // a DMA voice keeps its sample
-            static constexpr Generator kGen[kSeqGens] = {Generator::Chip, Generator::Chip, Generator::Sid, Generator::SyncBuzzer};
+            static constexpr Generator kGen[kSeqGens] = {Generator::Chip, Generator::Chip, Generator::Sid,
+                                                         Generator::SyncBuzzer, Generator::Fm};
             const Generator want = g ? kGen[std::min<int>(g, kSeqGens - 1)] : v.baseGen;
             if (want != v.gen) switchGen(v, want, c);
             v.genOv = g != 0;
@@ -1658,10 +1709,10 @@ struct Engine::Impl {
         v.shape = v.trackShape;
         primeBuzz(v);
         const double f = slideHz(v, PitchTarget::Timer);
-        v.timerHz = g == Generator::Sid ? f * sidRate(v) : (g == Generator::SyncBuzzer ? f * buzzRate(v) : 0);
+        v.timerHz = pitchedTimer(g) ? f * timerRate(v) : 0;
         startTimer(v, c);
     }
-    // Hard sync: square (16-channel) and timer restarted.
+    // Hard sync: square (32-channel) and timer restarted.
     void syncRestart(Voice& v, uint64_t c) noexcept {
         v.toneRestart = true;
         v.sidHigh = true;
@@ -1735,6 +1786,9 @@ struct Engine::Impl {
             if (v.buzzLen) nextBuzz(v);
             v.restart = true;
             break;
+        case Generator::Fm:
+            if (++v.wavePos >= v.fmLen) v.wavePos = 0;
+            break;
         case Generator::Digidrum:
         case Generator::Chipdrum:
             if (v.looping && v.dpos + 1 >= v.loopEnd) {  // sustain loop
@@ -1777,7 +1831,7 @@ struct Engine::Impl {
             return;
         }
         v.fadeAmt = 1.0 - double(v.fadeStep) / 64.0;
-        v.nextFade = v.fadeStart + periodCycles(uint64_t(v.fadeStep) + 1, kFadeRate);
+        v.nextFade = v.fadeStart + periodCycles(uint64_t(v.fadeStep) + 1, v.fadeRate);
     }
 
     // All the internal events of the voice dated at cycle c, in the order of the prototype (slide, VBL frame,
@@ -1807,6 +1861,7 @@ struct Engine::Impl {
             if (v.digiLevel < 1) sv = v.digiMap[size_t(std::clamp(sv, 0, 15))];
             w.volume = uint8_t(std::clamp(sv, 0, 15));
         } else {
+            if (v.gen == Generator::Fm) w.tone = fmPeriod(w.tone, v.fmWave[v.wavePos], v.fmSemis);
             w.toneOn = v.toneOn;
             w.noiseOn = v.noiseOn || v.ornNoiseOn;
             if (v.gen == Generator::Sid)  // wave: its step scaled by the volume of the note, rounded
@@ -1830,7 +1885,7 @@ struct Engine::Impl {
         return v.gen == Generator::SyncBuzzer || (v.envVolume && v.gen != Generator::Sid);
     }
 
-    // --------------------------------------------------------------------------------- 16-channel buses
+    // --------------------------------------------------------------------------------- 32-channel buses
     double drumGain(const Voice& v) const noexcept {
         if (v.frames) return 1;
         // A Digidrum is a chip channel playing its 4-bit values, as in 3 channels (no gain). The Chipdrum sample is
@@ -1838,16 +1893,16 @@ struct Engine::Impl {
         return v.gen == Generator::Chipdrum ? 1.8 : 1.0;
     }
     // Gains of the voice on the buses: gainBase, then × the constant-power panning of its track (cos and sin of
-    // (pan + 1) × π/4); a voice without a track is centred (√½).
+    // (pan + 1) × π/4), or of the PAN row it kept (panHeld); a voice without a track is centred (√½).
     void refreshGain(Voice& v) noexcept {
         const double lv = v.track >= 0 ? live[size_t(v.track)] : 1.0;
         const double gain = v.accent * drumGain(v) * v.fadeAmt;
         v.gainBase = gain * lv;
-        // The right side of a stereo DMA sample: its own fader, mute and solo.
-        const bool split = v.track >= 0 && v.gen == Generator::Dma && v.pcmStereo;
-        v.gainR = split ? gain * liveR[size_t(v.track)] : v.gainBase;
-        if (v.lfoPan != 0 && v.track >= 0) {  // panning moved by the LFO, same law as refreshLive
-            const double ang = (std::clamp(panNow[size_t(v.track)] + v.lfoPan, -1.0, 1.0) + 1) * 0.7853981633974483;
+        // The right side of a stereo track: its own fader, mute and solo; liveR is live elsewhere.
+        v.gainR = v.track >= 0 ? gain * liveR[size_t(v.track)] : v.gainBase;
+        if (v.track >= 0 && (v.lfoPan != 0 || !std::isnan(v.panHeld))) {  // LFO, same law as refreshLive
+            const double pan = std::isnan(v.panHeld) ? panNow[size_t(v.track)] : v.panHeld;
+            const double ang = (std::clamp(pan + v.lfoPan, -1.0, 1.0) + 1) * 0.7853981633974483;
             v.kL = v.gainBase * std::cos(ang);
             v.kR = v.gainR * std::sin(ang);
             return;
@@ -1965,7 +2020,7 @@ struct Engine::Impl {
         v.sR = sr;
         v.busT = t;
     }
-    // Separate output of the track (16-channel): the same contribution, without panning, on the bus of the track.
+    // Separate output of the track (32-channel): the same contribution, without panning, on the bus of the track.
     // Called by busUpdate before busT is updated. A voice that changes track leaves the old bus.
     void monoUpdate(Voice& v, size_t i, uint64_t t, double cm, double sm) noexcept {
         const double dt = double(t - v.busT);
@@ -2179,7 +2234,7 @@ struct Engine::Impl {
             }
             const uint64_t t = std::max(a, ceilTick(v.pcmNext));
             v.pcmNext += v.pcmPeriod;
-            pcmFrame(v);
+            pcmFrame(v, pcmSum(v));
             busUpdate(v, t);
         }
     }
@@ -2218,17 +2273,21 @@ struct Engine::Impl {
         float peakL = 0, peakR = 0;
         uint64_t t = v.busT;
         bool ended = false;
+        // Sides: a stereo sample, or a track whose right side has its own level; sum: a stereo sample
+        // on a track in Mono, its channels mixed.
+        const bool sum = pcmSum(v), sides = (v.pcmStereo && !sum) || gb != gr;
         // A mono sample after a stereo one: the half difference of the stereo one leaves the track.
-        if (!v.pcmStereo && cMeterD != 0) {
+        if (!sides && cMeterD != 0) {
             mdd[meterBucket(a)] -= cMeterD;
             cMeterD = 0;
             meterSide[o] = true;
         }
-        if (v.pcmStereo) meterSide[o] = true;
-        // One loop per case (ADSR ramp, stereo sample). In mono, r = l: (l + l) / 2 is l, the level of the
+        if (sides) meterSide[o] = true;
+        // One loop per case (ADSR ramp, stereo sample, sides). In mono, r = l: (l + l) / 2 is l, the level of the
         // oscilloscope is the same to the bit.
-        auto play = [&](auto rampTag, auto stereoTag) {
+        auto play = [&](auto rampTag, auto stereoTag, auto sidesTag) {
             constexpr bool kRamp = decltype(rampTag)::value, kStereo = decltype(stereoTag)::value;
+            constexpr bool kSides = decltype(sidesTag)::value;
             while (next <= last) {
                 t = std::max(a, ceilTick(next));
                 next += period;
@@ -2243,6 +2302,7 @@ struct Engine::Impl {
                 if constexpr (kStereo) {
                     l = pcm[2 * k] * kScale;
                     r = pcm[2 * k + 1] * kScale;
+                    if (sum) l = r = (l + r) * 0.5;
                 } else {
                     l = r = pcm[k] * kScale;
                 }
@@ -2251,11 +2311,11 @@ struct Engine::Impl {
                 if constexpr (kRamp) env = std::min(std::max(aRef + aSlope * double(int64_t(t * 8 - aT)), lo), hi);
                 const double ll = l * gain * env;
                 const double lr = kStereo ? r * gain * env : ll;
-                const double cm = kStereo ? (ll * gb + lr * gr) * 0.5 : ll * gb;  // gr: the right side's
+                const double cm = kSides ? (ll * gb + lr * gr) * 0.5 : ll * gb;  // gr: the right side's
                 while (t >= bs[bucket + 1]) ++bucket;  // meterBucket(t)
                 md[bucket] += cm - cMeter;
                 cMeter = cm;
-                if constexpr (kStereo) {  // each side its peak, their half difference around the mean
+                if constexpr (kSides) {  // each side its peak, their half difference around the mean
                     peakL = std::max(peakL, float(ll * gb));
                     peakR = std::max(peakR, float(lr * gr));
                     const double dm = (lr * gr - ll * gb) * 0.5;
@@ -2278,10 +2338,20 @@ struct Engine::Impl {
         };
         using Yes = std::true_type;
         using No = std::false_type;
-        if (ramp && v.pcmStereo) play(Yes{}, Yes{});
-        else if (ramp) play(Yes{}, No{});
-        else if (v.pcmStereo) play(No{}, Yes{});
-        else play(No{}, No{});
+        if (sides) {
+            if (ramp && v.pcmStereo) play(Yes{}, Yes{}, Yes{});
+            else if (ramp) play(Yes{}, No{}, Yes{});
+            else if (v.pcmStereo) play(No{}, Yes{}, Yes{});
+            else play(No{}, No{}, Yes{});
+        } else if (ramp && v.pcmStereo) {
+            play(Yes{}, Yes{}, No{});
+        } else if (ramp) {
+            play(Yes{}, No{}, No{});
+        } else if (v.pcmStereo) {
+            play(No{}, Yes{}, No{});
+        } else {
+            play(No{}, No{}, No{});
+        }
         v.pcmNext = next;
         v.pcmPos = pos;
         v.pcmL = l;
@@ -2292,7 +2362,7 @@ struct Engine::Impl {
         v.cMeterD = cMeterD;
         v.busT = t;
         meterPeak[o] = std::max(meterPeak[o], peakL);
-        meterPeakR[o] = std::max(meterPeakR[o], v.pcmStereo ? peakR : peakL);
+        meterPeakR[o] = std::max(meterPeakR[o], sides ? peakR : peakL);
         if (ended) {  // end of the sample without loop (pcmFrame)
             v.on = false;
             v.pcmL = v.pcmR = 0;
@@ -2307,7 +2377,11 @@ struct Engine::Impl {
     // Next frame: byte nearest (truncation) to the position, which advances by the read step; at the end, the
     // loop resumes at the start (while the voice sounds), otherwise the voice stops. The start is the first frame
     // read at the attack (Start, then Oxx), as the STE reloads its frame start address; the end is End.
-    static void pcmFrame(Voice& v) noexcept {
+    // A stereo sample on a track in Mono: both sides play the mean of the frame's two channels.
+    bool pcmSum(const Voice& v) const noexcept {
+        return v.pcmStereo && v.track >= 0 && tracks[size_t(v.track)].mix.mono;
+    }
+    static void pcmFrame(Voice& v, bool sum) noexcept {
         if (v.pcmPos >= double(v.pcmFrames)) {
             if (!v.pcmLoop || v.pcmFrames <= v.pcmStart) {
                 v.on = false;
@@ -2322,6 +2396,7 @@ struct Engine::Impl {
         const int b = v.pcmStereo ? v.pcm[2 * k + 1] : a;
         v.pcmL = a * (DmaBank::kScale / 128.0);
         v.pcmR = b * (DmaBank::kScale / 128.0);
+        if (sum) v.pcmL = v.pcmR = (v.pcmL + v.pcmR) * 0.5;  // as runPcmFast
         v.pcmPos += v.pcmStep;
     }
 
@@ -2489,6 +2564,11 @@ struct Engine::Impl {
             env = env || (f.reg[size_t(8 + ch)] & 0x10) != 0;
             Voice& v = chipVoice(cap.chip, ch);
             f.fx[size_t(ch)] = muted ? RegisterFrame::Effect{} : captureEffect(v);
+            if (f.fx[size_t(ch)].gen == Generator::Fm) {  // the note's period, the steps divide it
+                const uint16_t tp = uint16_t(std::clamp<int>(v.tpEff ? v.tpEff : v.tp, 1, 4095));
+                f.reg[size_t(2 * ch)] = uint8_t(tp & 0xff);
+                f.reg[size_t(2 * ch + 1)] = uint8_t(tp >> 8);
+            }
             f.fx[size_t(ch)].restart = f.fx[size_t(ch)].on && (v.fxStart || cap.count == 0);
             v.fxStart = false;
         }
@@ -2539,7 +2619,14 @@ struct Engine::Impl {
         if (!v.on || !v.timerOn) return e;
         e.on = true;
         e.gen = v.gen;
-        e.value = v.gen == Generator::Sid ? v.vol4 : v.gen == Generator::SyncBuzzer ? uint8_t(v.shape & 15) : v.slot;
+        e.value = v.gen == Generator::Sid          ? v.vol4
+                  : v.gen == Generator::SyncBuzzer ? uint8_t(v.shape & 15)
+                  : v.gen == Generator::Fm         ? v.fmLen
+                                                   : v.slot;
+        if (v.gen == Generator::Fm) {
+            e.semis = v.fmSemis;
+            for (size_t i = 0; i < v.fmLen; ++i) e.wave[i] = v.fmWave[i];
+        }
         // The exports play the SID as its square wave, two interrupts per period: a wave of steps or the Square of the
         // menu gives the timer of the square at the same pitch, not its own, which is sidSteps() / 2 times faster.
         const double steps = v.gen == Generator::Sid ? sidSteps(v) / 2 : 1.0;
@@ -2586,26 +2673,43 @@ struct Engine::Impl {
     }
 
     // --------------------------------------------------------------------------------------- Live mixer
-    // A solo is on (that of either side of a stereo DMA sample): the other tracks fall silent.
+    // A solo is on (that of either side of a stereo track apart): the other tracks fall silent.
     bool soloed() const noexcept {
         bool any = false;
         for (int i = 0; i < kTracks; ++i) {
             const TrackMix& m = tracks[size_t(i)].mix;
-            any |= m.solo || (m.soloR && trackStereo(i));
+            any |= m.solo || (m.soloR && sidesApart(i));
         }
         return any;
     }
-    // DMA track whose sample is stereo: the right side has its own fader, mute and solo.
-    bool trackStereo(int track) const noexcept {
-        const TrackPatch& p = tracks[size_t(track)].patch;
-        return p.generator == Generator::Dma &&
-               dmaBank.slot(p.dmaSlot >= 0 ? p.dmaSlot & 7 : dmaAutoSlot(track)).stereo;
+    // The voices of generator g playing slot k stop at once (its sample was replaced): they leave the buses,
+    // and none keeps reading the bytes given before.
+    void stopSlot(Generator g, int k) noexcept {
+        if (!prepared) return;
+        const uint64_t c = eventCycle();
+        for (int i = 0; i < kVoices; ++i) {
+            Voice& v = voices[size_t(i)];
+            if (!v.on || v.gen != g || v.slot != k) continue;
+            v.on = false;
+            v.pcmL = v.pcmR = 0;
+            touch(i, c);
+        }
     }
+    // The right side of the track has its own fader, mute and solo: a DMA track playing a stereo sample at first,
+    // then any DMA track, unless Mono. The other generators are mono: one fader, mute and
+    // solo for both sides of their pan (Indus, 31/10/2026 16:56).
+    bool trackStereo(int track) const noexcept {
+        const TrackParams& t = tracks[size_t(track)];
+        return !t.mix.mono && t.patch.generator == Generator::Dma;
+    }
+    // The right side of a stereo track at its own level, mute and solo: Link off. Linked, Volume, M and S act on both
+    // sides (for a stereo sample, M and S were each side's whatever Link).
+    bool sidesApart(int track) const noexcept { return trackStereo(track) && !tracks[size_t(track)].mix.link; }
     // A side of the track is heard: not muted, and in the solo if there is one. `right`: the right side of a stereo
-    // DMA sample, the left side elsewhere.
+    // track apart, the left side (or both) elsewhere.
     bool heard(int track, bool right, bool anySolo) const noexcept {
         const TrackMix& m = tracks[size_t(track)].mix;
-        if (right && trackStereo(track)) return !m.muteR && (!anySolo || m.soloR);
+        if (right && sidesApart(track)) return !m.muteR && (!anySolo || m.soloR);
         return !m.mute && (!anySolo || m.solo);
     }
     // Level, panning and send of each track: level 0 for a muted track or one outside the solo; the PAN row of the
@@ -2615,8 +2719,8 @@ struct Engine::Impl {
         for (int i = 0; i < kTracks; ++i) {
             const TrackMix& m = tracks[size_t(i)].mix;
             live[size_t(i)] = heard(i, false, anySolo) ? std::clamp(m.level, 0.0, 1.0) : 0.0;
-            liveR[size_t(i)] = !trackStereo(i)        ? live[size_t(i)]
-                               : heard(i, true, anySolo) ? std::clamp(m.link ? m.level : m.levelR, 0.0, 1.0)
+            liveR[size_t(i)] = !sidesApart(i)         ? live[size_t(i)]
+                               : heard(i, true, anySolo) ? std::clamp(m.levelR, 0.0, 1.0)
                                                          : 0.0;
             const double pan = std::isnan(panStep[size_t(i)]) ? m.pan : panStep[size_t(i)];
             panNow[size_t(i)] = std::clamp(pan, -1.0, 1.0);
@@ -2655,6 +2759,32 @@ struct Engine::Impl {
     int liveIns(int track) const noexcept {
         return isDrum(tracks[size_t(track)].patch.generator) ? 0 : program[size_t(track)];
     }
+    // Generator of a key played live on a track: that of the instrument chosen by Program Change, or the track's.
+    Generator liveGenerator(int track) const noexcept {
+        const int gen = laneGen(track, liveIns(track), -1);
+        return gen >= 0 ? Generator(gen) : tracks[size_t(track)].patch.generator;
+    }
+    static bool inChipRange(int note) noexcept { return note >= kPlayLow && note <= kPlayHigh; }
+    // Track of a drum pad playing `want`: the focused track when it plays that sound, switched on or
+    // off like the keys, else the first active track with that sound, else the first active drum track, else
+    // the first track with that sound (3 channels: the Digidrum track), else the focused track (track 1 when it is a
+    // DMA track of the 3-channel modes).
+    int padTrack(Generator want) const noexcept {
+        const int max = trackCount();
+        const int focus = std::clamp(global.focusTrack, 0, max - 1);
+        if (tracks[size_t(focus)].patch.generator == want) return focus;
+        int drum = -1, any = -1;
+        for (int i = 0; i < max; ++i) {
+            const TrackParams& tp = tracks[size_t(i)];
+            const bool on = tp.mix.enabled;
+            if (on && tp.patch.generator == want) return i;
+            if (on && drum < 0 && isDrum(tp.patch.generator)) drum = i;
+            if (any < 0 && tp.patch.generator == want) any = i;
+        }
+        if (drum >= 0) return drum;
+        if (any >= 0) return any;
+        return dmaTrack(focus) ? 0 : focus;
+    }
     // Instrument of a step (INS row): nullptr for the sound of the track (0, empty slot, no table).
     const Instrument* instrument(int ins) const noexcept {
         if (ins <= 0 || ins > kInstruments || !instruments) return nullptr;
@@ -2680,7 +2810,7 @@ struct Engine::Impl {
         return int(x->patch.generator);
     }
 
-    // Voice of a sequencer track (laneVoice): the voice of the track in 16-channel mode; in 3-channel mode, each chip
+    // Voice of a sequencer track (laneVoice): the voice of the track in 32-channel mode; in 3-channel mode, each chip
     // carries A, B, C then the Digidrum track, which takes the designated channel, like any track set to Digidrum.
     int laneVoice(int track) const noexcept {
         if (studio()) return track;
@@ -2693,14 +2823,14 @@ struct Engine::Impl {
     // dual chip, each channel is related to the tracks of its chip).
     bool reservedVoice(int index) const noexcept {
         if (!seq.on) return false;
-        if (studio()) return index < kTracks && tracks[size_t(index)].mix.enabled;
+        if (studio()) return index < trackCount() && tracks[size_t(index)].mix.enabled;
         const int k = index / 3;
         for (int t = 4 * k; t < 4 * k + 4 && t < trackCount(); ++t)
             if (tracks[size_t(t)].mix.enabled && laneVoice(t) == index) return true;
         return false;
     }
 
-    // Keyboard playing: free unreserved channel, then (16-channel) free voices of the manual playing, otherwise the
+    // Keyboard playing: free unreserved channel, then (32-channel) free voices of the manual playing, otherwise the
     // oldest of the unreserved voices, otherwise the oldest of all (voice stealing if everything is reserved).
     int allocVoice(int track) noexcept {
         int first = 0, count = kLaneVoices;
@@ -2730,8 +2860,10 @@ struct Engine::Impl {
     }
 
     // Note played live (keyboard, MIDI or keyboard arpeggio) at cycle c, one voice on each track that plays it: the
-    // focused track, or every active track when Layer is on or the focused track is off.
-    // `only` ≥ 0: this track alone (routing by channel), active or not.
+    // focused track, switched on or off, since it is the track being edited and the one the ADSR curve follows (the
+    // prototype sent the keys of a switched-off focused track to every active track, which played track 1's square
+    // while another track's sound was being set up: Indus, 01/11/2026 18:06-18:13); with Layer, every active
+    // track besides. `only` ≥ 0: this track alone (routing by channel), active or not.
     void trigger(int note, int velocity, VoiceTag tag, uint64_t c, int only = -1) noexcept {
         const double velLvl = global.velocity == VelocityMode::Off ? 1.0 : std::clamp(double(velocity) / 127, 0.05, 1.0);
         const int max = trackCount();
@@ -2739,14 +2871,25 @@ struct Engine::Impl {
         std::array<int, kTracks> layers{};
         int nl = 0;
         const int focus = global.focusTrack;
-        if (only >= 0) layers[size_t(nl++)] = only;
-        else if (!global.layer && focus >= 0 && focus < max && tracks[size_t(focus)].mix.enabled) layers[size_t(nl++)] = focus;
-        else
-            for (int i = 0; i < max; ++i)
-                if (tracks[size_t(i)].mix.enabled) layers[size_t(nl++)] = i;
+        const bool focused = focus >= 0 && focus < max;
+        if (only >= 0) {
+            layers[size_t(nl++)] = only;
+        } else {
+            if (focused) layers[size_t(nl++)] = focus;
+            if (global.layer || !focused)
+                for (int i = 0; i < max; ++i)
+                    if (i != focus && tracks[size_t(i)].mix.enabled) layers[size_t(nl++)] = i;
+        }
         if (nl == 0) layers[size_t(nl++)] = std::clamp(focus, 0, max - 1);  // no active track: focused track
+        // Out of the chip's range (B0 to C9), a key sounds on the drum tracks alone, as on the on-screen keyboard.
+        if (tag == VoiceTag::Manual && !inChipRange(note)) {
+            int kept = 0;
+            for (int l = 0; l < nl; ++l)
+                if (isDrum(liveGenerator(layers[size_t(l)]))) layers[size_t(kept++)] = layers[size_t(l)];
+            if ((nl = kept) == 0) return;
+        }
 
-        // 3-channel, or monophonic track: the previous notes of the track are released (legato in 16-channel mode).
+        // 3-channel, or monophonic track: the previous notes of the track are released (legato in 32-channel mode).
         std::array<int, kTracks> glideFrom{};
         glideFrom.fill(-1);
         for (int l = 0; l < nl; ++l) {
@@ -2768,10 +2911,10 @@ struct Engine::Impl {
             const TrackParams& tp = tracks[size_t(ci)];
             // Instrument chosen by Program Change: sound, volume and generator, like a step whose INS row
             // names it (laneTrigger); role, level and panning stay those of the track.
-            const int ins = liveIns(ci);
+            const int ins = padGen >= 0 ? 0 : liveIns(ci);  // a drum pad plays the track's own settings
             const Instrument* x = instrument(ins);
             const TrackPatch& src = x ? x->patch : tp.patch;
-            const int gen = laneGen(ci, ins, -1);
+            const int gen = padGen >= 0 ? padGen : laneGen(ci, ins, -1);
             const Generator g = gen >= 0 ? Generator(gen) : tp.patch.generator;
             int index;
             const bool dma3 = dmaTrack(ci);
@@ -2788,7 +2931,7 @@ struct Engine::Impl {
                 v.chip = index / 3;
                 v.channel = index % 3;
             }
-            // Velocity: audio gain in 16-channel mode (accent), 4-bit volume in 3-channel mode with the level of the
+            // Velocity: audio gain in 32-channel mode (accent), 4-bit volume in 3-channel mode with the level of the
             // track (prototype), or 4-bit volume everywhere; the 4-bit volume is the nearest level in decibels. A DMA voice has no 4-bit volume: audio gain, the level
             // of the track coming from the mixer.
             const bool dma = dma3 || (studio() && global.ste && g == Generator::Dma);
@@ -2830,7 +2973,8 @@ struct Engine::Impl {
     // drum transposition of the note, at the level of `k × drop` steps of the 4-bit volume lower, on the target track.
     // 3 channels: the repeat takes the channel of the note (that of the target track if there is one) only if it plays
     // no note of its own (off, an earlier repeat, or a note being released); otherwise it is skipped, and a new note
-    // always takes a channel back from a repeat. 16 channels: a free voice of the pool, otherwise the oldest repeat.
+    // always takes a channel back from a repeat. 16 and 32 channels: a free voice of the pool, otherwise the oldest
+    // repeat.
     uint64_t hostNow() const noexcept { return rOut ? rStart + rI : samples; }
     // Host sample of repeat k: k periods after `from` (the attack or the release of the note), rounded up.
     static uint64_t echoAt(uint64_t from, const EchoNote& e, int k) noexcept {
@@ -2866,6 +3010,7 @@ struct Engine::Impl {
             for (int k = 0; k < kInstruments; ++k)
                 if (&(*instruments)[size_t(k)].patch == patch) e->ins = k + 1;
         e->gen = gen;
+        e->slot = padSlot;
         e->vol = vol;
         e->voice = int(&v - voices.data());
         e->note = note;
@@ -2918,8 +3063,10 @@ struct Engine::Impl {
             v.channel = vi % 3;
         }
         const double down = tab1[size_t(2 * (15 - k * e.drop) + 1)] / tab1[31];
+        padSlot = e.slot;
         setupVoice(v, e.note, e.vol, VoiceTag::Echo, e.dst, e.level * down, c, e.gen, e.drumTr,
                    x ? &x->patch : nullptr);
+        padSlot = -1;
         v.echoId = e.id;
         v.echoRep = uint8_t(k);
         touch(vi, c);
@@ -3048,8 +3195,8 @@ struct Engine::Impl {
     }
     // Polyphonic arpeggio (24/10/2026): the arpeggio is one note per key pressed (or MIDI note), not one per
     // step (Indus, 20:33): its envelope runs on from step to step (the prototype's grabEnv / putEnv), and each key
-    // pressed starts a note of its own from the attack. In 16 channels, on a track whose Voicing is Polyphonic, the
-    // note before then goes on to its release while the new one plays; keys up, the last note walks on through the
+    // pressed starts a note of its own from the attack. In 16 and 32 channels, on a track whose Voicing is Polyphonic,
+    // the note before then goes on to its release while the new one plays; keys up, the last note walks on through the
     // arpeggio during its release (19:32), the notes before it ending theirs at their pitch. Otherwise (Monophonic,
     // 3-channel modes) the note before is cut.
     bool arpPoly() const noexcept {
@@ -3203,6 +3350,10 @@ struct Engine::Impl {
                 mpeNoteCh = 0;
                 break;
             }
+            if (arpEnabled() && !inChipRange(note)) {  // the arpeggio plays a melodic track: out of its range
+                mpeNoteCh = 0;
+                break;
+            }
             bool already = false;
             for (int i = 0; i < heldCount; ++i) already |= heldList[size_t(i)] == note;
             heldVel[size_t(note)] = vel;
@@ -3244,6 +3395,20 @@ struct Engine::Impl {
             }
             break;
         }
+        case EventType::DrumPad: {
+            const int k = e.a % kDrumSlots;
+            padGen = int(e.a < kDrumSlots ? Generator::Chipdrum : Generator::Digidrum);
+            padSlot = k;
+            trigger(kPadNote + k, e.b, VoiceTag::Manual, c, e.track >= 0 ? int(e.track) : padTrack(Generator(padGen)));
+            padGen = padSlot = -1;
+            break;
+        }
+        case EventType::DrumPadOff:  // the sustain loop of a Digidrum ends, the sample plays to its end
+            for (Voice& v : voices)
+                if (v.on && v.looping && v.tag == VoiceTag::Manual && v.gen == Generator::Digidrum &&
+                    e.a >= kDrumSlots && v.note == kPadNote + e.a % kDrumSlots)
+                    v.looping = false;
+            break;
         case EventType::Program:
             for (int t = 0; t < kTracks; ++t)
                 if (e.track < 0 || e.track == t) program[size_t(t)] = uint8_t(e.a);
@@ -3320,6 +3485,20 @@ struct Engine::Impl {
             }
             echoClear();
             break;
+        // The MIDI controller is gone: every key held is let go, as by its note off. The held notes leave the
+        // arpeggio, the manual voices go on to their release, a Digidrum's sustain loop stops.
+        case EventType::KeysOff:
+            heldCount = 0;
+            if (arpEnabled()) killTag(VoiceTag::Arp, false, c);
+            for (int i = 0; i < kVoices; ++i) {
+                Voice& v = voices[size_t(i)];
+                if (!v.on || v.tag != VoiceTag::Manual) continue;
+                v.looping = false;
+                if (v.fading() || isDrum(v.gen) || v.stage == 4) continue;
+                relVoice(v, 64, c);
+                touch(i, c);
+            }
+            break;
         case EventType::PlayerStart:  // ymplay: killTag('man'), killTag('seq')
             killTag(VoiceTag::Manual, false, c);
             killTag(VoiceTag::Chord, false, c);
@@ -3345,19 +3524,35 @@ struct Engine::Impl {
             seqMidiClock(c);  // sequencer step
             halfPulseIn = arpHalves() || seqHalves() ? seq.spt / 2 : 0;
             break;
+        // MIDI Start, Stop and Continue play and stop the sequencer whatever its clock but Host sync, where the host
+        // transport decides (Indus, 28/10/2026 02:10). Free run has no pause: Start and Continue play from the
+        // beginning, Start again while playing too. MIDI ext: Start also switches Play on; Stop pauses on the clock,
+        // Continue goes on from there.
         case EventType::MidiStart:
             if (global.seqClock == SeqClock::Host) break;
             halfPulseIn = 0;
             arp.clockTicks = std::max<int>(1, global.arpDivision) - 1;
             arp.idx = -1;
+            if (global.seqClock == SeqClock::Internal) {
+                seqHalt(c);
+                seqStart(c);
+                break;
+            }
+            if (!seq.on) seqStart(c);
             seqMidiStart();
             break;
         case EventType::MidiStop:
             halfPulseIn = 0;
-            seqMidiStop(c);
+            if (global.seqClock == SeqClock::Internal) seqHalt(c);
+            else seqMidiStop(c);
             break;
         case EventType::MidiContinue:
-            if (global.seqClock == SeqClock::Midi) seq.run = true;
+            if (global.seqClock == SeqClock::Internal) {
+                seqStart(c);  // nothing while playing
+            } else if (global.seqClock == SeqClock::Midi) {
+                if (!seq.on) seqStart(c);
+                seq.run = true;
+            }
             break;
         case EventType::MidiSongPosition: seqSongPosition(e.a); break;
         case EventType::SeqPlay:  // Host sync: the host transport decides
@@ -3372,9 +3567,10 @@ struct Engine::Impl {
             if (e.track >= 0 && e.track < trackCount()) laneTrigger(e.track, e.a, seqLevel(e.track, e.value * 15), -1, 1, 0, c);
             break;
         case EventType::DigiPreview: {
-            const int k = std::clamp<int>(e.a, 0, kDigidrumSlots - 1);
+            const int k = std::clamp<int>(e.a, 0, kDigidrumSlotsMax - 1);
             const DigidrumSlot& d = digiSlots[size_t(k)];
-            const SampleSpan part = sampleSpan(d.start, d.end, userLen[size_t(k)]);  // Start to End
+            // Start to End.
+            const SampleSpan part = sampleSpan(d.start, d.end, uint32_t(user[size_t(k)].size()));
             digiPreviewSlot = part.size() ? k : -1;
             digiPreviewPos = part.start;
             digiPreviewLooping = d.loop;
@@ -3419,6 +3615,12 @@ struct Engine::Impl {
     double masterLeft() const noexcept { return global.master * (global.masterPan > 0 ? 1 - global.masterPan : 1); }
     double masterRight() const noexcept { return global.master2 * (global.masterPan < 0 ? 1 + global.masterPan : 1); }
 
+    // Master Mono: each stereo output carries the mean of the two, before the Masters and the balance.
+    void monoOut(float* left, float* right, uint32_t n) const noexcept {
+        if (!global.masterMono) return;
+        for (uint32_t i = 0; i < n; ++i) left[i] = right[i] = (left[i] + right[i]) * 0.5f;
+    }
+
     // Output law of a buffer, in place: tanh(x × g) with the soft clip on, otherwise x × g.
     void output(float* x, uint32_t n, double g) const noexcept {
         if (global.softClip)
@@ -3427,9 +3629,9 @@ struct Engine::Impl {
             for (uint32_t i = 0; i < n; ++i) x[i] = float(double(x[i]) * g);
     }
 
-    // Preview of the kit (dprev of the worklet): the 4-bit sample of the instrument (16-channel render, 7 800 Hz),
+    // Preview of the kit (dprev of the worklet): the 4-bit sample of the instrument (32-channel render, 7 800 Hz),
     // read without interpolation, added to the mix before the output law, (s - 7.5) / 7.5 × 0.55, without panning,
-    // in both modes. scale: unit of the mix it enters (1 in 16-channel mode; in 3-channel mode, √2 / gain3, because
+    // in both modes. scale: unit of the mix it enters (1 in 32-channel mode; in 3-channel mode, √2 / gain3, because
     // the prototype adds the preview to mix, which its law multiplies by √2, whereas the chip, centred, only
     // receives cos π/4 × √2 = 1 of it).
     void mixDrumPreview(float* left, float* right, uint32_t n, double scale) noexcept {
@@ -3465,7 +3667,7 @@ struct Engine::Impl {
             return;
         }
         const uint8_t* s = user[slot].data();
-        const SampleSpan part = sampleSpan(d.start, d.end, userLen[slot]);
+        const SampleSpan part = sampleSpan(d.start, d.end, uint32_t(user[slot].size()));
         const double half = (tab1[31] - tab1[1]) / 2, mid = tab1[size_t(2 * std::min<int>(d.rest, 15) + 1)];
         for (uint32_t i = 0; i < n; ++i) {
             auto k = uint32_t(digiPreviewPos);
@@ -3484,7 +3686,7 @@ struct Engine::Impl {
         }
     }
 
-    // 16-channel render of the n samples at offset a of the block: the voices write their steps up to the internal
+    // 32-channel render of the n samples at offset a of the block: the voices write their steps up to the internal
     // step that the resampler needs, the buses are integrated and resampled, then come the delay, the previews and
     // the output law. The chip outputs stay silent in this mode.
     void flushStudio(const Outputs& out, uint32_t a, uint32_t n) noexcept {
@@ -3499,10 +3701,10 @@ struct Engine::Impl {
                 if (voices[size_t(i)].on) renderStudioVoice(i, genPos, target);
             const size_t w = size_t(genPos - bufBase);
             bool any = false;
-            uint16_t onTracks = 0;
+            uint32_t onTracks = 0;
             for (const Voice& v : voices) {
                 any |= v.on;
-                if (v.on && v.track >= 0) onTracks = uint16_t(onTracks | (1u << v.track));
+                if (v.on && v.track >= 0) onTracks |= 1u << v.track;
             }
             if (trackMask) integrateTracks(w, count, onTracks);
             meterStudio(count, onTracks);
@@ -3523,6 +3725,7 @@ struct Engine::Impl {
         dmaBank.mixPreview(left, right, n, double(hostRate()), 1.0);
         // Output of the prototype: tanh(mix × volume × 1.2 × √2), panning included; a level per side.
         const double g = 1.2 * 1.4142135623730951;
+        monoOut(left, right, n);
         output(left, n, masterLeft() * g);
         output(right, n, masterRight() * g);
         // Separate outputs: same law, centred (cos π/4 × √2 = 1).
@@ -3579,7 +3782,7 @@ struct Engine::Impl {
         slopeWritten = false;
         if (!any) vL = vR = sigL = sigR = 0;  // everything is silent: the bus starts again from an exact zero
     }
-    // Separate output of a track rendered from its bus (16-channel, and DMA tracks in 3-channel): same law, centred.
+    // Separate output of a track rendered from its bus (32-channel, and DMA tracks in 3-channel): same law, centred.
     void renderTrackOut(const Outputs& out, uint32_t a, uint32_t n, int tr) noexcept {
         float* o = out.track[size_t(tr)] ? out.track[size_t(tr)] + a : nullptr;
         if (!trackOut(tr)) {
@@ -3611,8 +3814,8 @@ struct Engine::Impl {
         }
     }
 
-    // Buses of the separate outputs (16-channel): integration of the steps and slopes, like the left and right buses.
-    void integrateTracks(size_t w, uint64_t count, uint16_t onTracks) noexcept {
+    // Buses of the separate outputs (32-channel): integration of the steps and slopes, like the left and right buses.
+    void integrateTracks(size_t w, uint64_t count, uint32_t onTracks) noexcept {
         for (int tr = 0; tr < kTracks; ++tr) {
             if (!trackOut(tr)) continue;
             const size_t t = size_t(tr);
@@ -3638,7 +3841,7 @@ struct Engine::Impl {
     }
 
     // Points of the Mixer oscilloscope: kScopeRate per second (8 samples at 48 kHz, decimation of the
-    // prototype), point n at position n × step, counted in internal steps (16-channel) or in samples (3-channel)
+    // prototype), point n at position n × step, counted in internal steps (32-channel) or in samples (3-channel)
     // since the start of the time base, and taken at the first whole step (or sample) that follows it.
     double meterTickStep() const noexcept { return clock().hz() / 8.0 / kScopeRate; }
     double meterSampleStep() const noexcept { return double(hostRate()) / kScopeRate; }
@@ -3647,7 +3850,7 @@ struct Engine::Impl {
         const double last = std::floor((double(end) - 1) / step);  // last point n such that ceil(n × step) < end
         return last < double(meterIndex) ? 0 : size_t(last - double(meterIndex)) + 1;
     }
-    // 16-channel: bucket of the first point that sees a step at step t (ceil(n × step) ≥ t).
+    // 32-channel: bucket of the first point that sees a step at step t (ceil(n × step) ≥ t).
     // Without std::floor (slow without SSE4.1): for t ≥ 1, the integer part of a positive number; t = 0 falls in
     // bucket 0.
     size_t meterBucket(uint64_t t) const noexcept {
@@ -3670,7 +3873,7 @@ struct Engine::Impl {
         }
         bucketStart[last + 1] = std::numeric_limits<uint64_t>::max();
     }
-    // 16-channel: peak of the voice and step of its contribution (without panning) in the oscilloscope bucket of
+    // 32-channel: peak of the voice and step of its contribution (without panning) in the oscilloscope bucket of
     // its track; the smooth ADSR slopes are only seen at the updates of the voice. A voice that changes track
     // leaves the old one. dm: half the difference of the right and left sides, 0 but for a stereo sample;
     // the left side's peak in meterPeak, the right one's in meterPeakR.
@@ -3697,9 +3900,9 @@ struct Engine::Impl {
             meterSide[o] = true;
         }
     }
-    // 16-channel, after computing steps [genPos, genPos + count): oscilloscope points of these steps, following
+    // 32-channel, after computing steps [genPos, genPos + count): oscilloscope points of these steps, following
     // buckets moved to the head.
-    void meterStudio(uint64_t count, uint16_t onTracks) noexcept {
+    void meterStudio(uint64_t count, uint32_t onTracks) noexcept {
         const size_t points = std::min(meterPointsBefore(genPos + count, meterTickStep()), meterD[0].size() - 1);
         for (int tr = 0; tr < kTracks; ++tr) meterTrackPoints(tr, points, ((onTracks >> tr) & 1u) != 0);
         meterIndex += points;
@@ -3743,13 +3946,13 @@ struct Engine::Impl {
         meterLevelD[t] = ld;
     }
     // 3-channel, STE machine: voices of the DMA tracks on the buses up to the end of the n samples, rendered
-    // into pcmHostL and pcmHostR (unit of the buses of the 16-channel mode), with the points of their oscilloscopes
+    // into pcmHostL and pcmHostR (unit of the buses of the 32-channel mode), with the points of their oscilloscopes
     // (those of the chip) and their separate outputs.
     void flushPcm3(const Outputs& out, uint32_t a, uint32_t n, size_t points) noexcept {
         const uint64_t endTick = tickAtSample(samples - base + n);
         const uint64_t target = std::max({endTick, outL.ticksNeeded(n), genPos});
         const uint64_t count = target - genPos;
-        uint16_t onTracks = 0;
+        uint32_t onTracks = 0;
         if (count > 0) {
             bool any = false;
             buildBuckets();
@@ -3757,7 +3960,7 @@ struct Engine::Impl {
                 if (voices[size_t(i)].on) renderStudioVoice(i, genPos, target);
                 const Voice& v = voices[size_t(i)];
                 any |= v.on;
-                if (v.on && v.track >= 0) onTracks = uint16_t(onTracks | (1u << v.track));
+                if (v.on && v.track >= 0) onTracks |= 1u << v.track;
             }
             const size_t w = size_t(genPos - bufBase);
             if (trackMask) integrateTracks(w, count, onTracks);
@@ -3790,7 +3993,7 @@ struct Engine::Impl {
     }
 
     // ------------------------------------------------------------------------------------- Delay
-    // Live in 16 channels while it is on; the 3-channel modes have the echo of the notes instead.
+    // Live in 16 and 32 channels while it is on; the 3-channel modes have the echo of the notes instead.
     bool delayWanted() const noexcept { return global.delay.on && studio(); }
     // At the start of a render: the send buses join the left and right ones in silence when the delay goes live.
     void updateSendLive() noexcept {
@@ -3881,7 +4084,7 @@ struct Engine::Impl {
         if (pcmOut) flushPcm3(out, a, n, points);
         meterIndex += points;
         meterPos = uint32_t((meterPos + points) % kScopePoints);
-        // Unit of the buses (16-channel) in that of the chips, at the level of the rest.
+        // Unit of the buses (32-channel) in that of the chips, at the level of the rest.
         const double chipUnit = std::sqrt(2.0) / gain3 * restLevel;
         mixDrumPreview(left, nullptr, n, chipUnit);
         mixDigiPreview(left, nullptr, n, chipUnit);
@@ -3893,6 +4096,7 @@ struct Engine::Impl {
             }
             dmaBank.mixPreview(left, right, n, double(hostRate()), chipUnit);
             // Stereo: a level per side in 3 channels; in 2x3 channels, the levels are in the mix.
+            monoOut(left, right, n);
             output(left, n, gain3 * (perChip ? 1.0 : masterLeft()) * 1.2);
             output(right, n, gain3 * (perChip ? 1.0 : masterRight()) * 1.2);
         } else {
@@ -3983,10 +4187,11 @@ struct Engine::Impl {
     // -------------------------------------------------------------------- Sequencer (Sequencer.cpp)
     uint64_t at() noexcept;  // cycle of the current sample, voices computed up to there
     void seqLogPush(char op, int voice, int a = 0, int b = 0, double x = 0, double y = 0, double z = 0, int track = -1,
-                    double bpm = 0) noexcept;
+                    double bpm = 0, int entry = -1) noexcept;
     const SeqLane& seqLane(int track) const noexcept;
     int patternSteps(int pattern) const noexcept;
     int trackLen(int track) const noexcept;
+    int trackStep(int track) const noexcept;
     double seqNote(const SeqLane& l, int track, int voice, int s) const noexcept;
     double seqBpm() const noexcept;
     double stepsPerBeat() const noexcept;
@@ -4052,7 +4257,7 @@ struct Engine::Impl {
     void lanesCatchUp() noexcept;
     int64_t lanesDue() const noexcept;
     void laneTrigger(int i, double note, double level, int gen, double drumTr, int ins, uint64_t c) noexcept;
-    void killLane(int vi, bool hard, uint64_t c) noexcept;
+    void killLane(int vi, bool hard, uint64_t c, bool cut = false) noexcept;
     bool laneTail(int i, uint64_t c) noexcept;
     void applyMix(int vi, int m, uint64_t c) noexcept;
     void applyMixDef(int vi, int track, int ins, int m, uint64_t c) noexcept;
@@ -4061,7 +4266,7 @@ struct Engine::Impl {
     void polyAge(int i, uint64_t c) noexcept;
     void polyTrigger(int i, const SeqLane& l, int st, double level, int mix, int64_t gateHold, double drumTr, int ins,
                      uint64_t c) noexcept;
-    void hardPoly(int i, uint64_t c) noexcept;
+    void hardPoly(int i, uint64_t c, bool cut = false) noexcept;
     int slideTarget(int i, const SeqLane& l, int st, int& k) const noexcept;
     void armSlide(int vi, int i, const SeqLane& l, int st, double stepSamp, uint64_t c) noexcept;
     void armArpSlide(int i, const SeqLane& l, int st, double stepSamp) noexcept;
@@ -4069,6 +4274,7 @@ struct Engine::Impl {
     void holdGlide(int vi, bool snap, uint64_t c) noexcept;
     void laneArpTick(int i, uint64_t c) noexcept;
     void setStepPan(int i, double pan, uint64_t c) noexcept;
+    void dropStepPans(uint64_t c) noexcept;
     void arpPulse(uint64_t c, int64_t pulse = kNoPulse, bool lanesToo = true, int weight = 1) noexcept;
     // Half pulses that the clock delivers: all of them for an odd division (1/64), whole clocks otherwise.
     bool arpHalves() const noexcept { return global.arpDivision % 2 != 0; }

@@ -1,6 +1,6 @@
 // STYM2149 — Sound engine settings, in the Settings window (Options > Sound engine before): entries
 // greyed out according to the machine (STE hardware with Computer ST; ZX Spectrum and Amstrad CPC clocks and
-// Free timer in Authentic 3ch; Custom clock outside 16 ch), with their reason, values already chosen
+// Free timer in Authentic 3ch; Custom clock outside 32 ch), with their reason, values already chosen
 // kept and listed by the CHIP monitor; the Custom clock's prompt box, in MHz; no Arp division.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -71,7 +71,7 @@ bool has(const std::string& text, const std::string& part) { return text.find(pa
 
 constexpr const char* kClockWhy = "Authentic 3ch: an Atari ST or STE clocks its YM at 2 MHz";
 constexpr const char* kTimerWhy = "Authentic 3ch: an Atari ST or STE times its effects with the MFP";
-constexpr const char* kCustomWhy = "Custom clock: 16 ch only (2 MHz in the other modes)";
+constexpr const char* kCustomWhy = "Custom clock: 16 and 32 ch only (2 MHz in the other modes)";
 
 // Types `text` in the open prompt box after clearing its field, then presses Enter (or Escape).
 void typePrompt(pluginui::MainWindow& w, const std::string& text, bool ok = true) {
@@ -146,21 +146,21 @@ TEST_CASE("Sound engine: STE output chain, bass and treble greyed out with Compu
 
 TEST_CASE("Sound engine: ZX Spectrum and Amstrad CPC clocks and Free timer greyed out in Authentic 3ch",
           "[ui][menu]") {
-    for (const int mode : {0, 1, 2}) {  // 16 ch, Authentic 3ch, Dual chip 2x3ch
+    for (const int mode : {0, 1, 2, 3}) {  // 16 ch, Authentic 3ch, Dual chip 2x3ch, 32 ch
         CAPTURE(mode);
         UiHost h;
         h.p(Global::VoiceMode) = float(mode);
         pluginui::MainWindow w(h);
         w.tick(0);
-        const bool authentic = mode == 1;
+        const bool authentic = mode == 1, studio = mode == 0 || mode == 3;
         const auto items = soundEngine(w);
         const gemui::MenuItem& clock = entry(items, "Chip clock");
         const gemui::MenuItem& timer = entry(items, "Timer");
         CHECK_FALSE(clock.disabled);
         CHECK_FALSE(timer.disabled);
         REQUIRE(clock.sub.size() == 4);
-        CHECK(clock.sub[0].disabled == (mode != 0));  // Custom, 16 ch only
-        CHECK(clock.sub[0].why == (mode != 0 ? kCustomWhy : ""));
+        CHECK(clock.sub[0].disabled == !studio);  // Custom, 16 and 32 ch only
+        CHECK(clock.sub[0].why == (studio ? "" : kCustomWhy));
         CHECK(clock.sub[1].label == "Atari ST 2.0053 MHz");  // without "PAL"
         CHECK_FALSE(clock.sub[1].disabled);
         for (const size_t i : {size_t(2), size_t(3)}) {  // ZX Spectrum, Amstrad CPC
@@ -186,7 +186,7 @@ TEST_CASE("Authentic 3ch: a clock or a timer chosen before is kept, and the CHIP
           "[ui][menu]") {
     UiHost h;
     h.p(Global::VoiceMode) = 1;
-    h.p(Global::ChipClock) = 2;  // ZX Spectrum, chosen in 16 ch or by the host
+    h.p(Global::ChipClock) = 2;  // ZX Spectrum, chosen in 32 ch or by the host
     h.p(Global::Timer) = 1;      // Free
     h.p(0, Track::Generator) = float(int(Generator::Sid));
     h.state.seq.cur().edit(0).pat[0] = 0;  // a note: the track is live
@@ -246,9 +246,9 @@ TEST_CASE("CHIP monitor: the ADSR of a Sync Buzzer is listed where it plays, not
     }
 }
 
-TEST_CASE("Sound engine: Custom clock typed in MHz in a prompt box, in 16 ch only (DAW tests, items 39 and 41)",
+TEST_CASE("Sound engine: Custom clock typed in MHz in a prompt box, in 16 and 32 ch only (DAW tests, items 39 and 41)",
           "[ui][menu]") {
-    UiHost h;  // 16 ch
+    UiHost h;  // 32 ch
     h.p(0, Track::Generator) = float(int(Generator::Sid));
     h.state.seq.cur().edit(0).pat[0] = 0;
     pluginui::MainWindow w(h);

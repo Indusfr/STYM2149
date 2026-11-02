@@ -7,9 +7,15 @@
 // free space goes first to the growable items (flex-grow, sliders with flex:1) in proportion, otherwise to the "auto"
 // left margins in equal shares; each item is centred in the height of its line.
 #pragma once
+#include <span>
 #include <vector>
 
 #include "gemui/Widget.h"
+
+namespace stym::gemui {
+class Button;
+class Label;
+}  // namespace stym::gemui
 
 namespace stym::pluginui {
 
@@ -28,5 +34,20 @@ struct FlexItem {
 // line and the lines; without wrap, all the items stay on one line, even if it overflows. Fills each item's box and
 // sets the box of its widget.
 double flexRow(double x, double y, double width, std::vector<FlexItem>& items, double gap = 8, bool wrap = true);
+
+// The two rows at the top of the Digidrums and DMA windows: "Slot", the arrow before, the eight slots of the
+// page (a hidden one keeps its place), the arrow after; then "Memory", the gauge and its text, only while the gauge is
+// visible (the 3-channel modes; the RAM is chosen in Settings). The labels `lw` wide, the rows
+// `width` wide from (x, y); returns the height taken, the gaps after them included.
+struct SlotRows {
+    gemui::Label& labSlot;
+    gemui::Button& prev;
+    std::span<gemui::Button> slots;
+    gemui::Button& next;
+    gemui::Label& labMemory;
+    gemui::Widget& gauge;
+    gemui::Label& memText;
+};
+double placeSlotRows(const SlotRows& r, double x, double y, double width, double lw);
 
 }  // namespace stym::pluginui

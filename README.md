@@ -6,11 +6,11 @@ Software instrument (VST3, CLAP, LV2 and Standalone; AU and AAX to come) that em
 
 Programming: Pascal "Indus" Nowak (with Claude's help) — Copyright © 2026 Indus / PRISM. Licence: AGPLv3.
 
-- Up to 16 tracks: one chip with 3 voices, two chips (2 × 3 voices) or 16 tracks; Atari ST, ZX Spectrum and Amstrad CPC clocks; Raw, ST and STE output chains.
-- Timer effects of the Atari ST (SID, Sync Buzzer, Digidrums), tuned buzzer, STE DMA sound, ADSR, vibrato, an LFO per track, arpeggios synchronised to the tempo, slides, an echo of the notes in every mode and a delay in 16 channels.
-- 16-track step sequencer with Song, mixer, 32 instruments and instrument sequences, MIDI learn.
-- 483 host parameters, with stable IDs; patterns, songs and settings are saved with the project.
-- Files: YM and SNDH player, MIDI import and export, WAV and stems export, VBL, YM3, YM6 and SNDH export for a real ST or STE, XM import.
+- Up to 32 tracks: one chip with 3 voices, two chips (2 × 3 voices), 16 or 32 tracks; Atari ST, ZX Spectrum and Amstrad CPC clocks; Raw, ST and STE output chains.
+- Timer effects of the Atari ST (SID, Sync Buzzer, FM, Digidrums), tuned buzzer, STE DMA sound, ADSR, vibrato, an LFO per track, arpeggios synchronised to the tempo, slides, an echo of the notes in every mode and a delay in 16 and 32 channels.
+- 32-track step sequencer with Song, mixer, 127 instruments and instrument sequences, MIDI learn.
+- 1102 host parameters, with stable IDs; patterns, songs and settings are saved with the project.
+- Files: YM and SNDH player, MIDI import and export, WAV and stems export, VBL, YM3, YM6 and SNDH export for a real ST or STE, XM, MOD, S3M and OKT import, YM and SNDH import as editable patterns.
 - No network access, no telemetry: STYM2149 never connects to anything.
 
 The [user manual](docs/MANUAL.md) explains installation and every window.
@@ -83,6 +83,8 @@ Packages: `packaging/linux/make_tarball.sh` builds the Linux archive; `packaging
 
 - `ym2wav`: renders a YM file (LHA-compressed or not) to WAV.
 - `ymbench`: CPU load of the voice engine (`--seq --notes 6 --noise` for the worst case, `--hash` for a fingerprint of the output).
+- `ymimport`: imports a YM or SNDH tune as patterns, as File > Import does, plays them back and compares them frame by frame with the tune.
+- `mymimport`: plays a maxYMiser song (.MYS + .MYV) with STYM2149's model of its replay routine and compares it tick by tick with the routine (whose binary you provide); with `--import` and `--export`, checks the import and the export frame by frame.
 - `gemshot`: renders the interface to PNG without a host or JUCE (visual tests).
 - `tools/gemfont`: GEM fonts taken from the prototype and EmuTOS.
 

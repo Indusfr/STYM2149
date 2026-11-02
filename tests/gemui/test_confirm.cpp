@@ -18,6 +18,7 @@
 #include "gemui/Alert.h"
 #include "plugincore/DigidrumBanks.h"
 #include "pluginui/AppIcon.h"
+#include "pluginui/InfoDemo.h"
 
 using namespace stym;
 using namespace stym::ui_testing;
@@ -187,10 +188,12 @@ TEST_CASE("Confirm box: the focus ring follows Tab, the 4 px frame stays on Canc
     d.paint();
     CHECK(rounded(d, cancel));
     CHECK(square(d, ok));
-    // .dflt: 4 px frame on Cancel only.
+    // GEM: 3 px frame on Cancel, the default button; 2 px on OK, a button that closes the box (EXIT).
     const gemui::Surface& s = d.surface();
-    CHECK(s.at(cancel.x + 3, cancel.y + cancel.h / 2) == gemui::colors::kBlack);
-    CHECK(s.at(ok.x + 3, ok.y + ok.h / 2) == gemui::colors::kWhite);
+    CHECK(s.at(cancel.x + 2, cancel.y + cancel.h / 2) == gemui::colors::kBlack);
+    CHECK(s.at(cancel.x + 3, cancel.y + cancel.h / 2) == gemui::colors::kWhite);
+    CHECK(s.at(ok.x + 1, ok.y + ok.h / 2) == gemui::colors::kBlack);
+    CHECK(s.at(ok.x + 2, ok.y + ok.h / 2) == gemui::colors::kWhite);
 }
 
 TEST_CASE("Prompt box: Cancel then OK; Tab goes field, Cancel, OK; Enter presses the focused button",
@@ -286,9 +289,100 @@ TEST_CASE("Message box picture: centred above the text, each pixel a square, tra
     CHECK(red.y == box.y + 2 + 24);                             // top margin of the box
 }
 
-TEST_CASE("Information box: the STYM2149 icon above the text, OK framed as the default button, Enter closes it ",
+TEST_CASE("Message box animated picture: a new image at each tick repaints the picture alone, drawn over nothing "
+          "below the box; closing stops it",
+          "[gemui][alert]") {
+    // A root that counts the times it is painted.
+    struct Root : gemui::Widget {
+        int painted = 0;
+        void paint(gemui::Painter& p) override {
+            ++painted;
+            p.fill(bounds(), 0xFF00FF00);
+        }
+    } root;
+    Desktop d(1272, 944);
+    root.setBounds(d.bounds());
+    d.setRoot(&root);
+    std::vector<gemui::Color> px(4, 0xFFFF0000);
+    int frames = 0;
+    Alert::Spec spec;
+    spec.lines = {{"STYM2149"}};
+    spec.picture = px.data();
+    spec.pictureW = spec.pictureH = 2;
+    spec.pictureScale = 10;
+    spec.animate = [&](double now) {
+        ++frames;
+        px.assign(4, now >= 100 ? 0xFF0000FF : 0xFFFF0000);
+        return now >= 100;
+    };
+    Alert& a = Alert::open(d, spec);
+    CHECK(frames == 1);  // the first image, at the opening
+    d.paint();
+    const Rect box = a.bounds();
+    const gemui::Point mid{box.x + box.w / 2, box.y + 2 + 24 + 10};
+    CHECK(d.surface().at(mid.x, mid.y) == 0xFFFF0000);
+    const int painted = root.painted;
+    d.tick(50);  // no new image: nothing to repaint
+    CHECK(frames == 2);
+    CHECK_FALSE(d.needsPaint());
+    d.tick(100);
+    CHECK(frames == 3);
+    REQUIRE(d.needsPaint());
+    const Rect area = d.paint();
+    CHECK(area.w == 20);
+    CHECK(area.h == 20);
+    CHECK(d.surface().at(mid.x, mid.y) == 0xFF0000FF);
+    CHECK(root.painted == painted);  // the box covers the picture: the root and the veil are left out
+    // An area wider than the box paints everything, the veil over the root.
+    d.invalidate({box.x - 4, box.y, 8, 8});
+    d.paint();
+    CHECK(root.painted == painted + 1);
+    d.keyDown(keyEvent(Key::Escape));
+    d.tick(200);
+    CHECK(frames == 3);
+}
+
+TEST_CASE("Information box: the demo after ST BLIX above the text, animated while it is open at 60 frames a second, "
+          "the whole box on the desktop",
           "[ui][alert]") {
     UiHost h;
+    pluginui::MainWindow w(h);
+    CHECK(w.frameRate() == 30);
+    w.openMenu(0);
+    pickItem(w, 0);
+    const Alert* a = topAlert(w);
+    REQUIRE(a);
+    CHECK(a->text().rfind("STYM2149\n", 0) == 0);
+    CHECK(w.frameRate() == 60);
+    const Rect box = a->bounds();
+    CHECK(box.y >= 0);
+    CHECK(box.bottom() <= w.desktop().height());
+    CHECK(box.w >= 2 * pluginui::InfoDemo::kW + 2 * 32 + 4);
+    // The picture: 320 × 128 pixels of the demo, each one doubled, at the top of the box.
+    const Rect pic{box.x + (box.w - 2 * pluginui::InfoDemo::kW) / 2, box.y + 2 + 24, 2 * pluginui::InfoDemo::kW,
+                   2 * pluginui::InfoDemo::kH};
+    const auto picture = [&] {
+        w.desktop().paint();
+        std::vector<gemui::Color> out;
+        for (int y = pic.y; y < pic.bottom(); y += 2)
+            for (int x = pic.x; x < pic.right(); x += 2) out.push_back(w.desktop().surface().at(x, y));
+        return out;
+    };
+    const std::vector<gemui::Color> first = picture();
+    CHECK(std::count(first.begin(), first.end(), gemui::colors::kWhite) == 0);  // opaque, the crate everywhere
+    w.tick(1000);  // 50 VBLs later
+    const std::vector<gemui::Color> later = picture();
+    CHECK(later != first);
+    key(w, Key::Enter);
+    CHECK_FALSE(w.desktop().hasModal());
+    CHECK(w.frameRate() == 30);
+}
+
+TEST_CASE("Information box: with Settings > Information demo Off, the STYM2149 icon above the text, OK framed as the "
+          "default button, Enter closes it",
+          "[ui][alert]") {
+    UiHost h;
+    h.prefs["infoDemo"] = "0";
     pluginui::MainWindow w(h);
     w.openMenu(0);
     pickItem(w, 0);
@@ -476,7 +570,7 @@ TEST_CASE("Digidrum bank confirms follow gemConfirm: Cancel first, framed and fo
     pickItem(w, 0);
     const Alert* a = topAlert(w);
     REQUIRE(a);
-    CHECK(a->text() == "Replace the 8 slots with bank \"Set A\"?");
+    CHECK(a->text() == "Replace the slots with bank \"Set A\"?");
     checkConfirm(*a, "Load");
     const uint64_t before = h.serial;
     key(w, Key::Enter);
@@ -528,15 +622,8 @@ TEST_CASE("Prompts of the editor follow gemPrompt: Cancel then OK, none framed, 
     key(w, Key::Enter);
     CHECK(h.patches.find("Patch 1") != std::string::npos);
 
-    // Digidrums: slot name, Banks > Save bank...
+    // Digidrums: Banks > Save bank... (the slot's name is typed in its field)
     w.digidrums().show();
-    click(w, "digName");
-    a = topAlert(w);
-    REQUIRE(a);
-    checkPrompt(*a);
-    key(w, Key::Tab);  // Cancel
-    key(w, Key::Enter);
-    CHECK_FALSE(w.desktop().hasModal());
     click(w, "digBanks");
     pickItem(w, 0);
     a = topAlert(w);

@@ -1,4 +1,4 @@
-// STYM2149 — voice engine (ymengine::Engine): 16-channel mode against the chip, 3-channel modes through registers,
+// STYM2149 — voice engine (ymengine::Engine): 32-channel mode against the chip, 3-channel modes through registers,
 // determinism, independence from the block size.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -67,7 +67,7 @@ double peak(const std::vector<float>& x) {
 
 }  // namespace
 
-TEST_CASE("16-channel engine: one voice alone = channel A of the chip, up to the gain", "[engine]") {
+TEST_CASE("32-channel engine: one voice alone = channel A of the chip, up to the gain", "[engine]") {
     using ymcore::BoardChain;
     using ymcore::OutputMode;
     struct Case {
@@ -127,7 +127,7 @@ TEST_CASE("16-channel engine: one voice alone = channel A of the chip, up to the
     }
 }
 
-TEST_CASE("16-channel engine: released note → voice freed, output exactly zero", "[engine]") {
+TEST_CASE("32-channel engine: released note → voice freed, output exactly zero", "[engine]") {
     Engine e;
     e.prepare(config());
     e.noteOn(0, 60, 100);
@@ -177,6 +177,7 @@ TEST_CASE("Engine: identical output whatever the block size", "[engine]") {
         t0.patch.decayMs = 80;
         t0.patch.sustainPct = 60;
         t0.patch.releaseMs = 150;
+        t0.patch.vibratoOn = true;
         t0.patch.vibratoCents = 40;
         t0.mix.enabled = true;
         t0.mix.pan = -0.5;
@@ -312,7 +313,7 @@ TEST_CASE("3-channel: the velocity and the track level go through the 4-bit volu
     REQUIRE(vol[0].value == 10);
 }
 
-TEST_CASE("3-channel and 16-channel: a track level and a velocity lower a note alike", "[engine][3ch]") {
+TEST_CASE("3-channel and 32-channel: a track level and a velocity lower a note alike", "[engine][3ch]") {
     // RMS of a held note alone, after its attack. The two modes stay within half of the largest 4-bit step (3.9 dB
     // from volume 13 to 14); the prototype's rounding of the 4-bit index made the 3-channel mode 10.6 dB quieter at
     // the plugin's defaults (level 0.75, velocity 100).
@@ -358,10 +359,10 @@ TEST_CASE("3-channel: the track level and the velocity lower the frame volumes o
     }
 }
 
-TEST_CASE("3-channel and 16-channel: a Digidrum and a Chipdrum hit play alike", "[engine][3ch][kit]") {
+TEST_CASE("3-channel and 32-channel: a Digidrum and a Chipdrum hit play alike", "[engine][3ch][kit]") {
     // RMS of the left output over the first 250 ms of a hit, track level and velocity as the plugin's defaults and
-    // at full level. A Digidrum is a chip channel playing its 4-bit values in both modes (no gain in 16 channels:
-    // it was 5, +14 dB); the 16-channel Chipdrum sample (gain 1.8) follows the register drums of the 3 channels.
+    // at full level. A Digidrum is a chip channel playing its 4-bit values in both modes (no gain in 32 channels:
+    // it was 5, +14 dB); the 32-channel Chipdrum sample (gain 1.8) follows the register drums of the 3 channels.
     std::vector<uint8_t> nibbles(7800);
     for (size_t i = 0; i < nibbles.size(); ++i) {  // 260 Hz sine, linear 4-bit values, decaying
         const double x = std::exp(-double(i) / 2000) * std::sin(6.283185307179586 * double(i) / 30);
@@ -590,7 +591,7 @@ TEST_CASE("Timer: mode frozen at the attack, changing it only affects the follow
     REQUIRE(std::fabs(rig.e.voice(v).timerActualHz - 2 * ymengine::noteHz(60)) < 1e-9);
 }
 
-TEST_CASE("16-channel: smooth ADSR, stages and sustain level", "[engine][adsr]") {
+TEST_CASE("32-channel: smooth ADSR, stages and sustain level", "[engine][adsr]") {
     auto cfg = config();
     cfg.render.dc = ymcore::DcFilter::None;  // linear and local output: exact ratio in sustain
     Rig with(ymengine::VoiceMode::Studio16, cfg), without(ymengine::VoiceMode::Studio16, cfg);
@@ -697,7 +698,7 @@ TEST_CASE("Voice observation: attack rank, period of the note, current ADSR leve
     REQUIRE(rig.e.voice(newest).note == 72);
 }
 
-TEST_CASE("16-channel: pitch bend on the sounding voices", "[engine]") {
+TEST_CASE("32-channel: pitch bend on the sounding voices", "[engine]") {
     Rig rig(ymengine::VoiceMode::Studio16);
     rig.e.setTrack(0, track());
     rig.e.noteOn(0, 69, 127);
@@ -709,7 +710,7 @@ TEST_CASE("16-channel: pitch bend on the sounding voices", "[engine]") {
     REQUIRE(rig.e.voice(0).note == 69);
 }
 
-// One note whose envelope runs on from step to step: Monophonic in 16 channels, any track in 3 channels.
+// One note whose envelope runs on from step to step: Monophonic in 32 channels, any track in 3 channels.
 TEST_CASE("Arpeggio: Monophonic or 3 channels, the last note keeps cycling during the release", "[engine][arp]") {
     for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {
         CAPTURE(int(mode));
@@ -790,8 +791,8 @@ TEST_CASE("Arpeggio: Monophonic or 3 channels, one ADSR per key pressed, running
     }
 }
 
-TEST_CASE("Arpeggio: Polyphonic in 16 channels, one ADSR per key pressed, the note before in its release; keys up, "
-          "the last note keeps cycling during its release (Indus, 24/10/2026 19:14, 19:32 and 20:33)",
+TEST_CASE("Arpeggio: Polyphonic in 16 and 32 channels, one ADSR per key pressed, the note before in its release; "
+          "keys up, the last note keeps cycling during its release (Indus, 24/10/2026 19:14, 19:32 and 20:33)",
           "[engine][arp]") {
     Rig rig(ymengine::VoiceMode::Studio16);
     auto t = track();

@@ -101,9 +101,10 @@ public:
     // Colour c laid over r at opacity alpha (veil of a modal box).
     virtual void shade(const Rect& r, Color c, double alpha) noexcept;
 
-    // Opacity group: what is painted in r between begin and end is blended with alpha over what was below. Groups
-    // nest. Only the part of r inside the drawing area counts: between begin and end, the drawing area can shrink,
-    // never grow.
+    // Opacity group: what is painted in r between begin and end is blended with alpha over what was below; in the GEM
+    // look, a GEM grey whatever alpha: one pixel in two kept (ditherKeeps), the others giving back what lay
+    // below. Groups nest. Only the part of r inside the drawing area counts: between begin and end, the drawing area
+    // can shrink, never grow.
     virtual void beginOpacity(const Rect& r, double alpha);
     virtual void endOpacity();
 

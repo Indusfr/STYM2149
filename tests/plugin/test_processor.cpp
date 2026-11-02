@@ -612,7 +612,7 @@ TEST_CASE("Processor: no allocation in processBlock", "[processor][realtime]") {
             default: midi.addEvent(juce::MidiMessage::pitchWheel(ch, int(next() % 16384)), at); break;
             }
         }
-        if (b % 50 == 0) setPlain(p, "voiceMode", float(next() % 3));
+        if (b % 50 == 0) setPlain(p, "voiceMode", float(next() % 4));
         if (b % 7 == 0) setPlain(p, "t01_level", float(next() % 101));
         // On-screen playing (editor): read by processBlock, like the engine status it publishes.
         if (b % 5 == 0) p.pushScreenMidi(0x90, uint8_t(48 + next() % 24), 100);

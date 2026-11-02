@@ -324,8 +324,7 @@ TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW 
     Lane l;
     CHECK(cmdCellText(l, 0) == "-");
     // The short names of the kinds of the Commands box.
-    const std::array<std::pair<SeqCmd, const char*>, 5> tags = {{{SeqCmd::Speed, "TIK"},
-                                                                 {SeqCmd::Sync, "SYN"},
+    const std::array<std::pair<SeqCmd, const char*>, 4> tags = {{{SeqCmd::Sync, "SYN"},
                                                                  {SeqCmd::VolSlide, "VSL"},
                                                                  {SeqCmd::EnvSlide, "BSL"},
                                                                  {SeqCmd::NoiseSlide, "NSL"}}};
@@ -339,8 +338,9 @@ TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW 
         CHECK(isCmdBoxRow(cmdRow(tags[i].first)));
     }
     // The kinds with a row of their own (VIB, BPM, ENV, DLY, CUT: items 132, 133 and 138 to 140; LFO, MOD, ARP, ENV
-    // for Rxx, SMP, TUN: twelfth DAW test, items 142 to 146, 152 and 153) stay out of the cell.
-    const std::array<std::pair<SeqCmd, const char*>, 11> own = {{{SeqCmd::Vibrato, "VIB"},
+    // for Rxx, SMP, TUN: twelfth DAW test, items 142 to 146, 152 and 153; TIK) stay out of the cell.
+    const std::array<std::pair<SeqCmd, const char*>, 12> own = {{{SeqCmd::Speed, "TIK"},
+                                                                 {SeqCmd::Vibrato, "VIB"},
                                                                  {SeqCmd::Tempo, "BPM"},
                                                                  {SeqCmd::Shape, "SHP"},
                                                                  {SeqCmd::Delay, "DLY"},
@@ -378,11 +378,13 @@ TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW 
     CHECK(cmdCellText(l, 0) == "-");
     CHECK(l.cmdAt(SeqCmd::Tempo, 0) == seqCmd(SeqCmd::Tempo, 0x8c));
     Lane m;
-    m.setCmd(5, seqCmd(SeqCmd::Speed, 3));
+    m.setCmd(5, seqCmd(SeqCmd::Sync, 3));
     m.setCmd(5, seqCmd(SeqCmd::Delay, 2));
+    m.setCmd(5, seqCmd(SeqCmd::Speed, 4));
     l.copyBoxCmds(0, m, 5);
-    CHECK(l.cmdAt(SeqCmd::Speed, 0) == seqCmd(SeqCmd::Speed, 3));
+    CHECK(l.cmdAt(SeqCmd::Sync, 0) == seqCmd(SeqCmd::Sync, 3));
     CHECK(l.cmdAt(SeqCmd::Delay, 0) == 0);
+    CHECK(l.cmdAt(SeqCmd::Speed, 0) == 0);  // the TIK row's
     CHECK(l.cmdAt(SeqCmd::Tempo, 0) == seqCmd(SeqCmd::Tempo, 0x8c));
     // Rows: a value goes to the row of its kind (the single CMD row of older states), 0 clears the row alone.
     l.set(Row::CmdArp, 7, seqCmd(SeqCmd::Speed, 3));
@@ -391,7 +393,7 @@ TEST_CASE("ymseq: one command of each kind per step, MUL in the cell (tenth DAW 
     CHECK(l.get(Row::CmdSpeed, 7) == seqCmd(SeqCmd::Speed, 3));
     l.set(Row::CmdNoiseSlide, 7, seqCmd(SeqCmd::NoiseSlide, 0x37));
     l.set(Row::CmdNoiseSlide, 7, 0);
-    CHECK(cmdCellText(l, 7) == "TIK");
+    CHECK(cmdCellText(l, 7) == "-");  // Sxx has the TIK row
     CHECK(cmdRow(SeqCmd::Vibrato) == Row::CmdVibrato);
     CHECK(cmdKind(Row::CmdTempo) == SeqCmd::Tempo);
     CHECK(cmdKind(Row::Ins) == SeqCmd::None);
@@ -522,6 +524,14 @@ TEST_CASE("ymseq: pattern bank, wait during playback, cut and transposition", "[
     p.applied(17);
     CHECK(p.current == 17);
     CHECK(p.pending == -1);
+    // The Song plays a pattern of another bank: the bank shown follows it, unless another bank was opened meanwhile.
+    p.viewBank = 2;  // bank C shown, that of pattern 18 played
+    p.applied(25);   // pattern 26, bank D
+    CHECK(p.viewBank == 3);
+    p.viewBank = 0;  // bank A opened by hand
+    p.applied(17);
+    CHECK(p.viewBank == 0);
+    p.viewBank = 2;
     p.tracks[2].length = 5;
     CHECK(p.trackLength(2) == 5);
     CHECK(p.trackLength(3) == 24);
@@ -1054,6 +1064,30 @@ TEST_CASE("ymseq: a resolution change fits the notes to the new grid, keeping th
     CHECK(twice.tie[13] == 1);  // one step of 1/16: two of 1/32
     CHECK(twice.tie[14] == 0);
     CHECK(twice.vol[24] == 4);
+    // The held step that no step of 1/16 reaches keeps the level of the one before: 1 as 0 (VOL 9), 2 as
+    // step 1 of 1/16 (no VOL: 15), 3 as 2.
+    CHECK(twice.vol[1] == 9);
+    CHECK(twice.vol[2] == 15);
+    CHECK(twice.vol[3] == 15);
+    CHECK(twice.vol[13] == 15);  // the note at 12 (no VOL)
+
+    // An imported module writes its volume on every held step (VOL 11), and its panning: 1/16 to 1/8 then back to
+    // 1/16 keeps them on every held step, and none on the steps after the note.
+    Lane held;
+    held.pat[0] = 0;
+    for (int s = 0; s < 8; ++s) {
+        held.tie[size_t(s)] = 1;
+        held.vol[size_t(s)] = 11;
+        held.pnr[size_t(s)] = 3;
+    }
+    const Lane back = fitLane(fitLane(held, 1, 2), 2, 1);
+    for (int s = 0; s < 8; ++s) {
+        CAPTURE(s);
+        CHECK(back.tie[size_t(s)] == 1);
+        CHECK(back.vol[size_t(s)] == 11);
+        CHECK(back.pnr[size_t(s)] == 3);
+    }
+    CHECK(back.tie[8] == 0);
 
     // Two notes on neighbouring steps at 1/16 to 1/8: the first one stays, the other goes with its step.
     Lane two;
@@ -1082,4 +1116,34 @@ TEST_CASE("ymseq: a resolution change fits the notes to the new grid, keeping th
     CHECK(p.tracks[0].length == 0);  // the pattern's length
     CHECK(p.song.entries[1].arg == 8);
     CHECK_FALSE(Project().hasNotes());
+}
+
+TEST_CASE("ymseq edit: a recorded key joins the step as a chord voice", "[ymseq][pianoroll]") {
+    Lane l;
+    EditContext ctx;  // track octave 3: row 0 = C3 (48)
+    LaneEditor e(l, ctx);
+    e.recordAt(2, 60, 127);
+    // E4 and G4 take the free voices, one step long; a pitch already there gives its voice back.
+    CHECK(e.recordVoiceAt(2, 64) == 2);
+    CHECK(e.recordVoiceAt(2, 67) == 3);
+    CHECK(e.recordVoiceAt(2, 60) == 1);
+    CHECK(e.recordVoiceAt(2, 64) == 2);
+    CHECK(e.voiceRow(2, 3) == 19);
+    CHECK(e.voiceDur(2, 2) == 1);
+    // A voice an octave higher keeps its octave; the six voices taken, nothing more is written.
+    CHECK(e.recordVoiceAt(2, 72) == 4);
+    CHECK(e.voiceRow(2, 4) == 24);
+    CHECK(e.recordVoiceAt(2, 74) == 5);
+    CHECK(e.recordVoiceAt(2, 76) == 6);
+    CHECK(e.recordVoiceAt(2, 77) == 0);
+    CHECK(e.voiceCount(2) == 6);
+    // Percussion: the pitch class folded onto the rows, as recordAt.
+    Lane d;
+    EditContext dc;
+    dc.drum = true;
+    LaneEditor de(d, dc);
+    de.recordAt(0, 36, 127);
+    CHECK(de.recordVoiceAt(0, 38) == 2);
+    CHECK(de.voiceRow(0, 2) == 2);
+    CHECK(de.recordVoiceAt(0, 48) == 1);  // C again: the root's row
 }

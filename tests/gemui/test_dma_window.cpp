@@ -14,6 +14,7 @@
 
 #include "gemui/Menu.h"
 #include "plugincore/Parameters.h"
+#include "gemui/Alert.h"
 #include "pluginui/MainWindow.h"
 
 using namespace stym;
@@ -64,8 +65,18 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
-    void loadDmaSample(int slot) override { loads.push_back(slot); }
+    // The file dialog answers `chosen`; the load records the slot and the file.
+    std::string chosen = "/samples/pad.wav";
+    std::vector<FileDialog> dialogs;
+    std::vector<std::string> files;
+    void chooseFileToOpen(const FileDialog& d, std::function<void(const std::string&)> done) override {
+        dialogs.push_back(d);
+        if (!chosen.empty()) done(chosen);
+    }
+    void loadDmaSample(int slot, const std::string& path) override {
+        loads.push_back(slot);
+        files.push_back(path);
+    }
     std::map<std::string, std::string, std::less<>> prefs;
     std::string preference(std::string_view key, std::string_view fallback) const override {
         const auto it = prefs.find(key);
@@ -160,6 +171,20 @@ void setComputer(MainWindow& w, int machine) {
     pick(w, machine);
 }
 
+// Types `text` in the name field `id`: a click gives it the keys, the old name erased, Enter keeps it.
+void typeName(MainWindow& w, const std::string& id, const std::string& text) {
+    click(w, id);
+    for (int i = 0; i < 40; ++i) key(w, gemui::Key::Backspace);
+    for (char c : text) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    key(w, gemui::Key::Enter);
+    CHECK_FALSE(w.desktop().hasModal());
+}
+
 void answer(MainWindow& w, const std::string& text) {
     REQUIRE(w.desktop().hasModal());
     for (int i = 0; i < 40; ++i) key(w, gemui::Key::Backspace);
@@ -198,6 +223,22 @@ std::vector<int8_t> ramp(size_t n) {
     return b;
 }
 
+// The button shown at the place of `id` in the main window (the samples of the GENERATOR frame have no id of their
+// own: rectOf names them).
+const gemui::Button* shownButton(const gemui::Widget& root, const gemui::Rect& r) {
+    if (const auto* b = dynamic_cast<const gemui::Button*>(&root); b && b->showing() && b->bounds() == r) return b;
+    for (const gemui::Widget* c : root.children())
+        if (const gemui::Button* b = shownButton(*c, r)) return b;
+    return nullptr;
+}
+const gemui::Button& genButton(MainWindow& w, const std::string& id) {
+    const std::optional<gemui::Rect> r = w.rectOf(id);
+    REQUIRE(r);
+    const gemui::Button* b = shownButton(*w.desktop().root(), *r);
+    REQUIRE(b);
+    return *b;
+}
+
 }  // namespace
 
 TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in the modes menu", "[ui][dma]") {
@@ -205,17 +246,14 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
     MainWindow w(h);
     CHECK(h.global(Global::Computer) == 0);
     const gemui::Rect voices = *w.rectOf("modeSel"), comp = *w.rectOf("compSel");
-    const gemui::Rect clock = *w.rectOf("clkSel");
     CHECK(comp.y > voices.bottom());
-    CHECK(clock.y > comp.bottom());
-    // The three buttons start together (thirteenth DAW test, item 161).
+    // The two buttons start together (thirteenth DAW test, item 161).
     CHECK(comp.x == voices.x);
-    CHECK(clock.x == voices.x);
-    // Band of the row and rows moved down (comparison with the screenshots).
-    const gemui::Rect row = *w.rectOf("computerRow"), below = *w.rectOf("systemBelow");
+    // Band of the row, in the place of the Clock row, which went to Settings: Master under it.
+    const gemui::Rect row = *w.rectOf("computerRow");
     CHECK(row.y == comp.y);
-    CHECK(row.bottom() == clock.y);
-    CHECK(below.y == clock.y);
+    CHECK(row.bottom() <= w.rectOf("master")->y);
+    CHECK_FALSE(w.rectOf("clkSel"));
 
     // A menu button (item 164): ST or STE, the current one marked.
     click(w, "compSel");
@@ -231,10 +269,12 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
     pick(w, 0);
     CHECK(h.global(Global::Computer) == 0);
 
-    // Modes menu: the three modes alone, the machine left to the Computer row (24/10/2026).
+    // Modes menu: the four modes alone, in the order 3ch, 2x3ch, 16 ch, 32 ch (Indus, 30/10/2026 02:21), the
+    // machine left to the Computer row (24/10/2026).
     click(w, "modeSel");
-    CHECK(labels(w).size() == 3);
-    pick(w, 0);
+    CHECK(labels(w) == std::vector<std::string>{"Authentic 3ch", "Dual chip 2x3ch", "16 ch", "32 ch"});
+    CHECK(menu(w).checked() == 2);
+    pick(w, 2);
     click(w, "compSel");
     pick(w, 1);
     CHECK(h.global(Global::Computer) == 1);
@@ -255,6 +295,7 @@ TEST_CASE("DMA: Computer row below Voices, ST by default, and Options; not in th
 
 TEST_CASE("DMA: DMA type of the generator with the STE, slot of the track", "[ui][dma]") {
     TestHost h;
+    for (const size_t k : {4, 18}) h.state.dmaSamples[k] = ramp(100);
     MainWindow w(h);
     // ST: no DMA type in the menu (as in the prototype).
     click(w, "fxSel");
@@ -268,18 +309,37 @@ TEST_CASE("DMA: DMA type of the generator with the STE, slot of the track", "[ui
     pick(w, int(std::find(l.begin(), l.end(), "DMA") - l.begin()));
     CHECK(h.values[size_t(paramIndex(0, plugin::Track::Generator))] == 5.0f);
 
-    // Slots: the one of the rank by default (track 1: 1), then the one chosen; no undo step (like a Digidrum).
+    // Slots: the one of the rank by default (track 1: 1), then the one chosen; no undo step (like a Digidrum). An empty
+    // sample is greyed, the track's one too, and a click does not choose it (Indus, 30/10/2026 02:07).
     REQUIRE(w.rectOf("genDma0"));
     CHECK_FALSE(w.rectOf("drumwave"));
+    CHECK(genButton(w, "genDma0").greyed());
+    CHECK(genButton(w, "genDma0").on());
+    CHECK(genButton(w, "genDma0").tip() == "DMA sample 1: empty. Load it in the DMA window (DMA samples).");
+    CHECK_FALSE(genButton(w, "genDma4").greyed());
     const size_t undo = h.editor.undo.undoSize();  // choosing the DMA type made one
+    click(w, "genDma3");
+    CHECK(h.state.tracks[0].patch.dmaSlot == -1);  // still the rank's
     click(w, "genDma4");
     CHECK(h.state.tracks[0].patch.dmaSlot == 4);
     CHECK(h.editor.undo.undoSize() == undo);
     w.tick(0);
-    // "DMA samples", under samples 5 to 8 and as wide as them: the DMA window, on the track's slot.
+    CHECK_FALSE(genButton(w, "genDma0").on());
+    CHECK(genButton(w, "genDma4").on());
+    // "DMA samples", under samples 5 to 8 and as wide as them, the arrows of the pages of eight on its left,
+    // under the label (eight again, Indus, 30/10/2026 02:06): the DMA window, on the track's slot.
+    REQUIRE(w.rectOf("genDma7"));
+    CHECK_FALSE(w.rectOf("genDma8"));
     const gemui::Rect s5 = *w.rectOf("genDma4"), s8 = *w.rectOf("genDma7"), edit = *w.rectOf("dmaEdit");
+    CHECK(s5.x == w.rectOf("genDma0")->x);
+    CHECK(s5.y > w.rectOf("genDma0")->bottom());
+    const gemui::Rect prev = *w.rectOf("genDmaPrev"), next = *w.rectOf("genDmaNext");
     CHECK(edit.x == s5.x);
     CHECK(edit.right() == s8.right());
+    CHECK(prev.right() < next.x);
+    CHECK(next.right() < edit.x);
+    CHECK(prev.y == edit.y);
+    CHECK(next.y == edit.y);
     CHECK(edit.y > s5.bottom());
     CHECK(edit.y - s5.bottom() <= 6);
     // The drawing of the sample, between the button and the text; it loads nothing.
@@ -294,6 +354,30 @@ TEST_CASE("DMA: DMA type of the generator with the STE, slot of the track", "[ui
     click(w, "dmaEdit");
     REQUIRE(w.dmaWindow().isOpen());
     CHECK(w.dmaWindow().slot() == 4);
+    w.dmaWindow().close();
+
+    // Pages of eight samples: the arrows turn them, a click on a button gives the track its sample.
+    CHECK_FALSE(genButton(w, "genDmaPrev").enabled());
+    click(w, "genDmaNext");
+    click(w, "genDmaNext");
+    CHECK(genButton(w, "genDma0").text() == "17");
+    CHECK(genButton(w, "genDma7").text() == "24");
+    CHECK(h.state.tracks[0].patch.dmaSlot == 4);  // turning a page changes nothing
+    click(w, "genDma2");
+    CHECK(h.state.tracks[0].patch.dmaSlot == 18);
+    for (int k = 0; k < 13; ++k) click(w, "genDmaNext");
+    CHECK_FALSE(genButton(w, "genDmaNext").enabled());
+    CHECK(genButton(w, "genDma0").text() == "121");
+    CHECK(genButton(w, "genDma6").text() == "127");
+    CHECK_FALSE(w.rectOf("genDma7"));  // no 128th sample
+    click(w, "genDmaPrev");
+    CHECK(genButton(w, "genDma0").text() == "113");
+    // The track's sample changed elsewhere: the page follows it.
+    h.state.tracks[0].patch.dmaSlot = 100;
+    ++h.serial;
+    w.tick(0);
+    CHECK(genButton(w, "genDma4").text() == "101");
+    CHECK(genButton(w, "genDma4").on());
 
     // ST machine: the track plays as Chip Voice again, its DMA setting kept.
     h.values[size_t(paramIndex(Global::Computer))] = 0;
@@ -345,18 +429,18 @@ TEST_CASE("DMA: DMA tracks in 3 ch mode with the STE (tabs, enforced role, Mixer
     // A change of voice mode keeps a focused track that the new mode still has, a DMA track of the STE included.
     setComputer(w, 1);
     click(w, "modeSel");
-    pick(w, 0);  // 16 ch
+    pick(w, 2);  // 16 ch
     click(w, "tab9");
     CHECK(h.global(Global::FocusTrack) == 10);
     click(w, "modeSel");
-    pick(w, 1);  // Authentic 3ch: DMA6
+    pick(w, 0);  // Authentic 3ch: DMA6
     CHECK(h.global(Global::FocusTrack) == 10);
     click(w, "modeSel");
-    pick(w, 2);  // Dual chip 2x3ch: DMA2
+    pick(w, 1);  // Dual chip 2x3ch: DMA2
     CHECK(h.global(Global::FocusTrack) == 10);
     click(w, "tab13");
     click(w, "modeSel");
-    pick(w, 1);  // Authentic 3ch has twelve tracks: back to the first one
+    pick(w, 0);  // Authentic 3ch has twelve tracks: back to the first one
     CHECK(h.global(Global::FocusTrack) == 1);
 }
 
@@ -513,7 +597,7 @@ TEST_CASE("DMA: name of the sample in the window, the drawings and the tips; ren
     // The name first in both drawings, in the tips of the slots and in the text of the generator frame.
     const std::vector<std::string> caps = captions(w);
     CHECK(std::count_if(caps.begin(), caps.end(), [](const std::string& c) {
-              return c.starts_with("sample 2: Pad loop, 1000 bytes, ");
+              return c.starts_with("Pad loop, 1000 bytes, ");
           }) == 2);
     const std::vector<std::string> t = tips(w);
     CHECK(std::find(t.begin(), t.end(), "Slot 2 \"Pad loop\": 1000 bytes") != t.end());
@@ -522,13 +606,12 @@ TEST_CASE("DMA: name of the sample in the window, the drawings and the tips; ren
     CHECK(std::find(t.begin(), t.end(), trackTip) != t.end());
     CHECK(std::find(t.begin(), t.end(), "Slot 1: empty") != t.end());
 
-    // Renamed (cleaned like a Digidrum name): one step; the same name again: none.
-    click(w, "dmaName");
-    answer(w, "  Strings ");
+    // Renamed in its field, cleaned like a Digidrum name: one step; the same name again: none.
+    typeName(w, "dmaName", "  Strings ");
     CHECK(h.state.dmaNames[1] == "Strings");
+    CHECK(w.dmaWindow().nameField().text() == "Strings");
     CHECK(h.editor.undo.undoSize() == 1);
-    click(w, "dmaName");
-    answer(w, "Strings");
+    typeName(w, "dmaName", "Strings");
     CHECK(h.editor.undo.undoSize() == 1);
     // Clear empties the name with the sample; both come back with the undo.
     click(w, "dmaClear");
@@ -587,20 +670,20 @@ TEST_CASE("DMA: loading, listening, tools and mono-stereo switch; bytes in the u
     CHECK(h.state.dmaSamples[2] == std::vector<int8_t>{10, 20, -5, -8});
     CHECK(h.dma().slots[2].stereo);
 
-    // Mono → stereo of a 32 KB sample: 16 KB per channel.
+    // Mono → stereo of a long sample: the whole of it on both sides (once 16 KB per channel at most).
     h.editExtras([](plugin::NonParamState& s) {
         s.dma.slots[2].stereo = false;
-        s.dmaSamples[2] = ramp(ymengine::kDmaMaxBytes);
+        s.dmaSamples[2] = ramp(100000);
     });
     w.tick(0);
     click(w, "dmaStereo");
-    CHECK(h.state.dmaSamples[2].size() == ymengine::kDmaMaxBytes);
+    CHECK(h.state.dmaSamples[2].size() == 200000);
 
     // Clear, then undone.
     click(w, "dmaClear");
     CHECK(h.state.dmaSamples[2].empty());
     CHECK(undoKey(w));
-    CHECK(h.state.dmaSamples[2].size() == ymengine::kDmaMaxBytes);
+    CHECK(h.state.dmaSamples[2].size() == 200000);
 }
 
 TEST_CASE("DMA: Normalize, Reverse and Fade out of the Digidrums; L and R choose the channels of a stereo sample "
@@ -912,4 +995,63 @@ TEST_CASE("DMA: window reopened with the session", "[ui][dma]") {
     }
     MainWindow c(h);
     CHECK_FALSE(c.dmaWindow().isOpen());
+}
+
+TEST_CASE("DMA: Load asks before replacing a sample; a file dropped on the drawing loads the same way (Indus, "
+          "30/10/2026 02:42-02:50)",
+          "[ui][dma]") {
+    TestHost h;
+    h.values[size_t(paramIndex(Global::Computer))] = 1;
+    MainWindow w(h);
+    w.dmaWindow().show();
+    click(w, "dmaSlot3");
+    click(w, "dmaLoad");
+    REQUIRE(h.dialogs.size() == 1);
+    CHECK(h.dialogs[0].title == "Load a DMA sample into slot 4");
+    CHECK(h.dialogs[0].patterns == "*.wav;*.aif;*.aiff;*.raw;*.spl;*.sam");
+    CHECK(h.loads == std::vector<int>{3});
+    CHECK_FALSE(w.desktop().hasModal());
+
+    // Full: the box (Cancel by default) without a name when the sample has none.
+    h.editExtras([](plugin::NonParamState& s) { s.dmaSamples[3] = ramp(500); });
+    w.tick(0);
+    const gemui::Point at = centre(*w.rectOf("dmaWave"));
+    CHECK(w.dropFiles({"/x/bass.raw"}, at));
+    const auto* a = dynamic_cast<const gemui::Alert*>(w.desktop().topModal());
+    REQUIRE(a);
+    CHECK(a->text().find("Slot 4 already holds a sample.") != std::string::npos);
+    CHECK(a->text().find("Replace it with \"bass\"?") != std::string::npos);
+    CHECK(a->focusedButton() == 0);
+    key(w, gemui::Key::Enter);  // Cancel
+    CHECK(h.loads.size() == 1);
+    CHECK(w.dropFiles({"/x/bass.raw"}, at));
+    a = dynamic_cast<const gemui::Alert*>(w.desktop().topModal());
+    REQUIRE(a);
+    press(w, centre(a->button(size_t(gemui::Alert::kConfirmOk)).bounds()));
+    CHECK(h.loads == std::vector<int>{3, 3});
+    CHECK(h.files.back() == "/x/bass.raw");
+}
+
+TEST_CASE("DMA: the memory line only in the 3-channel modes, the RAM in Settings (Indus, 30/10/2026 02:47-02:49)",
+          "[ui][dma]") {
+    TestHost h;
+    h.values[size_t(paramIndex(Global::Computer))] = 1;
+    h.values[size_t(paramIndex(Global::VoiceMode))] = float(int(ymengine::VoiceMode::Authentic3));
+    h.state.dmaSamples[0] = ramp(2048);
+    MainWindow w(h);
+    w.dmaWindow().show();
+    w.tick(0);
+    CHECK(w.dmaWindow().memoryLine() == "2 KB of 3968 KB");
+    CHECK(w.rectOf("dmaGauge"));
+    CHECK_FALSE(w.rectOf("dmaRam"));
+    const double h3 = w.rectOf("dmaWin")->h;
+    h.values[size_t(paramIndex(Global::VoiceMode))] = float(int(ymengine::VoiceMode::Dual3));
+    w.tick(10);
+    CHECK(w.dmaWindow().memoryLine() == "2 KB of 7936 KB");  // two Ataris
+    h.values[size_t(paramIndex(Global::VoiceMode))] = float(int(ymengine::VoiceMode::Studio32));
+    w.tick(20);
+    CHECK(w.dmaWindow().memoryLine().empty());
+    CHECK_FALSE(w.rectOf("dmaMemory"));
+    CHECK_FALSE(w.rectOf("dmaGauge"));
+    CHECK(w.rectOf("dmaWin")->h < h3);  // the row taken out
 }

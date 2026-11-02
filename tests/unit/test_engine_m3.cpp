@@ -93,7 +93,7 @@ std::function<void(Engine&, uint32_t, uint32_t)> all(std::vector<std::function<v
 
 }  // namespace
 
-TEST_CASE("16-channel separate outputs: one centred track alone = main output", "[engine][outputs]") {
+TEST_CASE("32-channel separate outputs: one centred track alone = main output", "[engine][outputs]") {
     for (const bool softClip : {true, false}) {
         Engine e;
         e.prepare(config(0b11));
@@ -113,12 +113,12 @@ TEST_CASE("16-channel separate outputs: one centred track alone = main output", 
         REQUIRE(maxDiff(m.l, m.r) < 1e-6);
         REQUIRE(peak(m.t[1]) == 0.0);
         for (size_t i = 2; i < m.t.size(); ++i) REQUIRE(peak(m.t[i]) == 0.0);  // not prepared: zeros
-        REQUIRE(peak(m.c[0]) == 0.0);  // no chip in 16-channel mode
+        REQUIRE(peak(m.c[0]) == 0.0);  // no chip in 32-channel mode
         REQUIRE(peak(m.c[1]) == 0.0);
     }
 }
 
-TEST_CASE("16-channel separate outputs: each track only receives its voices, mixer included", "[engine][outputs]") {
+TEST_CASE("32-channel separate outputs: each track only receives its voices, mixer included", "[engine][outputs]") {
     auto scene = [](bool withTrack1, bool mute0) {
         Engine e;
         e.prepare(config(0b11));
@@ -327,12 +327,12 @@ TEST_CASE("Velocity: accent, 4-bit volume or ignored", "[engine][velocity]") {
         return std::make_pair(int(e.voice(0).volume), peak(std::vector<float>(l, l + 4800)));
     };
     using ymengine::VoiceMode;
-    // 16-channel, accent: 4-bit volume intact, audio gain.
+    // 32-channel, accent: 4-bit volume intact, audio gain.
     const auto acc64 = voiceAfter(VoiceMode::Studio16, VelocityMode::Accent, 64);
     const auto acc127 = voiceAfter(VoiceMode::Studio16, VelocityMode::Accent, 127);
     REQUIRE(acc64.first == 13);
     REQUIRE(acc64.second < acc127.second * 0.7);
-    // 16-channel, volume: the 4-bit level nearest to volume 13 × 64/127 (−13.4 dB): 11, without accent.
+    // 32-channel, volume: the 4-bit level nearest to volume 13 × 64/127 (−13.4 dB): 11, without accent.
     REQUIRE(voiceAfter(VoiceMode::Studio16, VelocityMode::Volume, 64).first == 11);
     // Ignored: like velocity 127.
     const auto off = voiceAfter(VoiceMode::Studio16, VelocityMode::Off, 10);

@@ -7,13 +7,18 @@
 // instruments, register recorder take.
 //
 // Format v1, little-endian:
-//   "STYM", u16 version, u16 flags (0), then chunks: fourcc, u32 length, content.
+//   "STYM", u16 version, u16 flags, then chunks: fourcc, u32 length, content. Flags, bits 0 to 3: kind of the
+//   content (StateKind): 0 the host's state or a project file, 1 a pattern, 2 a Song, 3 a Chipdrum kit; the
+//   other bits are reserved (0). The binary files of the File menu use this format (docs/FILE_FORMAT.md).
 //   PARM: u32 count, then per parameter u16 length, UTF-8 id, f32 plain value.
 //   TRKX: u8 track count, then per track u32 length and its fields (see State.cpp; i8 DMA sample at the end of
-//         the track, -1 depending on the position).
+//         the track, -1 depending on the position; then i16 DMA sample, 0 to 126, and 8 × u8 Digidrum of
+//         each drum row, when one of them is not the default).
 //   GLBX: global fields outside the parameters.  KIT : 8 × 5 f64.  DIGI: u8 count, then per slot u32 sample count
-//   and the 4-bit values, two per byte (low nibble first).
+//   and the 4-bit values, two per byte (low nibble first). The slot counts of DIGI, DMAS and DIGS go up to 127
+//   (255 in an earlier version): eight at least, then up to the last slot used.
 //   NAME (only if a track is named): u8 count, then per track u8 length and the name in ASCII.
+//   TINS (only if a track has an instrument): u8 count, then per track u8 instrument (slot + 1, 0 none).
 //   SEQS: sequencer settings: u8 clock (0 Free run, 1 MIDI, 2 Host sync), u8 resolution (RESOS), u8 flags
 //         (1 loop, 2 Song, 4 metronome, 8 Quantize to VBL), u8 numerator and u8 denominator of the time signature,
 //         u8 current pattern, u8 displayed bank, 4 × u8 last pattern of each bank, u32 patterns created (bit n =
@@ -54,6 +59,7 @@
 //         generator of the timer effect (255: none), u8 value, u8 prescaler and u16 data of the MFP timer.
 //   RSYN (only if a frame of the take carries a Zxx): u32 count, then per entry u32 frame and u8 value of the
 //         Zxx; kept apart so that RECD keeps its frame size for older versions.
+//   STEM (only when not default): u8 memory of the Atari for the samples (index of kSteRamKb).
 // Reading: unknown chunks ignored, unknown parameters ignored, missing parameters at their default, values clamped,
 // fields missing at the end of a track at their default; a more recent version refused (the state is not touched).
 #pragma once
@@ -65,8 +71,11 @@
 #include <vector>
 
 #include "plugincore/Digidrum.h"
+#include "plugincore/HeapArray.h"
 #include "plugincore/Parameters.h"
 #include "plugincore/Recorder.h"
+#include "plugincore/SharedSamples.h"
+#include "plugincore/SteMemory.h"
 #include "ymengine/Dma.h"
 #include "ymengine/DrumKit.h"
 #include "ymengine/Params.h"
@@ -100,20 +109,26 @@ struct NonParamState {
     std::array<ymengine::TrackParams, kTracks> tracks{};
     ymengine::GlobalParams global{};
     ymengine::KitParams kit = ymengine::kKitBanks[0].kit;
-    std::array<std::vector<uint8_t>, ymengine::kDigidrumSlots> digidrums{};  // 4-bit values (0-15) played
+    // Digidrum samples, 127 at most: 4-bit values (0-15) played, shared by the copies of the state.
+    std::array<SharedSamples<uint8_t>, ymengine::kDigidrumSlotsMax> digidrums{};
     // Digidrum editor: name, playback (rate, root note, fine tune, loop), conversion, source.
-    std::array<DigidrumSlotState, ymengine::kDigidrumSlots> digiSlots{};
+    std::array<DigidrumSlotState, ymengine::kDigidrumSlotsMax> digiSlots{};
     // Track names (renameTrack of the prototype): 8 printable ASCII characters at most; empty = number.
     std::array<std::string, kTracks> trackNames{};
     // Sequencer: patterns, Song, current pattern and banks, octave and own length of the tracks.
     ymseq::Project seq;
-    // Project instruments, $01 to $20: the INS row of a step designates the slot + 1.
-    std::array<Instrument, ymengine::kInstruments> instruments{};
-    // STE DMA track: settings, signed bytes (kDmaMaxBytes at most) and names of the eight slots (the file
-    // loaded, or typed; cleanDigidrumName).
+    // Project instruments, 1 to 127: the INS row of a step designates the slot + 1. On the heap.
+    HeapArray<Instrument, ymengine::kInstruments> instruments;
+    // Instrument of each track: the slot + 1 of the instrument last loaded into it or stored from it, 0 none
+    // (the GENERATOR frame shows its number and name).
+    std::array<uint8_t, kTracks> trackInstruments{};
+    // STE DMA track: settings, signed bytes and names of the slots (the file loaded, or typed;
+    // cleanDigidrumName), 127 at most.
     ymengine::DmaParams dma{};
-    std::array<std::vector<int8_t>, ymengine::kDmaSlots> dmaSamples{};
-    std::array<std::string, ymengine::kDmaSlots> dmaNames{};
+    std::array<SharedSamples<int8_t>, ymengine::kDmaSlotsMax> dmaSamples{};
+    std::array<std::string, ymengine::kDmaSlotsMax> dmaNames{};
+    // Memory of the Atari for the samples in the 3-channel modes: index of kSteRamKb, 4 MB by default.
+    uint8_t steRam = kSteRamDefault;
 };
 
 // Rows of a pattern track as the state numbers them (PATN chunk): 0 to 15 those of the prototype (order of
@@ -121,11 +136,9 @@ struct NonParamState {
 // 32 to 37 the CMD rows Xyz, Sxx, Rxx, Zxx, Txx, Vxx, 38 to 46 those of the step effects (Axy, Pxy, Dxx, Cxx, Bxy, Nxy,
 // Exx, Oxx, Fxx), 47 to 49 the switches of the twelfth DAW test (Lxx, Mxx, Jxx) and 50 to 52 the volume glide and
 // the slide curves (Gxx, Kxx, Qxx); a command written in one of them goes to the row of its kind (Xyz
-// and Pxy, retired, are dropped). Value of a cell, empty value of a row, write clamped as when
-// reading a state (an unknown command leaves the cell empty; row or step out of range: nothing is written).
+// and Pxy, retired, are dropped). A cell written clamped as when reading a state (an unknown command
+// leaves the cell empty; row or step out of range: nothing is written).
 inline constexpr int kLaneRows = 53;
-int laneCell(const ymseq::Lane& l, int row, int step) noexcept;
-int laneEmpty(int row) noexcept;
 void setLaneCell(ymseq::Lane& l, int row, int step, int value) noexcept;
 
 // Patterns and Song as the engine plays them (tracks shared with the model, without copying the rows).
@@ -139,6 +152,12 @@ std::string cleanTrackName(std::string_view name);
 void sanitize(NonParamState& s);
 void sanitize(ymengine::TrackParams& t);
 
+// Kind of a blob (flags of the header) and the chunks it carries: State, everything (the host's state; a project
+// file without the recorder take); Pattern, PATN with pattern 0 only; Song, SEQS (only its Song flag is read), PATN,
+// SONG and SNGX; Kit, KIT.
+enum class StateKind : uint8_t { State = 0, Pattern = 1, Song = 2, Kit = 3 };
+inline constexpr int kStateKinds = 4;
+
 // Everything the host saves for one instance (encodeState / decodeState).
 struct PluginState {
     ParamValues values = defaultValues();
@@ -148,14 +167,17 @@ struct PluginState {
     RegisterTake take;
 };
 
-// The binary blob of the format above. Pure functions, usable on any thread.
-std::vector<uint8_t> encodeState(const PluginState& state);
+// The binary blob of the format above. Pure functions, usable on any thread. `take`: the RECD and RSYN chunks of the
+// recorder take (State only; a project file goes without it).
+std::vector<uint8_t> encodeState(const PluginState& state, StateKind kind = StateKind::State, bool take = true);
 
 // Outcome of decodeState: the state read, or the reason of the refusal; counters of what was skipped.
 struct DecodeResult {
     bool ok = false;
     std::string error;          // if !ok
     uint16_t version = 0;
+    StateKind kind = StateKind::State;  // flags of the header
+    bool hasSong = false;       // SONG chunk read
     int unknownParams = 0;      // unknown ids ignored
     int unknownChunks = 0;      // unknown chunks ignored
     bool hasSequencer = false;  // SEQS chunk read (otherwise: default sequencer settings, see the processor)

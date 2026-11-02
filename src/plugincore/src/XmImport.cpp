@@ -1,4 +1,4 @@
-// STYM2149 — plugincore: import of XM modules
+// STYM2149 — plugincore: import of XM, MOD, S3M and OKT modules
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "plugincore/XmImport.h"
@@ -6,20 +6,23 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <memory>
 
 #include "plugincore/Digidrum.h"
 #include "plugincore/DmaSample.h"
 #include "plugincore/Instruments.h"
 #include "plugincore/Mapping.h"
 #include "ymengine/Dma.h"
+#include "ymio/Mod.h"
+#include "ymio/Okt.h"
+#include "ymio/S3m.h"
 #include "ymio/Xm.h"
 
 namespace stym::plugin {
 
-using ymengine::kDmaMaxBytes;
 using ymengine::kDmaRateHz;
 using ymengine::kDmaRates;
-using ymengine::kDmaSlots;
+using ymengine::kDmaSlotsMax;
 using ymengine::VoiceMode;
 using ymio::XmCell;
 using ymio::XmModule;
@@ -93,15 +96,22 @@ struct Chan {
     int vol = 64, pan = 128;
 };
 
+// Channels before the first line: full volume, the module's pan (a MOD: the Amiga's L R R L).
+std::vector<Chan> startChannels(const XmModule& m) {
+    std::vector<Chan> ch(size_t(m.channels));
+    for (size_t c = 0; c < ch.size() && c < m.channelPan.size(); ++c) ch[c].pan = m.channelPan[c];
+    return ch;
+}
+
 void applyRow(const XmModule& m, Chan& ch, const XmCell& x) noexcept {
     if (x.instrument) ch.inst = x.instrument;
     if (hasNote(x)) ch.note = x.note;
-    if (x.instrument) {  // the instrument resets the volume and the pan of its sample
+    if (x.instrument) {  // the instrument resets the volume of its sample, and in an XM its pan
         const int k = sampleIndex(m, ch.inst, ch.note);
         if (k >= 0) {
             const XmSample& s = m.instruments[size_t(ch.inst - 1)].samples[size_t(k)];
             ch.vol = s.volume;
-            ch.pan = s.panning;
+            if (m.samplePanning) ch.pan = s.panning;
         }
     }
     // Volume column: $10-$50 sets the volume (0-64), $Cx the pan (x × 16).
@@ -117,14 +127,17 @@ struct DmaBuild {
     uint8_t rate = 0;
     bool loop = false;
     bool unrolled = false;  // loop that does not start at the beginning: attack and loop passes unrolled, no loop
-    bool cut = false;       // longer than 32 KB at the lowest rate
     double scale = 1;       // frames of the DMA sample per frame of the XM sample (9xx: Oxx)
 };
 
-DmaBuild buildDma(const XmSample& s) {
+// Length of an unrolled loop: 32 KB, the former length of a DMA sample (Claude's choice).
+inline constexpr size_t kUnrollBytes = 32 * 1024;
+
+DmaBuild buildDma(const XmSample& s, double c4Hz) {
     DmaBuild b;
-    // Rate of the sample's C4: relative note in semitones, fine tune in 1/128 of a semitone.
-    const double src = kXmC4Hz * std::pow(2.0, (s.relativeNote + s.finetune / 128.0) / 12.0);
+    // Rate of the sample's C4: that of the module's C-4, relative note in semitones, fine tune in 1/128 of a
+    // semitone.
+    const double src = c4Hz * std::pow(2.0, (s.relativeNote + s.finetune / 128.0) / 12.0);
     std::vector<float> x(s.data.size());
     for (size_t i = 0; i < x.size(); ++i) x[i] = float(s.data[i]) / 32768.0f;
     const size_t ls = s.loopStart, le = size_t(s.loopStart) + s.loopLength;
@@ -150,44 +163,39 @@ DmaBuild buildDma(const XmSample& s) {
         core = ls + cycle.size();
         b.unrolled = true;
     }
-    // The STE rate closest to the C4 rate among those at which the core fits in 32 KB; if none does, the lowest
-    // rate, and the sample is cut.
-    int best = -1;
-    for (int k = 0; k < kDmaRates; ++k) {
-        if (std::floor(double(core) * kDmaRateHz[size_t(k)] / src) > double(kDmaMaxBytes)) continue;
-        if (best < 0 || std::abs(kDmaRateHz[size_t(k)] - src) < std::abs(kDmaRateHz[size_t(best)] - src)) best = k;
-    }
-    b.cut = best < 0;
-    b.rate = uint8_t(std::max(best, 0));
+    // The STE rate closest to the C4 rate (the whole sample kept: the memory of the chosen STE limits the
+    // samples in the 3-channel modes, SteMemory.h).
+    int best = 0;
+    for (int k = 1; k < kDmaRates; ++k)
+        if (std::abs(kDmaRateHz[size_t(k)] - src) < std::abs(kDmaRateHz[size_t(best)] - src)) best = k;
+    b.rate = uint8_t(best);
     const double rate = kDmaRateHz[b.rate];
     b.scale = rate / src;
-    if (b.unrolled) {  // loop passes until the 32 KB are filled
-        const double need = double(kDmaMaxBytes) * src / rate + 2;
+    if (b.unrolled) {  // attack and loop passes up to kUnrollBytes, at least one whole pass
+        const double need = std::max(double(kUnrollBytes) * src / rate + 2, double(core));
         while (double(seq.size()) < need) seq.insert(seq.end(), cycle.begin(), cycle.end());
     }
-    if (b.cut) b.loop = false;  // the end of the loop is lost
     b.bytes = toDmaSample(seq, {}, src, rate);
     return b;
 }
 
 }  // namespace
 
-std::vector<int> xmImportTracks(VoiceMode mode) {
+std::vector<int> xmImportTracks(VoiceMode mode, int channels) {
+    // 8 channels or fewer in 16 or 32 ch: the tracks of the DMA in 3ch (Indus, 29/10/2026 20:01).
+    if (studioMode(mode) && channels <= ymengine::kDmaTracks) mode = VoiceMode::Authentic3;
+    const int n = studioMode(mode) ? studioTracks(mode) : ymengine::kDmaTracks;
     std::vector<int> out;
     const int first = 4 * chipCount(mode);
-    const int n = mode == VoiceMode::Studio16 ? kTracks : ymengine::kDmaTracks;
     for (int t = 0; t < n; ++t) out.push_back(first + t);
     return out;
 }
 
-XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamState& state) {
+namespace {
+
+// The conversion of a module read (an XM, or a MOD, S3M or OKT module in the XM shape).
+XmImportResult convert(const XmModule& m, VoiceMode mode, NonParamState& state) {
     XmImportResult out;
-    ymio::XmParseResult parsed = ymio::parseXm(file);
-    if (!parsed.module) {
-        out.error = parsed.error;
-        return out;
-    }
-    const XmModule& m = *parsed.module;
     if (m.patterns.empty() || m.order.empty()) {
         out.error = "Nothing to import: no notes with a sample.";
         return out;
@@ -242,13 +250,81 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     for (int p : xmOf)
         for (int row = 0; row < flows[size_t(p)].rows; ++row)
             for (int c = 0; c < m.channels; ++c) noted[size_t(c)] = noted[size_t(c)] || hasNote(m.cell(p, row, c));
-    const std::vector<int> tracks = xmImportTracks(mode);
+    const int notedCount = int(std::count(noted.begin(), noted.end(), true));
+    const std::vector<int> tracks = xmImportTracks(mode, notedCount);
+    // More channels than tracks (Indus, 29/10/2026 19:48): the rows where each channel sounds, from a note to
+    // its release, the end of its sample (without a loop), a cut (ECx) or its next note; a row of a pattern sounds when
+    // it does in one of its visits.
+    std::vector<size_t> base(xmOf.size() + 1, 0);  // first row of each pattern, the patterns end to end
+    for (size_t k = 0; k < xmOf.size(); ++k) base[k + 1] = base[k] + size_t(flows[size_t(xmOf[k])].rows);
+    std::vector<std::vector<bool>> sounds(size_t(m.channels));
+    if (notedCount > int(tracks.size())) {
+        for (std::vector<bool>& v : sounds) v.assign(base.back(), false);
+        constexpr double kForever = 1e30;
+        std::vector<double> left(size_t(m.channels), 0);  // seconds the channel still sounds
+        std::vector<int> inst(size_t(m.channels), 0);
+        int speed = std::clamp(m.tempo, 1, ymengine::kSpeedMax), bpm = std::clamp(m.bpm, kXmBpmMin, kXmBpmMax);
+        for (const Visit& v : visits) {
+            const int k = stymOf[size_t(v.pattern)];
+            for (int row = 0; row < flows[size_t(v.pattern)].rows; ++row) {
+                for (int c = 0; c < m.channels; ++c) {  // the line lasts at the speed and tempo of its Fxx
+                    const XmCell& x = m.cell(v.pattern, row, c);
+                    if (x.effect == kFxSpeed && x.param) (x.param < 0x20 ? speed : bpm) = x.param;
+                }
+                const double line = speed * 2.5 / bpm;
+                for (int c = 0; c < m.channels; ++c) {
+                    const XmCell& x = m.cell(v.pattern, row, c);
+                    double& l = left[size_t(c)];
+                    if (x.instrument) inst[size_t(c)] = x.instrument;
+                    if (hasNote(x)) {
+                        l = 0;
+                        const int s = sampleIndex(m, inst[size_t(c)], x.note);
+                        if (s >= 0) {
+                            const XmSample& sm = m.instruments[size_t(inst[size_t(c)] - 1)].samples[size_t(s)];
+                            const double hz =
+                                m.c4Hz * std::pow(2.0, (x.note - 49 + sm.relativeNote + sm.finetune / 128.0) / 12.0);
+                            const bool looped = sm.loopType != 0 && sm.loopLength > 0;
+                            if (usable(sm)) l = looped ? kForever : double(sm.data.size()) / hz;
+                        }
+                    } else if (x.note == ymio::kXmKeyOff) {
+                        l = 0;
+                    }
+                    if (k >= 0 && l > 0) sounds[size_t(c)][base[size_t(k)] + size_t(row)] = true;
+                    if (x.effect == kFxExtra && x.param >> 4 == kExCut) l = 0;
+                    if (l < kForever) l = std::max(0.0, l - line);
+                }
+            }
+        }
+    }
+    // Channels in order, one per track while there are enough tracks for those to come; otherwise on the first track
+    // whose channels never sound on its rows, or the next free track; a channel that finds neither is left out.
     std::vector<int> trackOf(size_t(m.channels), -1);
-    int channels = 0, droppedChannels = 0;
+    std::array<int, kTracks> onTrack{};  // channels of each track
+    std::vector<std::vector<bool>> busy;  // rows where the channels of tracks[i] sound
+    int used = 0, droppedChannels = 0, sharing = 0, toCome = notedCount;
     for (int c = 0; c < m.channels; ++c) {
         if (!noted[size_t(c)]) continue;
-        if (channels < int(tracks.size())) trackOf[size_t(c)] = tracks[size_t(channels++)];
-        else ++droppedChannels;
+        int i = -1;
+        if (toCome-- > int(tracks.size()) - used)
+            for (int j = 0; j < used && i < 0; ++j) {
+                bool clash = false;
+                for (size_t row = 0; row < busy[size_t(j)].size() && !clash; ++row)
+                    clash = busy[size_t(j)][row] && sounds[size_t(c)][row];
+                if (!clash) i = j;
+            }
+        if (i >= 0) {
+            ++sharing;
+            for (size_t row = 0; row < busy[size_t(i)].size(); ++row)
+                if (sounds[size_t(c)][row]) busy[size_t(i)][row] = true;
+        } else if (used < int(tracks.size())) {
+            i = used++;
+            busy.push_back(sounds[size_t(c)]);
+        } else {
+            ++droppedChannels;
+            continue;
+        }
+        trackOf[size_t(c)] = tracks[size_t(i)];
+        ++onTrack[size_t(trackOf[size_t(c)])];
     }
 
     // ---- Walk: notes played per instrument and sample, tempo, channel state at the start of the patterns ----
@@ -257,7 +333,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     std::vector<std::vector<Chan>> firstState(xmOf.size());
     std::vector<int> bpms;
     {
-        std::vector<Chan> ch(size_t(m.channels));
+        std::vector<Chan> ch = startChannels(m);
         int speed = std::clamp(m.tempo, 1, ymengine::kSpeedMax), bpm = std::clamp(m.bpm, kXmBpmMin, kXmBpmMax);
         bpms.push_back(bpm);
         for (Visit& v : visits) {
@@ -309,9 +385,11 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         if (p.plays > 0 && p.sample >= 0) picks.push_back(p);
     }
     std::stable_sort(picks.begin(), picks.end(), [](const Pick& a, const Pick& b) { return a.plays > b.plays; });
-    // The 8 most played keep a slot, then go back to the order of the module.
-    const int noSlot = int(std::max<size_t>(picks.size(), kDmaSlots) - kDmaSlots);
-    if (picks.size() > kDmaSlots) picks.resize(kDmaSlots);
+    // The most played keep an instrument and its DMA slot (127 at most, the instruments of a project; 8,
+    // then 32 in earlier versions), then go back to the order of the module.
+    constexpr size_t kPicks = std::min<size_t>(ymengine::kInstruments, kDmaSlotsMax);
+    const int noSlot = int(std::max(picks.size(), kPicks) - kPicks);
+    if (picks.size() > kPicks) picks.resize(kPicks);
     std::sort(picks.begin(), picks.end(), [](const Pick& a, const Pick& b) { return a.inst < b.inst; });
     if (picks.empty()) {
         out.error = "Nothing to import: no notes with a sample.";
@@ -321,13 +399,12 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     for (size_t k = 0; k < picks.size(); ++k) slotOf[size_t(picks[k].inst)] = int(k);
 
     // ---- Samples (before the patterns: the sample offsets follow their rate) ----
-    int unrolled = 0, cut = 0;
+    int unrolled = 0;
     std::vector<DmaBuild> builds;
     for (const Pick& p : picks) {
         const XmSample& s = m.instruments[size_t(p.inst - 1)].samples[size_t(p.sample)];
-        builds.push_back(buildDma(s));
-        unrolled += builds.back().unrolled && !builds.back().cut;
-        cut += builds.back().cut;
+        builds.push_back(buildDma(s, m.c4Hz));
+        unrolled += builds.back().unrolled;
     }
 
     // ---- Patterns ----
@@ -343,6 +420,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     int otherSample = 0, offsetClamped = 0;
     std::vector<bool> panned(size_t(m.channels), false);
     std::vector<ymseq::Pattern> patterns(xmOf.size());
+    const auto spare = std::make_unique<ymseq::Lane>();
     for (size_t k = 0; k < xmOf.size(); ++k) {
         const int p = xmOf[k];
         const int rows = flows[size_t(p)].rows;
@@ -352,7 +430,8 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         for (int c = 0; c < m.channels; ++c) {
             const int t = trackOf[size_t(c)];
             if (t < 0) continue;
-            ymseq::Lane& l = pat.edit(t);
+            ymseq::Lane& lane = pat.edit(t);
+            const bool alone = onTrack[size_t(t)] == 1;
             const int octave = state.seq.tracks[size_t(t)].octave;
             bool holding = true;  // first lines: the note of the previous position continues
             // Step effects: memories of the parameters (xx = 00: the previous one), slide that runs (an XM slide
@@ -365,6 +444,8 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
                 Chan& cs = ch[size_t(c)];
                 applyRow(m, cs, x);
                 const auto s = size_t(row);
+                // A shared track takes the channel's lines where it sounds; the others go to a spare lane.
+                ymseq::Lane& l = alone || sounds[size_t(c)][base[k] + s] ? lane : *spare;
                 if (hasNote(x)) {
                     const bool known = cs.inst >= 1 && cs.inst <= int(m.instruments.size());
                     const int slot = known ? slotOf[size_t(cs.inst)] : -1;
@@ -397,6 +478,8 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
                 const int sub = x.param >> 4, low = x.param & 15;
                 const int slot = cs.inst >= 1 && cs.inst <= int(m.instruments.size()) ? slotOf[size_t(cs.inst)] : -1;
                 bool volHere = false;
+                // An effect of an S3M or OKT module kept out of the XM shape, by its own name.
+                if (x.foreign) ++effects[m.foreignEffects[size_t(x.foreign - 1)]];
                 if (x.effect == kFxArp && x.param == 0) {  // 000: no effect
                 } else if (x.effect == kFxSpeed) {
                     if (x.param == 0) ++effects["F00"];
@@ -491,11 +574,14 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
             if (speed) speedLost += !place(row, from, ymengine::seqCmd(ymengine::SeqCmd::Speed, speed));
         }
     }
-    // Pan: only on the channels that move away from the centre (otherwise the track's).
-    for (int c = 0; c < m.channels; ++c) {
-        if (trackOf[size_t(c)] < 0 || panned[size_t(c)]) continue;
+    // Pan: only on the tracks of channels that move away from the centre (otherwise the track's).
+    std::array<bool, kTracks> panTrack{};
+    for (int c = 0; c < m.channels; ++c)
+        if (trackOf[size_t(c)] >= 0 && panned[size_t(c)]) panTrack[size_t(trackOf[size_t(c)])] = true;
+    for (int t : tracks) {
+        if (!onTrack[size_t(t)] || panTrack[size_t(t)]) continue;
         for (ymseq::Pattern& pat : patterns)
-            if (pat.lanes[size_t(trackOf[size_t(c)])]) pat.edit(trackOf[size_t(c)]).pnr.fill(0);
+            if (pat.lanes[size_t(t)]) pat.edit(t).pnr.fill(0);
     }
 
     // ---- Song: one entry per position played, repeats grouped ----
@@ -544,7 +630,7 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         dst.name = cleanInstrumentName(ins.name);
         if (dst.name.empty()) dst.name = cleanInstrumentName(ins.samples[size_t(picks[k].sample)].name);
         dst.patch.generator = ymengine::Generator::Dma;
-        dst.patch.dmaSlot = int8_t(k);
+        dst.patch.dmaSlot = int16_t(k);
         state.dma.slots[k] = {builds[k].rate, false, 60, builds[k].loop};  // mono, root note 60
         state.dmaSamples[k] = std::move(builds[k].bytes);
         // Name of the slot: that of the sample, otherwise that of the instrument.
@@ -557,7 +643,10 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
         r.speed = state.global.speed;
         r.vblRate = int(std::find(kVblRates.begin(), kVblRates.end(), uint32_t(bpms[0] * 2 / 5)) - kVblRates.begin());
     }
-    r.channels = channels;
+    r.channels = used;
+    r.shared = sharing;
+    r.played = notedCount;
+    r.mode = mode;
     r.patterns = int(xmOf.size());
     r.entries = state.seq.song.size();
     r.instruments = int(picks.size());
@@ -566,20 +655,23 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
 
     // ---- What the import does not render ----
     auto& n = r.notes;
+    n = m.notes;  // what the reader of the module's format left out (AdLib of an S3M)
+    if (sharing)
+        n.push_back("Channels on the track of one that never plays at the same time: " + std::to_string(sharing) +
+                    ".");
     if (droppedChannels)
         n.push_back("Channels beyond the " + std::to_string(tracks.size()) + " DMA tracks: " +
-                    std::to_string(droppedChannels) + ".");
+                    std::to_string(droppedChannels) + " left out.");
     if (droppedVisits)
         n.push_back("Patterns beyond 32: " + count(droppedVisits, "Song position", "Song positions") + " left out.");
     if (noSlot)
-        n.push_back("Instruments without a DMA slot (8 at most): " + std::to_string(noSlot) + ", " +
+        n.push_back("Instruments beyond the 127 of a project: " + std::to_string(noSlot) + ", " +
                     count(notesNoSlot, "note", "notes") + " left out.");
     if (notesNoSample) n.push_back("Notes without a sample: " + std::to_string(notesNoSample) + ".");
     if (adpcm) n.push_back("ADPCM samples (not read): " + std::to_string(adpcm) + ".");
     if (otherSample)
         n.push_back("Notes played with their instrument's main sample: " + std::to_string(otherSample) + ".");
     if (m.truncatedSamples) n.push_back("Sample data cut by the end of the file.");
-    if (cut) n.push_back("Samples cut to 32 KB: " + std::to_string(cut) + ".");
     if (unrolled)
         n.push_back("Loops unrolled to 32 KB (the STE loops whole samples): " + std::to_string(unrolled) + ".");
     if (tempoClamped) n.push_back("Tempos clamped to 20-300 BPM: " + std::to_string(tempoClamped) + ".");
@@ -606,8 +698,53 @@ XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamS
     return out;
 }
 
+}  // namespace
+
+std::optional<ModuleFormat> moduleFormat(std::span<const uint8_t> file) {
+    static constexpr char kXm[] = "Extended Module: ";
+    if (file.size() >= sizeof kXm - 1 && std::equal(kXm, kXm + sizeof kXm - 1, file.begin())) return ModuleFormat::Xm;
+    if (ymio::looksLikeOkt(file)) return ModuleFormat::Okt;
+    if (ymio::looksLikeS3m(file)) return ModuleFormat::S3m;
+    // A MOD has no signature at its start (and none at all for a Soundtracker one): a MOD is one that reads.
+    if (ymio::parseMod(file).module) return ModuleFormat::Mod;
+    return std::nullopt;
+}
+
+const char* moduleFormatName(ModuleFormat f) noexcept {
+    switch (f) {
+    case ModuleFormat::Mod: return "MOD";
+    case ModuleFormat::S3m: return "S3M";
+    case ModuleFormat::Okt: return "OKT";
+    case ModuleFormat::Xm: break;
+    }
+    return "XM";
+}
+
+XmImportResult importModule(ModuleFormat f, std::span<const uint8_t> file, VoiceMode mode, NonParamState& state) {
+    ymio::XmParseResult parsed = f == ModuleFormat::Mod   ? ymio::parseMod(file)
+                                 : f == ModuleFormat::S3m ? ymio::parseS3m(file)
+                                 : f == ModuleFormat::Okt ? ymio::parseOkt(file)
+                                                          : ymio::parseXm(file);
+    if (!parsed.module) {
+        XmImportResult out;
+        out.error = parsed.error;
+        return out;
+    }
+    XmImportResult out = convert(*parsed.module, mode, state);
+    if (out.import) out.import->format = f;
+    return out;
+}
+
+XmImportResult importXm(std::span<const uint8_t> file, VoiceMode mode, NonParamState& state) {
+    return importModule(ModuleFormat::Xm, file, mode, state);
+}
+
+XmImportResult importMod(std::span<const uint8_t> file, VoiceMode mode, NonParamState& state) {
+    return importModule(ModuleFormat::Mod, file, mode, state);
+}
+
 std::vector<std::string> xmImportMessage(const XmImport& r, const std::string& fileName) {
-    std::vector<std::string> lines = {"XM imported", "", fileName};
+    std::vector<std::string> lines = {std::string(moduleFormatName(r.format)) + " imported", "", fileName};
     if (!r.title.empty()) lines.push_back(r.title);
     lines.push_back(count(r.channels, "track", "tracks") + ", " + count(r.patterns, "pattern", "patterns") + ", " +
                     count(r.instruments, "DMA instrument", "DMA instruments") + ", " +
@@ -624,6 +761,28 @@ std::vector<std::string> xmImportMessage(const XmImport& r, const std::string& f
         for (const std::string& n : r.notes) lines.push_back(n.front() == ' ' ? "  " + n.substr(1) : "• " + n);
     }
     return lines;
+}
+
+void xmImportValues(const XmImport& r, ParamValues& values) {
+    auto set = [&values](int idx, float v) { values[size_t(idx)] = clampToSpec(paramSpec(idx), v); };
+    const bool studio = ymengine::studioMode(r.mode);
+    set(paramIndex(Global::VoiceMode), float(int(r.mode)));
+    set(paramIndex(Global::Computer), 1.0f);
+    for (int t = 0; t < kTracks; ++t) {
+        set(paramIndex(t, Track::On), r.on[size_t(t)] ? 1.0f : 0.0f);
+        if (r.on[size_t(t)] && studio) set(paramIndex(t, Track::Generator), float(int(ymengine::Generator::Dma)));
+    }
+    if (r.ticks) set(paramIndex(Global::VblRate), float(r.vblRate));
+    else set(paramIndex(Global::FreeTempo), r.tempo);
+}
+
+bool xmWantsStudio(const XmImport& r) noexcept {
+    if (r.mode == ymengine::VoiceMode::Studio32) return false;
+    return r.played > (r.mode == ymengine::VoiceMode::Studio16 ? 16 : ymengine::kDmaTracks);
+}
+
+ymengine::VoiceMode xmStudioMode(const XmImport& r) noexcept {
+    return r.played > 16 ? ymengine::VoiceMode::Studio32 : ymengine::VoiceMode::Studio16;
 }
 
 }  // namespace stym::plugin

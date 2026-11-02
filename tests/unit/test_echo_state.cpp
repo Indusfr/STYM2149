@@ -56,7 +56,7 @@ TEST_CASE("Echo: kept by the state, only for the tracks that change it", "[echo]
     x.division = 40;
     x.repeats = 0;
     x.drop = 99;
-    x.target = 30;
+    x.target = 40;
     sanitize(n);
     CHECK(x.division == ymengine::kDelayDivisions - 1);
     CHECK(x.repeats == 1);

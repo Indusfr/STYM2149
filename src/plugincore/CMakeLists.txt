@@ -4,6 +4,7 @@ add_library(stym_plugincore STATIC
   src/Parameters.cpp
   src/Mapping.cpp
   src/State.cpp
+  src/SteMemory.cpp
   src/Driver.cpp
   src/EngineStatus.cpp
   src/Digidrum.cpp
@@ -19,7 +20,15 @@ add_library(stym_plugincore STATIC
   src/Offline.cpp
   src/RegisterExport.cpp
   src/RegisterFiles.cpp
+  src/MaxYmExport.cpp
+  src/SongCapture.cpp
+  src/MaxYmImport.cpp
+  src/TTrakExport.cpp
+  src/TTrakImport.cpp
+  src/RegisterImport.cpp
   src/XmImport.cpp
+  src/YmtExport.cpp
+  src/YmtImport.cpp
   src/YmTune.cpp)
 target_include_directories(stym_plugincore PUBLIC include)
 target_link_libraries(stym_plugincore PUBLIC ymengine ymseq ymio)

@@ -11,6 +11,7 @@
 
 #include "gemui/Menu.h"
 #include "plugincore/Parameters.h"
+#include "gemui/Font.h"
 #include "pluginui/MainWindow.h"
 
 using namespace stym;
@@ -19,6 +20,15 @@ using ymengine::DrumSlot;
 using ymengine::kKitBanks;
 
 namespace {
+
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
 
 class TestHost : public pluginui::Host {
 public:
@@ -51,7 +61,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -160,10 +169,20 @@ TEST_CASE("Drum Kit: button, Ctrl+K and Edit menu open the window; boxes of the 
     CHECK(w.drumKit().isOpen());
     key(w, gemui::Key::Escape);
     w.openMenu(2);  // Edit > Drum kit (eighth entry since Effects, below the bar)
-    const gemui::Rect edit = *w.rectOf("mEdit");
-    press(w, {edit.x + 20, edit.bottom() + 2 + 7 * 20 + 10});
+    press(w, entryAt(w, 7));
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(w.drumKit().isOpen());
+}
+
+TEST_CASE("Drum Kit: the kit's name beside its button in the 8x8 font (Indus, 30/10/2026 03:03)", "[ui][kit]") {
+    TestHost h;
+    MainWindow w(h);
+    w.pickGenerator(int(ymengine::Generator::Chipdrum));
+    w.tick(0);
+    const auto r = w.rectOf("genKitName");
+    REQUIRE(r);
+    CHECK(r->w == int(gemui::Font::width("Classic", 12)));  // 8 pixels a letter, not the 6x6 font's 6
+    CHECK(r->w != int(gemui::Font::width("Classic", 12, 0, gemui::Face::kSmall)));
 }
 
 TEST_CASE("Drum Kit: Edit > Drum kit and Ctrl+K only on a Chipdrum track (second DAW test, item 18)",
@@ -284,8 +303,7 @@ TEST_CASE("Drum Kit: Audition, Reset of the instrument, banks of the Kits menu",
     // Kits: 13 banks sorted ignoring case; TR-808-ish (eleventh).
     click(w, "kitBank");
     REQUIRE(w.desktop().hasPopups());
-    const gemui::Rect b = *w.rectOf("kitBank");
-    press(w, {b.x + 20, b.bottom() - 2 + 2 + 20 * 10 + 10});
+    press(w, entryAt(w, 10));
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(h.state.kit == bank("TR-808-ish"));
     CHECK(h.editor.undo.undoSize() == 1);

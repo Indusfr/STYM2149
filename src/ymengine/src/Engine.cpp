@@ -10,9 +10,7 @@
 namespace stym::ymengine {
 
 // ======================================================================================================
-// The Digidrum slots are allocated here at their largest size, so that setUserSample never allocates.
 Engine::Engine() : impl_(std::make_unique<Impl>()) {
-    for (auto& u : impl_->user) u.assign(kMaxUserSample, 0);
     impl_->tracks[0].mix.enabled = true;  // the prototype activates track 1
     impl_->panStep.fill(std::numeric_limits<double>::quiet_NaN());
     impl_->refreshLive();
@@ -29,7 +27,7 @@ void Engine::prepare(const EngineConfig& config) {
     for (int i = 0; i < 32; ++i) m.tab1[size_t(i)] = ymcore::tables::kMixTable[i] / top;
     // A chip renders kMixTable / 32768 (ChipRenderer::render): gain3 brings it to the unit of tab1.
     m.gain3 = 32768.0 / top;
-    // 16-channel mode: buses and outputs.
+    // 32-channel mode: buses and outputs.
     m.outL.prepare(rc);
     m.outR.prepare(rc);
     // Internal steps of one render slice (kChunk samples), with a margin for the steps that the output chain asks
@@ -54,7 +52,7 @@ void Engine::prepare(const EngineConfig& config) {
     m.sendL.assign(kChunk, 0);
     m.sendR.assign(kChunk, 0);
     m.delay.prepare(rc.hostRate);
-    // Separate outputs: mono bus (16-channel) and chip copies (3-channel) of the requested tracks only.
+    // Separate outputs: mono bus (32-channel) and chip copies (3-channel) of the requested tracks only.
     m.trackMask = config.trackOutputs;
     for (int t = 0; t < kTracks; ++t) {
         const bool on = m.trackOut(t);
@@ -72,7 +70,7 @@ void Engine::prepare(const EngineConfig& config) {
     for (auto& c : m.chips) c.prepare(rc);
     m.chipBuf.assign(kChunk, 0);
     m.chipLevels.assign(kChunk, 0);
-    // Mixer meters: buckets of the steps of a render and of those computed ahead (16-channel), points of a render
+    // Mixer meters: buckets of the steps of a render and of those computed ahead (32-channel), points of a render
     // (3-channel).
     for (auto& d : m.meterD) d.assign(size_t(std::ceil(2.0 * double(cap) / m.meterTickStep())) + 3, 0);
     for (auto& d : m.meterDD) d.assign(m.meterD[0].size(), 0);
@@ -188,55 +186,55 @@ void Engine::setKit(const KitParams& kit) noexcept {
 
 const KitParams& Engine::kit() const noexcept { return impl_->kitParams; }
 
-void Engine::setUserSample(int slot, std::span<const uint8_t> nibbles) noexcept {
-    if (slot < 0 || slot >= kDigidrumSlots) return;
+void Engine::setUserSample(int slot, std::span<const uint8_t> nibbles) {
+    if (slot < 0 || slot >= kDigidrumSlotsMax) return;
+    std::vector<uint8_t>& own = impl_->userOwn[size_t(slot)];
+    own.resize(nibbles.size());
+    for (size_t i = 0; i < own.size(); ++i) own[i] = uint8_t(std::min<int>(nibbles[i], 15));
+    shareUserSample(slot, own);
+}
+
+void Engine::shareUserSample(int slot, std::span<const uint8_t> nibbles) noexcept {
+    if (slot < 0 || slot >= kDigidrumSlotsMax) return;
     Impl& m = *impl_;
-    const size_t n = std::min<size_t>(nibbles.size(), kMaxUserSample);
-    for (size_t i = 0; i < n; ++i) m.user[size_t(slot)][i] = uint8_t(std::min<int>(nibbles[i], 15));
-    m.userLen[size_t(slot)] = uint32_t(n);
+    m.user[size_t(slot)] = nibbles.first(std::min<size_t>(nibbles.size(), UINT32_MAX));
+    m.stopSlot(Generator::Digidrum, slot);  // their values have changed
+}
+
+std::span<const uint8_t> Engine::userSample(int slot) const noexcept {
+    return slot >= 0 && slot < kDigidrumSlotsMax ? impl_->user[size_t(slot)] : std::span<const uint8_t>{};
 }
 
 void Engine::setDigidrumSlot(int slot, const DigidrumSlot& s) noexcept {
-    if (slot < 0 || slot >= kDigidrumSlots) return;
+    if (slot < 0 || slot >= kDigidrumSlotsMax) return;
     DigidrumSlot d = s;
     d.rateHz = std::isfinite(s.rateHz) ? std::clamp(s.rateHz, kDigidrumRateMin, kDigidrumRateMax) : kDigidrumRate;
     d.root = uint8_t(std::min<int>(s.root, 127));
     d.cents = std::isfinite(s.cents) ? std::clamp(s.cents, -kDigidrumCentsMax, kDigidrumCentsMax) : 0.0;
-    d.end = std::min<uint32_t>(s.end, kMaxUserSample);
-    d.start = std::min(s.start, d.end > 0 ? d.end : kMaxUserSample);  // End 0: to the end of the sample
+    d.start = d.end > 0 ? std::min(s.start, d.end) : s.start;  // End 0: to the end of the sample
     d.rest = uint8_t(std::min<int>(s.rest, 15));
     impl_->digiSlots[size_t(slot)] = d;
 }
 
 const DigidrumSlot& Engine::digidrumSlot(int slot) const noexcept {
-    return impl_->digiSlots[size_t(std::clamp(slot, 0, kDigidrumSlots - 1))];
+    return impl_->digiSlots[size_t(std::clamp(slot, 0, kDigidrumSlotsMax - 1))];
 }
 
-void Engine::setDma(const DmaParams& p) noexcept {
-    Impl& m = *impl_;
-    bool moved = false;  // a slot goes from mono to stereo or back: the right side's mixer comes or goes
-    for (int k = 0; k < kDmaSlots; ++k) moved |= m.dmaBank.slot(k).stereo != p.slots[size_t(k)].stereo;
-    m.dmaBank.setParams(p);
-    if (!moved) return;
-    m.refreshLive();
-    if (m.prepared) m.remix(m.eventCycle());
-}
+// The right side's mixer no longer depends on the sample: a slot going from mono to stereo changes nothing
+// there.
+void Engine::setDma(const DmaParams& p) noexcept { impl_->dmaBank.setParams(p); }
 const DmaParams& Engine::dma() const noexcept { return impl_->dmaBank.params(); }
-void Engine::setDmaSample(int slot, std::span<const int8_t> bytes) noexcept {
-    Impl& m = *impl_;
-    if (slot < 0 || slot >= kDmaSlots) return;
-    m.dmaBank.setSample(slot, bytes);
-    // The voices that play this slot stop (their bytes have changed): their contribution leaves the buses.
-    if (!m.prepared) return;
-    const uint64_t c = m.eventCycle();
-    for (int i = 0; i < kVoices; ++i) {
-        Voice& v = m.voices[size_t(i)];
-        if (!v.on || v.gen != Generator::Dma || v.slot != slot) continue;
-        v.on = false;
-        v.pcmL = v.pcmR = 0;
-        m.touch(i, c);
-    }
+void Engine::setDmaSample(int slot, std::span<const int8_t> bytes) {
+    if (slot < 0 || slot >= kDmaSlotsMax) return;
+    impl_->dmaBank.setSample(slot, bytes);
+    impl_->stopSlot(Generator::Dma, slot);  // their bytes have changed
 }
+void Engine::shareDmaSample(int slot, std::span<const int8_t> bytes) noexcept {
+    if (slot < 0 || slot >= kDmaSlotsMax) return;
+    impl_->dmaBank.share(slot, bytes);
+    impl_->stopSlot(Generator::Dma, slot);
+}
+std::span<const int8_t> Engine::dmaSample(int slot) const noexcept { return impl_->dmaBank.bytes(slot); }
 
 void Engine::noteOn(uint32_t offset, int note, int velocity, int track, int channel) noexcept {
     if (note < 0 || note > 127 || track >= kTracks) return;
@@ -252,6 +250,18 @@ void Engine::noteOff(uint32_t offset, int note, int track, int channel) noexcept
     if (note < 0 || note > 127 || track >= kTracks) return;
     const double ch = std::clamp(channel, 0, Impl::kMpeChannels - 1);
     if (Event* e = impl_->push(offset, EventType::NoteOff, note, 0, ch)) e->track = int16_t(std::max(track, -1));
+}
+void Engine::drumPad(uint32_t offset, int pad, int velocity, int track) noexcept {
+    if (pad < 0 || pad >= kDrumPads || track >= kTracks) return;
+    if (velocity <= 0) {
+        drumPadOff(offset, pad);
+        return;
+    }
+    if (Event* e = impl_->push(offset, EventType::DrumPad, pad, std::min(velocity, 127), 0))
+        e->track = int16_t(std::max(track, -1));
+}
+void Engine::drumPadOff(uint32_t offset, int pad) noexcept {
+    if (pad >= 0 && pad < kDrumPads) impl_->push(offset, EventType::DrumPadOff, pad, 0, 0);
 }
 void Engine::pitchBend(uint32_t offset, double semitones, int track) noexcept {
     if (track >= kTracks) return;
@@ -290,6 +300,7 @@ void Engine::programChange(uint32_t offset, int program, int track) noexcept {
 }
 void Engine::allNotesOff(uint32_t offset) noexcept { impl_->push(offset, EventType::AllOff, 0, 0, 0); }
 void Engine::releaseManual(uint32_t offset) noexcept { impl_->push(offset, EventType::ManualOff, 0, 0, 0); }
+void Engine::releaseKeys(uint32_t offset) noexcept { impl_->push(offset, EventType::KeysOff, 0, 0, 0); }
 void Engine::releaseForPlayer(uint32_t offset) noexcept { impl_->push(offset, EventType::PlayerStart, 0, 0, 0); }
 void Engine::midiClock(uint32_t offset) noexcept { impl_->push(offset, EventType::MidiClock, 0, 0, 0); }
 void Engine::midiStart(uint32_t offset) noexcept { impl_->push(offset, EventType::MidiStart, 0, 0, 0); }
@@ -352,13 +363,13 @@ void Engine::drumPreview(uint32_t offset, int slot) noexcept {
 }
 
 void Engine::digidrumPreview(uint32_t offset, int slot) noexcept {
-    if (slot < 0 || slot >= kDigidrumSlots) return;
+    if (slot < 0 || slot >= kDigidrumSlotsMax) return;
     impl_->push(offset, EventType::DigiPreview, slot, 0, 0);
 }
 void Engine::digidrumStopPreview(uint32_t offset) noexcept { impl_->push(offset, EventType::DigiStop, 0, 0, 0); }
 
 void Engine::dmaPreview(uint32_t offset, int slot) noexcept {
-    if (slot >= 0 && slot < kDmaSlots) impl_->push(offset, EventType::DmaPreview, slot, 0, 0);
+    if (slot >= 0 && slot < kDmaSlotsMax) impl_->push(offset, EventType::DmaPreview, slot, 0, 0);
 }
 void Engine::dmaStopPreview(uint32_t offset) noexcept { impl_->push(offset, EventType::DmaStop, 0, 0, 0); }
 
@@ -389,6 +400,10 @@ void Engine::takeMeters(TrackMeters& out) noexcept {
     Impl& m = *impl_;
     out.peak = m.meterPeak;
     out.peakR = m.meterPeakR;
+    for (size_t k = 0; k < size_t(kTracks); ++k) {
+        out.panL[k] = float(m.panL[k]);
+        out.panR[k] = float(m.panR[k]);
+    }
     out.scope = m.meterScope;
     out.side = m.meterScopeD;
     out.scopePos = m.meterPos;
@@ -553,6 +568,7 @@ Engine::VoiceInfo Engine::voice(int index) const noexcept {
     info.accent = v.accent;
     info.noise = v.noiseOn || v.ornNoiseOn;
     info.gen = v.gen;
+    info.slot = v.slot;
     info.tone = v.toneOn;
     info.envelope = v.envVolume;
     info.noisePeriod = Impl::noiseOut(v);
@@ -586,12 +602,13 @@ int Engine::program(int track) const noexcept {
 bool Engine::trackStereo(int track) const noexcept {
     return track >= 0 && track < kTracks && impl_->trackStereo(track);
 }
-uint8_t Engine::dmaPlayingSlots() const noexcept {
+std::bitset<kDmaSlotsMax> Engine::dmaPlayingSlots() const noexcept {
     const Impl& m = *impl_;
-    uint8_t mask = m.dmaBank.previewSlot() >= 0 ? uint8_t(1u << m.dmaBank.previewSlot()) : 0;
+    std::bitset<kDmaSlotsMax> playing;
+    if (m.dmaBank.previewSlot() >= 0) playing.set(size_t(m.dmaBank.previewSlot()));
     for (const Voice& v : m.voices)
-        if (v.on && v.gen == Generator::Dma) mask = uint8_t(mask | (1u << (v.slot & 7)));
-    return mask;
+        if (v.on && v.gen == Generator::Dma && v.slot < kDmaSlotsMax) playing.set(v.slot);
+    return playing;
 }
 
 int Engine::activeVoices() const noexcept {

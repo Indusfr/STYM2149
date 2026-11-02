@@ -269,6 +269,7 @@ TEST_CASE("Exported SNDH: timer effects played by MFP timers A, B and D", "[sndh
     EffectsSong s;
     const ymio::SndhSubsong sub[1] = {{s.frames, {}}};
     ymio::SndhWriteInfo info;
+    info.digidrums.resize(3);
     info.digidrums[2] = s.drum;
     const ymio::SndhWriteResult w = ymio::sndhFile(sub, info);
     REQUIRE(w.error.empty());
@@ -324,12 +325,74 @@ TEST_CASE("Exported SNDH: timer effects played by MFP timers A, B and D", "[sndh
     CHECK(p[50].reg[10] == 5);
 }
 
+TEST_CASE("Exported SNDH: FM Voice, the note's period divided by each step's multiple at each interrupt",
+          "[sndhwriter][fm]") {
+    // Channel B: an FM Voice of three steps (x1, x2, x3) on period 400, on period 300 from frame 20; stopped at 40.
+    // Channel A: a SID meanwhile, on its own timer.
+    const MfpSetting fm{4, 60};
+    std::vector<RegisterFrame> frames;
+    for (uint32_t k = 0; k < 50; ++k) {
+        RegisterFrame f;
+        const uint16_t tp = k < 20 ? 400 : 300;
+        f.reg = {0x40, 0, uint8_t(tp), uint8_t(tp >> 8), 0, 0, 0, 0x3C, 12, 13, 0, 0, 0, 0};
+        if (k < 40) {
+            f.fx[1].on = true;
+            f.fx[1].gen = Generator::Fm;
+            f.fx[1].value = 3;
+            f.fx[1].timer = fm;
+            f.fx[1].restart = k == 0;
+            f.fx[1].wave = {1, 3, 4};
+            f.fx[0] = {true, Generator::Sid, 12, MfpSetting{4, 49}, k == 0};
+        }
+        frames.push_back(f);
+    }
+    const ymio::SndhSubsong sub[1] = {{frames, {}}};
+    const ymio::SndhWriteResult w = ymio::sndhFile(sub, ymio::SndhWriteInfo{});
+    REQUIRE(w.error.empty());
+    CHECK(w.report.droppedEffects == 0);
+    const std::vector<Played> p = play(load(w.data), 1, 50);
+    REQUIRE(p.size() == 50);
+    // Each interrupt writes R2 then R3: pair them in that order.
+    auto pairs = [&](int from, int to) {
+        std::vector<int> out;
+        int lo = -1;
+        for (int k = from; k < to; ++k)
+            for (const auto& [reg, val] : p[size_t(k)].irq) {
+                if (reg == 2) lo = val;
+                if (reg == 3 && lo >= 0) {
+                    out.push_back(val << 8 | lo);
+                    lo = -1;
+                }
+            }
+        return out;
+    };
+    const std::vector<int> first = pairs(1, 19);
+    REQUIRE(first.size() > 30);
+    const std::vector<int> want = {400, 200, 133};
+    size_t at = size_t(std::find(want.begin(), want.end(), first[0]) - want.begin());
+    REQUIRE(at < want.size());
+    for (size_t i = 0; i < first.size(); ++i) CHECK(first[i] == want[(at + i) % 3]);
+    // 2 457 600 / (50 × 60) = 819.2 interrupts a second.
+    CHECK(std::abs(double(first.size()) - 819.2 * 18 / 50) <= 3);
+    // From frame 20, the periods of 300.
+    const std::vector<int> second = pairs(21, 39);
+    REQUIRE(second.size() > 30);
+    for (const int x : second) CHECK((x == 300 || x == 150 || x == 100));
+    // Stopped at frame 40: no more interrupts, the play writes the tone of channel B again.
+    for (int k = 41; k < 50; ++k) CHECK(p[size_t(k)].irq.empty());
+    CHECK(p[40].reg[2] == (300 & 0xFF));
+    CHECK(p[40].reg[3] == 1);
+    // Channel A's SID still toggles its volume.
+    CHECK(countWrites(p[10], 8) > 5);
+}
+
 TEST_CASE("Exported SNDH: the SID interrupt gives D0 back whole to the program it interrupts", "[sndhwriter]") {
     // AtariAudio runs each handler on its own, so only the code shows it: the SID handler clears D0 with moveq
     // (all 32 bits) and must save and restore it as a long word, not only its low word.
     EffectsSong s;
     const ymio::SndhSubsong sub[1] = {{s.frames, {}}};
     ymio::SndhWriteInfo info;
+    info.digidrums.resize(3);
     info.digidrums[2] = s.drum;
     const ymio::SndhWriteResult w = ymio::sndhFile(sub, info);
     REQUIRE(w.error.empty());
@@ -360,6 +423,7 @@ TEST_CASE("Exported SNDH: STE DMA sound, copies at the pitch and volume of the a
     const ymio::SndhSubsong sub[1] = {{frames, dma}};
     ymio::SndhWriteInfo info;
     info.ste = true;
+    info.dma.resize(1);
     info.dma[0] = {pcm, 2, false, true};
     const ymio::SndhWriteResult w = ymio::sndhFile(sub, info);
     REQUIRE(w.error.empty());
@@ -403,6 +467,7 @@ TEST_CASE("Exported SNDH: STE DMA sound started at a sample offset (Oxx)", "[snd
     const ymio::SndhSubsong sub[1] = {{frames, dma}};
     ymio::SndhWriteInfo info;
     info.ste = true;
+    info.dma.resize(1);
     info.dma[0] = {pcm, 2, false, true};
     const ymio::SndhWriteResult w = ymio::sndhFile(sub, info);
     REQUIRE(w.error.empty());
@@ -466,6 +531,7 @@ TEST_CASE("SNDH of a captured pattern: registers, SID and DMA replayed by AtariA
     info.frameHz = c->take.frameHz;
     info.clock = {c->take.clockNum, c->take.clockDen};
     info.ste = true;
+    info.dma.resize(1);
     info.dma[0] = {x.dmaSamples[0], x.dma.slots[0].rate, x.dma.slots[0].stereo, x.dma.slots[0].loop};
     const ymio::SndhWriteResult w = ymio::sndhFile(sub, info);
     INFO(w.error);

@@ -53,7 +53,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }
@@ -420,4 +419,88 @@ TEST_CASE("GENERATOR frame: N, D, Fine and the Steps of the Sync Buzzer and of t
     form(w, "Base");
     form(w, "Sine");
     CHECK(p.sidWaveLen == 8);
+}
+
+TEST_CASE("GENERATOR frame of an FM Voice: Ratios or Semitones, each scale with its own wave",
+          "[ui][generator][fm][undo]") {
+    TestHost h;
+    h.values[size_t(paramIndex(0, Track::Generator))] = float(ymengine::Generator::Fm);
+    MainWindow w(h);
+    w.tick(0);
+    const ymengine::TrackPatch& p = h.patch();
+    const auto ratios = p.fmWave;
+    CHECK(w.fmScaleButton().text() == "Ratios");
+    CHECK(w.fmWave().maxValue() == ymengine::kFmMultipleCount - 1);
+    CHECK(w.fmWave().state().wave == p.fmWave);
+
+    click(w, "fmScale");
+    CHECK(labels(w) == std::vector<std::string>{"Ratios", "Semitones"});
+    pick(w, 1);
+    w.tick(0);
+    CHECK(p.fmScale == ymengine::FmScale::Semitones);
+    CHECK(w.fmScaleButton().text() == "Semitones");
+    CHECK(w.fmWave().maxValue() == ymengine::kFmSemitoneMax);
+    CHECK(w.fmWave().state().wave == p.fmSemi);
+    CHECK(p.fmSemi[0] == 0);
+    CHECK(p.fmSemi[1] == 12);  // an octave on every other step by default
+
+    // A click 7 px above the bottom of the third bar: a fifth (1 px per semitone), into fmSemi only.
+    const gemui::Rect grid = *w.rectOf("fmGrid");
+    press(w, {grid.x + 2 * (pluginui::SidWaveGrid::kCellW + pluginui::SidWaveGrid::kGap) + 5,
+              grid.y + pluginui::SidWaveGrid::kBarH - 1 - 7});
+    w.tick(0);
+    CHECK(p.fmSemi[2] == 7);
+    CHECK(p.fmWave == ratios);
+
+    // Back to Ratios: the multiples come back untouched, the semitones are kept for later.
+    click(w, "fmScale");
+    pick(w, 0);
+    w.tick(0);
+    CHECK(p.fmScale == ymengine::FmScale::Ratios);
+    CHECK(w.fmWave().state().wave == ratios);
+    CHECK(p.fmSemi[2] == 7);
+
+    // One undo step per change.
+    undoKey(w);
+    CHECK(p.fmScale == ymengine::FmScale::Semitones);
+    undoKey(w);
+    CHECK(p.fmSemi[2] == 0);
+    undoKey(w);
+    CHECK(p.fmScale == ymengine::FmScale::Ratios);
+}
+
+TEST_CASE("FM wave in Semitones: a second row of values under the bars, the rows below moved down",
+          "[ui][generator][fm]") {
+    TestHost h;
+    h.values[size_t(paramIndex(0, Track::Generator))] = float(ymengine::Generator::Fm);
+    MainWindow w(h);
+    w.tick(0);
+    using pluginui::SidWaveGrid;
+    // Ratios: one hexadecimal digit per bar, as the SID wave.
+    CHECK(w.fmWave().digitRows() == 1);
+    CHECK(w.rectOf("fmGrid")->h == SidWaveGrid::kHeight);
+    const int stepsY = w.rectOf("fmSteps")->y;
+
+    // Semitones: two hexadecimal digits ($00 to $7F), the even steps on the first row and the odd steps on the second.
+    click(w, "fmScale");
+    pick(w, 1);
+    w.tick(0);
+    CHECK(w.fmWave().digitRows() == 2);
+    CHECK(w.rectOf("fmGrid")->h == SidWaveGrid::kHeight + SidWaveGrid::kDigitH);
+    CHECK(w.rectOf("fmSteps")->y == stepsY + SidWaveGrid::kDigitH);
+
+    // The second row belongs to the columns above it: a right click there opens the step's slider.
+    const gemui::Rect grid = *w.rectOf("fmGrid");
+    CHECK_FALSE(w.desktop().hasPopups());
+    press(w, {grid.x + (SidWaveGrid::kCellW + SidWaveGrid::kGap) + 5, grid.bottom() - 2}, gemui::MouseButton::Right);
+    CHECK(w.desktop().hasPopups());
+    CHECK(h.patch().fmSemi[1] == 12);
+    w.desktop().closePopups();
+
+    // Back to Ratios: one row again.
+    click(w, "fmScale");
+    pick(w, 0);
+    w.tick(0);
+    CHECK(w.rectOf("fmGrid")->h == SidWaveGrid::kHeight);
+    CHECK(w.rectOf("fmSteps")->y == stepsY);
 }

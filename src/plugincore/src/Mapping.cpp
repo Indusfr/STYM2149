@@ -14,6 +14,7 @@ VoiceMode voiceMode(const ParamValues& v) noexcept {
     switch (intValue(v, Global::VoiceMode)) {
     case 1: return VoiceMode::Authentic3;
     case 2: return VoiceMode::Dual3;
+    case 3: return VoiceMode::Studio32;
     default: return VoiceMode::Studio16;
     }
 }
@@ -30,6 +31,37 @@ MidiRouting midiRouting(const ParamValues& v) noexcept {
     }
 }
 
+int drumPadChannel(const ParamValues& v) noexcept {
+    if (value(v, Global::Mpe) >= 0.5f && studioMode(voiceMode(v))) return 0;  // MPE: every channel a note
+    return std::clamp(intValue(v, Global::DrumPads), 0, 16);
+}
+
+int drumPadOf(const ParamValues& v, int channel, int note) noexcept {
+    const int pad = note - kDrumPadFirstNote;
+    return drumPadChannel(v) == channel + 1 && pad >= 0 && pad < ymengine::kDrumPads ? pad : -1;
+}
+
+int curved(Curve c, int value) noexcept {
+    const double x = std::clamp(value, 0, 127) / 127.0;
+    double y = x;
+    switch (c) {
+    case Curve::Soft: y = std::sqrt(x); break;
+    case Curve::Hard: y = x * x; break;
+    case Curve::SCurve: y = x * x * (3 - 2 * x); break;
+    case Curve::Linear: break;
+    }
+    return int(std::lround(y * 127));
+}
+
+int curvedVelocity(const ParamValues& v, int velocity) noexcept {
+    if (velocity <= 0) return 0;  // a note-off stays one
+    return std::max(1, curved(Curve(std::clamp(intValue(v, Global::VelocityCurve), 0, 3)), velocity));
+}
+
+int curvedPressure(const ParamValues& v, int pressure) noexcept {
+    return curved(Curve(std::clamp(intValue(v, Global::AftertouchCurve), 0, 3)), pressure);
+}
+
 bool steMachine(const ParamValues& v) noexcept { return intValue(v, Global::Computer) == 1; }
 
 bool dmaTrack(VoiceMode mode, bool ste, int track) noexcept {
@@ -40,7 +72,7 @@ bool dmaTrack(VoiceMode mode, bool ste, int track) noexcept {
 
 int trackCount(VoiceMode mode, bool ste) noexcept {
     const int chips = chipCount(mode);
-    return chips == 0 ? kTracks : 4 * chips + (ste ? kDmaTracks : 0);
+    return chips == 0 ? studioTracks(mode) : 4 * chips + (ste ? kDmaTracks : 0);
 }
 
 int trackCount(const ParamValues& v) noexcept { return trackCount(voiceMode(v), steMachine(v)); }
@@ -87,7 +119,10 @@ GlobalParams toGlobal(const ParamValues& v, const GlobalParams& base) noexcept {
     GlobalParams g = base;
     g.mode = voiceMode(v);
     g.master = double(value(v, Global::Master)) / 100.0;
-    g.master2 = value(v, Global::MasterLink) >= 0.5f ? g.master : double(value(v, Global::Master2)) / 100.0;
+    // Linked, or in Mono: Master on both sides.
+    g.masterMono = value(v, Global::MasterMono) >= 0.5f;
+    const bool linked = value(v, Global::MasterLink) >= 0.5f || g.masterMono;
+    g.master2 = linked ? g.master : double(value(v, Global::Master2)) / 100.0;
     g.masterPan = std::clamp(double(value(v, Global::MasterPan)) / 100.0, -1.0, 1.0);
     g.softClip = value(v, Global::SoftClip) >= 0.5f;
     g.vblHz = kVblRates[size_t(std::clamp(intValue(v, Global::VblRate), 0, int(kVblRates.size()) - 1))];
@@ -143,6 +178,7 @@ TrackMix toMix(const ParamValues& v, int t) noexcept {
     m.levelR = double(value(v, t, Track::LevelR)) / 100.0;
     m.muteR = value(v, t, Track::MuteR) >= 0.5f;
     m.soloR = value(v, t, Track::SoloR) >= 0.5f;
+    m.mono = value(v, t, Track::Mono) >= 0.5f;
     return m;
 }
 
@@ -195,16 +231,16 @@ ymcore::MasterClock chipClock(const ParamValues& v) noexcept { return clockOf(co
 ConfigKey configKey(const ParamValues& v) noexcept {
     ConfigKey k;
     k.clock = uint8_t(std::clamp(intValue(v, Global::ChipClock), 0, 3));
-    // Custom clock: 16 channels only (Indus, fourth DAW test); the 2 MHz of the entry it replaces in the other modes,
-    // the clock of the register exports.
+    // Custom clock: the studio modes only (Indus, fourth DAW test); the 2 MHz of the entry it replaces in the other
+    // modes, the clock of the register exports.
     if (k.clock == 0)
-        k.hz = voiceMode(v) == ymengine::VoiceMode::Studio16 ? customClockHz(v) : uint32_t(kCustomClockDefaultHz);
+        k.hz = studioMode(voiceMode(v)) ? customClockHz(v) : uint32_t(kCustomClockDefaultHz);
     k.chain = uint8_t(std::clamp(intValue(v, Global::OutputChain), 0, 2));
     k.resampling = uint8_t(std::clamp(intValue(v, Global::Resampling), 0, 2));
     return k;
 }
 
-EngineConfig engineConfig(const ConfigKey& key, const ParamValues& v, uint32_t hostRate, uint16_t trackOutputs) noexcept {
+EngineConfig engineConfig(const ConfigKey& key, const ParamValues& v, uint32_t hostRate, uint32_t trackOutputs) noexcept {
     EngineConfig c;
     static constexpr ymcore::BoardChain kChains[] = {ymcore::BoardChain::Raw, ymcore::BoardChain::ST,
                                                      ymcore::BoardChain::STE};

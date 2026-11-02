@@ -1,9 +1,10 @@
-# STYM2149 tooltips: Français (fr), installed with STYM2149.
+# STYM2149 tooltips and interface: Français (fr), installed with STYM2149.
 # Programming: Pascal "Indus" Nowak (with Claude's help).
 # Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #
 # Kept up to date by tools/tipcatalog/tipcatalog.py, which gives it one entry per English line of
-# tools/tipcatalog/en.txt. Translations by Claude, to be reviewed by a native speaker (TO CONFIRM).
+# tools/tipcatalog/en.txt (the tooltips), then one per line of tools/tipcatalog/ui.txt (the interface,
+# context "ui"). Translations by Claude, to be reviewed by a native speaker (TO CONFIRM).
 msgid ""
 msgstr ""
 "Project-Id-Version: STYM2149\n"
@@ -13,8 +14,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "16 ch: sixteen channels with panning and polyphony. 3 ch: the authentic YM, three voices, mono"
-msgstr "16 ch : seize canaux avec panoramique et polyphonie. 3 ch : le YM authentique, trois voix, mono"
+msgid "16 and 32 ch: sixteen or thirty-two channels with panning and polyphony. 3 ch: the authentic YM, three voices, mono"
+msgstr "16 et 32 ch : seize ou trente-deux canaux avec panoramique et polyphonie. 3 ch : le YM authentique, trois voix, mono"
 
 msgid "4-bit values matched to the chip's measured output levels (the sample keeps its shape)"
 msgstr "Valeurs 4 bits calées sur les niveaux de sortie mesurés de la puce (l'échantillon garde sa forme)"
@@ -33,6 +34,9 @@ msgstr "Une piste DMA joue son sample : ni carré, ni bruit, ni volume 4 bits, 
 
 msgid "A SID Voice writes its own volumes: the envelope is not used"
 msgstr "Une SID Voice écrit ses propres volumes : l'enveloppe ne sert pas"
+
+msgid "A SysEx: its length, then its first bytes; a message that comes again is counted under it"
+msgstr "Un SysEx : sa longueur, puis ses premiers octets ; un message qui revient est compté en dessous"
 
 msgid "A drum hit plays its own sound: no source, no envelope"
 msgstr "Une frappe de percussion joue son propre son : ni source, ni enveloppe"
@@ -54,6 +58,12 @@ msgstr "Un glissé garde l'instrument de la note d'où il part"
 
 msgid "ARP: switch the arpeggiator of the track on or off from this step"
 msgstr "ARP : allumer ou éteindre l'arpégiateur de la piste à partir de ce pas"
+
+msgid "Aftertouch curve: how key pressure becomes its amount. Linear, as pressed; Soft, light pressure counts more"
+msgstr "Courbe d'aftertouch : comment la pression des touches devient son effet. Linéaire, telle que pressée ; Douce, une pression légère compte plus"
+
+msgid "Aftertouch curve: set Aftertouch to one of its targets"
+msgstr "Courbe d'aftertouch : régler Aftertouch sur l'une de ses cibles"
 
 msgid "Aftertouch: what the pressure of the keys drives (of the channel or of each note), with the wheel's choices"
 msgstr "Aftertouch : ce que pilote la pression des touches (du canal ou de chaque note), avec les choix de la molette"
@@ -124,8 +134,8 @@ msgstr "Longueur de mesure : accents et métronome la suivent"
 msgid "Buzzer Slide (Bxy): the envelope goes up or down this many 1/16 semitones per replay tick; 0 stops it"
 msgstr "Glissé de buzzer (Bxy) : l'enveloppe monte ou descend d'autant de seizièmes de demi-ton par tick de replay ; 0 l'arrête"
 
-msgid "CMD: commands of this step, click to set them (ticks per line, sync mark, slides); MUL: several"
-msgstr "CMD : commandes de ce pas, clic pour les régler (ticks par ligne, marque de synchro, glissés) ; MUL : plusieurs"
+msgid "CMD: commands of this step, click to set them (sync mark, slides); MUL: several"
+msgstr "CMD : commandes de ce pas, clic pour les régler (marque de synchro, glissés) ; MUL : plusieurs"
 
 msgid "CND: play this step only when the condition is met"
 msgstr "CND : jouer ce pas seulement si la condition est remplie"
@@ -148,11 +158,17 @@ msgstr "Canal"
 msgid "Channel level in the mix"
 msgstr "Niveau du canal dans le mix"
 
-msgid "Chip clock: the frequency that drives the YM, and so its pitch. Custom, typed in MHz, plays in 16 ch only"
-msgstr "Horloge de la puce : la fréquence qui cadence le YM, et donc sa hauteur. Custom, saisie en MHz, joue en 16 ch seulement"
+msgid "Chip clock: the frequency that drives the YM, and so its pitch. Custom, typed in MHz, plays in 16 and 32 ch only"
+msgstr "Horloge de la puce : la fréquence qui cadence le YM, et donc sa hauteur. Custom, saisie en MHz, joue en 16 et 32 ch seulement"
 
 msgid "Chip conformity"
 msgstr "Conformité à la puce"
+
+msgid "Chipdrum sounds 1 to 8, notes 44 to 51 the Digidrum samples 1 to 8; Off: the channel plays as the others"
+msgstr "les sons Chipdrum 1 à 8, les notes 44 à 51 les samples Digidrum 1 à 8 ; Off : le canal joue comme les autres"
+
+msgid "Clear the MIDI monitor: every line it keeps goes, after a confirmation"
+msgstr "Effacer le moniteur MIDI : toutes les lignes qu'il garde partent, après confirmation"
 
 msgid "Clear the current track"
 msgstr "Effacer la piste courante"
@@ -196,17 +212,20 @@ msgstr "Fermer sans changer le pas"
 msgid "Computer: Atari ST, the YM alone"
 msgstr "Computer : Atari ST, le YM seul"
 
-msgid "Computer: Atari STE, the YM plus the DMA sound: eight DMA tracks in 3 ch, the DMA type on any track in 16 ch"
-msgstr "Computer : Atari STE, le YM plus le son DMA : huit pistes DMA en 3 ch, le type DMA sur toute piste en 16 ch"
+msgid "Computer: Atari STE, the YM plus the DMA sound: eight DMA tracks in 3 ch, the DMA type on any track in 16 and 32 ch"
+msgstr "Computer : Atari STE, le YM plus le son DMA : huit pistes DMA en 3 ch, le type DMA sur toute piste en 16 et 32 ch"
 
 msgid "Copy the note under the cursor, or the selection (Ctrl+C)"
 msgstr "Copier la note sous le curseur, ou la sélection (Ctrl+C)"
 
-msgid "Curve (16 channels): Up, Down and the shapes of the CRV row, from this step to the next command of its kind"
-msgstr "Courbe (16 voies) : Up, Down et les formes de la ligne CRV, de ce pas jusqu'à la commande suivante de son type"
+msgid "Curve (16 and 32 channels): Up, Down and the shapes of the CRV row, from this step to the next command of its kind"
+msgstr "Courbe (16 et 32 voies) : Up, Down et les formes de la ligne CRV, de ce pas jusqu'à la commande suivante de son type"
 
-msgid "Custom clock: 16 ch only (2 MHz in the other modes)"
-msgstr "Horloge personnalisée : 16 ch seulement (2 MHz dans les autres modes)"
+msgid "Custom clock: 16 and 32 ch only (2 MHz in the other modes)"
+msgstr "Horloge personnalisée : 16 et 32 ch seulement (2 MHz dans les autres modes)"
+
+msgid "Custom: a number of lines typed, from 1 to 100000"
+msgstr "Perso. : un nombre de lignes tapé, de 1 à 100000"
 
 msgid "Cut the note under the cursor, or the selection (Ctrl+X)"
 msgstr "Couper la note sous le curseur, ou la sélection (Ctrl+X)"
@@ -217,8 +236,11 @@ msgstr "D : l'enveloppe joue la note x N / D"
 msgid "DLY: the notes of this step start at this tick of the line"
 msgstr "DLY : les notes de ce pas partent à ce tick de la ligne"
 
-msgid "DMA sample {1}: empty. This track plays it, tuned from its root note."
-msgstr "Échantillon DMA {1} : vide. Cette piste le joue, accordé sur sa note de référence."
+msgid "DMA sample {1}: empty. Load it in the DMA window (DMA samples)."
+msgstr "Échantillon DMA {1} : vide. Chargez-le dans la fenêtre DMA (Échantillons DMA)."
+
+msgid "DMA sample {1}: {2} bytes, silent: past the memory of the Atari. This track plays it, tuned from its root note."
+msgstr "Échantillon DMA {1} : {2} octets, muet : au-delà de la mémoire de l'Atari. Cette piste le joue, accordé sur sa note de référence."
 
 msgid "DMA sample {1}: {2} bytes. This track plays it, tuned from its root note."
 msgstr "Échantillon DMA {1} : {2} octets. Cette piste le joue, accordé sur sa note de référence."
@@ -229,8 +251,8 @@ msgstr "Piste DMA {1} (STE)"
 msgid "DMA track {1} (STE) - {2}"
 msgstr "Piste DMA {1} (STE) - {2}"
 
-msgid "DMA window: load the eight samples, set their rate, format, root note and loop"
-msgstr "DMA window : charger les huit échantillons, régler fréquence, format, note de référence et boucle"
+msgid "DMA window: load the samples, set their rate, format, root note and loop"
+msgstr "DMA window : charger les échantillons, régler fréquence, format, note de référence et boucle"
 
 msgid "Decay time: how long the hit rings (4 to 20)"
 msgstr "Déclin : durée de résonance du coup (4 à 20)"
@@ -244,8 +266,8 @@ msgstr "Temps du delay en millisecondes"
 msgid "Delay time: a division of the tempo"
 msgstr "Temps du delay : une division du tempo"
 
-msgid "Delay: 16 ch only. In 3 ch, the Echo repeats the notes on the chip"
-msgstr "Delay : 16 ch seulement. En 3 ch, l'Echo répète les notes sur la puce"
+msgid "Delay: 16 and 32 ch only. In 3 ch, the Echo repeats the notes on the chip"
+msgstr "Delay : 16 et 32 ch seulement. En 3 ch, l'Echo répète les notes sur la puce"
 
 msgid "Delay: echoes of the sound of every track, as much as its Send in the Mixer"
 msgstr "Delay : des échos du son de chaque piste, autant que son Send dans le Mixer"
@@ -265,23 +287,14 @@ msgstr "Digidrum - {1}"
 msgid "Digidrum slot to trigger"
 msgstr "Emplacement Digidrum à déclencher"
 
-msgid "Digidrum slot {1}: pick it. In the sequencer, the row you write on chooses the slot. Load and edit the samples with Digidrum samples."
-msgstr "Emplacement Digidrum {1} : le choisir. Dans le séquenceur, la ligne où l'on écrit choisit l'emplacement. Charger et modifier les échantillons avec Digidrum samples."
-
-msgid "Digidrum slot {1}: play it and select it for editing."
-msgstr "Emplacement Digidrum {1} : le jouer et le sélectionner pour l'éditer."
-
-msgid "Digidrum slot {1}: play it and select it for editing. No sample loaded yet."
-msgstr "Emplacement Digidrum {1} : le jouer et le sélectionner pour l'éditer. Aucun échantillon chargé."
-
 msgid "Digidrum {1}"
 msgstr "Digidrum {1}"
 
 msgid "Digidrum {1} - {2}"
 msgstr "Digidrum {1} - {2}"
 
-msgid "Digidrums window: load the eight samples, set their rate, root note, tuning and loop"
-msgstr "Fenêtre Digidrums : charger les huit échantillons, régler leur fréquence, note de référence, accord et boucle"
+msgid "Digidrums window: load the samples, set their rate, root note, tuning and loop"
+msgstr "Fenêtre Digidrums : charger les échantillons, régler leur fréquence, note de référence, accord et boucle"
 
 msgid "Direction of the slide: up or down"
 msgstr "Sens du glissé : vers le haut ou vers le bas"
@@ -301,6 +314,12 @@ msgstr "Dessin : cliquer pour écrire des notes, glisser pour les déplacer"
 msgid "Drum Kit: shape the eight Chipdrum instruments (Ctrl+K)"
 msgstr "Drum Kit : façonner les huit instruments Chipdrum (Ctrl+K)"
 
+msgid "Drum pads: off with MPE, whose notes use every channel"
+msgstr "Drum pads : coupé en MPE, dont les notes utilisent tous les canaux"
+
+msgid "Drum pads: the MIDI channel of the pads (10 by default, as pads send in drum mode). Notes 36 to 43 play the"
+msgstr "Drum pads : le canal MIDI des pads (10 par défaut, comme les pads en mode batterie). Les notes 36 à 43 jouent"
+
 msgid "Drum to trigger"
 msgstr "Percussion à déclencher"
 
@@ -319,8 +338,8 @@ msgstr "Echo : aucun pour Sync Buzzer en 3 ch, une répétition relancerait à 
 msgid "Echo: play each note of this sound again, quieter each time; Authentic 3 ch plays the repeats on the chip"
 msgstr "Echo : rejouer chaque note de ce son, de plus en plus doucement ; Authentic 3 ch joue les répétitions sur la puce"
 
-msgid "Effects: echo of the notes, and the audio delay in 16 ch (Ctrl+F)"
-msgstr "Effets : écho des notes, et le delay audio en 16 ch (Ctrl+F)"
+msgid "Effects: echo of the notes, and the audio delay in 16 and 32 ch (Ctrl+F)"
+msgstr "Effets : écho des notes, et le delay audio en 16 et 32 ch (Ctrl+F)"
 
 msgid "Empty slot"
 msgstr "Emplacement vide"
@@ -391,11 +410,14 @@ msgstr "FIX, pas {1} : joue la note fixe. Cliquer pour basculer."
 msgid "FIX step {1}: plays the note. Click to toggle."
 msgstr "FIX, pas {1} : joue la note. Cliquer pour basculer."
 
-msgid "FLOPPY DISK"
-msgstr "DISQUETTE"
-
 msgid "Fade the sample out to its end"
 msgstr "Atténuer l'échantillon en fondu jusqu'à sa fin"
+
+msgid "Fade: 16 and 32 ch only (3ch and 2x3ch cut as an Atari does)"
+msgstr "Fade : 16 et 32 ch seulement (3ch et 2x3ch coupent comme un Atari)"
+
+msgid "Fade: every CUT of the project fades out, without a click"
+msgstr "Fade : chaque CUT du projet s'éteint, sans clic"
 
 msgid "Feedback: how much of each echo comes back in the next one"
 msgstr "Feedback : la part de chaque écho qui revient dans le suivant"
@@ -463,8 +485,14 @@ msgstr "HLD : ne pas redéclencher la percussion tant qu'elle résonne"
 msgid "Hard sync: a DMA track plays a sample, with no square or timer to restart"
 msgstr "Hard sync : une piste DMA joue un sample, sans carré ni timer à relancer"
 
-msgid "Hard sync: restart the square (16 voices) and the timer on tied and slid notes too"
-msgstr "Hard sync : relancer le carré (16 voix) et le timer aussi sur les notes liées et glissées"
+msgid "Hard sync: restart the square (16 and 32 ch) and the timer on tied and slid notes too"
+msgstr "Hard sync : relancer le carré (16 et 32 ch) et le timer aussi sur les notes liées et glissées"
+
+msgid "Hard, more force for the loud notes; S-curve, the middle steeper and both ends flatter"
+msgstr "Dure, plus de force pour les notes fortes ; Courbe en S, le milieu plus raide et les deux bouts plus plats"
+
+msgid "Hard, more pressure for the top; S-curve, the middle steeper and both ends flatter"
+msgstr "Dure, plus de pression pour le haut ; Courbe en S, le milieu plus raide et les deux bouts plus plats"
 
 msgid "Hardware envelope shape (register R13)"
 msgstr "Forme de l'enveloppe matérielle (registre R13)"
@@ -486,6 +514,12 @@ msgstr "INS : jouer cette note avec un instrument du projet (fenêtre Instrumen
 
 msgid "In 3 ch mode, the DMA tracks play the DMA sound"
 msgstr "En mode 3 ch, les pistes DMA jouent le son DMA"
+
+msgid "Information demo: the animation of the Fuji > Information box; Off shows its icon instead"
+msgstr "Démo des informations : l'animation de la boîte Fuji > Information ; Off montre son icône à la place"
+
+msgid "Instrument of this track: the one last loaded into it or stored from it. Pick another to load it into the track; --: the track plays its own sound"
+msgstr "Instrument de cette piste : le dernier chargé dans la piste ou enregistré depuis elle. En choisir un autre pour le charger dans la piste ; -- : la piste joue son propre son"
 
 msgid "Instrument that takes over when a Hold table ends"
 msgstr "Instrument qui prend le relais à la fin d'une table Hold"
@@ -532,6 +566,9 @@ msgstr "LFO : allumer ou éteindre le LFO de la piste à partir de ce pas"
 msgid "Land: on the last tick of a glissando, fall back to the root so the target note joins without a jump"
 msgstr "Land : au dernier tick d'un glissando, revenir à la fondamentale pour que la note visée enchaîne sans saut"
 
+msgid "Language of the menus, buttons, labels and window titles"
+msgstr "Langue des menus, boutons, libellés et titres de fenêtres"
+
 msgid "Language of the tooltips"
 msgstr "Langue des infobulles"
 
@@ -541,11 +578,17 @@ msgstr "Dure {1} pas de {2} : pas un nombre entier"
 msgid "Latch: keys stay held until you press them again"
 msgstr "Latch : les touches restent tenues jusqu'au prochain appui"
 
+msgid "Launch: the MIDI keys and pads C2 to G2 pick the patterns 1 to 8, G#2 to B2 the banks A to D, instead of playing"
+msgstr "Launch : les touches et pads MIDI C2 à G2 choisissent les motifs 1 à 8, G#2 à B2 les banques A à D, au lieu de jouer"
+
 msgid "Layout of the computer keyboard; Auto follows the system's"
 msgstr "Disposition du clavier de l'ordinateur ; Auto suit celle du système"
 
-msgid "Left side of the stereo sample"
-msgstr "Côté gauche de l'échantillon stéréo"
+msgid "Left side, after the pan"
+msgstr "Côté gauche, après le panoramique"
+
+msgid "Length of the fade of every CUT, in milliseconds (1 to 100, 5 by default)"
+msgstr "Durée du fondu de chaque CUT, en millisecondes (1 à 100, 5 par défaut)"
 
 msgid "Length of the figure before it repeats"
 msgstr "Longueur de la figure avant répétition"
@@ -574,17 +617,17 @@ msgstr "Link : un seul Master pour les deux puces ; éteint : un niveau pour 
 msgid "Link: one Master for both outputs; off: a level for each"
 msgstr "Link : un seul Master pour les deux sorties ; éteint : un niveau pour chacune"
 
-msgid "Link: one Volume for both sides; off: a level for each"
-msgstr "Link : un seul Volume pour les deux côtés ; éteint : un niveau pour chacun"
+msgid "Link: one Volume, M and S for both sides; off: each side its own"
+msgstr "Link : un seul Volume, M et S pour les deux côtés ; éteint : chaque côté les siens"
 
 msgid "Load a patch library from a file"
 msgstr "Charger une bibliothèque de patchs depuis un fichier"
 
-msgid "Load an audio file (resampled to the rate) or raw 8-bit bytes (.raw, .spl, .sam) into this slot"
-msgstr "Charger ici un fichier audio (rééchantillonné à la fréquence) ou des octets 8 bits bruts (.raw, .spl, .sam)"
+msgid "Load an audio file (resampled to the rate) or raw 8-bit bytes (.raw, .spl, .sam) into this slot; a file dropped on the drawing loads too"
+msgstr "Charger ici un fichier audio (rééchantillonné à la fréquence) ou des octets 8 bits bruts (.raw, .spl, .sam) ; un fichier déposé sur le dessin se charge aussi"
 
-msgid "Load an audio file into this slot (first channel, resampled to the rate, 3 s at most)"
-msgstr "Charger un fichier audio dans cet emplacement (premier canal, rééchantillonné à la fréquence, 3 s max)"
+msgid "Load an audio file into this slot (a stereo file as Stereo says, resampled to the rate); a file dropped on the drawing loads too"
+msgstr "Charger un fichier audio dans cet emplacement (un fichier stéréo selon Stéréo, rééchantillonné à la fréquence) ; un fichier déposé sur le dessin se charge aussi"
 
 msgid "Longer than the track ({1} steps)"
 msgstr "Plus long que la piste ({1} pas)"
@@ -610,6 +653,18 @@ msgstr "Décalage minimal de période de son de la table de vibrato"
 msgid "MIDI ext: the arpeggio follows the incoming MIDI clock"
 msgstr "MIDI ext : l'arpège suit l'horloge MIDI entrante"
 
+msgid "MIDI learn can switch it from a button of the controller"
+msgstr "Le MIDI learn peut le basculer depuis un bouton du contrôleur"
+
+msgid "MIDI messages received: channel, message and values, the most recent at the bottom"
+msgstr "Messages MIDI reçus : canal, message et valeurs, le plus récent en bas"
+
+msgid "MIDI monitor: how many of the last messages received it keeps, to scroll back"
+msgstr "Moniteur MIDI : combien des derniers messages reçus il garde, pour revenir en arrière"
+
+msgid "MIDI monitor: scroll back through the lines kept (Settings > MIDI monitor), with the arrows, a click beside the thumb or the wheel"
+msgstr "Moniteur MIDI : remonter dans les lignes gardées (Réglages > Moniteur MIDI), avec les flèches, un clic à côté du curseur ou la molette"
+
 msgid "MIDI routing: Omni, the focused track; Layer, every enabled track; Per channel, channel n plays track n"
 msgstr "Routage MIDI : Omni, la piste active ; Layer, toutes les pistes activées ; Per channel, le canal n joue la piste n"
 
@@ -628,8 +683,8 @@ msgstr "MOD : allumer ou éteindre la table de modulation de la piste à partir
 msgid "MPE slide (CC74) of each note: Volume, from 0 at the bottom to 15 at the top (64 leaves it)"
 msgstr "Slide MPE (CC74) de chaque note : Volume, de 0 en bas à 15 en haut (64 le laisse tel quel)"
 
-msgid "MPE: 16 ch only"
-msgstr "MPE : 16 ch seulement"
+msgid "MPE: 16 and 32 ch only"
+msgstr "MPE : 16 et 32 ch seulement"
 
 msgid "MPE: channel 1 plays as usual, channels 2 to 16 one note each, with its own bend, pressure and slide"
 msgstr "MPE : le canal 1 joue comme d'habitude, les canaux 2 à 16 une note chacun, avec son bend, sa pression et son slide"
@@ -655,8 +710,14 @@ msgstr "Master : niveau de la sortie gauche (les deux avec Link)"
 msgid "Master: level of the right output (both with Link)"
 msgstr "Master : niveau de la sortie droite (les deux avec Link)"
 
+msgid "Memory the samples take out of what the Atari leaves them; red: some do not fit and are silent"
+msgstr "Mémoire prise par les échantillons sur ce que l'Atari leur laisse ; rouge : certains ne tiennent pas et sont muets"
+
 msgid "Merge: keep what is already written instead of clearing the track"
 msgstr "Merge : garder ce qui est déjà écrit au lieu d'effacer la piste"
+
+msgid "Merge: one trace of left and right; off, a stereo source is drawn in two halves, left and right"
+msgstr "Fusionner : une seule courbe pour la gauche et la droite ; éteint, une source stéréo est dessinée en deux moitiés, gauche et droite"
 
 msgid "Metallic content: high gives a ringing cymbal"
 msgstr "Part métallique : élevée = cymbale qui résonne"
@@ -678,6 +739,12 @@ msgstr "Modulation : table par tick pour la hauteur, le bruit et le volume (Ctr
 
 msgid "Mono: one byte per frame (a stereo sample is mixed down: left and right averaged)"
 msgstr "Mono : un octet par trame (un échantillon stéréo est réduit : moyenne de gauche et droite)"
+
+msgid "Mono: one fader, M, S and oscilloscope for both sides; a stereo sample mixed"
+msgstr "Mono : un seul fader, M, S et oscilloscope pour les deux côtés ; un échantillon stéréo est mixé"
+
+msgid "Mono: the outputs mixed to mono, one Master"
+msgstr "Mono : les sorties mixées en mono, un seul Master"
 
 msgid "Monophonic: a new hit chokes the one still ringing, like a closed hi-hat"
 msgstr "Monophonic : un nouveau coup étouffe celui qui résonne encore, comme un charleston fermé"
@@ -706,11 +773,11 @@ msgstr "Monter le clavier virtuel d'une octave (touche X)"
 msgid "Move: drag notes or a selection without resizing them"
 msgstr "Déplacer : glisser des notes ou une sélection sans les redimensionner"
 
-msgid "Mute the left side of the stereo sample"
-msgstr "Coupe le côté gauche de l'échantillon stéréo"
+msgid "Mute the left side (both with Link)"
+msgstr "Coupe le côté gauche (les deux avec Link)"
 
-msgid "Mute the right side of the stereo sample"
-msgstr "Coupe le côté droit de l'échantillon stéréo"
+msgid "Mute the right side (both with Link)"
+msgstr "Coupe le côté droit (les deux avec Link)"
 
 msgid "N: the envelope plays the note x N / D"
 msgstr "N : l'enveloppe joue la note x N / D"
@@ -730,11 +797,14 @@ msgstr "NSE, pas {1} : ajouter du bruit sur ce tick"
 msgid "NSE: a DMA track plays a sample, without noise"
 msgstr "NSE : une piste DMA joue un sample, sans bruit"
 
-msgid "Name of this sample, 16 characters (taken from the file loaded)"
-msgstr "Nom de cet échantillon, 16 caractères (pris du fichier chargé)"
+msgid "Name of the track's instrument: type it and press Enter to rename the instrument. Without one, the track's sound is stored in the first free slot under this name"
+msgstr "Nom de l'instrument de la piste : le taper et appuyer sur Entrée pour renommer l'instrument. Sans instrument, le son de la piste est enregistré dans le premier emplacement libre sous ce nom"
 
-msgid "Name of this slot, 16 characters (shown in its tip and kept in banks)"
-msgstr "Nom de cet emplacement, 16 caractères (montré dans son infobulle, gardé dans les banques)"
+msgid "Name of this sample, 16 characters (taken from the file loaded): type it, Enter keeps it"
+msgstr "Nom de cet échantillon, 16 caractères (pris du fichier chargé) : tapez-le, Entrée le garde"
+
+msgid "Name of this slot, 16 characters (shown in its tip and kept in banks): type it, Enter keeps it"
+msgstr "Nom de cet emplacement, 16 caractères (montré dans son infobulle, gardé dans les banques) : tapez-le, Entrée le garde"
 
 msgid "Next song entry"
 msgstr "Entrée suivante du morceau"
@@ -829,6 +899,9 @@ msgstr "Seules les entrées de boucle sautent en arrière"
 msgid "Only rest and note-off entries have a length"
 msgstr "Seules les entrées silence et note-off ont une longueur"
 
+msgid "Open the Instruments window (Ctrl+T)"
+msgstr "Ouvrir la fenêtre Instruments (Ctrl+T)"
+
 msgid "Open the Song window and chain patterns"
 msgstr "Ouvrir la fenêtre Song et enchaîner les motifs"
 
@@ -843,6 +916,9 @@ msgstr "Ordre de lecture de la table"
 
 msgid "Oscillations over the table length"
 msgstr "Oscillations sur la longueur de la table"
+
+msgid "Oscilloscope: Main shows the main output, Track the focused track"
+msgstr "Oscilloscope : Sortie montre la sortie principale, Piste la piste active"
 
 msgid "Out-of-scale rows are greyed; click to force notes in"
 msgstr "Les lignes hors gamme sont grisées ; cliquer pour y forcer les notes"
@@ -865,11 +941,26 @@ msgstr "PER, pas {1} : période de son {2} (plus aigu). Glisser pour dessiner, 
 msgid "PER step {1}: {2} tone period (lower). Drag to draw, wheel to adjust (Shift: 10), right click for a slider."
 msgstr "PER, pas {1} : période de son {2} (plus grave). Glisser pour dessiner, molette pour régler (Shift : 10), clic droit pour un curseur."
 
+msgid "Pad {1}: Digidrum {2}, empty. Right click: the Digidrum this pad plays. In the sequencer, row {3} plays it."
+msgstr "Pad {1} : Digidrum {2}, vide. Clic droit : le Digidrum que joue ce pad. Dans le séquenceur, la ligne {3} le joue."
+
+msgid "Pad {1}: Digidrum {2}, silent: past the memory of the Atari. Click: the keyboard plays it. Right click: the Digidrum this pad plays. In the sequencer, row {3} plays it."
+msgstr "Pad {1} : Digidrum {2}, muet : au-delà de la mémoire de l'Atari. Clic : le clavier le joue. Clic droit : le Digidrum que joue ce pad. Dans le séquenceur, la ligne {3} le joue."
+
+msgid "Pad {1}: Digidrum {2}. Click: the keyboard plays it. Right click: the Digidrum this pad plays. In the sequencer, row {3} plays it."
+msgstr "Pad {1} : Digidrum {2}. Clic : le clavier le joue. Clic droit : le Digidrum que joue ce pad. Dans le séquenceur, la ligne {3} le joue."
+
+msgid "Pad {1}: Digidrum {2}: play it and select it for editing."
+msgstr "Pad {1} : Digidrum {2} : le jouer et le sélectionner pour l'éditer."
+
+msgid "Pad {1}: Digidrum {2}: play it and select it for editing. No sample loaded yet."
+msgstr "Pad {1} : Digidrum {2} : le jouer et le sélectionner pour l'éditer. Aucun échantillon chargé."
+
 msgid "Pan"
 msgstr "Panoramique"
 
-msgid "Pan: 16 channels only; the 3-channel modes are mono"
-msgstr "Pan : 16 voies seulement ; les modes 3 voies sont mono"
+msgid "Pan: 16 and 32 channels only; the 3-channel modes are mono"
+msgstr "Pan : 16 et 32 voies seulement ; les modes 3 voies sont mono"
 
 msgid "Panic"
 msgstr "Panique"
@@ -961,6 +1052,9 @@ msgstr "Pixels : Sharp pose chaque pixel sur des pixels entiers de l'écran ; 
 msgid "Play"
 msgstr "Lecture"
 
+msgid "Play another file (as File > Play...)"
+msgstr "Jouer un autre fichier (comme File > Play...)"
+
 msgid "Play every enabled track instead of the focused one"
 msgstr "Jouer toutes les pistes activées au lieu de la piste courante"
 
@@ -1012,6 +1106,12 @@ msgstr "Mettre cette commande dans le pas, ou l'en retirer"
 msgid "Quantize to VBL: notes and steps start on the replay frames, as an Atari replay routine plays them"
 msgstr "Quantize to VBL : notes et pas démarrent sur les trames de replay, comme les joue une routine de replay Atari"
 
+msgid "RAM of the Atari: the Digidrum and DMA samples share it in 3 ch, twice it in 2x3ch (two Ataris)"
+msgstr "RAM de l'Atari : les échantillons Digidrum et DMA se la partagent en 3 ch, le double en 2x3ch (deux Atari)"
+
+msgid "RAM: 3ch and 2x3ch only (no limit in 16 and 32 ch)"
+msgstr "RAM : 3ch et 2x3ch seulement (pas de limite en 16 et 32 ch)"
+
 msgid "RTG: repeat the hit 2, 3 or 4 times inside the step"
 msgstr "RTG : répéter le coup 2, 3 ou 4 fois dans le pas"
 
@@ -1060,8 +1160,11 @@ msgstr "Répéter la partie de Start à End tant que la note est tenue ; au rel
 msgid "Repeat the part from Start to End while the note sounds; otherwise the part plays once"
 msgstr "Répéter la partie de Start à End tant que la note sonne ; sinon la partie joue une fois"
 
-msgid "Resample on: a new rate resamples the sample, which keeps its length and its pitch (32 KB at most)"
-msgstr "Resample allumé : une nouvelle fréquence rééchantillonne l'échantillon, qui garde sa durée et sa hauteur (32 Ko au plus)"
+msgid "Replay ticks of each line from this step on, for every track (Ticks timing)"
+msgstr "Ticks de replay de chaque ligne à partir de ce pas, pour toutes les pistes (cadence Ticks)"
+
+msgid "Resample on: a new rate resamples the sample, which keeps its length and its pitch"
+msgstr "Resample allumé : une nouvelle fréquence rééchantillonne l'échantillon, qui garde sa durée et sa hauteur"
 
 msgid "Resampling: how the chip's rate is brought to the host's. Box and Retro fall back to Sinc above clk/8"
 msgstr "Rééchantillonnage : comment la cadence de la puce est ramenée à celle de l'hôte. Box et Retro passent en Sinc au-delà de clk/8"
@@ -1093,8 +1196,8 @@ msgstr "Clic droit : copier, couper, coller, ou l'ajouter au morceau."
 msgid "Right click: copy, paste or rename."
 msgstr "Clic droit : copier, coller ou renommer."
 
-msgid "Right side of the stereo sample"
-msgstr "Côté droit de l'échantillon stéréo"
+msgid "Right side, after the pan"
+msgstr "Côté droit, après le panoramique"
 
 msgid "Root note: the note that plays the sample at its rate"
 msgstr "Note de référence : la note qui joue l'échantillon à sa fréquence"
@@ -1110,9 +1213,6 @@ msgstr "Faire tourner le motif à droite"
 
 msgid "SID ratio: SID Voice only"
 msgstr "Rapport SID : SID Voice seulement"
-
-msgid "SID timer rate as a multiple of the note's frequency: 1 plays the note, 2 one octave higher"
-msgstr "Fréquence du timer SID en multiple de celle de la note : 1 joue la note, 2 une octave plus haut"
 
 msgid "SID wave: one volume per timer interrupt, scaled by the note volume; the timer runs Steps/2 times faster, so the pitch stays."
 msgstr "SID wave : un volume par interruption du timer, multiplié par le volume de la note ; le timer tourne Steps/2 fois plus vite, la hauteur ne change pas."
@@ -1144,14 +1244,17 @@ msgstr "Aigus STE : -12 à +12 dB, avec la chaîne de sortie STE"
 msgid "Samples are played by the Digidrum track, not by a hardware voice"
 msgstr "Les échantillons sont joués par la piste Digidrum, pas par une voix matérielle"
 
-msgid "Save the 8 samples as a named bank, load or delete a bank (library shared by all projects)"
-msgstr "Enregistrer les 8 échantillons en banque nommée, charger ou supprimer une banque (banques partagées entre projets)"
-
-msgid "Save the 8 slots as a named bank, load or delete a bank (library shared by all projects)"
-msgstr "Enregistrer les 8 emplacements en banque nommée, charger ou supprimer une banque (banques partagées entre projets)"
-
 msgid "Save the current patch to the library"
 msgstr "Enregistrer le patch courant dans la bibliothèque"
+
+msgid "Save the samples as a named bank, load or delete a bank (library shared by all projects)"
+msgstr "Enregistrer les échantillons en banque nommée, charger ou supprimer une banque (banques partagées entre projets)"
+
+msgid "Save the slots as a named bank, load or delete a bank (library shared by all projects)"
+msgstr "Enregistrer les emplacements en banque nommée, charger ou supprimer une banque (banques partagées entre projets)"
+
+msgid "Scale of the FM wave: Ratios, multiples of the note's frequency as TTrak's FM timers; Semitones, 0 to 127 semitones above the note as maxYMiser's square FM, which plays two steps per period of the note (Timer ratio x Steps = 2). Each scale keeps its own wave."
+msgstr "Échelle de l'onde FM : Ratios, multiples de la fréquence de la note comme les timers FM de TTrak ; Demi-tons, 0 à 127 demi-tons au-dessus de la note comme le square FM de maxYMiser, qui joue deux pas par période de la note (Rapport timer x Pas = 2). Chaque échelle garde sa propre onde."
 
 msgid "Scale root"
 msgstr "Tonique de la gamme"
@@ -1210,8 +1313,14 @@ msgstr "Emplacement {1} : vide"
 msgid "Slot {1}: {2} bytes"
 msgstr "Emplacement {1} : {2} octets"
 
+msgid "Slot {1}: {2} bytes, silent: past the memory of the Atari"
+msgstr "Emplacement {1} : {2} octets, muet : au-delà de la mémoire de l'Atari"
+
 msgid "Slot {1}: {2} values"
 msgstr "Emplacement {1} : {2} valeurs"
+
+msgid "Slot {1}: {2} values, silent: past the memory of the Atari"
+msgstr "Emplacement {1} : {2} valeurs, muet : au-delà de la mémoire de l'Atari"
 
 msgid "Smooth out a jagged curve"
 msgstr "Lisser une courbe irrégulière"
@@ -1219,14 +1328,14 @@ msgstr "Lisser une courbe irrégulière"
 msgid "Soft clip: a gentle saturation of the output instead of a hard clip"
 msgstr "Soft clip : une saturation douce de la sortie au lieu d'un écrêtage brutal"
 
-msgid "Solo the left side of the stereo sample"
-msgstr "Solo du côté gauche de l'échantillon stéréo"
+msgid "Solo the left side (both with Link)"
+msgstr "Solo du côté gauche (les deux avec Link)"
 
-msgid "Solo the right side of the stereo sample"
-msgstr "Solo du côté droit de l'échantillon stéréo"
+msgid "Solo the right side (both with Link)"
+msgstr "Solo du côté droit (les deux avec Link)"
 
-msgid "Sound generator of this channel: Chip Voice, SID Voice, Sync Buzzer, Chipdrum, Digidrum or the DMA sound of the STE"
-msgstr "Générateur de son de ce canal : Chip Voice, SID Voice, Sync Buzzer, Chipdrum, Digidrum ou le son DMA du STE"
+msgid "Sound generator of this channel: Chip Voice, SID Voice, Sync Buzzer, FM Voice, Chipdrum, Digidrum or the DMA sound of the STE"
+msgstr "Générateur de son de ce canal : Chip Voice, SID Voice, Sync Buzzer, FM Voice, Chipdrum, Digidrum ou le son DMA du STE"
 
 msgid "Sound source of this channel: square wave, noise, both or neither, with the fixed volume or the envelope"
 msgstr "Source sonore de ce canal : onde carrée, bruit, les deux ou aucun, avec le volume fixe ou l'enveloppe"
@@ -1246,6 +1355,12 @@ msgstr "Saisie pas à pas : jouer une note l'écrit au curseur"
 msgid "Step {1}"
 msgstr "Pas {1}"
 
+msgid "Step {1}: +{2} semitone above the note. Drag to draw, wheel to adjust, right click for a slider."
+msgstr "Pas {1} : +{2} demi-ton au-dessus de la note. Glisser pour dessiner, molette pour régler, clic droit pour un curseur."
+
+msgid "Step {1}: +{2} semitones above the note. Drag to draw, wheel to adjust, right click for a slider."
+msgstr "Pas {1} : +{2} demi-tons au-dessus de la note. Glisser pour dessiner, molette pour régler, clic droit pour un curseur."
+
 msgid "Step {1}: no pitch shift. Drag to draw the pitch table."
 msgstr "Pas {1} : hauteur inchangée. Glisser pour dessiner la table de hauteur."
 
@@ -1257,6 +1372,9 @@ msgstr "Pas {1} : volume {2}. Glisser pour dessiner, molette pour régler, clic
 
 msgid "Step {1}: volume {2}. Square wave: the note's volume, then SID min vol. Choose Custom in the menu to draw a wave."
 msgstr "Pas {1} : volume {2}. Onde carrée : le volume de la note, puis SID min vol. Choisissez Custom dans le menu pour dessiner une onde."
+
+msgid "Step {1}: x{2} the note's frequency. Drag to draw, wheel to adjust, right click for a slider."
+msgstr "Pas {1} : x{2} la fréquence de la note. Glisser pour dessiner, molette pour régler, clic droit pour un curseur."
 
 msgid "Step {1}: {2} semitone. Drag to draw the pitch table."
 msgstr "Pas {1} : {2} demi-ton. Glisser pour dessiner la table de hauteur."
@@ -1270,14 +1388,17 @@ msgstr "Pas avant que cette piste ne reboucle"
 msgid "Steps for the vibrato to reach its full depth"
 msgstr "Pas pour que le vibrato atteigne sa pleine profondeur"
 
+msgid "Steps of the FM wave, one per timer interrupt: each step plays the note's period divided by its multiple (Ratios) or the note raised by its semitones (Semitones)"
+msgstr "Pas de l'onde FM, un par interruption du timer : chaque pas joue la période de la note divisée par son multiple (Ratios) ou la note montée de ses demi-tons (Demi-tons)"
+
 msgid "Steps of the SID wave, one per timer interrupt: those of a period of the Square, or the bars played of Sine, Bounce and Custom. Base has none"
 msgstr "Pas de l'onde SID, un par interruption du timer : ceux d'une période du Square, ou les barres jouées de Sine, Bounce et Custom. Base n'en a pas"
 
 msgid "Steps of the Sync Buzzer, one per restart (0: the track's shape every time)"
 msgstr "Pas du Sync Buzzer, un par relance (0 : la forme de la piste à chaque fois)"
 
-msgid "Stereo: bytes interleaved left, right (a mono sample is doubled, 16 KB per side at most)"
-msgstr "Stereo : octets entrelacés gauche, droite (un échantillon mono est doublé, 16 KB par côté au plus)"
+msgid "Stereo: bytes interleaved left, right (a mono sample is doubled)"
+msgstr "Stereo : octets entrelacés gauche, droite (un échantillon mono est doublé)"
 
 msgid "Stereo: the tools work on the left channel"
 msgstr "Stéréo : les outils agissent sur le canal gauche"
@@ -1324,11 +1445,14 @@ msgstr "Sync au tempo : un écho par Division, au tempo de l'hôte dans un DAW,
 msgid "Sync to the tempo: one step per Division, at the host's tempo in a DAW, the sequencer's otherwise; off: Rate in Hz"
 msgstr "Synchro au tempo : un pas par Division, au tempo de l'hôte dans un DAW, du séquenceur sinon ; éteint : Rate en Hz"
 
+msgid "TIK: replay ticks of each line from this step on, for every track (Ticks timing)"
+msgstr "TIK : ticks de replay de chaque ligne à partir de ce pas, pour toutes les pistes (cadence Ticks)"
+
 msgid "TON: tune this step by semitones"
 msgstr "TON : accorder ce pas par demi-tons"
 
-msgid "TRASH"
-msgstr "CORBEILLE"
+msgid "TTrak plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "TTrak joue les trois voies d'une puce : passer en Authentic 3ch"
 
 msgid "TUN: fine tune of the track in cents from this step on"
 msgstr "TUN : accord fin de la piste en cents à partir de ce pas"
@@ -1345,6 +1469,12 @@ msgstr "La hauteur de table (ARP, PER, FIX) modifie le timer (SID, Sync Buzzer) 
 msgid "Table speed, in VBL ticks per step"
 msgstr "Vitesse de la table, en ticks VBL par pas"
 
+msgid "Tabs of the tracks after"
+msgstr "Onglets des pistes suivantes"
+
+msgid "Tabs of the tracks before"
+msgstr "Onglets des pistes précédentes"
+
 msgid "Take this command out of the step"
 msgstr "Retirer cette commande du pas"
 
@@ -1357,17 +1487,38 @@ msgstr "Tempo en battements par minute"
 msgid "Tempo of every track from this step on, until the next BPM (standalone application, BPM timing)"
 msgstr "Tempo de toutes les pistes à partir de ce pas, jusqu'au BPM suivant (application autonome, cadence BPM)"
 
+msgid "The 32 instruments after"
+msgstr "Les 32 instruments suivants"
+
+msgid "The 32 instruments before"
+msgstr "Les 32 instruments précédents"
+
 msgid "The DMA sample of this step starts this far in, in steps of 256 frames"
 msgstr "Le sample DMA de ce pas démarre aussi loin, par pas de 256 trames"
 
 msgid "The Digidrum track plays samples only"
 msgstr "La piste Digidrum ne joue que des échantillons"
 
+msgid "The Song is empty: add entries in the Song window"
+msgstr "La Song est vide : ajoutez des entrées dans la fenêtre Song"
+
 msgid "The bank file could not be read"
 msgstr "Impossible de lire le fichier de banque"
 
 msgid "The chip plays the nearest period it can: at 2 MHz, an A4 at 440 Hz plays 440.14 Hz"
 msgstr "La puce joue la période la plus proche qu'elle peut : à 2 MHz, un La4 à 440 Hz joue 440,14 Hz"
+
+msgid "The eight samples after"
+msgstr "Les huit échantillons suivants"
+
+msgid "The eight samples before"
+msgstr "Les huit échantillons précédents"
+
+msgid "The eight slots after"
+msgstr "Les huit emplacements suivants"
+
+msgid "The eight slots before"
+msgstr "Les huit emplacements précédents"
 
 msgid "The envelope restarts at this tick of the line (0: at once)"
 msgstr "L'enveloppe repart à ce tick de la ligne (0 : tout de suite)"
@@ -1381,14 +1532,20 @@ msgstr "L'hôte ferme le plugin"
 msgid "The note goes on after this step: only the GAT of its last step acts"
 msgstr "La note continue après ce pas : seul le GAT de son dernier pas agit"
 
-msgid "The notes go to the focused track (or Layer); 16 ch only"
-msgstr "Les notes vont à la piste active (ou en Layer) ; 16 ch seulement"
+msgid "The notes go to the focused track (or Layer); 16 and 32 ch only"
+msgstr "Les notes vont à la piste active (ou en Layer) ; 16 et 32 ch seulement"
 
 msgid "The notes of this step start at this tick of the line"
 msgstr "Les notes de ce pas partent à ce tick de la ligne"
 
 msgid "The notes of this step stop at this tick of the line (0: at once)"
 msgstr "Les notes de ce pas s'arrêtent à ce tick de la ligne (0 : tout de suite)"
+
+msgid "The pads play the eight Digidrums after"
+msgstr "Les pads jouent les huit Digidrums suivants"
+
+msgid "The pads play the eight Digidrums before"
+msgstr "Les pads jouent les huit Digidrums précédents"
 
 msgid "The song cannot restart on a loop"
 msgstr "Le morceau ne peut reprendre sur une boucle"
@@ -1402,11 +1559,11 @@ msgstr "Cette piste DMA ne joue que le son DMA du STE"
 msgid "This track is monophonic: set Voicing to Polyphonic to write chords"
 msgstr "Cette piste est monophonique : régler Voicing sur Polyphonic pour écrire des accords"
 
+msgid "Those past it are silent and crossed out. 16 and 32 ch have no limit"
+msgstr "Ceux qui la dépassent sont muets et barrés. 16 et 32 ch n'ont pas de limite"
+
 msgid "Three octaves: the widest sweep, at the cost of very high notes"
 msgstr "Trois octaves : le balayage le plus large, au prix de notes très aiguës"
-
-msgid "Ticks per Line (Sxx): replay ticks of each line from this step (Ticks timing)"
-msgstr "Ticks par ligne (Sxx) : ticks de replay de chaque ligne à partir de ce pas (cadence Ticks)"
 
 msgid "Ticks: Host sync follows the host's beats, the lines use the resolution"
 msgstr "Ticks : Host sync suit les temps de l'hôte, les lignes suivent la résolution"
@@ -1432,14 +1589,23 @@ msgstr "Le temps va de gauche à droite. A, D et R sont des durées, S est le ni
 msgid "Time runs left to right. A, D and R are durations, S is the level held while the key is down. Steps: one register write per VBL tick"
 msgstr "Le temps va de gauche à droite. A, D et R sont des durées, S est le niveau tenu tant que la touche est enfoncée. Steps : une écriture de registre par tick VBL"
 
-msgid "Timer rate at the root note (the values are kept: the pitch moves). A file loads at this rate."
-msgstr "Fréquence du timer à la note de référence (valeurs conservées : la hauteur change). Un fichier se charge à cette fréquence."
+msgid "Timer rate at the root note (Resample off: the values are kept, the pitch moves). A file loads at this rate."
+msgstr "Fréquence du timer à la note de référence (Resample éteint : valeurs conservées, la hauteur change). Un fichier se charge à cette fréquence."
+
+msgid "Timer rate of the SID Voice or the FM Voice as a multiple of the note's frequency: 1 plays the note, 2 one octave higher"
+msgstr "Fréquence du timer de la SID Voice ou de la FM Voice en multiple de celle de la note : 1 joue la note, 2 une octave plus haut"
 
 msgid "Timer: the timer effects on the steps of the Atari MFP 68901, or Free, continuous"
 msgstr "Timer : les effets de timer sur les pas du MFP 68901 de l'Atari, ou Free, continus"
 
 msgid "Tooltips: show these help boxes, or not"
 msgstr "Infobulles : afficher ces bulles d'aide, ou non"
+
+msgid "Track edited: the one the grid shows and the main window's tabs choose"
+msgstr "Piste éditée : celle que montre la grille et que choisissent les onglets de la fenêtre principale"
+
+msgid "Track edited: the one the table shows and the main window's tabs choose"
+msgstr "Piste éditée : celle que montre la table et que choisissent les onglets de la fenêtre principale"
 
 msgid "Track length (polymeter)"
 msgstr "Longueur de la piste (polymètre)"
@@ -1483,6 +1649,9 @@ msgstr "Deux octaves : l'accord se répète une octave plus haut avant de boucl
 msgid "Type a length"
 msgstr "Saisir une longueur"
 
+msgid "Type a name here, or click an empty slot of the Instruments window"
+msgstr "Tapez un nom ici, ou cliquez sur un emplacement vide de la fenêtre Instruments"
+
 msgid "Type a value"
 msgstr "Saisir une valeur"
 
@@ -1513,8 +1682,14 @@ msgstr "VOL : accent. Glisser pour dessiner, clic droit pour un curseur"
 msgid "Value of one step"
 msgstr "Valeur d'un pas"
 
-msgid "Velocity: Accent (a gain in 16 ch, the 4-bit volume in 3 ch), Vol 4-bit or Off"
-msgstr "Vélocité : Accent (un gain en 16 ch, le volume 4 bits en 3 ch), Vol 4-bit ou Off"
+msgid "Velocity curve: how the force of a key becomes its velocity. Linear, as played; Soft, the light touches louder"
+msgstr "Courbe de vélocité : comment la force d'une touche devient sa vélocité. Linéaire, telle que jouée ; Douce, les touchers légers plus forts"
+
+msgid "Velocity curve: set Velocity to Accent or Vol 4-bit"
+msgstr "Courbe de vélocité : régler Vélocité sur Accent ou Vol 4 bits"
+
+msgid "Velocity: Accent (a gain in 16 and 32 ch, the 4-bit volume in 3 ch), Vol 4-bit or Off"
+msgstr "Vélocité : Accent (un gain en 16 et 32 ch, le volume 4 bits en 3 ch), Vol 4-bit ou Off"
 
 msgid "Vibrato depth in cents"
 msgstr "Profondeur du vibrato en cents"
@@ -1573,8 +1748,11 @@ msgstr "Volume : le volume 4 bits du canal, le même que dans le cadre SOURCE"
 msgid "Volume: the source plays the hardware envelope, the 4-bit volume is ignored"
 msgstr "Volume : la source joue l'enveloppe matérielle, le volume 4 bits est ignoré"
 
-msgid "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 channels)"
-msgstr "Ce que le LFO fait varier : volume, période de bruit, période d'enveloppe, rapport SID, hauteur ou panoramique (16 voies)"
+msgid "What Load takes from a stereo file: its left channel, its right channel, or both mixed"
+msgstr "Ce que Charger prend d'un fichier stéréo : son canal gauche, son canal droit, ou les deux mixés"
+
+msgid "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 and 32 channels)"
+msgstr "Ce que le LFO fait varier : volume, période de bruit, période d'enveloppe, rapport SID, hauteur ou panoramique (16 et 32 voies)"
 
 msgid "Width of the Square: the note volume over Width of its Steps, SID min vol over the rest (half and half by default). Square only"
 msgstr "Largeur du Square : le volume de la note sur Width de ses Steps, SID min vol sur le reste (moitié-moitié par défaut). Seulement avec Square"
@@ -1600,6 +1778,12 @@ msgstr "Écrire ce tempo dans le pas, pour toutes les pistes"
 msgid "YM Pad: the tone runs at period 0 under the envelope, about -6 dB"
 msgstr "YM Pad : le son tourne à la période 0 sous l'enveloppe, environ -6 dB"
 
+msgid "YM-Tracker plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "YM-Tracker joue les trois voies d'une puce : passer en Authentic 3ch"
+
+msgid "maxYMiser plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "maxYMiser joue les trois voies d'une puce : passer en Authentic 3ch"
+
 msgid "{1}: A DMA note plays its sample: no square, no noise, no envelope"
 msgstr "{1} : une note DMA joue son sample : ni carré, ni bruit, ni enveloppe"
 
@@ -1620,6 +1804,9 @@ msgstr "{1} : une note tenue garde l'instrument avec lequel elle est partie"
 
 msgid "{1}: A slide keeps the instrument of the note it starts from"
 msgstr "{1} : un glissé garde l'instrument de la note d'où il part"
+
+msgid "{1}: BPM timing: a line lasts by the tempo"
+msgstr "{1} : cadence BPM, une ligne dure selon le tempo"
 
 msgid "{1}: During a slide, only VOL acts"
 msgstr "{1} : pendant un glissé, seul VOL agit"
@@ -1668,3 +1855,5127 @@ msgstr "{1} : jouer ce son. Le façonner dans la fenêtre Drum Kit (Ctrl+K)."
 
 msgid "{1}: {2} voices per note ({3} semitones), {4} at most"
 msgstr "{1} : {2} voix par note ({3} demi-tons), {4} au plus"
+
+msgctxt "ui"
+msgid "(Apache-2.0). Fonts and icons from EmuTOS (GPL)."
+msgstr "(Apache-2.0). Polices et icônes d'EmuTOS (GPL)."
+
+msgctxt "ui"
+msgid "(Arnaud Carré) and ym2149-rs by slippyex (MIT)."
+msgstr "(Arnaud Carré) et ym2149-rs de slippyex (MIT)."
+
+msgctxt "ui"
+msgid "(per channel)"
+msgstr "(par canal)"
+
+msgctxt "ui"
+msgid "(shared)"
+msgstr "(partagée)"
+
+msgctxt "ui"
+msgid "({1} to {2}):"
+msgstr "({1} à {2}) :"
+
+msgctxt "ui"
+msgid "16 and 32 ch have no YM registers: switch to 3ch or 2x3ch."
+msgstr "Les 16 et 32 ch n'ont pas de registres YM : passez en 3ch ou 2x3ch."
+
+msgctxt "ui"
+msgid "16 ch plays 16 and leaves the others out."
+msgstr "16 ch en joue 16 et laisse les autres de côté."
+
+msgctxt "ui"
+msgid "16 ch plays up to 16 of them on DMA tracks;"
+msgstr "16 ch en joue jusqu'à 16 sur des pistes DMA ;"
+
+msgctxt "ui"
+msgid "3 ch: the eight DMA tracks follow the YM tracks. 16 and 32 ch: any track can use the DMA type."
+msgstr "3 ch : les huit pistes DMA suivent les pistes YM. 16 et 32 ch : toute piste peut prendre le type DMA."
+
+msgctxt "ui"
+msgid "32 ch plays up to 32 of them on DMA tracks;"
+msgstr "32 ch en joue jusqu'à 32 sur des pistes DMA ;"
+
+msgctxt "ui"
+msgid "3CH AUTH (shared env+noise)"
+msgstr "3CH AUTH (env+bruit partagés)"
+
+msgctxt "ui"
+msgid "3ch: the drum takes over this channel"
+msgstr "3ch : la percussion occupe ce canal"
+
+msgctxt "ui"
+msgid "3xx without a note before it in the pattern: {1}."
+msgstr "3xx sans note avant lui dans le motif : {1}."
+
+msgctxt "ui"
+msgid "4-bit"
+msgstr "4 bits"
+
+msgctxt "ui"
+msgid "50 Hz = VBL rate"
+msgstr "50 Hz = fréq. VBL"
+
+msgctxt "ui"
+msgid "68000 emulator by Karl Stenerud (MIT); ICE unpacking"
+msgstr "68000 Musashi de Karl Stenerud (MIT), décompression ICE"
+
+msgctxt "ui"
+msgid "68000 replay routine played at its timer rate. The register strip and scope follow."
+msgstr "Routine de replay 68000 jouée à la cadence de son timer. Les registres et l'oscilloscope suivent."
+
+msgctxt "ui"
+msgid "6th"
+msgstr "Sixte"
+
+msgctxt "ui"
+msgid "7 fifth  12 octave  19 x3  24 x4"
+msgstr "7 quinte  12 octave  19 x3  24 x4"
+
+msgctxt "ui"
+msgid "70 Hz (Monochrome)"
+msgstr "70 Hz (monochrome)"
+
+msgctxt "ui"
+msgid "8-bit signed samples, within the memory of the Atari. A DMA track plays one of them, tuned from its root note."
+msgstr "Échantillons 8 bits signés, dans la mémoire de l'Atari. Une piste DMA joue l'un d'eux, accordé d'après sa note de référence."
+
+msgctxt "ui"
+msgid "A frame is a replay tick of the tune ({1} Hz)."
+msgstr "Une trame est un tick de lecture du morceau ({1} Hz)."
+
+msgctxt "ui"
+msgid "A pattern of the song is damaged."
+msgstr "Un motif du morceau est endommagé."
+
+msgctxt "ui"
+msgid "ADPCM samples (not read): {1}."
+msgstr "Échantillons ADPCM (non lus) : {1}."
+
+msgctxt "ui"
+msgid "ADSR ENVELOPE"
+msgstr "ENVELOPPE ADSR"
+
+msgctxt "ui"
+msgid "ADSR stages beyond 15 ticks, clamped: {1}."
+msgstr "Étapes ADSR au-delà de 15 ticks, ramenées : {1}."
+
+msgctxt "ui"
+msgid "ARP (Jxx)"
+msgstr "ARP (Jxx)"
+
+msgctxt "ui"
+msgid "ARPEGGIATOR - {1}"
+msgstr "ARPÉGIATEUR - {1}"
+
+msgctxt "ui"
+msgid "Accent"
+msgstr "Accent"
+
+msgctxt "ui"
+msgid "Accents"
+msgstr "Accents"
+
+msgctxt "ui"
+msgid "AdLib channels (no OPL chip): {1} left out."
+msgstr "Canaux AdLib (pas de puce OPL) : {1} non repris."
+
+msgctxt "ui"
+msgid "AdLib instruments (no OPL chip): {1} left out."
+msgstr "Instruments AdLib (pas de puce OPL) : {1} non repris."
+
+msgctxt "ui"
+msgid "Add"
+msgstr "Ajouter"
+
+msgctxt "ui"
+msgid "Add appends the current pattern (again = +1 repeat, Shift+Add = new entry)."
+msgstr "Ajouter place le motif courant à la fin (encore = +1 répétition, Shift+Ajouter = nouvelle entrée)."
+
+msgctxt "ui"
+msgid "Add to song"
+msgstr "Ajouter au morceau"
+
+msgctxt "ui"
+msgid "Aftertouch"
+msgstr "Aftertouch"
+
+msgctxt "ui"
+msgid "Aftertouch curve"
+msgstr "Courbe d'aftertouch"
+
+msgctxt "ui"
+msgid "Aka pygmies"
+msgstr "Pygmées Aka"
+
+msgctxt "ui"
+msgid "All"
+msgstr "Tous"
+
+msgctxt "ui"
+msgid "All its notes and settings will be lost."
+msgstr "Toutes ses notes et ses réglages seront perdus."
+
+msgctxt "ui"
+msgid "All off"
+msgstr "Aucune"
+
+msgctxt "ui"
+msgid "All on"
+msgstr "Toutes"
+
+msgctxt "ui"
+msgid "Alt + click a note"
+msgstr "Alt + clic sur une note"
+
+msgctxt "ui"
+msgid "Always"
+msgstr "Toujours"
+
+msgctxt "ui"
+msgid "An export is already running."
+msgstr "Un export est déjà en cours."
+
+msgctxt "ui"
+msgid "An instrument names a missing sequence."
+msgstr "Un instrument désigne une séquence absente."
+
+msgctxt "ui"
+msgid "An instrument of the song is damaged."
+msgstr "Un instrument du morceau est endommagé."
+
+msgctxt "ui"
+msgid "Analog"
+msgstr "Analogique"
+
+msgctxt "ui"
+msgid "Apply"
+msgstr "Appliquer"
+
+msgctxt "ui"
+msgid "Arab"
+msgstr "Arabe"
+
+msgctxt "ui"
+msgid "Armed: the take starts when the host plays."
+msgstr "Armé : la prise démarre quand l'hôte joue."
+
+msgctxt "ui"
+msgid "Armed: the take starts when the sequencer plays."
+msgstr "Armé : la prise démarre quand le séquenceur joue."
+
+msgctxt "ui"
+msgid "Arpeggiator"
+msgstr "Arpégiateur"
+
+msgctxt "ui"
+msgid "Arpeggios and envelope periods that start after their note's attack, played from it: {1}."
+msgstr "Arpèges et périodes d'enveloppe qui commencent après l'attaque de leur note, joués dès elle : {1}."
+
+msgctxt "ui"
+msgid "Arrows"
+msgstr "Flèches"
+
+msgctxt "ui"
+msgid "At once"
+msgstr "Immédiat"
+
+msgctxt "ui"
+msgid "At tick"
+msgstr "Au tick"
+
+msgctxt "ui"
+msgid "Audio/MIDI settings"
+msgstr "Réglages audio/MIDI"
+
+msgctxt "ui"
+msgid "Audition"
+msgstr "Écouter"
+
+msgctxt "ui"
+msgid "Aug {1}"
+msgstr "Augm. {1}"
+
+msgctxt "ui"
+msgid "Augmented"
+msgstr "Augmenté"
+
+msgctxt "ui"
+msgid "Authentic 3ch"
+msgstr "Authentic 3ch"
+
+msgctxt "ui"
+msgid "Auto (detect)"
+msgstr "Auto (détection)"
+
+msgctxt "ui"
+msgid "BPM row tempos clamped to 32-255 BPM: {1}."
+msgstr "Tempos de la ligne BPM ramenés à 32-255 BPM : {1}."
+
+msgctxt "ui"
+msgid "Balance"
+msgstr "Balance"
+
+msgctxt "ui"
+msgid "Balance (-100 to 100):"
+msgstr "Balance (-100 à 100) :"
+
+msgctxt "ui"
+msgid "Bank"
+msgstr "Banque"
+
+msgctxt "ui"
+msgid "Bank name, 16 chars (same name: replaced):"
+msgstr "Nom de la banque, 16 car. (même nom : remplacée) :"
+
+msgctxt "ui"
+msgid "Banks"
+msgstr "Banques"
+
+msgctxt "ui"
+msgid "Base"
+msgstr "Base"
+
+msgctxt "ui"
+msgid "Bend"
+msgstr "Bend"
+
+msgctxt "ui"
+msgid "Bend range"
+msgstr "Plage du bend"
+
+msgctxt "ui"
+msgid "Beyond 10 minutes: {1} left out."
+msgstr "Au-delà de 10 minutes : {1} non repris."
+
+msgctxt "ui"
+msgid "Block: Copy"
+msgstr "Bloc : Copier"
+
+msgctxt "ui"
+msgid "Block: Cut"
+msgstr "Bloc : Couper"
+
+msgctxt "ui"
+msgid "Blues major"
+msgstr "Blues majeur"
+
+msgctxt "ui"
+msgid "Body"
+msgstr "Corps"
+
+msgctxt "ui"
+msgid "Bounce"
+msgstr "Rebond"
+
+msgctxt "ui"
+msgid "Bounce only"
+msgstr "Rebond seul"
+
+msgctxt "ui"
+msgid "Box (AtariAudio)"
+msgstr "Box (AtariAudio)"
+
+msgctxt "ui"
+msgid "Brazilian samba"
+msgstr "Samba brésilienne"
+
+msgctxt "ui"
+msgid "Built with JUCE (AGPLv3). Licences: see the"
+msgstr "Réalisé avec JUCE (AGPLv3). Licences : voir le"
+
+msgctxt "ui"
+msgid "Buzzer Slide"
+msgstr "Glissé de buzzer"
+
+msgctxt "ui"
+msgid "Buzzer ratios played at the nearest octave: {1}."
+msgstr "Rapports de buzzer joués à l'octave la plus proche : {1}."
+
+msgctxt "ui"
+msgid "CH {1} / {2}"
+msgstr "CH {1} / {2}"
+
+msgctxt "ui"
+msgid "CH {1} / {2} / {3}"
+msgstr "CH {1} / {2} / {3}"
+
+msgctxt "ui"
+msgid "CHIP: OK"
+msgstr "PUCE : OK"
+
+msgctxt "ui"
+msgid "CHIP: {1}"
+msgstr "PUCE : {1}"
+
+msgctxt "ui"
+msgid "COMPUTER KEYBOARD"
+msgstr "CLAVIER D'ORDINATEUR"
+
+msgctxt "ui"
+msgid "COMPUTER KEYBOARD: {1}"
+msgstr "CLAVIER D'ORDINATEUR : {1}"
+
+msgctxt "ui"
+msgid "Cancel"
+msgstr "Annuler"
+
+msgctxt "ui"
+msgid "Center"
+msgstr "Centre"
+
+msgctxt "ui"
+msgid "Central African"
+msgstr "Centrafricain"
+
+msgctxt "ui"
+msgid "Channel"
+msgstr "Canal"
+
+msgctxt "ui"
+msgid "Channel (track mixer)"
+msgstr "Canal (mixage de piste)"
+
+msgctxt "ui"
+msgid "Channel {1}"
+msgstr "Canal {1}"
+
+msgctxt "ui"
+msgid "Channel {1} [{2}]"
+msgstr "Canal {1} [{2}]"
+
+msgctxt "ui"
+msgid "Channels beyond the first three (one chip, Authentic 3ch): {1}."
+msgstr "Voies au-delà des trois premières (une puce, Authentic 3ch) : {1}."
+
+msgctxt "ui"
+msgid "Channels beyond the {1} DMA tracks: {2} left out."
+msgstr "Canaux au-delà des {1} pistes DMA : {2} non repris."
+
+msgctxt "ui"
+msgid "Channels on the track of one that never plays at the same time: {1}."
+msgstr "Canaux sur la piste d'un autre qui ne joue jamais en même temps : {1}."
+
+msgctxt "ui"
+msgid "Channels {1}-{2} already contain data."
+msgstr "Les canaux {1}-{2} contiennent déjà des données."
+
+msgctxt "ui"
+msgid "Chip"
+msgstr "Puce"
+
+msgctxt "ui"
+msgid "Chip Voice"
+msgstr "Chip Voice"
+
+msgctxt "ui"
+msgid "Chip Voice: no settings of its own"
+msgstr "Chip Voice : aucun réglage propre"
+
+msgctxt "ui"
+msgid "Chip clock"
+msgstr "Horloge puce"
+
+msgctxt "ui"
+msgid "Chip conformity"
+msgstr "Conformité à la puce"
+
+msgctxt "ui"
+msgid "Chipdrum"
+msgstr "Chipdrum"
+
+msgctxt "ui"
+msgid "Chipdrum and DMA notes"
+msgstr "notes Chipdrum et DMA"
+
+msgctxt "ui"
+msgid "Chipdrum only: do not retrigger while it still rings"
+msgstr "Chipdrum seul : ne pas redéclencher tant qu'il résonne"
+
+msgctxt "ui"
+msgid "Choose the song (.MYS) of the voiceset"
+msgstr "Choisir le morceau (.MYS) du jeu d'instruments"
+
+msgctxt "ui"
+msgid "Choose the voiceset (.MYV) of the song"
+msgstr "Choisir le jeu d'instruments (.MYV) du morceau"
+
+msgctxt "ui"
+msgid "Chord"
+msgstr "Accord"
+
+msgctxt "ui"
+msgid "Chord..."
+msgstr "Accord..."
+
+msgctxt "ui"
+msgid "Chromatic"
+msgstr "Chromatique"
+
+msgctxt "ui"
+msgid "Ch{1} CC {2} {3}"
+msgstr "Ch{1} CC {2} {3}"
+
+msgctxt "ui"
+msgid "Ch{1} Note off {2} {3}"
+msgstr "Ch{1} Note off {2} {3}"
+
+msgctxt "ui"
+msgid "Ch{1} Note on {2} {3}"
+msgstr "Ch{1} Note on {2} {3}"
+
+msgctxt "ui"
+msgid "Ch{1} Pitch bend {2}"
+msgstr "Ch{1} Pitch bend {2}"
+
+msgctxt "ui"
+msgid "Ch{1} Poly AT {2} {3}"
+msgstr "Ch{1} Poly AT {2} {3}"
+
+msgctxt "ui"
+msgid "Ch{1} Pressure {2}"
+msgstr "Ch{1} Pression {2}"
+
+msgctxt "ui"
+msgid "Ch{1} Program {2}"
+msgstr "Ch{1} Programme {2}"
+
+msgctxt "ui"
+msgid "Clap"
+msgstr "Clap"
+
+msgctxt "ui"
+msgid "Classical"
+msgstr "Classique"
+
+msgctxt "ui"
+msgid "Clear"
+msgstr "Effacer"
+
+msgctxt "ui"
+msgid "Clear MIDI map"
+msgstr "Effacer le mappage MIDI"
+
+msgctxt "ui"
+msgid "Clear block (n/a)"
+msgstr "Effacer le bloc (n/d)"
+
+msgctxt "ui"
+msgid "Clear the MIDI monitor?"
+msgstr "Effacer le moniteur MIDI ?"
+
+msgctxt "ui"
+msgid "Clear track {1}?"
+msgstr "Effacer la piste {1} ?"
+
+msgctxt "ui"
+msgid "Click = load into focused channel. Right click for actions."
+msgstr "Clic = charger dans le canal courant. Clic droit : actions."
+
+msgctxt "ui"
+msgid "Click a mixer scope"
+msgstr "Clic sur un oscilloscope du Mixeur"
+
+msgctxt "ui"
+msgid "Click a note"
+msgstr "Clic sur une note"
+
+msgctxt "ui"
+msgid "Click an empty cell"
+msgstr "Clic sur une case vide"
+
+msgctxt "ui"
+msgid "Click selects (Shift = multi). Right click for actions."
+msgstr "Clic : sélection (Shift = plusieurs). Clic droit : actions."
+
+msgctxt "ui"
+msgid "Click: load into the focused channel, or store it in an empty slot. Right click for actions."
+msgstr "Clic : charger dans le canal courant, ou mémoriser dans un emplacement vide. Clic droit : actions."
+
+msgctxt "ui"
+msgid "Clock"
+msgstr "Horloge"
+
+msgctxt "ui"
+msgid "Closed Hat"
+msgstr "Closed Hat"
+
+msgctxt "ui"
+msgid "Color"
+msgstr "Couleur"
+
+msgctxt "ui"
+msgid "Commands - step {1}"
+msgstr "Commandes - pas {1}"
+
+msgctxt "ui"
+msgid "Computer"
+msgstr "Ordinateur"
+
+msgctxt "ui"
+msgid "Computer keyboard"
+msgstr "Clavier d'ordinateur"
+
+msgctxt "ui"
+msgid "Computer: ST. The DMA sound needs the STE."
+msgstr "Ordinateur : ST. Le son DMA demande le STE."
+
+msgctxt "ui"
+msgid "Computer: STE, DMA tracks {1} to {2}."
+msgstr "Ordinateur : STE, pistes DMA {1} à {2}."
+
+msgctxt "ui"
+msgid "Computer: STE, any track can use the DMA type."
+msgstr "Ordinateur : STE, toute piste peut prendre le type DMA."
+
+msgctxt "ui"
+msgid "Configuration"
+msgstr "Configuration"
+
+msgctxt "ui"
+msgid "Configuration read error."
+msgstr "Erreur de lecture de la configuration."
+
+msgctxt "ui"
+msgid "Continue"
+msgstr "Reprise"
+
+msgctxt "ui"
+msgid "Copy"
+msgstr "Copier"
+
+msgctxt "ui"
+msgid "Copy ({1} notes)"
+msgstr "Copier ({1} notes)"
+
+msgctxt "ui"
+msgid "Copy ({1})"
+msgstr "Copier ({1})"
+
+msgctxt "ui"
+msgid "Copy block (n/a)"
+msgstr "Copier le bloc (n/d)"
+
+msgctxt "ui"
+msgid "Copy row"
+msgstr "Copier la ligne"
+
+msgctxt "ui"
+msgid "Copy settings"
+msgstr "Copier les réglages"
+
+msgctxt "ui"
+msgid "Corrupt MOD module."
+msgstr "Module MOD corrompu."
+
+msgctxt "ui"
+msgid "Corrupt OKT module."
+msgstr "Module OKT corrompu."
+
+msgctxt "ui"
+msgid "Corrupt S3M module."
+msgstr "Module S3M corrompu."
+
+msgctxt "ui"
+msgid "Corrupt TTrak module header."
+msgstr "En-tête du module TTrak endommagé."
+
+msgctxt "ui"
+msgid "Corrupt TTrak sample table."
+msgstr "Table des samples TTrak endommagée."
+
+msgctxt "ui"
+msgid "Corrupt XM header."
+msgstr "En-tête XM corrompu."
+
+msgctxt "ui"
+msgid "Corrupt XM instrument."
+msgstr "Instrument XM corrompu."
+
+msgctxt "ui"
+msgid "Corrupt XM pattern."
+msgstr "Motif XM corrompu."
+
+msgctxt "ui"
+msgid "Corrupt digidrum in the voiceset."
+msgstr "Digidrum corrompu dans le jeu d'instruments."
+
+msgctxt "ui"
+msgid "Corrupt pattern in the song."
+msgstr "Motif corrompu dans le morceau."
+
+msgctxt "ui"
+msgid "Corrupt song header."
+msgstr "En-tête du morceau corrompu."
+
+msgctxt "ui"
+msgid "Curve"
+msgstr "Courbe"
+
+msgctxt "ui"
+msgid "Custom"
+msgstr "Perso."
+
+msgctxt "ui"
+msgid "Custom chip clock in MHz"
+msgstr "Horloge puce personnalisée en MHz"
+
+msgctxt "ui"
+msgid "Custom {1} MHz"
+msgstr "Perso. {1} MHz"
+
+msgctxt "ui"
+msgid "Custom {1} MHz..."
+msgstr "Perso. {1} MHz..."
+
+msgctxt "ui"
+msgid "Custom {1} lines"
+msgstr "Perso. {1} lignes"
+
+msgctxt "ui"
+msgid "Custom {1} lines..."
+msgstr "Perso. {1} lignes..."
+
+msgctxt "ui"
+msgid "Custom..."
+msgstr "Perso..."
+
+msgctxt "ui"
+msgid "Cut"
+msgstr "Couper"
+
+msgctxt "ui"
+msgid "Cut ({1})"
+msgstr "Couper ({1})"
+
+msgctxt "ui"
+msgid "Cut block (n/a)"
+msgstr "Couper le bloc (n/d)"
+
+msgctxt "ui"
+msgid "Cycles"
+msgstr "Cycles"
+
+msgctxt "ui"
+msgid "DIGIDRUMS"
+msgstr "DIGIDRUMS"
+
+msgctxt "ui"
+msgid "DMA (STE)"
+msgstr "DMA (STE)"
+
+msgctxt "ui"
+msgid "DMA - STE"
+msgstr "DMA - STE"
+
+msgctxt "ui"
+msgid "DMA samples"
+msgstr "Échantillons DMA"
+
+msgctxt "ui"
+msgid "DRUM KIT"
+msgstr "BATTERIE"
+
+msgctxt "ui"
+msgid "Decay"
+msgstr "Déclin"
+
+msgctxt "ui"
+msgid "Delay"
+msgstr "Delay"
+
+msgctxt "ui"
+msgid "Delete"
+msgstr "Supprimer"
+
+msgctxt "ui"
+msgid "Delete bank"
+msgstr "Supprimer banque"
+
+msgctxt "ui"
+msgid "Delete bank \"{1}\" from the library?"
+msgstr "Supprimer la banque \"{1}\" de la bibliothèque ?"
+
+msgctxt "ui"
+msgid "Delete the recorded take?"
+msgstr "Supprimer la prise enregistrée ?"
+
+msgctxt "ui"
+msgid "Demo pattern"
+msgstr "Motif de démo"
+
+msgctxt "ui"
+msgid "Depth"
+msgstr "Prof."
+
+msgctxt "ui"
+msgid "Deselect"
+msgstr "Désélectionner"
+
+msgctxt "ui"
+msgid "Detune"
+msgstr "Désaccord"
+
+msgctxt "ui"
+msgid "Detune and Analog"
+msgstr "Désaccord et Analogique"
+
+msgctxt "ui"
+msgid "Digi"
+msgstr "Digi"
+
+msgctxt "ui"
+msgid "Digidrum"
+msgstr "Digidrum"
+
+msgctxt "ui"
+msgid "Digidrum hits beyond 255 samples: {1}."
+msgstr "Frappes de digidrum au-delà de 255 échantillons : {1}."
+
+msgctxt "ui"
+msgid "Digidrum hits beyond 3 octaves of their slot's rate: {1}."
+msgstr "Frappes de digidrum à plus de 3 octaves de la fréquence de leur emplacement : {1}."
+
+msgctxt "ui"
+msgid "Digidrum hits beyond 8 samples: {1}."
+msgstr "Frappes de digidrum au-delà de 8 échantillons : {1}."
+
+msgctxt "ui"
+msgid "Digidrum hits left out: {1}."
+msgstr "Frappes de digidrum non reprises : {1}."
+
+msgctxt "ui"
+msgid "Digidrum hits of channels other than {1} left out (one Digidrum track): {2}."
+msgstr "Frappes de digidrum des canaux autres que {1} non reprises (une seule piste Digidrum) : {2}."
+
+msgctxt "ui"
+msgid "Digidrum hits of other channels, played on channel {1}: {2}."
+msgstr "Frappes de digidrum d'autres voies, jouées sur la voie {1} : {2}."
+
+msgctxt "ui"
+msgid "Digidrum hits on empty slots"
+msgstr "Frappes de digidrum sur des emplacements vides"
+
+msgctxt "ui"
+msgid "Digidrum hits on the same row as another: {1}."
+msgstr "Frappes de digidrum sur la même ligne qu'une autre : {1}."
+
+msgctxt "ui"
+msgid "Digidrum hits without a sample in the bank: {1}."
+msgstr "Frappes de digidrum sans échantillon dans la banque : {1}."
+
+msgctxt "ui"
+msgid "Digidrum of pad {1}"
+msgstr "Digidrum du pad {1}"
+
+msgctxt "ui"
+msgid "Digidrum rates beyond 65535 Hz, clamped: {1}."
+msgstr "Fréquences de digidrum au-delà de 65535 Hz, ramenées : {1}."
+
+msgctxt "ui"
+msgid "Digidrum samples"
+msgstr "Échantillons Digidrum"
+
+msgctxt "ui"
+msgid "Digidrum samples cut to their 3 seconds: {1}."
+msgstr "Échantillons de digidrum coupés à 3 secondes : {1}."
+
+msgctxt "ui"
+msgid "Digidrum samples on track 4: {1}."
+msgstr "Échantillons de digidrum sur la piste 4 : {1}."
+
+msgctxt "ui"
+msgid "Digidrum {1} played once, without its loop."
+msgstr "Digidrum {1} joué une fois, sans sa boucle."
+
+msgctxt "ui"
+msgid "Digidrum: on track {1}, the Digidrum track."
+msgstr "Digidrum : sur la piste {1}, la piste Digidrum."
+
+msgctxt "ui"
+msgid "Digidrums"
+msgstr "Digidrums"
+
+msgctxt "ui"
+msgid "Digidrums past the 32 samples of TTrak left out: {1}."
+msgstr "Digidrums au-delà des 32 samples de TTrak non repris : {1}."
+
+msgctxt "ui"
+msgid "Diminished"
+msgstr "Diminué"
+
+msgctxt "ui"
+msgid "Diminished (H-W)"
+msgstr "Diminuée (1/2-1)"
+
+msgctxt "ui"
+msgid "Diminished (W-H)"
+msgstr "Diminuée (1-1/2)"
+
+msgctxt "ui"
+msgid "Diminished {1}"
+msgstr "Diminué {1}"
+
+msgctxt "ui"
+msgid "Discard the changes?"
+msgstr "Abandonner les modifications ?"
+
+msgctxt "ui"
+msgid "Division"
+msgstr "Division"
+
+msgctxt "ui"
+msgid "Dominant {1}"
+msgstr "Dominante {1}"
+
+msgctxt "ui"
+msgid "Dorian"
+msgstr "Dorien"
+
+msgctxt "ui"
+msgid "Double click a mixer pan"
+msgstr "Double-clic sur un pan du Mixeur"
+
+msgctxt "ui"
+msgid "Double harmonic"
+msgstr "Double harmonique"
+
+msgctxt "ui"
+msgid "Double octave"
+msgstr "Double octave"
+
+msgctxt "ui"
+msgid "Down"
+msgstr "Descente"
+
+msgctxt "ui"
+msgid "Down {1}"
+msgstr "Descente {1}"
+
+msgctxt "ui"
+msgid "Drag a note"
+msgstr "Glisser une note"
+
+msgctxt "ui"
+msgid "Drag a song block"
+msgstr "Glisser un bloc du morceau"
+
+msgctxt "ui"
+msgid "Drag from an empty cell"
+msgstr "Glisser depuis une case vide"
+
+msgctxt "ui"
+msgid "Drag past the first / last column"
+msgstr "Glisser au-delà de la première / dernière colonne"
+
+msgctxt "ui"
+msgid "Drag past the top / bottom row"
+msgstr "Glisser au-delà de la ligne du haut / du bas"
+
+msgctxt "ui"
+msgid "Drop"
+msgstr "Perte"
+
+msgctxt "ui"
+msgid "Drum Kit"
+msgstr "Batterie"
+
+msgctxt "ui"
+msgid "Drum kit"
+msgstr "Batterie"
+
+msgctxt "ui"
+msgid "Drum pads"
+msgstr "Pads batterie"
+
+msgctxt "ui"
+msgid "Dual chip 2x3ch"
+msgstr "2 puces 2x3ch"
+
+msgctxt "ui"
+msgid "Duplicate"
+msgstr "Dupliquer"
+
+msgctxt "ui"
+msgid "Duplicate ({1})"
+msgstr "Dupliquer ({1})"
+
+msgctxt "ui"
+msgid "E({1}) {2}"
+msgstr "E({1}) {2}"
+
+msgctxt "ui"
+msgid "EFFECTS - {1}"
+msgstr "EFFETS - {1}"
+
+msgctxt "ui"
+msgid "EFFECTS - {1} [{2}]"
+msgstr "EFFETS - {1} [{2}]"
+
+msgctxt "ui"
+msgid "ENVELOPE"
+msgstr "ENVELOPPE"
+
+msgctxt "ui"
+msgid "ENVELOPE - {1}"
+msgstr "ENVELOPPE - {1}"
+
+msgctxt "ui"
+msgid "EP ="
+msgstr "PE ="
+
+msgctxt "ui"
+msgid "Echo"
+msgstr "Écho"
+
+msgctxt "ui"
+msgid "Edit"
+msgstr "Édition"
+
+msgctxt "ui"
+msgid "Effects"
+msgstr "Effets"
+
+msgctxt "ui"
+msgid "Effects left out: {1}"
+msgstr "Effets non repris : {1}"
+
+msgctxt "ui"
+msgid "Effects without room in their cell: {1}."
+msgstr "Effets sans place dans leur case : {1}."
+
+msgctxt "ui"
+msgid "Emulation after AtariAudio by Leonard/Oxygene"
+msgstr "Émulation d'après AtariAudio de Leonard/Oxygene"
+
+msgctxt "ui"
+msgid "End"
+msgstr "Fin"
+
+msgctxt "ui"
+msgid "Ends at {1}% of the interval: the slide stops short of the target note."
+msgstr "Finit à {1}% de l'intervalle : le glissé s'arrête avant la note cible."
+
+msgctxt "ui"
+msgid "English (C D E)"
+msgstr "Anglais (C D E)"
+
+msgctxt "ui"
+msgid "Enter"
+msgstr "Enter"
+
+msgctxt "ui"
+msgid "Entries to play again before this loop (1-255):"
+msgstr "Entrées à rejouer avant cette boucle (1-255) :"
+
+msgctxt "ui"
+msgid "Entry"
+msgstr "Entrée"
+
+msgctxt "ui"
+msgid "Env"
+msgstr "Env"
+
+msgctxt "ui"
+msgid "Env freq"
+msgstr "Fréq. env."
+
+msgctxt "ui"
+msgid "Env period"
+msgstr "Période env."
+
+msgctxt "ui"
+msgid "Envelope"
+msgstr "Enveloppe"
+
+msgctxt "ui"
+msgid "Envelope restart"
+msgstr "Relance d'enveloppe"
+
+msgctxt "ui"
+msgid "Envelope restarts left out (one per step): {1}."
+msgstr "Relances d'enveloppe non reprises (une par pas) : {1}."
+
+msgctxt "ui"
+msgid "Envelope restarts within a row left out: {1}."
+msgstr "Relances d'enveloppe en cours de ligne non reprises : {1}."
+
+msgctxt "ui"
+msgid "Euclid"
+msgstr "Euclide"
+
+msgctxt "ui"
+msgid "Euclidean generator"
+msgstr "Générateur euclidien"
+
+msgctxt "ui"
+msgid "Everything in this pattern can be written to YM registers."
+msgstr "Tout ce motif peut s'écrire dans les registres YM."
+
+msgctxt "ui"
+msgid "Expected a YM register dump (YM2 / YM3 / YM5 / YM6) or an SNDH file."
+msgstr "Attendu : un dump de registres YM (YM2 / YM3 / YM5 / YM6) ou un fichier SNDH."
+
+msgctxt "ui"
+msgid "Expected a YM, SNDH, maxYMiser, YM-Tracker,"
+msgstr "Attendu : un fichier YM, SNDH, maxYMiser, YM-Tracker,"
+
+msgctxt "ui"
+msgid "Expected a standard MIDI file (format 0 or 1) with notes."
+msgstr "Attendu : un fichier MIDI standard (format 0 ou 1) avec des notes."
+
+msgctxt "ui"
+msgid "Expected an XM, MOD, S3M, OKT, maxYMiser,"
+msgstr "Attendu : un fichier XM, MOD, S3M, OKT, maxYMiser,"
+
+msgctxt "ui"
+msgid "Exponential"
+msgstr "Exponentielle"
+
+msgctxt "ui"
+msgid "Export"
+msgstr "Exporter"
+
+msgctxt "ui"
+msgid "Export pattern"
+msgstr "Exporter le motif"
+
+msgctxt "ui"
+msgid "Export song"
+msgstr "Exporter le morceau"
+
+msgctxt "ui"
+msgid "Export the patch library"
+msgstr "Exporter la bibliothèque de patchs"
+
+msgctxt "ui"
+msgid "Export the pattern as MIDI"
+msgstr "Exporter le motif en MIDI"
+
+msgctxt "ui"
+msgid "Export the pattern as WAV"
+msgstr "Exporter le motif en WAV"
+
+msgctxt "ui"
+msgid "Export the pattern stems"
+msgstr "Exporter les stems du motif"
+
+msgctxt "ui"
+msgid "Export the song as MIDI"
+msgstr "Exporter le morceau en MIDI"
+
+msgctxt "ui"
+msgid "Export the song as WAV"
+msgstr "Exporter le morceau en WAV"
+
+msgctxt "ui"
+msgid "Export the song as {1}"
+msgstr "Exporter le morceau en {1}"
+
+msgctxt "ui"
+msgid "Export the song for TTrak"
+msgstr "Exporter le morceau pour TTrak"
+
+msgctxt "ui"
+msgid "Export the song for YM-Tracker"
+msgstr "Exporter le morceau pour YM-Tracker"
+
+msgctxt "ui"
+msgid "Export the song for maxYMiser"
+msgstr "Exporter le morceau pour maxYMiser"
+
+msgctxt "ui"
+msgid "Export the song stems"
+msgstr "Exporter les stems du morceau"
+
+msgctxt "ui"
+msgid "Export the take as {1}"
+msgstr "Exporter la prise en {1}"
+
+msgctxt "ui"
+msgid "Exporting patterns"
+msgstr "Export des motifs"
+
+msgctxt "ui"
+msgid "Exporting patterns:"
+msgstr "Export des motifs :"
+
+msgctxt "ui"
+msgid "Exporting songs"
+msgstr "Export des morceaux"
+
+msgctxt "ui"
+msgid "Exporting songs:"
+msgstr "Export des morceaux :"
+
+msgctxt "ui"
+msgid "Exx without the envelope"
+msgstr "Exx sans l'enveloppe"
+
+msgctxt "ui"
+msgid "FLOPPY DISK"
+msgstr "DISQUETTE"
+
+msgctxt "ui"
+msgid "FM Voice frames played as the note alone (TTrak's FM: four steps of x1, x1.5, x2 or x3, no envelope): {1}."
+msgstr "Trames de FM Voice jouées comme la note seule (FM de TTrak : quatre pas de x1, x1.5, x2 ou x3, sans enveloppe) : {1}."
+
+msgctxt "ui"
+msgid "FM Voice frames played as the note alone: {1}."
+msgstr "Trames de FM Voice jouées comme la note seule : {1}."
+
+msgctxt "ui"
+msgid "FM Voice frames whose steps play approximately (x0.5, x5 or more than 8 steps): {1}."
+msgstr "Trames de FM Voice dont les pas sont joués approximativement (x0.5, x5 ou plus de 8 pas) : {1}."
+
+msgctxt "ui"
+msgid "FM Voice steps (the note plays alone)"
+msgstr "pas de la FM Voice (la note joue seule)"
+
+msgctxt "ui"
+msgid "FM wave"
+msgstr "Onde FM"
+
+msgctxt "ui"
+msgid "Fade"
+msgstr "Fade"
+
+msgctxt "ui"
+msgid "Fade out"
+msgstr "Fondu"
+
+msgctxt "ui"
+msgid "Feedback"
+msgstr "Réinjection"
+
+msgctxt "ui"
+msgid "Fifth"
+msgstr "Quinte"
+
+msgctxt "ui"
+msgid "File"
+msgstr "Fichier"
+
+msgctxt "ui"
+msgid "Fine"
+msgstr "Accord fin"
+
+msgctxt "ui"
+msgid "Fine tune"
+msgstr "Accord fin"
+
+msgctxt "ui"
+msgid "Fit"
+msgstr "Ajuster"
+
+msgctxt "ui"
+msgid "Fit: each note keeps its time, on the steps of {1}/{2}."
+msgstr "Ajuster : chaque note garde sa place dans le temps, sur les pas de {1}/{2}."
+
+msgctxt "ui"
+msgid "Fix"
+msgstr "Fixe"
+
+msgctxt "ui"
+msgid "Follow"
+msgstr "Suivre"
+
+msgctxt "ui"
+msgid "Format"
+msgstr "Format"
+
+msgctxt "ui"
+msgid "Fourth"
+msgstr "Quarte"
+
+msgctxt "ui"
+msgid "Frames beyond TTrak's pitch tables (or a timer too slow): {1}."
+msgstr "Trames hors des tables de hauteur de TTrak (ou timer trop lent) : {1}."
+
+msgctxt "ui"
+msgid "Frames per step"
+msgstr "Trames par pas"
+
+msgctxt "ui"
+msgid "Frames played with the closest of the 32 instruments: {1}."
+msgstr "Trames jouées avec le plus proche des 32 instruments : {1}."
+
+msgctxt "ui"
+msgid "Frames that TTrak plays otherwise: {1} of {2}."
+msgstr "Trames que TTrak joue autrement : {1} sur {2}."
+
+msgctxt "ui"
+msgid "Frames whose buzzer or timer pitch is approximate (a third generator): {1}."
+msgstr "Trames dont la hauteur du buzzer ou du timer est approchée (un troisième générateur) : {1}."
+
+msgctxt "ui"
+msgid "Frames whose timer effect differs from their row's: {1}."
+msgstr "Trames dont l'effet de timer diffère de celui de leur ligne : {1}."
+
+msgctxt "ui"
+msgid "Free"
+msgstr "Libre"
+
+msgctxt "ui"
+msgid "Free software under the GNU Affero General Public"
+msgstr "Logiciel libre sous licence GNU Affero General Public"
+
+msgctxt "ui"
+msgid "GEN Chip Voice on a Sync Buzzer"
+msgstr "GEN Chip Voice sur un Sync Buzzer"
+
+msgctxt "ui"
+msgid "GEN on held steps"
+msgstr "GEN sur des pas tenus"
+
+msgctxt "ui"
+msgid "GEN: generator. FIX: fixed note. OUT: pitch of C4 (+-12). Right click: a slider on VOL, PER and NP; clears MIX, GEN, FIX."
+msgstr "GEN : générateur. FIX : note fixe. OUT : hauteur du C4 (+-12). Clic droit : un curseur sur VOL, PER et NP ; efface MIX, GEN, FIX."
+
+msgctxt "ui"
+msgid "GENERATOR"
+msgstr "GÉNÉRATEUR"
+
+msgctxt "ui"
+msgid "GENERATOR - {1} [{2}]"
+msgstr "GÉNÉRATEUR - {1} [{2}]"
+
+msgctxt "ui"
+msgid "Gate"
+msgstr "Gate"
+
+msgctxt "ui"
+msgid "Generator"
+msgstr "Générateur"
+
+msgctxt "ui"
+msgid "Ghost"
+msgstr "Fantôme"
+
+msgctxt "ui"
+msgid "Global"
+msgstr "Global"
+
+msgctxt "ui"
+msgid "Grid guessed from {1} notes: {2} % of them start on a step."
+msgstr "Grille déduite de {1} notes : {2} % d'entre elles commencent sur un pas."
+
+msgctxt "ui"
+msgid "Groove: ticks added to each line, up to 16 values (0-15)"
+msgstr "Groove : ticks ajoutés à chaque ligne, jusqu'à 16 valeurs (0-15)"
+
+msgctxt "ui"
+msgid "Groove: {1} {2} {3} {4}..."
+msgstr "Groove : {1} {2} {3} {4}..."
+
+msgctxt "ui"
+msgid "Groove: {1}..."
+msgstr "Groove : {1}..."
+
+msgctxt "ui"
+msgid "Half-dim {1}"
+msgstr "Demi-dim. {1}"
+
+msgctxt "ui"
+msgid "Hard"
+msgstr "Dure"
+
+msgctxt "ui"
+msgid "Hard sync"
+msgstr "Hard sync"
+
+msgctxt "ui"
+msgid "Harmonic minor"
+msgstr "Mineur harmonique"
+
+msgctxt "ui"
+msgid "Hat"
+msgstr "Hat"
+
+msgctxt "ui"
+msgid "Held notes"
+msgstr "Notes tenues"
+
+msgctxt "ui"
+msgid "Hi cut"
+msgstr "Coupe-haut"
+
+msgctxt "ui"
+msgid "Hold"
+msgstr "Tenue"
+
+msgctxt "ui"
+msgid "Home / End"
+msgstr "Home / End"
+
+msgctxt "ui"
+msgid "Host"
+msgstr "Hôte"
+
+msgctxt "ui"
+msgid "Hungarian minor"
+msgstr "Mineur hongrois"
+
+msgctxt "ui"
+msgid "INSTRUMENTS"
+msgstr "INSTRUMENTS"
+
+msgctxt "ui"
+msgid "INTERFACE"
+msgstr "INTERFACE"
+
+msgctxt "ui"
+msgid "Import"
+msgstr "Importer"
+
+msgctxt "ui"
+msgid "Import a MIDI file"
+msgstr "Importer un fichier MIDI"
+
+msgctxt "ui"
+msgid "Import a patch library"
+msgstr "Importer une bibliothèque de patchs"
+
+msgctxt "ui"
+msgid "Import a tracker song"
+msgstr "Importer un morceau de tracker"
+
+msgctxt "ui"
+msgid "Import an SNDH or YM file"
+msgstr "Importer un fichier SNDH ou YM"
+
+msgctxt "ui"
+msgid "Import the SNDH file as patterns"
+msgstr "Importer le fichier SNDH en motifs"
+
+msgctxt "ui"
+msgid "Import the YM file as patterns"
+msgstr "Importer le fichier YM en motifs"
+
+msgctxt "ui"
+msgid "Importing files"
+msgstr "Import de fichiers"
+
+msgctxt "ui"
+msgid "Importing files:"
+msgstr "Import de fichiers :"
+
+msgctxt "ui"
+msgid "Information"
+msgstr "Informations"
+
+msgctxt "ui"
+msgid "Information demo"
+msgstr "Démo des informations"
+
+msgctxt "ui"
+msgid "Ins or A"
+msgstr "Ins ou A"
+
+msgctxt "ui"
+msgid "Insert loop"
+msgstr "Insérer une boucle"
+
+msgctxt "ui"
+msgid "Insert note-off"
+msgstr "Insérer un note-off"
+
+msgctxt "ui"
+msgid "Insert rest"
+msgstr "Insérer un silence"
+
+msgctxt "ui"
+msgid "Instrument"
+msgstr "Instrument"
+
+msgctxt "ui"
+msgid "Instrument {1} name:"
+msgstr "Nom de l'instrument {1} :"
+
+msgctxt "ui"
+msgid "Instruments"
+msgstr "Instruments"
+
+msgctxt "ui"
+msgid "Instruments beyond the 127 of a project: {1}, {2} note left out."
+msgstr "Instruments au-delà des 127 d'un projet : {1}, {2} note non reprise."
+
+msgctxt "ui"
+msgid "Instruments beyond the 127 of a project: {1}, {2} notes left out."
+msgstr "Instruments au-delà des 127 d'un projet : {1}, {2} notes non reprises."
+
+msgctxt "ui"
+msgid "Instruments without a DMA slot (8 at most): {1}, {2} note left out."
+msgstr "Instruments sans emplacement DMA (8 au plus) : {1}, {2} note non reprise."
+
+msgctxt "ui"
+msgid "Instruments without a DMA slot (8 at most): {1}, {2} notes left out."
+msgstr "Instruments sans emplacement DMA (8 au plus) : {1}, {2} notes non reprises."
+
+msgctxt "ui"
+msgid "Instruments..."
+msgstr "Instruments..."
+
+msgctxt "ui"
+msgid "Interface language"
+msgstr "Langue de l'interface"
+
+msgctxt "ui"
+msgid "Internal"
+msgstr "Interne"
+
+msgctxt "ui"
+msgid "Invert"
+msgstr "Retourner"
+
+msgctxt "ui"
+msgid "It cannot be read by this version."
+msgstr "Cette version ne peut pas le lire."
+
+msgctxt "ui"
+msgid "It cannot be undone."
+msgstr "Action irréversible."
+
+msgctxt "ui"
+msgid "It comes from a newer STYM2149."
+msgstr "Il vient d'une version plus récente de STYM2149."
+
+msgctxt "ui"
+msgid "It was left unchanged."
+msgstr "Rien n'a été modifié."
+
+msgctxt "ui"
+msgid "Japanese (Hirajoshi)"
+msgstr "Japonaise (Hirajoshi)"
+
+msgctxt "ui"
+msgid "Join with next (n/a)"
+msgstr "Joindre la suivante (n/d)"
+
+msgctxt "ui"
+msgid "Join with next J"
+msgstr "Joindre la suivante J"
+
+msgctxt "ui"
+msgid "Keep"
+msgstr "Garder"
+
+msgctxt "ui"
+msgid "Keep: each note keeps its step, which lasts {1}/{2}."
+msgstr "Garder : chaque note garde son pas, qui dure {1}/{2}."
+
+msgctxt "ui"
+msgid "Keyboard layout"
+msgstr "Disposition clavier"
+
+msgctxt "ui"
+msgid "Keys: Left/Right move, Ins/A add, Del remove, D duplicate, +/- repeats, X/C/V cut/copy/paste, Home/End jump"
+msgstr "Touches : Gauche/Droite déplacer, Ins/A ajouter, Del retirer, D dupliquer, +/- répétitions, X/C/V couper/copier/coller, Home/End aller au bout"
+
+msgctxt "ui"
+msgid "Kick"
+msgstr "Kick"
+
+msgctxt "ui"
+msgid "Kit by note: C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = do not retrigger while it still rings. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "Kit par note : C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = ne pas redéclencher tant qu'il résonne. PAN = pan par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "Kit by note: C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = do not retrigger while it still rings. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "Kit par note : C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = ne pas redéclencher tant qu'il résonne. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "Kit: {1}"
+msgstr "Kit : {1}"
+
+msgctxt "ui"
+msgid "Kits"
+msgstr "Kits"
+
+msgctxt "ui"
+msgid "LHA decompression after pylzh by Hirofumi Ukawa"
+msgstr "Décompression LHA d'après pylzh de Hirofumi Ukawa"
+
+msgctxt "ui"
+msgid "Languages folder..."
+msgstr "Dossier des langues..."
+
+msgctxt "ui"
+msgid "Latch"
+msgstr "Latch"
+
+msgctxt "ui"
+msgid "Latin (Do Re Mi)"
+msgstr "Latin (Do Re Mi)"
+
+msgctxt "ui"
+msgid "Launch"
+msgstr "Lancement"
+
+msgctxt "ui"
+msgid "Layer"
+msgstr "Layer"
+
+msgctxt "ui"
+msgid "Left"
+msgstr "Gauche"
+
+msgctxt "ui"
+msgid "Left / Right"
+msgstr "Gauche / Droite"
+
+msgctxt "ui"
+msgid "Left out: {1} ({2})."
+msgstr "Non repris : {1} ({2})."
+
+msgctxt "ui"
+msgid "Len"
+msgstr "Long."
+
+msgctxt "ui"
+msgid "Len ="
+msgstr "Long. ="
+
+msgctxt "ui"
+msgid "Len {1}"
+msgstr "Long. {1}"
+
+msgctxt "ui"
+msgid "Length of this entry, in steps (1-256):"
+msgstr "Longueur de cette entrée, en pas (1-256) :"
+
+msgctxt "ui"
+msgid "Length..."
+msgstr "Longueur..."
+
+msgctxt "ui"
+msgid "Length: {1} step"
+msgstr "Longueur : {1} pas"
+
+msgctxt "ui"
+msgid "Length: {1} steps"
+msgstr "Longueur : {1} pas"
+
+msgctxt "ui"
+msgid "Level"
+msgstr "Niveau"
+
+msgctxt "ui"
+msgid "Library is empty"
+msgstr "Bibliothèque vide"
+
+msgctxt "ui"
+msgid "Library is empty. Save current stores the focused channel sound."
+msgstr "Bibliothèque vide. Mémoriser enregistre le son du canal courant."
+
+msgctxt "ui"
+msgid "License v3: you may share and modify it under its"
+msgstr "License v3 : vous pouvez le partager et le modifier"
+
+msgctxt "ui"
+msgid "Linear"
+msgstr "Linéaire"
+
+msgctxt "ui"
+msgid "Lines the MIDI monitor keeps"
+msgstr "Lignes que garde le moniteur MIDI"
+
+msgctxt "ui"
+msgid "Link"
+msgstr "Lier"
+
+msgctxt "ui"
+msgid "Link: none"
+msgstr "Lien : aucun"
+
+msgctxt "ui"
+msgid "Link: {1}"
+msgstr "Lien : {1}"
+
+msgctxt "ui"
+msgid "Load"
+msgstr "Charger"
+
+msgctxt "ui"
+msgid "Load a DMA sample into slot {1}"
+msgstr "Charger un échantillon DMA dans l'emplacement {1}"
+
+msgctxt "ui"
+msgid "Load a sample into slot {1}"
+msgstr "Charger un échantillon dans l'emplacement {1}"
+
+msgctxt "ui"
+msgid "Load bank"
+msgstr "Charger banque"
+
+msgctxt "ui"
+msgid "Load configuration"
+msgstr "Charger une configuration"
+
+msgctxt "ui"
+msgid "Load drum kit"
+msgstr "Charger un kit de batterie"
+
+msgctxt "ui"
+msgid "Load from Patches"
+msgstr "Charger depuis Patchs"
+
+msgctxt "ui"
+msgid "Load into channel"
+msgstr "Charger dans le canal"
+
+msgctxt "ui"
+msgid "Load pattern"
+msgstr "Charger un motif"
+
+msgctxt "ui"
+msgid "Load preset"
+msgstr "Charger un préréglage"
+
+msgctxt "ui"
+msgid "Load song"
+msgstr "Charger un morceau"
+
+msgctxt "ui"
+msgid "Load..."
+msgstr "Charger..."
+
+msgctxt "ui"
+msgid "Locrian"
+msgstr "Locrien"
+
+msgctxt "ui"
+msgid "Logarithmic"
+msgstr "Logarithmique"
+
+msgctxt "ui"
+msgid "Longer ]"
+msgstr "Plus long ]"
+
+msgctxt "ui"
+msgid "Loop"
+msgstr "Boucle"
+
+msgctxt "ui"
+msgid "Loop back..."
+msgstr "Rebouclage..."
+
+msgctxt "ui"
+msgid "Looped Digidrum slots played once: {1}."
+msgstr "Emplacements de digidrum en boucle joués une fois : {1}."
+
+msgctxt "ui"
+msgid "Loops unrolled to 32 KB (the STE loops whole samples): {1}."
+msgstr "Boucles déroulées jusqu'à 32 Ko (le STE boucle des échantillons entiers) : {1}."
+
+msgctxt "ui"
+msgid "Lydian"
+msgstr "Lydien"
+
+msgctxt "ui"
+msgid "MIDI exported"
+msgstr "MIDI exporté"
+
+msgctxt "ui"
+msgid "MIDI ext"
+msgstr "MIDI ext"
+
+msgctxt "ui"
+msgid "MIDI file"
+msgstr "Fichier MIDI"
+
+msgctxt "ui"
+msgid "MIDI imported"
+msgstr "MIDI importé"
+
+msgctxt "ui"
+msgid "MIDI learn"
+msgstr "MIDI learn"
+
+msgctxt "ui"
+msgid "MIDI learn: [{1}] armed - move a knob or press a pad"
+msgstr "MIDI learn : [{1}] armé - tournez un bouton ou frappez un pad"
+
+msgctxt "ui"
+msgid "MIDI learn: [{1}] disarmed - click another control or exit via Options"
+msgstr "MIDI learn : [{1}] désarmé - cliquez sur un autre contrôle ou quittez par Options"
+
+msgctxt "ui"
+msgid "MIDI learn: click a slider or button, then move a control..."
+msgstr "MIDI learn : cliquer sur un curseur ou un bouton, puis bouger un contrôle..."
+
+msgctxt "ui"
+msgid "MIDI learn: map cleared"
+msgstr "MIDI learn : mappage effacé"
+
+msgctxt "ui"
+msgid "MIDI learn: {1} -> [{2}] - click another control or exit via Options"
+msgstr "MIDI learn : {1} -> [{2}] - cliquez sur un autre contrôle ou quittez par Options"
+
+msgctxt "ui"
+msgid "MIDI monitor"
+msgstr "Moniteur MIDI"
+
+msgctxt "ui"
+msgid "MIDI routing"
+msgstr "Routage MIDI"
+
+msgctxt "ui"
+msgid "MIDI: -"
+msgstr "MIDI : -"
+
+msgctxt "ui"
+msgid "MIDI: access denied"
+msgstr "MIDI : accès refusé"
+
+msgctxt "ui"
+msgid "MIDI: host"
+msgstr "MIDI : hôte"
+
+msgctxt "ui"
+msgid "MIDI: none"
+msgstr "MIDI : aucun"
+
+msgctxt "ui"
+msgid "MIXER"
+msgstr "MIXEUR"
+
+msgctxt "ui"
+msgid "MOD imported"
+msgstr "MOD importé"
+
+msgctxt "ui"
+msgid "MOD not imported"
+msgstr "MOD non importé"
+
+msgctxt "ui"
+msgid "MODULATION - {1}"
+msgstr "MODULATION - {1}"
+
+msgctxt "ui"
+msgid "MODULATION - {1} [{2}]"
+msgstr "MODULATION - {1} [{2}]"
+
+msgctxt "ui"
+msgid "MPE bend range"
+msgstr "Plage du bend MPE"
+
+msgctxt "ui"
+msgid "MPE slide (CC74)"
+msgstr "Slide MPE (CC74)"
+
+msgctxt "ui"
+msgid "MTC quarter frame"
+msgstr "MTC quarter frame"
+
+msgctxt "ui"
+msgid "Macedonian"
+msgstr "Macédonien"
+
+msgctxt "ui"
+msgid "Macros that do not repeat within 64 ticks, held at the 64th: {1}."
+msgstr "Macros qui ne se répètent pas en 64 ticks, tenues au 64e : {1}."
+
+msgctxt "ui"
+msgid "Main"
+msgstr "Sortie"
+
+msgctxt "ui"
+msgid "Major"
+msgstr "Majeur"
+
+msgctxt "ui"
+msgid "Major (Ionian)"
+msgstr "Majeur (ionien)"
+
+msgctxt "ui"
+msgid "Major 1st inv"
+msgstr "Majeur 1er renv."
+
+msgctxt "ui"
+msgid "Major 2nd inv"
+msgstr "Majeur 2e renv."
+
+msgctxt "ui"
+msgid "Major spread"
+msgstr "Majeur ouvert"
+
+msgctxt "ui"
+msgid "Major {1}"
+msgstr "Majeur {1}"
+
+msgctxt "ui"
+msgid "Master"
+msgstr "Master"
+
+msgctxt "ui"
+msgid "Master (0 to 100):"
+msgstr "Master (0 à 100) :"
+
+msgctxt "ui"
+msgid "Max"
+msgstr "Max"
+
+msgctxt "ui"
+msgid "Melodic minor"
+msgstr "Mineur mélodique"
+
+msgctxt "ui"
+msgid "Memory"
+msgstr "Mémoire"
+
+msgctxt "ui"
+msgid "Menu"
+msgstr "Menu"
+
+msgctxt "ui"
+msgid "Merge"
+msgstr "Fusionner"
+
+msgctxt "ui"
+msgid "Metro"
+msgstr "Métro"
+
+msgctxt "ui"
+msgid "Min"
+msgstr "Min"
+
+msgctxt "ui"
+msgid "Minor"
+msgstr "Mineur"
+
+msgctxt "ui"
+msgid "Minor (Aeolian)"
+msgstr "Mineur (éolien)"
+
+msgctxt "ui"
+msgid "Minor 1st inv"
+msgstr "Mineur 1er renv."
+
+msgctxt "ui"
+msgid "Minor 2nd inv"
+msgstr "Mineur 2e renv."
+
+msgctxt "ui"
+msgid "Minor add9"
+msgstr "Mineur add9"
+
+msgctxt "ui"
+msgid "Minor maj {1}"
+msgstr "Mineur maj {1}"
+
+msgctxt "ui"
+msgid "Minor spread"
+msgstr "Mineur ouvert"
+
+msgctxt "ui"
+msgid "Minor {1}"
+msgstr "Mineur {1}"
+
+msgctxt "ui"
+msgid "Mix"
+msgstr "Mix"
+
+msgctxt "ui"
+msgid "Mixer"
+msgstr "Mixeur"
+
+msgctxt "ui"
+msgid "Mixolydian"
+msgstr "Mixolydien"
+
+msgctxt "ui"
+msgid "Mode"
+msgstr "Mode"
+
+msgctxt "ui"
+msgid "Modulation"
+msgstr "Modulation"
+
+msgctxt "ui"
+msgid "Mono"
+msgstr "Mono"
+
+msgctxt "ui"
+msgid "Monophonic"
+msgstr "Monophonique"
+
+msgctxt "ui"
+msgid "More keys"
+msgstr "Autres touches"
+
+msgctxt "ui"
+msgid "Most ASIO drivers serve one application at a time: if a copy stays silent, choose another output for it in Options > Audio/MIDI settings."
+msgstr "La plupart des pilotes ASIO ne servent qu'une application à la fois : si une copie reste muette, choisissez-lui une autre sortie dans Options > Réglages audio/MIDI."
+
+msgctxt "ui"
+msgid "Mouse"
+msgstr "Souris"
+
+msgctxt "ui"
+msgid "Mouse wheel over the grid"
+msgstr "Molette sur la grille"
+
+msgctxt "ui"
+msgid "Move left"
+msgstr "Vers la gauche"
+
+msgctxt "ui"
+msgid "Move right"
+msgstr "Vers la droite"
+
+msgctxt "ui"
+msgid "NP, MIX, GEN and FIX table rows"
+msgstr "lignes NP, MIX, GEN et FIX des tables"
+
+msgctxt "ui"
+msgid "Name"
+msgstr "Nom"
+
+msgctxt "ui"
+msgid "Neapolitan minor"
+msgstr "Mineur napolitain"
+
+msgctxt "ui"
+msgid "New"
+msgstr "Nouveau"
+
+msgctxt "ui"
+msgid "New project?"
+msgstr "Nouveau projet ?"
+
+msgctxt "ui"
+msgid "No change"
+msgstr "Inchangé"
+
+msgctxt "ui"
+msgid "No instrument yet"
+msgstr "Aucun instrument"
+
+msgctxt "ui"
+msgid "No tracks with notes."
+msgstr "Aucune piste avec des notes."
+
+msgctxt "ui"
+msgid "Noise"
+msgstr "Bruit"
+
+msgctxt "ui"
+msgid "Noise Slide"
+msgstr "Glissé de bruit"
+
+msgctxt "ui"
+msgid "Noise period"
+msgstr "Période bruit"
+
+msgctxt "ui"
+msgid "Noise+Env"
+msgstr "Bruit+Env"
+
+msgctxt "ui"
+msgid "None"
+msgstr "Aucun"
+
+msgctxt "ui"
+msgid "Normalize"
+msgstr "Normaliser"
+
+msgctxt "ui"
+msgid "Not a MOD module."
+msgstr "Pas un module MOD."
+
+msgctxt "ui"
+msgid "Not a TTrak module (.TPM)."
+msgstr "Ce n'est pas un module TTrak (.TPM)."
+
+msgctxt "ui"
+msgid "Not a YM-Tracker song."
+msgstr "Ce n'est pas un morceau YM-Tracker."
+
+msgctxt "ui"
+msgid "Not a gzip stream."
+msgstr "Ce n'est pas un flux gzip."
+
+msgctxt "ui"
+msgid "Not a maxYMiser song (.MYS)."
+msgstr "Ce n'est pas un morceau maxYMiser (.MYS)."
+
+msgctxt "ui"
+msgid "Not a maxYMiser voiceset (.MYV)."
+msgstr "Ce n'est pas un jeu d'instruments maxYMiser (.MYV)."
+
+msgctxt "ui"
+msgid "Not a valid STYM2149 file."
+msgstr "Fichier STYM2149 non valide."
+
+msgctxt "ui"
+msgid "Not a valid drum kit file."
+msgstr "Fichier de kit de batterie non valide."
+
+msgctxt "ui"
+msgid "Not a valid patch library file."
+msgstr "Fichier de bibliothèque de patchs non valide."
+
+msgctxt "ui"
+msgid "Not an OKT module."
+msgstr "Pas un module OKT."
+
+msgctxt "ui"
+msgid "Not an S3M module."
+msgstr "Pas un module S3M."
+
+msgctxt "ui"
+msgid "Not an XM module."
+msgstr "Pas un module XM."
+
+msgctxt "ui"
+msgid "Not as heard:"
+msgstr "Différences avec l'écoute :"
+
+msgctxt "ui"
+msgid "Not as in the module:"
+msgstr "Différences avec le module :"
+
+msgctxt "ui"
+msgid "Not as in the song:"
+msgstr "Différences avec le morceau :"
+
+msgctxt "ui"
+msgid "Not as in the tune:"
+msgstr "Différences avec le morceau :"
+
+msgctxt "ui"
+msgid "Note"
+msgstr "Note"
+
+msgctxt "ui"
+msgid "Note cut"
+msgstr "Coupure de note"
+
+msgctxt "ui"
+msgid "Note delay"
+msgstr "Retard de note"
+
+msgctxt "ui"
+msgid "Note effects on rows without a note of this pattern: {1}."
+msgstr "Effets de note sur des lignes sans note de ce motif : {1}."
+
+msgctxt "ui"
+msgid "Note length"
+msgstr "Longueur de note"
+
+msgctxt "ui"
+msgid "Note monitor"
+msgstr "Moniteur de notes"
+
+msgctxt "ui"
+msgid "Note names"
+msgstr "Noms des notes"
+
+msgctxt "ui"
+msgid "Note releases moved to the end of their row (the cell holds another effect): {1}."
+msgstr "Relâchements de note déplacés en fin de ligne (la case porte un autre effet) : {1}."
+
+msgctxt "ui"
+msgid "Note's generator"
+msgstr "Générateur de la note"
+
+msgctxt "ui"
+msgid "Note: Copy"
+msgstr "Note : Copier"
+
+msgctxt "ui"
+msgid "Note: Cut"
+msgstr "Note : Couper"
+
+msgctxt "ui"
+msgid "Notes before the first step left out: {1}."
+msgstr "Notes avant le premier pas non reprises : {1}."
+
+msgctxt "ui"
+msgid "Notes beyond 127 instruments, played without their effects: {1}."
+msgstr "Notes au-delà de 127 instruments, jouées sans leurs effets : {1}."
+
+msgctxt "ui"
+msgid "Notes beyond B0-C9 brought within: {1}."
+msgstr "Notes hors de B0-C9 ramenées dedans : {1}."
+
+msgctxt "ui"
+msgid "Notes beyond C-1 to B-8 moved by octaves: {1}."
+msgstr "Notes hors de C-1 à B-8 décalées d'octaves : {1}."
+
+msgctxt "ui"
+msgid "Notes longer than an instrument's tables, played approximately: {1}."
+msgstr "Notes plus longues que les tables d'un instrument, jouées approximativement : {1}."
+
+msgctxt "ui"
+msgid "Notes longer than their table (64 frames): {1}."
+msgstr "Notes plus longues que leur table (64 trames) : {1}."
+
+msgctxt "ui"
+msgid "Notes played louder (their row has no room for the volume effect): {1}."
+msgstr "Notes jouées plus fort (leur ligne n'a pas de place pour l'effet de volume) : {1}."
+
+msgctxt "ui"
+msgid "Notes played with the closest of the 127 instruments: {1}."
+msgstr "Notes jouées avec le plus proche des 127 instruments : {1}."
+
+msgctxt "ui"
+msgid "Notes played with the closest of the 16 instruments: {1}."
+msgstr "Notes jouées avec le plus proche des 16 instruments : {1}."
+
+msgctxt "ui"
+msgid "Notes played with the closest of the 32 instruments: {1}."
+msgstr "Notes jouées avec le plus proche des 32 instruments : {1}."
+
+msgctxt "ui"
+msgid "Notes played with their instrument's main sample: {1}."
+msgstr "Notes jouées avec l'échantillon principal de leur instrument : {1}."
+
+msgctxt "ui"
+msgid "Notes under the Digidrum hits, left out as the sequencer does: {1}."
+msgstr "Notes sous les frappes de digidrum, non reprises comme le fait le séquenceur : {1}."
+
+msgctxt "ui"
+msgid "Notes whose envelope period changes (one per instrument): {1}."
+msgstr "Notes dont la période d'enveloppe change (une par instrument) : {1}."
+
+msgctxt "ui"
+msgid "Notes whose pitch goes beyond their table (12 semitones up or down): {1}."
+msgstr "Notes dont la hauteur sort de leur table (12 demi-tons de part et d'autre) : {1}."
+
+msgctxt "ui"
+msgid "Notes without a sample: {1}."
+msgstr "Notes sans échantillon : {1}."
+
+msgctxt "ui"
+msgid "Nothing to import: no notes on the first three channels."
+msgstr "Rien à importer : aucune note sur les trois premières voies."
+
+msgctxt "ui"
+msgid "Nothing to import: no notes with a sample."
+msgstr "Rien à importer : aucune note avec échantillon."
+
+msgctxt "ui"
+msgid "Nothing to import: the song has no pattern."
+msgstr "Rien à importer : le morceau n'a aucun motif."
+
+msgctxt "ui"
+msgid "Nothing to play in this file."
+msgstr "Rien à jouer dans ce fichier."
+
+msgctxt "ui"
+msgid "Number..."
+msgstr "Numéro..."
+
+msgctxt "ui"
+msgid "Numpad 0 - 9"
+msgstr "Pavé num. 0 - 9"
+
+msgctxt "ui"
+msgid "OCT / GAT / PAN"
+msgstr "OCT / GAT / PAN"
+
+msgctxt "ui"
+msgid "OKT imported"
+msgstr "OKT importé"
+
+msgctxt "ui"
+msgid "OKT not imported"
+msgstr "OKT non importé"
+
+msgctxt "ui"
+msgid "Oct +"
+msgstr "Oct +"
+
+msgctxt "ui"
+msgid "Oct -"
+msgstr "Oct -"
+
+msgctxt "ui"
+msgid "Oct {1}"
+msgstr "Oct {1}"
+
+msgctxt "ui"
+msgid "Oct {1}-{2}"
+msgstr "Oct {1}-{2}"
+
+msgctxt "ui"
+msgid "Oct+"
+msgstr "Oct+"
+
+msgctxt "ui"
+msgid "Oct-"
+msgstr "Oct-"
+
+msgctxt "ui"
+msgid "Octave"
+msgstr "Octave"
+
+msgctxt "ui"
+msgid "Octaves"
+msgstr "Octaves"
+
+msgctxt "ui"
+msgid "Off"
+msgstr "Off"
+
+msgctxt "ui"
+msgid "Omni"
+msgstr "Omni"
+
+msgctxt "ui"
+msgid "On"
+msgstr "On"
+
+msgctxt "ui"
+msgid "One frame of R0-R13 per replay tick while the host plays (standalone: the sequencer)."
+msgstr "Une trame de R0-R13 par tick de replay pendant la lecture de l'hôte (application autonome : le séquenceur)."
+
+msgctxt "ui"
+msgid "Open Hat"
+msgstr "Open Hat"
+
+msgctxt "ui"
+msgid "Options"
+msgstr "Options"
+
+msgctxt "ui"
+msgid "Order"
+msgstr "Ordre"
+
+msgctxt "ui"
+msgid "Oscilloscope"
+msgstr "Oscilloscope"
+
+msgctxt "ui"
+msgid "Other"
+msgstr "Autre"
+
+msgctxt "ui"
+msgid "Out"
+msgstr "Sortie"
+
+msgctxt "ui"
+msgid "Out L"
+msgstr "Sortie G"
+
+msgctxt "ui"
+msgid "Out R"
+msgstr "Sortie D"
+
+msgctxt "ui"
+msgid "Output chain"
+msgstr "Chaîne de sortie"
+
+msgctxt "ui"
+msgid "Overshoot"
+msgstr "Dépassement"
+
+msgctxt "ui"
+msgid "Overview"
+msgstr "Aperçu"
+
+msgctxt "ui"
+msgid "Overwrite"
+msgstr "Écraser"
+
+msgctxt "ui"
+msgid "Overwrite them?"
+msgstr "Les écraser ?"
+
+msgctxt "ui"
+msgid "PATCHES"
+msgstr "PATCHS"
+
+msgctxt "ui"
+msgid "Pads 1 to 8: Digidrum slots 1 to 8"
+msgstr "Pads 1 à 8 : emplacements Digidrum 1 à 8"
+
+msgctxt "ui"
+msgid "Pads 1 to 8: Kick to Tom 2"
+msgstr "Pads 1 à 8 : Kick à Tom 2"
+
+msgctxt "ui"
+msgid "Pan"
+msgstr "Pan"
+
+msgctxt "ui"
+msgid "Pan (-100 to 100):"
+msgstr "Pan (-100 à 100) :"
+
+msgctxt "ui"
+msgid "Pan {1}"
+msgstr "Pan {1}"
+
+msgctxt "ui"
+msgid "Panic"
+msgstr "Panique"
+
+msgctxt "ui"
+msgid "Paste"
+msgstr "Coller"
+
+msgctxt "ui"
+msgid "Paste (n/a)"
+msgstr "Coller (n/d)"
+
+msgctxt "ui"
+msgid "Paste block (n/a)"
+msgstr "Coller le bloc (n/d)"
+
+msgctxt "ui"
+msgid "Paste here"
+msgstr "Coller ici"
+
+msgctxt "ui"
+msgid "Paste note here"
+msgstr "Coller la note ici"
+
+msgctxt "ui"
+msgid "Paste row"
+msgstr "Coller la ligne"
+
+msgctxt "ui"
+msgid "Paste row (n/a)"
+msgstr "Coller la ligne (n/d)"
+
+msgctxt "ui"
+msgid "Paste settings"
+msgstr "Coller les réglages"
+
+msgctxt "ui"
+msgid "Patch name:"
+msgstr "Nom du patch :"
+
+msgctxt "ui"
+msgid "Patch {1}"
+msgstr "Patch {1}"
+
+msgctxt "ui"
+msgid "Patches"
+msgstr "Patchs"
+
+msgctxt "ui"
+msgid "Pattern"
+msgstr "Motif"
+
+msgctxt "ui"
+msgid "Pattern breaks to a later row (played from row 0): {1}."
+msgstr "Sauts de motif vers une ligne plus loin (joués depuis la ligne 0) : {1}."
+
+msgctxt "ui"
+msgid "Pattern read error."
+msgstr "Erreur de lecture du motif."
+
+msgctxt "ui"
+msgid "Patterns beyond 32: {1} left out."
+msgstr "Motifs au-delà de 32 non repris : {1}."
+
+msgctxt "ui"
+msgid "Pause"
+msgstr "Pause"
+
+msgctxt "ui"
+msgid "Pentatonic major"
+msgstr "Pentatonique majeure"
+
+msgctxt "ui"
+msgid "Pentatonic minor"
+msgstr "Pentatonique mineure"
+
+msgctxt "ui"
+msgid "Per channel"
+msgstr "Par canal"
+
+msgctxt "ui"
+msgid "Per-VBL-frame tables (the tracker \"ornament\"): pitch in semitones, NSE row toggles noise, VOL row sets level. Click / drag to draw."
+msgstr "Tables par trame VBL (l'\"ornement\" des trackers) : hauteur en demi-tons, la ligne NSE active le bruit, la ligne VOL règle le niveau. Clic / glisser pour dessiner."
+
+msgctxt "ui"
+msgid "Period"
+msgstr "Période"
+
+msgctxt "ui"
+msgid "Persian"
+msgstr "Persan"
+
+msgctxt "ui"
+msgid "Phrygian"
+msgstr "Phrygien"
+
+msgctxt "ui"
+msgid "Phrygian dominant"
+msgstr "Phrygien dominant"
+
+msgctxt "ui"
+msgid "Ping-pong"
+msgstr "Ping-pong"
+
+msgctxt "ui"
+msgid "Pitch"
+msgstr "Hauteur"
+
+msgctxt "ui"
+msgid "Pitch macros beyond an octave and 127 period steps, clamped: {1}."
+msgstr "Macros de hauteur au-delà d'une octave et de 127 pas de période, ramenées : {1}."
+
+msgctxt "ui"
+msgid "Pitch matrix"
+msgstr "Matrice de hauteur"
+
+msgctxt "ui"
+msgid "Pixels"
+msgstr "Pixels"
+
+msgctxt "ui"
+msgid "Play"
+msgstr "Lecture"
+
+msgctxt "ui"
+msgid "Play a file"
+msgstr "Jouer un fichier"
+
+msgctxt "ui"
+msgid "Play them with Chipdrum or Digidrum?"
+msgstr "Les jouer avec Chipdrum ou Digidrum ?"
+
+msgctxt "ui"
+msgid "Play..."
+msgstr "Jouer..."
+
+msgctxt "ui"
+msgid "Play/Stop"
+msgstr "Lecture/Arrêt"
+
+msgctxt "ui"
+msgid "Polyphonic"
+msgstr "Polyphonique"
+
+msgctxt "ui"
+msgid "Power"
+msgstr "Power"
+
+msgctxt "ui"
+msgid "Power + oct"
+msgstr "Power + oct"
+
+msgctxt "ui"
+msgid "Preset"
+msgstr "Préréglage"
+
+msgctxt "ui"
+msgid "Preset read error."
+msgstr "Erreur de lecture du préréglage."
+
+msgctxt "ui"
+msgid "Presets"
+msgstr "Préréglages"
+
+msgctxt "ui"
+msgid "Proceed"
+msgstr "Poursuivre"
+
+msgctxt "ui"
+msgid "Programming: Pascal \"Indus\" Nowak (with Claude's help)"
+msgstr "Programmation : Pascal \"Indus\" Nowak (aidé par Claude)"
+
+msgctxt "ui"
+msgid "Pulses"
+msgstr "Impulsions"
+
+msgctxt "ui"
+msgid "Quantize to VBL"
+msgstr "Quantifier sur VBL"
+
+msgctxt "ui"
+msgid "Quit"
+msgstr "Quitter"
+
+msgctxt "ui"
+msgid "Quit STYM2149?"
+msgstr "Quitter STYM2149 ?"
+
+msgctxt "ui"
+msgid "RAM"
+msgstr "RAM"
+
+msgctxt "ui"
+msgid "RECORDER"
+msgstr "ENREGISTREUR"
+
+msgctxt "ui"
+msgid "RTG / CND"
+msgstr "RTG / CND"
+
+msgctxt "ui"
+msgid "Ramp"
+msgstr "Rampe"
+
+msgctxt "ui"
+msgid "Random"
+msgstr "Aléatoire"
+
+msgctxt "ui"
+msgid "Random walk"
+msgstr "Marche aléatoire"
+
+msgctxt "ui"
+msgid "Rate"
+msgstr "Fréq."
+
+msgctxt "ui"
+msgid "Rate (kHz)"
+msgstr "Fréq. (kHz)"
+
+msgctxt "ui"
+msgid "Ratios"
+msgstr "Ratios"
+
+msgctxt "ui"
+msgid "Raw"
+msgstr "Brut"
+
+msgctxt "ui"
+msgid "Read error."
+msgstr "Erreur de lecture."
+
+msgctxt "ui"
+msgid "Ready."
+msgstr "Prêt."
+
+msgctxt "ui"
+msgid "Rebuilds live while playing."
+msgstr "Recalculé en direct pendant la lecture."
+
+msgctxt "ui"
+msgid "Rec"
+msgstr "Enr."
+
+msgctxt "ui"
+msgid "Recorder"
+msgstr "Enregistreur"
+
+msgctxt "ui"
+msgid "Recording chip {1}: {2}, {3} frames."
+msgstr "Enregistrement puce {1} : {2}, {3} trames."
+
+msgctxt "ui"
+msgid "Redo"
+msgstr "Rétablir"
+
+msgctxt "ui"
+msgid "Register monitor"
+msgstr "Moniteur de registres"
+
+msgctxt "ui"
+msgid "Register stream played at the VBL rate. The register strip and scope follow."
+msgstr "Flux de registres joué à la fréquence VBL. Les registres et l'oscilloscope suivent."
+
+msgctxt "ui"
+msgid "Remove"
+msgstr "Retirer"
+
+msgctxt "ui"
+msgid "Remove ({1})"
+msgstr "Retirer ({1})"
+
+msgctxt "ui"
+msgid "Rename"
+msgstr "Renommer"
+
+msgctxt "ui"
+msgid "Rename channel..."
+msgstr "Renommer le canal..."
+
+msgctxt "ui"
+msgid "Rename instrument {1}:"
+msgstr "Renommer l'instrument {1} :"
+
+msgctxt "ui"
+msgid "Rename patch:"
+msgstr "Renommer le patch :"
+
+msgctxt "ui"
+msgid "Rename..."
+msgstr "Renommer..."
+
+msgctxt "ui"
+msgid "Renderer"
+msgstr "Rendu"
+
+msgctxt "ui"
+msgid "Repeat x1"
+msgstr "Répéter x1"
+
+msgctxt "ui"
+msgid "Repeat x16"
+msgstr "Répéter x16"
+
+msgctxt "ui"
+msgid "Repeat x2"
+msgstr "Répéter x2"
+
+msgctxt "ui"
+msgid "Repeat x4"
+msgstr "Répéter x4"
+
+msgctxt "ui"
+msgid "Repeat x8"
+msgstr "Répéter x8"
+
+msgctxt "ui"
+msgid "Repeats"
+msgstr "Répétitions"
+
+msgctxt "ui"
+msgid "Replace"
+msgstr "Remplacer"
+
+msgctxt "ui"
+msgid "Replace it with \"{1}\"?"
+msgstr "Le remplacer par \"{1}\" ?"
+
+msgctxt "ui"
+msgid "Replace the samples with bank \"{1}\"?"
+msgstr "Remplacer les échantillons par la banque \"{1}\" ?"
+
+msgctxt "ui"
+msgid "Replace the slots with bank \"{1}\"?"
+msgstr "Remplacer les emplacements par la banque \"{1}\" ?"
+
+msgctxt "ui"
+msgid "Replay at {1} Hz written at {2} Hz (ticks of twice the length)."
+msgstr "Rejeu à {1} Hz écrit à {2} Hz (ticks deux fois plus longs)."
+
+msgctxt "ui"
+msgid "Replay rate {1} Hz played at {2} Hz."
+msgstr "Fréquence de lecture {1} Hz jouée à {2} Hz."
+
+msgctxt "ui"
+msgid "Replayed at {1} Hz instead of {2} Hz (TTrak's rates: 50, 100, 150, 200 Hz)."
+msgstr "Rejoué à {1} Hz au lieu de {2} Hz (fréquences de TTrak : 50, 100, 150, 200 Hz)."
+
+msgctxt "ui"
+msgid "Resample"
+msgstr "Rééchant."
+
+msgctxt "ui"
+msgid "Resampling"
+msgstr "Rééchantillonnage"
+
+msgctxt "ui"
+msgid "Reset"
+msgstr "Réinit."
+
+msgctxt "ui"
+msgid "Resolution"
+msgstr "Résolution"
+
+msgctxt "ui"
+msgid "Restart"
+msgstr "Relance"
+
+msgctxt "ui"
+msgid "Restart from start"
+msgstr "Reprise au début"
+
+msgctxt "ui"
+msgid "Restart here"
+msgstr "Reprise ici"
+
+msgctxt "ui"
+msgid "Retrig"
+msgstr "Retrig"
+
+msgctxt "ui"
+msgid "Retro"
+msgstr "Rétro"
+
+msgctxt "ui"
+msgid "Reverse"
+msgstr "Inverser"
+
+msgctxt "ui"
+msgid "Rewind"
+msgstr "Retour"
+
+msgctxt "ui"
+msgid "Rhythms"
+msgstr "Rythmes"
+
+msgctxt "ui"
+msgid "Right"
+msgstr "Droite"
+
+msgctxt "ui"
+msgid "Right click a channel tab"
+msgstr "Clic droit sur un onglet de canal"
+
+msgctxt "ui"
+msgid "Right click a note"
+msgstr "Clic droit sur une note"
+
+msgctxt "ui"
+msgid "Right click a pattern slot"
+msgstr "Clic droit sur un emplacement de motif"
+
+msgctxt "ui"
+msgid "Right click a row label"
+msgstr "Clic droit sur un nom de ligne"
+
+msgctxt "ui"
+msgid "Right click a song block"
+msgstr "Clic droit sur un bloc du morceau"
+
+msgctxt "ui"
+msgid "Right click an empty cell"
+msgstr "Clic droit sur une case vide"
+
+msgctxt "ui"
+msgid "Root"
+msgstr "Note réf."
+
+msgctxt "ui"
+msgid "Rotate"
+msgstr "Rotation"
+
+msgctxt "ui"
+msgid "Rows = sample slots. Drag a note to set how long the sample plays. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "Lignes = emplacements d'échantillons. Glisser une note pour régler la durée de lecture de l'échantillon. PAN = pan par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "Rows = sample slots. Drag a note to set how long the sample plays. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "Lignes = emplacements d'échantillons. Glisser une note pour régler la durée de lecture de l'échantillon. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "Rows longer than 255 frames cut to 255: {1}."
+msgstr "Lignes de plus de 255 trames ramenées à 255 : {1}."
+
+msgctxt "ui"
+msgid "Rows longer than 31 ticks, shortened: {1}."
+msgstr "Lignes de plus de 31 ticks, raccourcies : {1}."
+
+msgctxt "ui"
+msgid "Rows longer than 63 frames, their notes held from the 63rd: {1}."
+msgstr "Lignes de plus de 63 trames, leurs notes tenues à partir de la 63e : {1}."
+
+msgctxt "ui"
+msgid "Rows of one frame played as two: {1}."
+msgstr "Lignes d'une trame jouées sur deux : {1}."
+
+msgctxt "ui"
+msgid "S-curve"
+msgstr "Courbe en S"
+
+msgctxt "ui"
+msgid "S3M imported"
+msgstr "S3M importé"
+
+msgctxt "ui"
+msgid "S3M not imported"
+msgstr "S3M non importé"
+
+msgctxt "ui"
+msgid "SCOPE - TRACK {1}"
+msgstr "OSCILLOSCOPE - PISTE {1}"
+
+msgctxt "ui"
+msgid "SCOPE - {1}"
+msgstr "OSCILLOSCOPE - {1}"
+
+msgctxt "ui"
+msgid "SETTINGS"
+msgstr "RÉGLAGES"
+
+msgctxt "ui"
+msgid "SHORTCUTS"
+msgstr "RACCOURCIS"
+
+msgctxt "ui"
+msgid "SID Voice"
+msgstr "SID Voice"
+
+msgctxt "ui"
+msgid "SID min vol"
+msgstr "Vol min SID"
+
+msgctxt "ui"
+msgid "SID notes below volume 15 (their waveform scaled down, not lowered): {1}."
+msgstr "Notes SID sous le volume 15 (forme d'onde réduite, non abaissée) : {1}."
+
+msgctxt "ui"
+msgid "SID rates beyond 1/4 to 8 times the note, clamped: {1}."
+msgstr "Vitesses SID hors de 1/4 à 8 fois la note, ramenées : {1}."
+
+msgctxt "ui"
+msgid "SID ratio"
+msgstr "Rapport SID"
+
+msgctxt "ui"
+msgid "SID wave"
+msgstr "Onde SID"
+
+msgctxt "ui"
+msgid "SLIDE CURVE"
+msgstr "COURBE DE GLISSÉ"
+
+msgctxt "ui"
+msgid "SNDH / YM file"
+msgstr "Fichier SNDH / YM"
+
+msgctxt "ui"
+msgid "SNDH imported"
+msgstr "SNDH importé"
+
+msgctxt "ui"
+msgid "SNDH not imported"
+msgstr "SNDH non importé"
+
+msgctxt "ui"
+msgid "SNDH played by AtariAudio's machine and the Musashi"
+msgstr "SNDH joué par la machine d'AtariAudio et l'émulateur"
+
+msgctxt "ui"
+msgid "SONG"
+msgstr "MORCEAU"
+
+msgctxt "ui"
+msgid "SOUND ENGINE"
+msgstr "MOTEUR SONORE"
+
+msgctxt "ui"
+msgid "SOURCE"
+msgstr "SOURCE"
+
+msgctxt "ui"
+msgid "SOURCE - {1}"
+msgstr "SOURCE - {1}"
+
+msgctxt "ui"
+msgid "SRC / GEN"
+msgstr "SRC / GEN"
+
+msgctxt "ui"
+msgid "SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). ARP = arpeggio table. Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "SRC = source son/bruit. GEN = générateur par pas (CV/SID/SB/FM). ARP = table d'arpège. La longueur des notes se dessine dans la grille : glisser une note pour l'étirer. SLD = glissé vers la note suivante. CRV = forme du glissé de ce pas. GAT = gate par pas. PAN = pan par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). ARP = arpeggio table. Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "SRC = source son/bruit. GEN = générateur par pas (CV/SID/SB/FM). ARP = table d'arpège. La longueur des notes se dessine dans la grille : glisser une note pour l'étirer. SLD = glissé vers la note suivante. CRV = forme du glissé de ce pas. GAT = gate par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "SRC = source son/bruit. GEN = générateur par pas (CV/SID/SB/FM). La longueur des notes se dessine dans la grille : glisser une note pour l'étirer. SLD = glissé vers la note suivante. CRV = forme du glissé de ce pas. GAT = gate par pas. PAN = pan par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %."
+msgstr "SRC = source son/bruit. GEN = générateur par pas (CV/SID/SB/FM). La longueur des notes se dessine dans la grille : glisser une note pour l'étirer. SLD = glissé vers la note suivante. CRV = forme du glissé de ce pas. GAT = gate par pas. VOL = accent. RTG = ratchet : nombre de coups dans le pas (1 = normal). CND = condition de déclenchement : 1:2 / 2:2 = un passage sur deux, 1:4 / 4:4 = un passage sur quatre, 25 / 50 / 75 = probabilité en %."
+
+msgctxt "ui"
+msgid "ST channel"
+msgstr "Canal ST"
+
+msgctxt "ui"
+msgid "STE DAC sound left out."
+msgstr "Son du DAC STE non repris."
+
+msgctxt "ui"
+msgid "STE DMA sound left out."
+msgstr "Son DMA STE non repris."
+
+msgctxt "ui"
+msgid "STE DMA tracks left out."
+msgstr "Pistes DMA STE non reprises."
+
+msgctxt "ui"
+msgid "STE bass"
+msgstr "Graves STE"
+
+msgctxt "ui"
+msgid "STE treble"
+msgstr "Aigus STE"
+
+msgctxt "ui"
+msgid "STEP SEQUENCER - {1} [{2}]"
+msgstr "SÉQUENCEUR - {1} [{2}]"
+
+msgctxt "ui"
+msgid "STOP"
+msgstr "STOP"
+
+msgctxt "ui"
+msgid "SYNC"
+msgstr "SYNCHRO"
+
+msgctxt "ui"
+msgid "SYSTEM"
+msgstr "SYSTEME"
+
+msgctxt "ui"
+msgid "Same track"
+msgstr "Même piste"
+
+msgctxt "ui"
+msgid "Sample"
+msgstr "Échantillon"
+
+msgctxt "ui"
+msgid "Sample data cut by the end of the file."
+msgstr "Données d'échantillon coupées par la fin du fichier."
+
+msgctxt "ui"
+msgid "Sample offset"
+msgstr "Début d'échantillon"
+
+msgctxt "ui"
+msgid "Sample offsets above OFF brought down: {1}."
+msgstr "Débuts d'échantillon au-delà de OFF ramenés : {1}."
+
+msgctxt "ui"
+msgid "Sample {1} \"{2}\": {3}Hz, {4}, root {5}, loop."
+msgstr "Échantillon {1} \"{2}\" : {3}Hz, {4}, note réf. {5}, boucle."
+
+msgctxt "ui"
+msgid "Sample {1} \"{2}\": {3}Hz, {4}, root {5}, one shot."
+msgstr "Échantillon {1} \"{2}\" : {3}Hz, {4}, note réf. {5}, sans boucle."
+
+msgctxt "ui"
+msgid "Sample {1} is empty: load it in the DMA window."
+msgstr "L'échantillon {1} est vide : chargez-le dans la fenêtre DMA."
+
+msgctxt "ui"
+msgid "Sample {1}: {2}Hz, {3}, root {4}, loop."
+msgstr "Échantillon {1} : {2}Hz, {3}, note réf. {4}, boucle."
+
+msgctxt "ui"
+msgid "Sample {1}: {2}Hz, {3}, root {4}, one shot."
+msgstr "Échantillon {1} : {2}Hz, {3}, note réf. {4}, sans boucle."
+
+msgctxt "ui"
+msgid "Samples"
+msgstr "Échantillons"
+
+msgctxt "ui"
+msgid "Save"
+msgstr "Enregistrer"
+
+msgctxt "ui"
+msgid "Save as"
+msgstr "Enregistrer sous"
+
+msgctxt "ui"
+msgid "Save bank..."
+msgstr "Enreg. banque..."
+
+msgctxt "ui"
+msgid "Save configuration as"
+msgstr "Enregistrer la configuration sous"
+
+msgctxt "ui"
+msgid "Save current"
+msgstr "Mémoriser"
+
+msgctxt "ui"
+msgid "Save drum kit as"
+msgstr "Enregistrer le kit de batterie sous"
+
+msgctxt "ui"
+msgid "Save pattern as"
+msgstr "Enregistrer le motif sous"
+
+msgctxt "ui"
+msgid "Save preset as"
+msgstr "Enregistrer le préréglage sous"
+
+msgctxt "ui"
+msgid "Save song as"
+msgstr "Enregistrer le morceau sous"
+
+msgctxt "ui"
+msgid "Save to Patches"
+msgstr "Ajouter aux Patchs"
+
+msgctxt "ui"
+msgid "Saw"
+msgstr "Scie"
+
+msgctxt "ui"
+msgid "Saw down"
+msgstr "Scie desc."
+
+msgctxt "ui"
+msgid "Saw up"
+msgstr "Scie mont."
+
+msgctxt "ui"
+msgid "Sawtooth"
+msgstr "Dent de scie"
+
+msgctxt "ui"
+msgid "Scale"
+msgstr "Gamme"
+
+msgctxt "ui"
+msgid "Scale + Snap"
+msgstr "Gamme + Aimant"
+
+msgctxt "ui"
+msgid "Scale-locked"
+msgstr "Calé sur la gamme"
+
+msgctxt "ui"
+msgid "Select all"
+msgstr "Tout sélectionner"
+
+msgctxt "ui"
+msgid "Select all ^A"
+msgstr "Tout sélectionner ^A"
+
+msgctxt "ui"
+msgid "Selection"
+msgstr "Sélection"
+
+msgctxt "ui"
+msgid "Selection: Copy"
+msgstr "Sélection : Copier"
+
+msgctxt "ui"
+msgid "Selection: Cut"
+msgstr "Sélection : Couper"
+
+msgctxt "ui"
+msgid "Semitone offsets, applied to the last played note."
+msgstr "Décalages en demi-tons, appliqués à la dernière note jouée."
+
+msgctxt "ui"
+msgid "Semitones"
+msgstr "Demi-tons"
+
+msgctxt "ui"
+msgid "Semitones above the note:"
+msgstr "Demi-tons au-dessus de la note :"
+
+msgctxt "ui"
+msgid "Send"
+msgstr "Envoi"
+
+msgctxt "ui"
+msgid "Send (0 to 100):"
+msgstr "Envoi (0 à 100) :"
+
+msgctxt "ui"
+msgid "Send {1}"
+msgstr "Envoi {1}"
+
+msgctxt "ui"
+msgid "Sequence rows, played with the table tick by tick. PER: tone period offset (+ lower). NP: noise period. MIX: channel mode 0-7."
+msgstr "Lignes de séquence, jouées avec la table tick par tick. PER : décalage de période du son (+ = plus grave). NP : période du bruit. MIX : mode du canal 0-7."
+
+msgctxt "ui"
+msgid "Sequencer rows"
+msgstr "Lignes du séquenceur"
+
+msgctxt "ui"
+msgid "Sequencer view"
+msgstr "Vue du séquenceur"
+
+msgctxt "ui"
+msgid "Set"
+msgstr "Écrire"
+
+msgctxt "ui"
+msgid "Settings this version does not know are not used."
+msgstr "Les réglages inconnus de cette version ne sont pas utilisés."
+
+msgctxt "ui"
+msgid "Settings..."
+msgstr "Réglages..."
+
+msgctxt "ui"
+msgid "Seventh"
+msgstr "Septième"
+
+msgctxt "ui"
+msgid "Shape"
+msgstr "Forme"
+
+msgctxt "ui"
+msgid "Shape R13"
+msgstr "Forme R13"
+
+msgctxt "ui"
+msgid "Shared"
+msgstr "Partagé"
+
+msgctxt "ui"
+msgid "Shared by every step of track {1}"
+msgstr "Commun à tous les pas de la piste {1}"
+
+msgctxt "ui"
+msgid "Sharp"
+msgstr "Net"
+
+msgctxt "ui"
+msgid "Shift"
+msgstr "Shift"
+
+msgctxt "ui"
+msgid "Shift + 1 - 4"
+msgstr "Shift + 1 - 4"
+
+msgctxt "ui"
+msgid "Shift + drag in the grid"
+msgstr "Shift + glisser dans la grille"
+
+msgctxt "ui"
+msgid "Short"
+msgstr "Court"
+
+msgctxt "ui"
+msgid "Shortcuts"
+msgstr "Raccourcis"
+
+msgctxt "ui"
+msgid "Shorter ["
+msgstr "Plus court ["
+
+msgctxt "ui"
+msgid "Sign"
+msgstr "Signe"
+
+msgctxt "ui"
+msgid "Signature"
+msgstr "Mesure"
+
+msgctxt "ui"
+msgid "Sinc"
+msgstr "Sinc"
+
+msgctxt "ui"
+msgid "Sine"
+msgstr "Sinus"
+
+msgctxt "ui"
+msgid "Slide"
+msgstr "Glissé"
+
+msgctxt "ui"
+msgid "Slides"
+msgstr "Glissés"
+
+msgctxt "ui"
+msgid "Slot"
+msgstr "Empl."
+
+msgctxt "ui"
+msgid "Slot {1}"
+msgstr "Empl. {1}"
+
+msgctxt "ui"
+msgid "Slot {1} already holds \"{2}\"."
+msgstr "L'emplacement {1} contient déjà \"{2}\"."
+
+msgctxt "ui"
+msgid "Slot {1} already holds a sample."
+msgstr "L'emplacement {1} contient déjà un échantillon."
+
+msgctxt "ui"
+msgid "Smooth"
+msgstr "Lisse"
+
+msgctxt "ui"
+msgid "Snap"
+msgstr "Aimant"
+
+msgctxt "ui"
+msgid "Snare"
+msgstr "Snare"
+
+msgctxt "ui"
+msgid "Soft"
+msgstr "Douce"
+
+msgctxt "ui"
+msgid "Soft clip"
+msgstr "Écrêtage doux"
+
+msgctxt "ui"
+msgid "Soft saw"
+msgstr "Scie douce"
+
+msgctxt "ui"
+msgid "Software"
+msgstr "Logiciel"
+
+msgctxt "ui"
+msgid "Song"
+msgstr "Morceau"
+
+msgctxt "ui"
+msgid "Song is empty. Add entries first."
+msgstr "Le morceau est vide. Ajoutez d'abord des entrées."
+
+msgctxt "ui"
+msgid "Song position {1}"
+msgstr "Position morceau {1}"
+
+msgctxt "ui"
+msgid "Song read error."
+msgstr "Erreur de lecture du morceau."
+
+msgctxt "ui"
+msgid "Song select {1}"
+msgstr "Choix morceau {1}"
+
+msgctxt "ui"
+msgid "Song window"
+msgstr "Fenêtre Morceau"
+
+msgctxt "ui"
+msgid "Source"
+msgstr "Source"
+
+msgctxt "ui"
+msgid "South African"
+msgstr "Sud-africain"
+
+msgctxt "ui"
+msgid "Space"
+msgstr "Espace"
+
+msgctxt "ui"
+msgid "Speed changes without a free CMD cell: {1}."
+msgstr "Changements de vitesse sans case CMD libre : {1}."
+
+msgctxt "ui"
+msgid "Speed {1} at {2} BPM, loops at position {3}."
+msgstr "Vitesse {1} à {2} BPM, boucle à la position {3}."
+
+msgctxt "ui"
+msgid "Speed {1} at {2} BPM, plays once."
+msgstr "Vitesse {1} à {2} BPM, joué une fois."
+
+msgctxt "ui"
+msgid "Speed {1} at {2} Hz, loops at step {3}."
+msgstr "Vitesse {1} à {2} Hz, boucle à la position {3}."
+
+msgctxt "ui"
+msgid "Speed {1} at {2} Hz, plays once."
+msgstr "Vitesse {1} à {2} Hz, joué une fois."
+
+msgctxt "ui"
+msgid "Speed: ticks per line (1-31)"
+msgstr "Vitesse : ticks par ligne (1-31)"
+
+msgctxt "ui"
+msgid "Speed: {1} ticks..."
+msgstr "Vitesse : {1} ticks..."
+
+msgctxt "ui"
+msgid "Split here \\"
+msgstr "Scinder ici \\"
+
+msgctxt "ui"
+msgid "Square"
+msgstr "Carré"
+
+msgctxt "ui"
+msgid "Start"
+msgstr "Début"
+
+msgctxt "ui"
+msgid "Start to End is played; Loop repeats it while the note is held. The 8-bit source is kept."
+msgstr "Début à Fin est joué ; Boucle le répète tant que la note est tenue. La source 8 bits est conservée."
+
+msgctxt "ui"
+msgid "Stems (ZIP)"
+msgstr "Stems (ZIP)"
+
+msgctxt "ui"
+msgid "Stems exported"
+msgstr "Stems exportés"
+
+msgctxt "ui"
+msgid "Step"
+msgstr "Pas"
+
+msgctxt "ui"
+msgid "Step Sequencer"
+msgstr "Séquenceur"
+
+msgctxt "ui"
+msgid "Step command rows"
+msgstr "Lignes de commandes par pas"
+
+msgctxt "ui"
+msgid "Step {1} step"
+msgstr "Pas {1} pas"
+
+msgctxt "ui"
+msgid "Stepped"
+msgstr "En escalier"
+
+msgctxt "ui"
+msgid "Steps"
+msgstr "Pas"
+
+msgctxt "ui"
+msgid "Steps per pattern"
+msgstr "Pas par motif"
+
+msgctxt "ui"
+msgid "Stereo"
+msgstr "Stéréo"
+
+msgctxt "ui"
+msgid "Stop"
+msgstr "Arrêt"
+
+msgctxt "ui"
+msgid "Stop MIDI learn"
+msgstr "Arrêter le MIDI learn"
+
+msgctxt "ui"
+msgid "Store channel"
+msgstr "Mémoriser le canal"
+
+msgctxt "ui"
+msgid "Subsong"
+msgstr "Sous-morceau"
+
+msgctxt "ui"
+msgid "Subsong to import"
+msgstr "Sous-morceau à importer"
+
+msgctxt "ui"
+msgid "Sweep"
+msgstr "Balayage"
+
+msgctxt "ui"
+msgid "Swing"
+msgstr "Swing"
+
+msgctxt "ui"
+msgid "Swing left out."
+msgstr "Swing non repris."
+
+msgctxt "ui"
+msgid "Sync"
+msgstr "Synchro"
+
+msgctxt "ui"
+msgid "Sync Buzzer"
+msgstr "Sync Buzzer"
+
+msgctxt "ui"
+msgid "Sync Buzzer steps"
+msgstr "Pas du Sync Buzzer"
+
+msgctxt "ui"
+msgid "Sync Mark"
+msgstr "Marque synchro"
+
+msgctxt "ui"
+msgid "Sync buzzers of more than 2 shapes whose square plays lower: {1}."
+msgstr "Sync buzzers de plus de 2 formes dont le carré joue plus bas : {1}."
+
+msgctxt "ui"
+msgid "Sync buzzers whose envelope period does not follow the note: {1}."
+msgstr "Sync buzzers dont la période d'enveloppe ne suit pas la note : {1}."
+
+msgctxt "ui"
+msgid "Sync-Buzzer (Uxx) rates following the note: {1}."
+msgstr "Vitesses de Sync-Buzzer (Uxx) qui suivent la note : {1}."
+
+msgctxt "ui"
+msgid "SysEx {1} bytes"
+msgstr "SysEx {1} octets"
+
+msgctxt "ui"
+msgid "System {1}"
+msgstr "Système {1}"
+
+msgctxt "ui"
+msgid "TRASH"
+msgstr "CORBEILLE"
+
+msgctxt "ui"
+msgid "TTrak module exported"
+msgstr "Module TTrak exporté"
+
+msgctxt "ui"
+msgid "TTrak module imported"
+msgstr "Module TTrak importé"
+
+msgctxt "ui"
+msgid "TTrak module not imported"
+msgstr "Module TTrak non importé"
+
+msgctxt "ui"
+msgid "TTrak plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "TTrak joue les trois voies d'une puce : passer en Authentic 3ch"
+
+msgctxt "ui"
+msgid "TTrak, XM, MOD, S3M, OKT or STYM2149 file."
+msgstr "TTrak, XM, MOD, S3M, OKT ou STYM2149."
+
+msgctxt "ui"
+msgid "Tab / Shift + Tab"
+msgstr "Tab / Shift + Tab"
+
+msgctxt "ui"
+msgid "Table"
+msgstr "Table"
+
+msgctxt "ui"
+msgid "Tail"
+msgstr "Queue"
+
+msgctxt "ui"
+msgid "Take"
+msgstr "Prise"
+
+msgctxt "ui"
+msgid "Tempo"
+msgstr "Tempo"
+
+msgctxt "ui"
+msgid "Tempo for this block (blank = song tempo):"
+msgstr "Tempo de ce bloc (vide = tempo du morceau) :"
+
+msgctxt "ui"
+msgid "Tempo {1} BPM, STE machine."
+msgstr "Tempo {1} BPM, machine STE."
+
+msgctxt "ui"
+msgid "Tempo {1} BPM, replay at {2} Hz, Authentic 3ch."
+msgstr "Tempo {1} BPM, rejoué à {2} Hz, Authentic 3ch."
+
+msgctxt "ui"
+msgid "Tempo..."
+msgstr "Tempo..."
+
+msgctxt "ui"
+msgid "Tempos beyond 32-255 BPM once in ticks, clamped: {1}."
+msgstr "Tempos hors de 32-255 BPM une fois en ticks, ramenés : {1}."
+
+msgctxt "ui"
+msgid "Tempos clamped to 20-300 BPM: {1}."
+msgstr "Tempos ramenés à 20-300 BPM : {1}."
+
+msgctxt "ui"
+msgid "Tenth"
+msgstr "Dixième"
+
+msgctxt "ui"
+msgid "The 127 instruments are in use: clear one in the Instruments window first."
+msgstr "Les 127 instruments sont utilisés : videz-en un dans la fenêtre Instruments d'abord."
+
+msgctxt "ui"
+msgid "The ASIO driver of the first copy serves one application at a time."
+msgstr "Le pilote ASIO de la première copie ne sert qu'une application à la fois."
+
+msgctxt "ui"
+msgid "The DMA bank file could not be read."
+msgstr "Le fichier de banque DMA n'a pas pu être lu."
+
+msgctxt "ui"
+msgid "The Digidrum bank file could not be read."
+msgstr "Le fichier de banque Digidrum n'a pas pu être lu."
+
+msgctxt "ui"
+msgid "The LFO of this track is off (Modulation window)"
+msgstr "Le LFO de cette piste est coupé (fenêtre Modulation)"
+
+msgctxt "ui"
+msgid "The Languages folder cannot be opened"
+msgstr "Impossible d'ouvrir le dossier des langues"
+
+msgctxt "ui"
+msgid "The MIDI file fills pattern {1}."
+msgstr "Le fichier MIDI remplit le motif {1}."
+
+msgctxt "ui"
+msgid "The MIDI file fills patterns {1} to {2}."
+msgstr "Le fichier MIDI remplit les motifs {1} à {2}."
+
+msgctxt "ui"
+msgid "The MIDI file holds drums (channel {1})."
+msgstr "Le fichier MIDI contient des percussions (canal {1})."
+
+msgctxt "ui"
+msgid "The Song is empty."
+msgstr "Le morceau est vide."
+
+msgctxt "ui"
+msgid "The Song plays nothing."
+msgstr "La Song ne joue rien."
+
+msgctxt "ui"
+msgid "The Song stops after 256 positions."
+msgstr "Le morceau s'arrête après 256 positions."
+
+msgctxt "ui"
+msgid "The TTrak module is cut."
+msgstr "Le module TTrak est tronqué."
+
+msgctxt "ui"
+msgid "The YM file is damaged."
+msgstr "Le fichier YM est endommagé."
+
+msgctxt "ui"
+msgid "The compressed data are damaged or too large."
+msgstr "Les données compressées sont endommagées ou trop grandes."
+
+msgctxt "ui"
+msgid "The file cannot be played."
+msgstr "Le fichier ne peut pas être joué."
+
+msgctxt "ui"
+msgid "The file could not be exported:"
+msgstr "Le fichier n'a pas pu être exporté :"
+
+msgctxt "ui"
+msgid "The file could not be read."
+msgstr "Le fichier n'a pas pu être lu."
+
+msgctxt "ui"
+msgid "The file could not be written:"
+msgstr "Le fichier n'a pas pu être écrit :"
+
+msgctxt "ui"
+msgid "The file reached its 4 GB limit and has been cut."
+msgstr "Le fichier a atteint sa limite de 4 Go et a été coupé."
+
+msgctxt "ui"
+msgid "The file was longer and has been truncated."
+msgstr "Le fichier était plus long et a été tronqué."
+
+msgctxt "ui"
+msgid "The gzip checksum does not match."
+msgstr "La somme de contrôle gzip ne correspond pas."
+
+msgctxt "ui"
+msgid "The gzip header is cut."
+msgstr "L'en-tête gzip est tronqué."
+
+msgctxt "ui"
+msgid "The gzip length does not match."
+msgstr "La longueur gzip ne correspond pas."
+
+msgctxt "ui"
+msgid "The gzip stream is cut."
+msgstr "Le flux gzip est tronqué."
+
+msgctxt "ui"
+msgid "The last take is saved with the project."
+msgstr "La dernière prise est enregistrée avec le projet."
+
+msgctxt "ui"
+msgid "The lines it keeps will be lost."
+msgstr "Les lignes qu'il garde seront perdues."
+
+msgctxt "ui"
+msgid "The module plays {1} channels."
+msgstr "Le module joue {1} voies."
+
+msgctxt "ui"
+msgid "The notes already written will be lost."
+msgstr "Les notes déjà écrites seront perdues."
+
+msgctxt "ui"
+msgid "The notes on its hits will be replaced."
+msgstr "Les notes sur ses coups seront remplacées."
+
+msgctxt "ui"
+msgid "The other tracks and the tempo stay."
+msgstr "Les autres pistes et le tempo sont conservés."
+
+msgctxt "ui"
+msgid "The patch library file could not be read."
+msgstr "Le fichier de bibliothèque de patchs n'a pas pu être lu."
+
+msgctxt "ui"
+msgid "The patterns hold notes. Fit them to {1}/{2}?"
+msgstr "Les motifs contiennent des notes. Les ajuster à {1}/{2} ?"
+
+msgctxt "ui"
+msgid "The replay routine stopped before its first frame."
+msgstr "La routine de lecture s'est arrêtée avant sa première trame."
+
+msgctxt "ui"
+msgid "The samples take {1},"
+msgstr "Les échantillons prennent {1},"
+
+msgctxt "ui"
+msgid "The settings changed in this window will be lost."
+msgstr "Les réglages modifiés dans cette fenêtre seront perdus."
+
+msgctxt "ui"
+msgid "The song could not be exported:"
+msgstr "Le morceau n'a pas pu être exporté :"
+
+msgctxt "ui"
+msgid "The song file is cut."
+msgstr "Le fichier du morceau est tronqué."
+
+msgctxt "ui"
+msgid "The song is cut."
+msgstr "Le morceau est tronqué."
+
+msgctxt "ui"
+msgid "The song is damaged."
+msgstr "Le morceau est endommagé."
+
+msgctxt "ui"
+msgid "The song names a missing pattern."
+msgstr "Le morceau désigne un motif absent."
+
+msgctxt "ui"
+msgid "The song stops where TTrak runs out of positions (127) or patterns (128)."
+msgstr "Le morceau s'arrête là où TTrak n'a plus de positions (127) ou de motifs (128)."
+
+msgctxt "ui"
+msgid "The song stops where maxYMiser runs out of song steps (256) or patterns (240)."
+msgstr "Le morceau s'arrête là où maxYMiser n'a plus de positions (256) ou de motifs (240)."
+
+msgctxt "ui"
+msgid "The song was longer than one hour and has been cut."
+msgstr "Le morceau dépassait une heure et a été coupé."
+
+msgctxt "ui"
+msgid "The tune plays no note."
+msgstr "Le morceau ne joue aucune note."
+
+msgctxt "ui"
+msgid "The tune plays only through timer effects or samples, which the import leaves out."
+msgstr "Le morceau ne joue que par des effets de timer ou des samples, que l'import ne reprend pas."
+
+msgctxt "ui"
+msgid "The voiceset file is cut."
+msgstr "Le fichier du jeu d'instruments est tronqué."
+
+msgctxt "ui"
+msgid "These may sound different in VBL, YM3, YM6 or SNDH exports:"
+msgstr "Ces éléments peuvent sonner autrement dans les exports VBL, YM3, YM6 ou SNDH :"
+
+msgctxt "ui"
+msgid "Third"
+msgstr "Tierce"
+
+msgctxt "ui"
+msgid "This copy has no audio output: choose one in Options > Audio/MIDI settings."
+msgstr "Cette copie n'a pas de sortie audio : choisissez-en une dans Options > Réglages audio/MIDI."
+
+msgctxt "ui"
+msgid "This copy plays through another output: choose it in Options > Audio/MIDI settings."
+msgstr "Cette copie joue par une autre sortie : choisissez-la dans Options > Réglages audio/MIDI."
+
+msgctxt "ui"
+msgid "This copy plays through the ASIO driver of the first copy."
+msgstr "Cette copie joue par le pilote ASIO de la première copie."
+
+msgctxt "ui"
+msgid "This file comes from a newer STYM2149."
+msgstr "Ce fichier vient d'une version plus récente de STYM2149."
+
+msgctxt "ui"
+msgid "This file holds a drum kit."
+msgstr "Ce fichier contient un kit de batterie."
+
+msgctxt "ui"
+msgid "This file holds a pattern."
+msgstr "Ce fichier contient un motif."
+
+msgctxt "ui"
+msgid "This file holds a project."
+msgstr "Ce fichier contient un projet."
+
+msgctxt "ui"
+msgid "This file holds a song."
+msgstr "Ce fichier contient un morceau."
+
+msgctxt "ui"
+msgid "This file is too long for a sample."
+msgstr "Ce fichier est trop long pour un échantillon."
+
+msgctxt "ui"
+msgid "This track is not a Chipdrum. Switch its generator to Chipdrum (Ctrl+C) to edit the kit."
+msgstr "Cette piste n'est pas un Chipdrum. Passez son générateur sur Chipdrum (Ctrl+C) pour éditer le kit."
+
+msgctxt "ui"
+msgid "Those past it will be silent and crossed out,"
+msgstr "Ceux qui la dépassent seront muets et barrés,"
+
+msgctxt "ui"
+msgid "Tick"
+msgstr "Tick"
+
+msgctxt "ui"
+msgid "Ticks per line"
+msgstr "Ticks par ligne"
+
+msgctxt "ui"
+msgid "Ticks {1}"
+msgstr "Ticks {1}"
+
+msgctxt "ui"
+msgid "Ticks {1}+"
+msgstr "Ticks {1}+"
+
+msgctxt "ui"
+msgid "Ticks: Speed ticks per line"
+msgstr "Ticks : Vitesse ticks par ligne"
+
+msgctxt "ui"
+msgid "Ticks: speed {1} at {2} Hz, Authentic 3ch, A4 {3} Hz."
+msgstr "Ticks : vitesse {1} à {2} Hz, Authentic 3ch, A4 {3} Hz."
+
+msgctxt "ui"
+msgid "Ticks: speed {1} at {2} Hz, Authentic 3ch."
+msgstr "Ticks : vitesse {1} à {2} Hz, Authentic 3ch."
+
+msgctxt "ui"
+msgid "Ticks: speed {1} at {2} Hz, STE machine."
+msgstr "Ticks : vitesse {1} à {2} Hz, machine STE."
+
+msgctxt "ui"
+msgid "Time"
+msgstr "Temps"
+
+msgctxt "ui"
+msgid "Timer"
+msgstr "Timer"
+
+msgctxt "ui"
+msgid "Timer effect frames beyond the MFP's reach, played at its nearest rate: {1}."
+msgstr "Trames d'effet de timer hors de portée du MFP, jouées à sa fréquence la plus proche : {1}."
+
+msgctxt "ui"
+msgid "Timer effects (SID, digidrums, sync buzzers) left out: {1}."
+msgstr "Effets de timer (SID, digidrums, sync buzzers) non repris : {1}."
+
+msgctxt "ui"
+msgid "Timer effects that STYM2149 does not play (pulse width, buzzer FM, sync square) left out: {1}."
+msgstr "Effets de timer que STYM2149 ne joue pas (pulse width, FM buzzer, sync square) non repris : {1}."
+
+msgctxt "ui"
+msgid "Timer ratio"
+msgstr "Rapport timer"
+
+msgctxt "ui"
+msgid "To"
+msgstr "Vers"
+
+msgctxt "ui"
+msgid "Tom {1}"
+msgstr "Tom {1}"
+
+msgctxt "ui"
+msgid "Tone"
+msgstr "Son"
+
+msgctxt "ui"
+msgid "Tone+Env"
+msgstr "Son+Env"
+
+msgctxt "ui"
+msgid "Tone+Noise"
+msgstr "Son+Bruit"
+
+msgctxt "ui"
+msgid "Tone+Noise+Env"
+msgstr "Son+Bruit+Env"
+
+msgctxt "ui"
+msgid "Too many patterns in the song."
+msgstr "Trop de motifs dans le morceau."
+
+msgctxt "ui"
+msgid "Too many sequences in the voiceset."
+msgstr "Trop de séquences dans le jeu d'instruments."
+
+msgctxt "ui"
+msgid "Tools"
+msgstr "Outils"
+
+msgctxt "ui"
+msgid "Tooltip language"
+msgstr "Langue des infobulles"
+
+msgctxt "ui"
+msgid "Tooltips"
+msgstr "Infobulles"
+
+msgctxt "ui"
+msgid "Track"
+msgstr "Piste"
+
+msgctxt "ui"
+msgid "Track ({1})"
+msgstr "Piste ({1})"
+
+msgctxt "ui"
+msgid "Track length"
+msgstr "Longueur de piste"
+
+msgctxt "ui"
+msgid "Track name, 8 chars (blank = number):"
+msgstr "Nom de la piste, 8 car. (vide = numéro) :"
+
+msgctxt "ui"
+msgid "Track {1} holds notes. Replace them?"
+msgstr "La piste {1} contient des notes. Les remplacer ?"
+
+msgctxt "ui"
+msgid "Tracker song"
+msgstr "Morceau de tracker"
+
+msgctxt "ui"
+msgid "Tracker song not imported"
+msgstr "Morceau de tracker non importé"
+
+msgctxt "ui"
+msgid "Tracks {1} and {2} hold notes. Replace them?"
+msgstr "Les pistes {1} et {2} contiennent des notes. Les remplacer ?"
+
+msgctxt "ui"
+msgid "Transport and edit"
+msgstr "Transport et édition"
+
+msgctxt "ui"
+msgid "Tri fifth"
+msgstr "Quinte tri"
+
+msgctxt "ui"
+msgid "Triangle"
+msgstr "Triangle"
+
+msgctxt "ui"
+msgid "Tritone"
+msgstr "Triton"
+
+msgctxt "ui"
+msgid "Tune"
+msgstr "Hauteur"
+
+msgctxt "ui"
+msgid "Tune request"
+msgstr "Demande d'accord"
+
+msgctxt "ui"
+msgid "Tuning"
+msgstr "Accordage"
+
+msgctxt "ui"
+msgid "Tuning A4"
+msgstr "Diapason A4"
+
+msgctxt "ui"
+msgid "Tuning A4 left out (YM-Tracker plays A4 at 440 Hz)."
+msgstr "Diapason A4 non repris (YM-Tracker joue A4 à 440 Hz)."
+
+msgctxt "ui"
+msgid "Tuning La4"
+msgstr "Diapason La4"
+
+msgctxt "ui"
+msgid "Turkish"
+msgstr "Turc"
+
+msgctxt "ui"
+msgid "Type"
+msgstr "Type"
+
+msgctxt "ui"
+msgid "Ukrainian Dorian"
+msgstr "Dorien ukrainien"
+
+msgctxt "ui"
+msgid "Undo"
+msgstr "Annuler"
+
+msgctxt "ui"
+msgid "Unknown effects left out: {1}."
+msgstr "Effets inconnus non repris : {1}."
+
+msgctxt "ui"
+msgid "Unknown gzip compression method."
+msgstr "Méthode de compression gzip inconnue."
+
+msgctxt "ui"
+msgid "Unknown gzip header flags."
+msgstr "Drapeaux d'en-tête gzip inconnus."
+
+msgctxt "ui"
+msgid "Unsaved work will be lost."
+msgstr "Le travail non enregistré sera perdu."
+
+msgctxt "ui"
+msgid "Unsupported MIDI file"
+msgstr "Fichier MIDI non pris en charge"
+
+msgctxt "ui"
+msgid "Unsupported XM version (1.04 only)."
+msgstr "Version XM non prise en charge (1.04 seulement)."
+
+msgctxt "ui"
+msgid "Unsupported chip clock: {1} Hz."
+msgstr "Horloge puce non prise en charge : {1} Hz."
+
+msgctxt "ui"
+msgid "Unsupported file"
+msgstr "Fichier non pris en charge"
+
+msgctxt "ui"
+msgid "Unsupported number of channels."
+msgstr "Nombre de voies non pris en charge."
+
+msgctxt "ui"
+msgid "Unsupported pattern length."
+msgstr "Longueur de motif non prise en charge."
+
+msgctxt "ui"
+msgid "Up"
+msgstr "Montée"
+
+msgctxt "ui"
+msgid "Up {1}"
+msgstr "Montée {1}"
+
+msgctxt "ui"
+msgid "UpDn"
+msgstr "Mon/Des"
+
+msgctxt "ui"
+msgid "Use STE"
+msgstr "Utiliser STE"
+
+msgctxt "ui"
+msgid "Used by the Custom entry of the CRV row."
+msgstr "Utilisée par l'entrée Perso. de la ligne CRV."
+
+msgctxt "ui"
+msgid "VBL frequency"
+msgstr "Fréquence VBL"
+
+msgctxt "ui"
+msgid "VBL, YM3 and SNDH exports will match what you hear."
+msgstr "Les exports VBL, YM3 et SNDH seront fidèles à l'écoute."
+
+msgctxt "ui"
+msgid "VBL, YM3, YM6 and SNDH exports will match what you hear."
+msgstr "Les exports VBL, YM3, YM6 et SNDH seront fidèles à l'écoute."
+
+msgctxt "ui"
+msgid "VIBRATO"
+msgstr "VIBRATO"
+
+msgctxt "ui"
+msgid "Value..."
+msgstr "Valeur..."
+
+msgctxt "ui"
+msgid "Velocity"
+msgstr "Vélocité"
+
+msgctxt "ui"
+msgid "Velocity curve"
+msgstr "Courbe de vélocité"
+
+msgctxt "ui"
+msgid "Version: {1}"
+msgstr "Version : {1}"
+
+msgctxt "ui"
+msgid "Vibrato"
+msgstr "Vibrato"
+
+msgctxt "ui"
+msgid "Vibrato table"
+msgstr "Table de vibrato"
+
+msgctxt "ui"
+msgid "Voice {1}"
+msgstr "Voix {1}"
+
+msgctxt "ui"
+msgid "Voices"
+msgstr "Voix"
+
+msgctxt "ui"
+msgid "Voicing"
+msgstr "Polyphonie"
+
+msgctxt "ui"
+msgid "Vol"
+msgstr "Vol"
+
+msgctxt "ui"
+msgid "Vol 4-bit"
+msgstr "Vol 4 bits"
+
+msgctxt "ui"
+msgid "Volume"
+msgstr "Volume"
+
+msgctxt "ui"
+msgid "Volume (0 to 100):"
+msgstr "Volume (0 à 100) :"
+
+msgctxt "ui"
+msgid "Volume R"
+msgstr "Volume D"
+
+msgctxt "ui"
+msgid "Volume Slide"
+msgstr "Glissé de volume"
+
+msgctxt "ui"
+msgid "Volume column effects left out: {1}."
+msgstr "Effets de colonne de volume non repris : {1}."
+
+msgctxt "ui"
+msgid "Volumes below the one of VOL 1 ({1} of 15), played at it: {2}."
+msgstr "Volumes sous celui de VOL 1 ({1} sur 15), joués à celui-ci : {2}."
+
+msgctxt "ui"
+msgid "WAV exported"
+msgstr "WAV exporté"
+
+msgctxt "ui"
+msgid "West African"
+msgstr "Ouest-africain"
+
+msgctxt "ui"
+msgid "Wheel"
+msgstr "Molette"
+
+msgctxt "ui"
+msgid "Wheel depth"
+msgstr "Prof. molette"
+
+msgctxt "ui"
+msgid "Whole pattern: every step, every octave. Click or drag to move the view."
+msgstr "Motif entier : chaque pas, chaque octave. Cliquer ou glisser pour déplacer la vue."
+
+msgctxt "ui"
+msgid "Whole tone"
+msgstr "Par tons"
+
+msgctxt "ui"
+msgid "Width"
+msgstr "Largeur"
+
+msgctxt "ui"
+msgid "Windows"
+msgstr "Fenêtres"
+
+msgctxt "ui"
+msgid "Wobble"
+msgstr "Ondulation"
+
+msgctxt "ui"
+msgid "Write PER"
+msgstr "Écrire PER"
+
+msgctxt "ui"
+msgid "Write the figure into track {1}?"
+msgstr "Écrire la figure dans la piste {1} ?"
+
+msgctxt "ui"
+msgid "Writing notes"
+msgstr "Écrire des notes"
+
+msgctxt "ui"
+msgid "XM imported"
+msgstr "XM importé"
+
+msgctxt "ui"
+msgid "XM not imported"
+msgstr "XM non importé"
+
+msgctxt "ui"
+msgid "YM Pad"
+msgstr "YM Pad"
+
+msgctxt "ui"
+msgid "YM imported"
+msgstr "YM importé"
+
+msgctxt "ui"
+msgid "YM levels"
+msgstr "Niveaux YM"
+
+msgctxt "ui"
+msgid "YM not imported"
+msgstr "YM non importé"
+
+msgctxt "ui"
+msgid "YM-Tracker or TTrak file."
+msgstr "YM-Tracker ou TTrak."
+
+msgctxt "ui"
+msgid "YM-Tracker plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "YM-Tracker joue les trois voies d'une puce : passer en Authentic 3ch"
+
+msgctxt "ui"
+msgid "YM-Tracker song exported"
+msgstr "Morceau YM-Tracker exporté"
+
+msgctxt "ui"
+msgid "YM-Tracker song imported"
+msgstr "Morceau YM-Tracker importé"
+
+msgctxt "ui"
+msgid "YM-Tracker song not imported"
+msgstr "Morceau YM-Tracker non importé"
+
+msgctxt "ui"
+msgid "YM/MOD PLAYER"
+msgstr "LECTEUR YM/MOD"
+
+msgctxt "ui"
+msgid "YM2149F REGISTER MONITOR"
+msgstr "REGISTRES DU YM2149F"
+
+msgctxt "ui"
+msgid "YM2149F emulator - GEM edition"
+msgstr "Émulateur YM2149F - édition GEM"
+
+msgctxt "ui"
+msgid "a VBL dump"
+msgstr "dump VBL"
+
+msgctxt "ui"
+msgid "accent; left click draws, right click opens a slider"
+msgstr "accent ; le clic gauche dessine, le clic droit ouvre un curseur"
+
+msgctxt "ui"
+msgid "after Hans Wessels (public domain)."
+msgstr "d'après Hans Wessels (domaine public)."
+
+msgctxt "ui"
+msgid "audio gain"
+msgstr "gain audio"
+
+msgctxt "ui"
+msgid "bar length; accents and metronome follow it"
+msgstr "longueur de la mesure ; accents et métronome la suivent"
+
+msgctxt "ui"
+msgid "block and channel menu"
+msgstr "menu du bloc et du canal"
+
+msgctxt "ui"
+msgid "buzzer fine tune"
+msgstr "réglage fin du buzzer"
+
+msgctxt "ui"
+msgid "chord notes"
+msgstr "notes d'accord"
+
+msgctxt "ui"
+msgid "clear the selected block"
+msgstr "effacer le bloc sélectionné"
+
+msgctxt "ui"
+msgid "clear the step at the Modulation cursor"
+msgstr "effacer le pas sous le curseur de Modulation"
+
+msgctxt "ui"
+msgid "clear the step at the cursor"
+msgstr "effacer le pas sous le curseur"
+
+msgctxt "ui"
+msgid "close the topmost window, then panic (all notes off)"
+msgstr "fermer la fenêtre du dessus, puis panique (toutes les notes coupées)"
+
+msgctxt "ui"
+msgid "copy / cut / paste / transpose the pattern"
+msgstr "copier / couper / coller / transposer le motif"
+
+msgctxt "ui"
+msgid "copy / paste that row to another track"
+msgstr "copier / coller cette ligne vers une autre piste"
+
+msgctxt "ui"
+msgid "copy / paste the whole patch"
+msgstr "copier / coller tout le patch"
+
+msgctxt "ui"
+msgid "copy, cut, paste the note at the grid cursor, or the selected box or block"
+msgstr "copier, couper, coller la note sous le curseur de la grille, ou le cadre ou le bloc sélectionné"
+
+msgctxt "ui"
+msgid "cut, copy, paste blocks"
+msgstr "couper, copier, coller des blocs"
+
+msgctxt "ui"
+msgid "drag to draw — left = start of the slide, right = arrival"
+msgstr "glisser pour dessiner - gauche = début du glissé, droite = arrivée"
+
+msgctxt "ui"
+msgid "draw the note and its length in one move"
+msgstr "dessiner la note et sa longueur d'un seul geste"
+
+msgctxt "ui"
+msgid "drop the block selection"
+msgstr "abandonner la sélection de bloc"
+
+msgctxt "ui"
+msgid "drums: off"
+msgstr "percus : off"
+
+msgctxt "ui"
+msgid "duplicate the block"
+msgstr "dupliquer le bloc"
+
+msgctxt "ui"
+msgid "empty"
+msgstr "vide"
+
+msgctxt "ui"
+msgid "empty - click to load a file"
+msgstr "vide - cliquer pour charger un fichier"
+
+msgctxt "ui"
+msgid "envelope only"
+msgstr "enveloppe seule"
+
+msgctxt "ui"
+msgid "erase it (no menu)"
+msgstr "l'effacer (sans menu)"
+
+msgctxt "ui"
+msgid "first / last block"
+msgstr "premier / dernier bloc"
+
+msgctxt "ui"
+msgid "from the last, until the memory is enough again."
+msgstr "en partant du dernier, jusqu'à ce que la mémoire suffise."
+
+msgctxt "ui"
+msgid "glissando shape used by the slide starting on that step"
+msgstr "forme du glissando qui part de ce pas"
+
+msgctxt "ui"
+msgid "grey out-of-scale rows, or force notes into the scale"
+msgstr "griser les lignes hors gamme, ou forcer les notes dans la gamme"
+
+msgctxt "ui"
+msgid "hit"
+msgstr "coup"
+
+msgctxt "ui"
+msgid "insert the current pattern after the cursor"
+msgstr "insérer le motif courant après le curseur"
+
+msgctxt "ui"
+msgid "join the note at the grid cursor to the next one"
+msgstr "joindre la note sous le curseur de la grille à la suivante"
+
+msgctxt "ui"
+msgid "jump to that block and load its pattern"
+msgstr "aller à ce bloc et charger son motif"
+
+msgctxt "ui"
+msgid "keyboard octave (Computer keyboard open)"
+msgstr "octave du clavier (Clavier d'ordinateur ouvert)"
+
+msgctxt "ui"
+msgid "keyboard octave down / up"
+msgstr "baisser / monter l'octave du clavier"
+
+msgctxt "ui"
+msgid "length written when placing a note, from 1/1 to 1/64, dotted or triplet"
+msgstr "longueur écrite en plaçant une note, de 1/1 à 1/64, pointée ou en triolet"
+
+msgctxt "ui"
+msgid "lengthen / shorten the note at the grid cursor"
+msgstr "allonger / raccourcir la note sous le curseur de la grille"
+
+msgctxt "ui"
+msgid "licenses folder and THIRD_PARTY.md."
+msgstr "dossier licenses et THIRD_PARTY.md."
+
+msgctxt "ui"
+msgid "loop"
+msgstr "boucle"
+
+msgctxt "ui"
+msgid "maxYMiser plays the three channels of one chip: switch to Authentic 3ch"
+msgstr "maxYMiser joue les trois voies d'une puce : passer en Authentic 3ch"
+
+msgctxt "ui"
+msgid "maxYMiser song exported"
+msgstr "Morceau maxYMiser exporté"
+
+msgctxt "ui"
+msgid "maxYMiser song imported"
+msgstr "Morceau maxYMiser importé"
+
+msgctxt "ui"
+msgid "maxYMiser song not imported"
+msgstr "Morceau maxYMiser non importé"
+
+msgctxt "ui"
+msgid "metronome on / off"
+msgstr "métronome on / off"
+
+msgctxt "ui"
+msgid "mono"
+msgstr "mono"
+
+msgctxt "ui"
+msgid "more / fewer repeats"
+msgstr "plus / moins de répétitions"
+
+msgctxt "ui"
+msgid "more than the {1} the memory of the Atari leaves them."
+msgstr "plus que les {1} que la mémoire de l'Atari leur laisse."
+
+msgctxt "ui"
+msgid "move it in pitch and time, keeping its length"
+msgstr "la déplacer en hauteur et dans le temps, sans changer sa longueur"
+
+msgctxt "ui"
+msgid "move the cursor along the arrangement"
+msgstr "déplacer le curseur dans l'arrangement"
+
+msgctxt "ui"
+msgid "move the cursor of the Arpeggiator or Modulation table"
+msgstr "déplacer le curseur de la table de l'Arpégiateur ou de Modulation"
+
+msgctxt "ui"
+msgid "move the edit cursor in the grid (Shift + Left/Right: change channel)"
+msgstr "déplacer le curseur d'édition dans la grille (Shift + Gauche/Droite : changer de canal)"
+
+msgctxt "ui"
+msgid "move the selected block (Shift + Up/Down: one octave)"
+msgstr "déplacer le bloc sélectionné (Shift + Haut/Bas : une octave)"
+
+msgctxt "ui"
+msgid "new project (File > New)"
+msgstr "nouveau projet (Fichier > Nouveau)"
+
+msgctxt "ui"
+msgid "next / previous open window to the front"
+msgstr "amener au premier plan la fenêtre ouverte suivante / précédente"
+
+msgctxt "ui"
+msgid "noise steps of tables"
+msgstr "pas de bruit des tables"
+
+msgctxt "ui"
+msgid "none"
+msgstr "aucun"
+
+msgctxt "ui"
+msgid "not available in this version yet."
+msgstr "pas encore disponible dans cette version."
+
+msgctxt "ui"
+msgid "note"
+msgstr "note"
+
+msgctxt "ui"
+msgid "octave"
+msgstr "octave"
+
+msgctxt "ui"
+msgid "octave, gate and pan, per step"
+msgstr "octave, gate et pan, par pas"
+
+msgctxt "ui"
+msgid "open the large oscilloscope"
+msgstr "ouvrir le grand oscilloscope"
+
+msgctxt "ui"
+msgid "pad"
+msgstr "pad"
+
+msgctxt "ui"
+msgid "play / stop"
+msgstr "lecture / arrêt"
+
+msgctxt "ui"
+msgid "previous / next channel (grid closed)"
+msgstr "canal précédent / suivant (grille fermée)"
+
+msgctxt "ui"
+msgid "put or remove a note at the cursor"
+msgstr "poser ou retirer une note sous le curseur"
+
+msgctxt "ui"
+msgid "quit"
+msgstr "quitter"
+
+msgctxt "ui"
+msgid "ratchet (hits inside the step) and trigger condition"
+msgstr "ratchet (coups dans le pas) et condition de déclenchement"
+
+msgctxt "ui"
+msgid "recentre it"
+msgstr "le recentrer"
+
+msgctxt "ui"
+msgid "redo"
+msgstr "rétablir"
+
+msgctxt "ui"
+msgid "remove the block or the selection"
+msgstr "retirer le bloc ou la sélection"
+
+msgctxt "ui"
+msgid "reorder the arrangement"
+msgstr "réordonner l'arrangement"
+
+msgctxt "ui"
+msgid "repeat / duplicate / cut / move / remove"
+msgstr "répéter / dupliquer / couper / déplacer / retirer"
+
+msgctxt "ui"
+msgid "repeated x{1}"
+msgstr "répété x{1}"
+
+msgctxt "ui"
+msgid "resize it to the current Note value, or remove it if already that long"
+msgstr "la redimensionner à la valeur de Note courante, ou la retirer si elle a déjà cette longueur"
+
+msgctxt "ui"
+msgid "scroll the view one semitone"
+msgstr "faire défiler la vue d'un demi-ton"
+
+msgctxt "ui"
+msgid "select a block of steps"
+msgstr "sélectionner un bloc de pas"
+
+msgctxt "ui"
+msgid "select a pattern bank"
+msgstr "choisir une banque de motifs"
+
+msgctxt "ui"
+msgid "select a pattern slot"
+msgstr "choisir un emplacement de motif"
+
+msgctxt "ui"
+msgid "select all the notes of the grid"
+msgstr "sélectionner toutes les notes de la grille"
+
+msgctxt "ui"
+msgid "sharp"
+msgstr "dièse"
+
+msgctxt "ui"
+msgid "show the notes of the other channels behind the grid"
+msgstr "afficher les notes des autres canaux derrière la grille"
+
+msgctxt "ui"
+msgid "slide to the next note"
+msgstr "glisser vers la note suivante"
+
+msgctxt "ui"
+msgid "slot {1}:"
+msgstr "empl. {1} :"
+
+msgctxt "ui"
+msgid "slot {1}: empty"
+msgstr "empl. {1} : vide"
+
+msgctxt "ui"
+msgid "slot {1}: {2} smp @ {3} Hz"
+msgstr "empl. {1} : {2} éch. @ {3} Hz"
+
+msgctxt "ui"
+msgid "snare"
+msgstr "snare"
+
+msgctxt "ui"
+msgid "split it at the clicked step"
+msgstr "la scinder au pas cliqué"
+
+msgctxt "ui"
+msgid "split the note at the grid cursor"
+msgstr "scinder la note sous le curseur de la grille"
+
+msgctxt "ui"
+msgid "steps"
+msgstr "pas"
+
+msgctxt "ui"
+msgid "stereo"
+msgstr "stéréo"
+
+msgctxt "ui"
+msgid "terms (see LICENSE)."
+msgstr "selon ses termes (voir LICENSE)."
+
+msgctxt "ui"
+msgid "the view scrolls one semitone at a time"
+msgstr "la vue défile d'un demi-ton à la fois"
+
+msgctxt "ui"
+msgid "the view scrolls through the pattern"
+msgstr "la vue défile dans le motif"
+
+msgctxt "ui"
+msgid "this window"
+msgstr "cette fenêtre"
+
+msgctxt "ui"
+msgid "ticks {1}"
+msgstr "ticks {1}"
+
+msgctxt "ui"
+msgid "toggle NSE at the Modulation cursor"
+msgstr "basculer NSE sous le curseur de Modulation"
+
+msgctxt "ui"
+msgid "tone-noise source and generator, per step"
+msgstr "source son-bruit et générateur, par pas"
+
+msgctxt "ui"
+msgid "transport & edit"
+msgstr "transport & édition"
+
+msgctxt "ui"
+msgid "tuned x{1}/{2}"
+msgstr "acc. x{1}/{2}"
+
+msgctxt "ui"
+msgid "undo / redo"
+msgstr "annuler / rétablir"
+
+msgctxt "ui"
+msgid "value of one step, from 1/4 down to 1/64, plus triplets"
+msgstr "valeur d'un pas, de 1/4 à 1/64, plus les triolets"
+
+msgctxt "ui"
+msgid "volume tables under an ADSR"
+msgstr "tables de volume sous un ADSR"
+
+msgctxt "ui"
+msgid "waiting for clock..."
+msgstr "attente de l'horloge..."
+
+msgctxt "ui"
+msgid "whole pattern at a glance; click or drag it to move the view"
+msgstr "tout le motif d'un coup d'œil ; cliquer ou glisser pour déplacer la vue"
+
+msgctxt "ui"
+msgid "write a note with the current Note value"
+msgstr "écrire une note avec la valeur de Note courante"
+
+msgctxt "ui"
+msgid "write the step at the table cursor"
+msgstr "écrire le pas sous le curseur de la table"
+
+msgctxt "ui"
+msgid "{1} (empty)"
+msgstr "{1} (vide)"
+
+msgctxt "ui"
+msgid "{1} ({2} to {3}):"
+msgstr "{1} ({2} à {3}) :"
+
+msgctxt "ui"
+msgid "{1} DMA instrument"
+msgstr "{1} instrument DMA"
+
+msgctxt "ui"
+msgid "{1} DMA instruments"
+msgstr "{1} instruments DMA"
+
+msgctxt "ui"
+msgid "{1} Env"
+msgstr "{1} Env"
+
+msgctxt "ui"
+msgid "{1} Hz, loops at position {2}."
+msgstr "{1} Hz, boucle à la position {2}."
+
+msgctxt "ui"
+msgid "{1} Hz, plays once."
+msgstr "{1} Hz, joué une fois."
+
+msgctxt "ui"
+msgid "{1} KB"
+msgstr "{1} Ko"
+
+msgctxt "ui"
+msgid "{1} KB of {2} KB"
+msgstr "{1} Ko sur {2} Ko"
+
+msgctxt "ui"
+msgid "{1} MB"
+msgstr "{1} Mo"
+
+msgctxt "ui"
+msgid "{1} Noise"
+msgstr "{1} Bruit"
+
+msgctxt "ui"
+msgid "{1} Noise+Env"
+msgstr "{1} Bruit+Env"
+
+msgctxt "ui"
+msgid "{1} Off"
+msgstr "{1} Off"
+
+msgctxt "ui"
+msgid "{1} Song entries"
+msgstr "{1} entrées de morceau"
+
+msgctxt "ui"
+msgid "{1} Song entry"
+msgstr "{1} entrée de morceau"
+
+msgctxt "ui"
+msgid "{1} Song position"
+msgstr "{1} position de morceau"
+
+msgctxt "ui"
+msgid "{1} Song positions"
+msgstr "{1} positions de morceau"
+
+msgctxt "ui"
+msgid "{1} Tone"
+msgstr "{1} Son"
+
+msgctxt "ui"
+msgid "{1} Tone+Env"
+msgstr "{1} Son+Env"
+
+msgctxt "ui"
+msgid "{1} Tone+Noise"
+msgstr "{1} Son+Bruit"
+
+msgctxt "ui"
+msgid "{1} Tone+Noise+Env"
+msgstr "{1} Son+Bruit+Env"
+
+msgctxt "ui"
+msgid "{1} [{2}]"
+msgstr "{1} [{2}]"
+
+msgctxt "ui"
+msgid "{1} bytes"
+msgstr "{1} octets"
+
+msgctxt "ui"
+msgid "{1} digidrum"
+msgstr "{1} digidrum"
+
+msgctxt "ui"
+msgid "{1} digidrums"
+msgstr "{1} digidrums"
+
+msgctxt "ui"
+msgid "{1} exported"
+msgstr "{1} exporté"
+
+msgctxt "ui"
+msgid "{1} frame"
+msgstr "{1} trame"
+
+msgctxt "ui"
+msgid "{1} frame at {2} Hz, {3}."
+msgstr "{1} trame à {2} Hz, {3}."
+
+msgctxt "ui"
+msgid "{1} frames"
+msgstr "{1} trames"
+
+msgctxt "ui"
+msgid "{1} frames at {2} Hz, {3}."
+msgstr "{1} trames à {2} Hz, {3}."
+
+msgctxt "ui"
+msgid "{1} frames, {2} at {3} Hz, chip {4}"
+msgstr "{1} trames, {2} à {3} Hz, puce {4}"
+
+msgctxt "ui"
+msgid "{1} instrument"
+msgstr "{1} instrument"
+
+msgctxt "ui"
+msgid "{1} instruments"
+msgstr "{1} instruments"
+
+msgctxt "ui"
+msgid "{1} lines"
+msgstr "{1} lignes"
+
+msgctxt "ui"
+msgid "{1} octave"
+msgstr "{1} octave"
+
+msgctxt "ui"
+msgid "{1} pattern"
+msgstr "{1} motif"
+
+msgctxt "ui"
+msgid "{1} patterns"
+msgstr "{1} motifs"
+
+msgctxt "ui"
+msgid "{1} plays 8 and leaves the others out."
+msgstr "{1} en joue 8 et laisse les autres de côté."
+
+msgctxt "ui"
+msgid "{1} position"
+msgstr "{1} position"
+
+msgctxt "ui"
+msgid "{1} position, {2}, {3}, {4}."
+msgstr "{1} position, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} position, {2}, {3}."
+msgstr "{1} position, {2}, {3}."
+
+msgctxt "ui"
+msgid "{1} positions"
+msgstr "{1} positions"
+
+msgctxt "ui"
+msgid "{1} positions, {2}, {3}, {4}."
+msgstr "{1} positions, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} positions, {2}, {3}."
+msgstr "{1} positions, {2}, {3}."
+
+msgctxt "ui"
+msgid "{1} row"
+msgstr "{1} ligne"
+
+msgctxt "ui"
+msgid "{1} rows"
+msgstr "{1} lignes"
+
+msgctxt "ui"
+msgid "{1} s at {2} Hz"
+msgstr "{1} s à {2} Hz"
+
+msgctxt "ui"
+msgid "{1} sample"
+msgstr "{1} sample"
+
+msgctxt "ui"
+msgid "{1} samples"
+msgstr "{1} samples"
+
+msgctxt "ui"
+msgid "{1} semitone"
+msgstr "{1} demi-ton"
+
+msgctxt "ui"
+msgid "{1} smp @ {2} Hz"
+msgstr "{1} éch. @ {2} Hz"
+
+msgctxt "ui"
+msgid "{1} song step, {2}, {3}, {4}."
+msgstr "{1} position de morceau, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} song step, {2}, {3}."
+msgstr "{1} position de morceau, {2}, {3}."
+
+msgctxt "ui"
+msgid "{1} song steps, {2}, {3}, {4}."
+msgstr "{1} positions de morceau, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} song steps, {2}, {3}."
+msgstr "{1} positions de morceau, {2}, {3}."
+
+msgctxt "ui"
+msgid "{1} to {2}"
+msgstr "{1} à {2}"
+
+msgctxt "ui"
+msgid "{1} to {2} (partly out of the chip range)"
+msgstr "{1} à {2} (en partie hors de la plage de la puce)"
+
+msgctxt "ui"
+msgid "{1} track, {2}"
+msgstr "{1} piste, {2}"
+
+msgctxt "ui"
+msgid "{1} track, {2} pattern of {3} steps (the last of {4}), {5} BPM."
+msgstr "{1} piste, {2} motif de {3} pas (le dernier de {4}), {5} BPM."
+
+msgctxt "ui"
+msgid "{1} track, {2} pattern of {3} steps, {4} BPM."
+msgstr "{1} piste, {2} motif de {3} pas, {4} BPM."
+
+msgctxt "ui"
+msgid "{1} track, {2} patterns of {3} steps (the last of {4}), {5} BPM."
+msgstr "{1} piste, {2} motifs de {3} pas (le dernier de {4}), {5} BPM."
+
+msgctxt "ui"
+msgid "{1} track, {2} patterns of {3} steps, {4} BPM."
+msgstr "{1} piste, {2} motifs de {3} pas, {4} BPM."
+
+msgctxt "ui"
+msgid "{1} track, {2}, {3}, {4}."
+msgstr "{1} piste, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} track, {2}-bit, {3} kHz, {4}."
+msgstr "{1} piste, {2} bits, {3} kHz, {4}."
+
+msgctxt "ui"
+msgid "{1} track, {2}."
+msgstr "{1} piste, {2}."
+
+msgctxt "ui"
+msgid "{1} tracks hold notes. Replace them?"
+msgstr "{1} pistes contiennent des notes. Les remplacer ?"
+
+msgctxt "ui"
+msgid "{1} tracks, {2}"
+msgstr "{1} pistes, {2}"
+
+msgctxt "ui"
+msgid "{1} tracks, {2} pattern of {3} steps, {4} BPM."
+msgstr "{1} pistes, {2} motif de {3} pas, {4} BPM."
+
+msgctxt "ui"
+msgid "{1} tracks, {2} pattern, {3} DMA instrument, {4} Song entry."
+msgstr "{1} pistes, {2} motif, {3} instrument DMA, {4} entrée de morceau."
+
+msgctxt "ui"
+msgid "{1} tracks, {2} patterns of {3} steps (the last of {4}), {5} BPM."
+msgstr "{1} pistes, {2} motifs de {3} pas (le dernier de {4}), {5} BPM."
+
+msgctxt "ui"
+msgid "{1} tracks, {2} patterns of {3} steps, {4} BPM."
+msgstr "{1} pistes, {2} motifs de {3} pas, {4} BPM."
+
+msgctxt "ui"
+msgid "{1} tracks, {2}, {3}, {4}."
+msgstr "{1} pistes, {2}, {3}, {4}."
+
+msgctxt "ui"
+msgid "{1} tracks, {2}-bit, {3} kHz, {4}."
+msgstr "{1} pistes, {2} bits, {3} kHz, {4}."
+
+msgctxt "ui"
+msgid "{1} triplet"
+msgstr "{1} triolet"
+
+msgctxt "ui"
+msgid "{1} values"
+msgstr "{1} valeurs"
+
+msgctxt "ui"
+msgid "{1}-bit"
+msgstr "{1} bits"
+
+msgctxt "ui"
+msgid "{1}-bit float"
+msgstr "{1} bits flottant"
+
+msgctxt "ui"
+msgid "{1}-bit float, {2} kHz, {3}."
+msgstr "{1} bits flottant, {2} kHz, {3}."
+
+msgctxt "ui"
+msgid "{1}-bit reg"
+msgstr "rég. {1} bits"
+
+msgctxt "ui"
+msgid "{1}-bit samples at the slot rate."
+msgstr "Échantillons {1} bits à la fréquence de l'emplacement."
+
+msgctxt "ui"
+msgid "{1}-bit samples played by the timer of a Digidrum track, at the rate below from the root note."
+msgstr "Échantillons {1} bits joués par le timer d'une piste Digidrum, à la fréquence ci-dessous d'après la note de référence."
+
+msgctxt "ui"
+msgid "{1}-bit, {2} kHz, {3}."
+msgstr "{1} bits, {2} kHz, {3}."
+
+msgctxt "ui"
+msgid "{1}/frame"
+msgstr "{1}/trame"
+
+msgctxt "ui"
+msgid "{1}/{2} eighth"
+msgstr "{1}/{2} croche"
+
+msgctxt "ui"
+msgid "{1}/{2} quarter"
+msgstr "{1}/{2} noire"
+
+msgctxt "ui"
+msgid "{1}/{2} sixteenth"
+msgstr "{1}/{2} double croche"
+
+msgctxt "ui"
+msgid "{1}/{2} sixty-fourth"
+msgstr "{1}/{2} quadruple croche"
+
+msgctxt "ui"
+msgid "{1}/{2} thirty-second"
+msgstr "{1}/{2} triple croche"
+
+msgctxt "ui"
+msgid "{1}/{2} {3} step"
+msgstr "{1}/{2} {3} pas"
+
+msgctxt "ui"
+msgid "{1}/{2} {3} steps"
+msgstr "{1}/{2} {3} pas"
+
+msgctxt "ui"
+msgid "{1}/{2}. {3} step"
+msgstr "{1}/{2}. {3} pas"
+
+msgctxt "ui"
+msgid "{1}/{2}. {3} steps"
+msgstr "{1}/{2}. {3} pas"
+
+msgctxt "ui"
+msgid "{1}/{2}T triplet"
+msgstr "{1}/{2}T triolet"
+
+msgctxt "ui"
+msgid "{1}/{2}T {3} step"
+msgstr "{1}/{2}T {3} pas"
+
+msgctxt "ui"
+msgid "{1}/{2}T {3} steps"
+msgstr "{1}/{2}T {3} pas"
+
+msgctxt "ui"
+msgid "• Chip clock {1} is not an Atari clock (an ST or STE runs its YM at {2} MHz)"
+msgstr "• L'horloge puce {1} n'est pas celle d'un Atari (un ST ou STE cadence son YM à {2} MHz)"
+
+msgctxt "ui"
+msgid "• Dual chip: VBL, YM and SNDH exports need Authentic 3ch (one chip)"
+msgstr "• Double puce : les exports VBL, YM et SNDH demandent Authentic 3ch (une puce)"
+
+msgctxt "ui"
+msgid "• Master L / R and balance are ignored (the ST is mono)"
+msgstr "• Master G / D et la balance sont ignorés (le ST est mono)"
+
+msgctxt "ui"
+msgid "• Master level is a playback gain, not a register value"
+msgstr "• Le niveau Master est un gain de lecture, pas une valeur de registre"
+
+msgctxt "ui"
+msgid "• Mixer levels are ignored (only the {1}-bit volume is written)"
+msgstr "• Les niveaux du Mixeur sont ignorés (seul le volume {1} bits est écrit)"
+
+msgctxt "ui"
+msgid "• Mixer pan is ignored (the ST is mono)"
+msgstr "• Le pan du Mixeur est ignoré (le ST est mono)"
+
+msgctxt "ui"
+msgid "• Per-step PAN row is ignored (the ST is mono)"
+msgstr "• La ligne PAN par pas est ignorée (le ST est mono)"
+
+msgctxt "ui"
+msgid "• Tempo: {1} steps/s exceeds the {2} Hz VBL rate — steps would be dropped"
+msgstr "• Tempo : {1} pas/s dépassent la fréquence VBL de {2} Hz - des pas seraient perdus"
+
+msgctxt "ui"
+msgid "• Timer Free: exact timer rates, which the MFP of an ST or STE rounds"
+msgstr "• Timer Libre : fréquences de timer exactes, que le MFP d'un ST ou STE arrondit"
+
+msgctxt "ui"
+msgid "• Timer effects frozen: {1} voice frames."
+msgstr "• Effets timer figés : {1} trames de voix."
+
+msgctxt "ui"
+msgid "• {1}"
+msgstr "• {1}"
+
+msgctxt "ui"
+msgid "• {1} DMA tracks with notes — the STE has one DMA channel, the SNDH plays the latest note"
+msgstr "• {1} pistes DMA avec des notes - le STE a un seul canal DMA, le SNDH joue la dernière note"
+
+msgctxt "ui"
+msgid "• {1} tracks with notes — a YM2149 has three voices (A, B, C)"
+msgstr "• {1} pistes avec des notes - un YM2149 a trois voix (A, B, C)"
+
+msgctxt "ui"
+msgid "• {1}: ADSR in Smooth mode (audio gain, not in registers)"
+msgstr "• {1} : ADSR en mode Lisse (gain audio, pas dans les registres)"
+
+msgctxt "ui"
+msgid "• {1}: ADSR on a Sync Buzzer — the hardware envelope drives the level"
+msgstr "• {1} : ADSR sur un Sync Buzzer - l'enveloppe matérielle mène le niveau"
+
+msgctxt "ui"
+msgid "• {1}: Chipdrum uses sample tables here (Authentic 3ch synthesises it from registers)"
+msgstr "• {1} : le Chipdrum utilise ici des tables d'échantillons (Authentic 3ch le synthétise par les registres)"
+
+msgctxt "ui"
+msgid "• {1}: DMA sound of the STE, carried by SNDH only"
+msgstr "• {1} : son DMA du STE, porté par le SNDH seulement"
+
+msgctxt "ui"
+msgid "• {1}: Digidrum replays its sample in YM6 and SNDH only (silent in VBL and YM3)"
+msgstr "• {1} : le Digidrum ne rejoue son échantillon qu'en YM6 et SNDH (muet en VBL et YM3)"
+
+msgctxt "ui"
+msgid "• {1}: FM Voice of {2} step at ratio x{3} needs a timer faster than most ST replayers run"
+msgstr "• {1} : FM Voice de {2} pas au rapport x{3}, il faut un timer plus rapide que dans la plupart des replays ST"
+
+msgctxt "ui"
+msgid "• {1}: FM Voice of {2} steps at ratio x{3} needs a timer faster than most ST replayers run"
+msgstr "• {1} : FM Voice de {2} pas au rapport x{3}, il faut un timer plus rapide que dans la plupart des replays ST"
+
+msgctxt "ui"
+msgid "• {1}: FM Voice plays its wave in SNDH only (the note alone in VBL, YM3 and YM6)"
+msgstr "• {1} : la FM Voice ne joue son onde qu'en SNDH (la note seule en VBL, YM3 et YM6)"
+
+msgctxt "ui"
+msgid "• {1}: SID ratio x{2} needs a timer faster than most ST replayers run"
+msgstr "• {1} : rapport SID x{2}, il faut un timer plus rapide que dans la plupart des replays ST"
+
+msgctxt "ui"
+msgid "• {1}: arpeggio at {2} Hz is faster than the VBL rate"
+msgstr "• {1} : arpège à {2} Hz, plus rapide que la fréquence VBL"
+
+msgctxt "ui"
+msgid "• {1}: modulation table runs faster than one step per VBL"
+msgstr "• {1} : la table de modulation va plus vite qu'un pas par VBL"
+
+msgctxt "ui"
+msgid "• {1}: slide curves other than Linear are interpolated, not written per VBL"
+msgstr "• {1} : les courbes de glissé autres que Linéaire sont interpolées, pas écrites à chaque VBL"
+
+msgctxt "ui"
+msgid "• {1}: vibrato is smooth here; on hardware it steps at the VBL rate"
+msgstr "• {1} : le vibrato est continu ici ; sur le matériel il avance à la fréquence VBL"
+
+msgctxt "ui"
+msgid "• {1}: {2} note above the chip range"
+msgstr "• {1} : {2} note au-dessus de la plage de la puce"
+
+msgctxt "ui"
+msgid "• {1}: {2} note below the chip range (period would exceed 4095)"
+msgstr "• {1} : {2} note sous la plage de la puce (la période dépasserait 4095)"
+
+msgctxt "ui"
+msgid "• {1}: {2} notes above the chip range"
+msgstr "• {1} : {2} notes au-dessus de la plage de la puce"
+
+msgctxt "ui"
+msgid "• {1}: {2} notes below the chip range (period would exceed 4095)"
+msgstr "• {1} : {2} notes sous la plage de la puce (la période dépasserait 4095)"
+
+msgctxt "ui"
+msgid "• {1}: {2} step with a chord — one YM voice plays one note at a time"
+msgstr "• {1} : {2} pas avec un accord - une voix YM joue une note à la fois"
+
+msgctxt "ui"
+msgid "• {1}: {2} steps with a chord — one YM voice plays one note at a time"
+msgstr "• {1} : {2} pas avec un accord - une voix YM joue une note à la fois"

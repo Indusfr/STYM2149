@@ -14,13 +14,13 @@ namespace stym::plugin {
 using ymengine::Engine;
 
 namespace {
-// Log of a chunk: a few hundred entries at most (arpeggios at 200 Hz on 16 tracks and their chords); the capacity is
+// Log of a chunk: a few hundred entries at most (arpeggios at 200 Hz on 32 tracks and their chords); the capacity is
 // reserved once, the engine does not write beyond it.
 constexpr size_t kLogCapacity = size_t(1) << 16;
 }  // namespace
 
 OfflineRender::OfflineRender(Source source, uint32_t sampleRate, const ParamValues& values,
-                             const NonParamState& extras, uint16_t trackOutputs)
+                             const NonParamState& extras, uint32_t trackOutputs)
     : driver_(std::make_unique<Driver>()),
       snapshot_(std::make_unique<Snapshot>()),
       values_(values),
@@ -47,6 +47,8 @@ OfflineRender::~OfflineRender() = default;
 const NonParamState& OfflineRender::extras() const noexcept { return snapshot_->state; }
 
 uint32_t OfflineRender::latencySamples() const noexcept { return driver_->latencySamples(); }
+
+uint8_t OfflineRender::reg(unsigned r) const noexcept { return driver_->engine().chip(0).chip().readRegister(r); }
 
 bool OfflineRender::startCapture(std::span<ymengine::RegisterFrame> frames, std::span<ymengine::DmaFrame> dma) noexcept {
     if (started_) return false;

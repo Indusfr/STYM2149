@@ -5,6 +5,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,6 +14,7 @@
 #include "Scenes.h"
 #include "UiHost.h"
 #include "gemui/Font.h"
+#include "gemui/Language.h"
 #include "pluginui/DeskIcons.h"
 #include "pluginui/IconData.h"
 
@@ -23,7 +25,9 @@ namespace {
 
 using pluginui::MainWindow;
 
-gemui::Point pictureOf(const gemui::DeskIcon& i) { return {i.bounds().x + gemui::DeskIcon::kW / 2, i.bounds().y + 16}; }
+gemui::Point pictureOf(const gemui::DeskIcon& i) {
+    return {i.bounds().x + gemui::DeskIcon::kW / 2, i.bounds().y + gemui::DeskIcon::kPicture / 2};
+}
 
 }  // namespace
 
@@ -33,32 +37,34 @@ TEST_CASE("Desktop: the menu bar across the top, the windows below it (ninth DAW
     // Titles from the left edge of the desktop, indicators at its right edge.
     const gemui::Rect fuji = *w.rectOf("mFuji"), midi = *w.rectOf("miditxt");
     CHECK(fuji.y == 0);
-    CHECK(fuji.x == 8);
+    CHECK(fuji.x == 16);  // GEM: the first title from the second character (Devpac 3)
     CHECK(midi.y == 0);
     CHECK(midi.right() == MainWindow::kWidth - 8);
-    CHECK(w.desktop().workTop() == MainWindow::kMenuH);
+    // The GEM bar is 19 px high; the windows keep their places below the prototype's 26 px.
+    CHECK(gemui::MenuBar::height() == 19);
+    CHECK(w.desktop().workTop() == gemui::MenuBar::height());
     // The main window starts below the bar, without a menu row: its title bar, then its content.
     CHECK(w.mainPlace().y == MainWindow::kWinY);
     CHECK(MainWindow::kWinY == MainWindow::kMenuH + 18);
     // A title opens its menu below the bar.
     w.openMenu(1);
     REQUIRE(topMenu(w));
-    CHECK(topMenu(w)->bounds().y >= MainWindow::kMenuH - 2);
+    CHECK(topMenu(w)->bounds().y == gemui::MenuBar::height() - 1);  // its frame on the bar's rule
     w.desktop().closePopups();
 
     // Neither the main window nor a floating window goes above the bar.
     w.moveMainTo(200, 0);
-    CHECK(w.mainPlace().y == MainWindow::kMenuH);
+    CHECK(w.mainPlace().y == gemui::MenuBar::height());
     CHECK(w.mainPlace().x == 200);
     w.sequencer().show();
     const gemui::Rect bar = w.sequencer().titleBar().bounds();
     w.desktop().mouseDown({bar.x + 300, bar.y + 10}, gemui::MouseButton::Left, {});
     w.desktop().mouseDrag({bar.x + 300, 0}, {});
     w.desktop().mouseUp({bar.x + 300, 0}, {});
-    CHECK(w.sequencer().bounds().y == MainWindow::kMenuH);
+    CHECK(w.sequencer().bounds().y == gemui::MenuBar::height());
 }
 
-TEST_CASE("Desktop: icons A, B and trash, named in the tooltip language, moved by a held press only (item 102)",
+TEST_CASE("Desktop: icons A, B and trash, named in the interface language, moved by a held press only (item 102)",
           "[ui][desktop]") {
     UiHost h;
     h.languages = gemshot::installedLanguages();
@@ -68,14 +74,17 @@ TEST_CASE("Desktop: icons A, B and trash, named in the tooltip language, moved b
     CHECK(icons[0].name() == "FLOPPY DISK");
     CHECK(icons[1].name() == "FLOPPY DISK");
     CHECK(icons[2].name() == "TRASH");
-    // A and B on one row at the top left, beside the main window, below the menu bar; the trash at the bottom right
-    // (tenth DAW test, item 124). All three in cells of the icons' size, the first row level with the main window
-    // (thirteenth DAW test, item 167): A and B in the first two, the trash in the last.
+    // A and B at the top left, beside the main window, below the menu bar; the trash at the bottom right (tenth DAW
+    // test, item 124). All three in cells of the icons' size, the first row level with the main window (thirteenth
+    // DAW test, item 167): A and B in the first column, A above B (the icons twice as big, names included), the
+    // trash in the last cell.
     constexpr int kW = gemui::DeskIcon::kW, kH = gemui::DeskIcon::kH;
+    CHECK(kW == 144);
+    CHECK(kH == 80);
     CHECK(icons[0].bounds().x == 0);
     CHECK(icons[0].bounds().y == MainWindow::kWinY);
-    CHECK(icons[1].bounds().y == icons[0].bounds().y);
-    CHECK(icons[1].bounds().x == kW);
+    CHECK(icons[1].bounds().x == 0);
+    CHECK(icons[1].bounds().y == MainWindow::kWinY + kH);
     CHECK(icons[1].bounds().right() <= MainWindow::kWinX);
     CHECK(icons[2].bounds().x % kW == 0);
     CHECK((icons[2].bounds().y - MainWindow::kWinY) % kH == 0);
@@ -84,14 +93,17 @@ TEST_CASE("Desktop: icons A, B and trash, named in the tooltip language, moved b
     CHECK(icons[2].bounds().bottom() <= MainWindow::kHeight);
     CHECK(icons[2].bounds().bottom() + kH > MainWindow::kHeight);
 
-    // The names follow the tooltip language.
+    // The names are drawn in the interface language, not in the tooltip language.
     w->setTipLanguage("fr");
-    CHECK(icons[0].name() == "DISQUETTE");
-    CHECK(icons[2].name() == "CORBEILLE");
-    w->setTipLanguage("de");
-    CHECK(icons[1].name() == "DISKETTE");
-    CHECK(icons[2].name() == "PAPIERKORB");
+    CHECK(gemui::uiString(icons[0].name()) == "FLOPPY DISK");
     w->setTipLanguage("en");
+    w->setUiLanguage("fr");
+    CHECK(gemui::uiString(icons[0].name()) == "DISQUETTE");
+    CHECK(gemui::uiString(icons[2].name()) == "CORBEILLE");
+    w->setUiLanguage("de");
+    CHECK(gemui::uiString(icons[1].name()) == "DISKETTE");
+    CHECK(gemui::uiString(icons[2].name()) == "PAPIERKORB");
+    w->setUiLanguage("en");
 
     // A click or a double click on A or B does nothing: no menu, no window, no move, nothing written.
     for (size_t k : {size_t(0), size_t(1)}) {
@@ -111,14 +123,14 @@ TEST_CASE("Desktop: icons A, B and trash, named in the tooltip language, moved b
     const gemui::Rect home = icons[2].bounds();
     const gemui::Point p = pictureOf(icons[2]);
     w->desktop().mouseDown(p, gemui::MouseButton::Left, {});
-    w->desktop().mouseDrag({p.x - 20, p.y - 300}, {});
+    w->desktop().mouseDrag({p.x - 20, p.y - 15 * kH / 2}, {});
     CHECK(icons[2].dragging());
     const gemui::Rect cell = home.translated(0, -7 * kH);  // -20: the same column; -7.5 rows: 7 up (a half rounds down)
     CHECK(icons[2].dragRect() == cell);
-    w->desktop().mouseDrag({p.x - 50, p.y - 290}, {});
+    w->desktop().mouseDrag({p.x - 100, p.y - 15 * kH / 2 + 10}, {});
     CHECK(icons[2].dragRect() == cell.translated(-kW, 0));
     CHECK(icons[2].bounds() == home);
-    w->desktop().mouseUp({p.x - 50, p.y - 290}, {});
+    w->desktop().mouseUp({p.x - 100, p.y - 15 * kH / 2 + 10}, {});
     CHECK_FALSE(icons[2].dragging());
     const gemui::Rect moved = cell.translated(-kW, 0);
     CHECK(icons[2].bounds() == moved);
@@ -143,9 +155,9 @@ TEST_CASE("Desktop: icons A, B and trash, named in the tooltip language, moved b
     // A cell that another icon holds refuses the drop: the icon stays.
     const gemui::Point qb = pictureOf(icons[1]);
     w->desktop().mouseDown(qb, gemui::MouseButton::Left, {});
-    w->desktop().mouseDrag({qb.x - kW, qb.y}, {});
+    w->desktop().mouseDrag({qb.x, qb.y - kH}, {});
     CHECK(icons[1].dragRect() == a);
-    w->desktop().mouseUp({qb.x - kW, qb.y}, {});
+    w->desktop().mouseUp({qb.x, qb.y - kH}, {});
     CHECK(icons[1].bounds() == b);
 
     // The places come back with the preference.
@@ -261,7 +273,9 @@ TEST_CASE("Desktop: the Atari logo of the menu bar, the outline of the real logo
     int same = 0;
     for (int y = 0; y < f.h; ++y)
         for (int x = 0; x < f.w; ++x) {
-            const bool black = d.surface().row(title.y + 5 + y)[title.x + 10 + x] == gemui::colors::kBlack;
+            // In the GEM bar: one character from the cell's left edge, centred in its height.
+            const int top = title.y + (title.h - f.h) / 2;
+            const bool black = d.surface().row(top + y)[title.x + 8 + x] == gemui::colors::kBlack;
             same += black == f.at(x, y);
         }
     CHECK(same == f.w * f.h);
@@ -293,24 +307,66 @@ TEST_CASE("Desktop: the floppy disk and the trash of the EmuTOS desktop", "[ui][
         }
     CHECK(clash == 0);
     CHECK(uncovered == 0);
-    // The letter in the 6 × 6 font, its cell's top-left corner there, as the AES draws ib_char (gr_gicon).
+    // The letter in the 6 × 6 font, its cell's top-left corner there, as the AES draws ib_char (gr_gicon); the picture
+    // and the letter twice as big: each pixel a 2 × 2 square.
+    constexpr int kZoom = gemui::DeskIcon::kZoom;
+    static_assert(kZoom == 2 && gemui::DeskIcon::kPicture == 64);
     gemui::DeskIcon icon;
     icon.setBounds({0, 0, gemui::DeskIcon::kW, gemui::DeskIcon::kH});
     icon.setPicture(&icons::kFloppy, &icons::kFloppyMask);
     icon.setLetter('A', icons::kFloppyLetterX, icons::kFloppyLetterY);
+    icon.setName("FLOPPY DISK");
     gemui::Surface surface(gemui::DeskIcon::kW, gemui::DeskIcon::kH, gemui::colors::kGreen);
     gemui::Painter p(surface);
     icon.paint(p);
+    const int left = (gemui::DeskIcon::kW - gemui::DeskIcon::kPicture) / 2;
     const int g = gemui::Font::glyph(U'A');
     const gemui::Font::Raster a = gemui::Font::raster(8, g, 0, gemui::Face::kSmall);
-    const int px = (gemui::DeskIcon::kW - gemui::DeskIcon::kPicture) / 2 + icons::kFloppyLetterX + a.shift;
+    auto square = [&surface](int x, int y) {  // the colour of a 2 × 2 square, or green when its pixels differ
+        const gemui::Color c = surface.at(x, y);
+        if (surface.at(x + 1, y) != c || surface.at(x, y + 1) != c || surface.at(x + 1, y + 1) != c)
+            return gemui::colors::kGreen;
+        return c;
+    };
     int wrong = 0, ink = 0;
     for (int r = 0; r < a.count; ++r)
         for (int b = 0; b < 6; ++b) {
             const bool lit = (a.bits(r) & (0x8000 >> b)) != 0;
             ink += lit;
-            wrong += (surface.at(px + b, icons::kFloppyLetterY + r) == gemui::colors::kBlack) != lit;
+            const int x = left + kZoom * (icons::kFloppyLetterX + a.shift + b), y = kZoom * (icons::kFloppyLetterY + r);
+            wrong += (square(x, y) == gemui::colors::kBlack) != lit;
         }
     CHECK(ink > 8);
     CHECK(wrong == 0);
+    // Every pixel of the 32 × 32 picture outside the letter's cell: black on its data, white on its mask only, the
+    // desktop elsewhere; the name box below it, white.
+    int picture = 0;
+    for (int y = 0; y < 32; ++y)
+        for (int x = 0; x < 32; ++x) {
+            const bool inLetter = x >= icons::kFloppyLetterX && x < icons::kFloppyLetterX + 6 &&
+                                  y >= icons::kFloppyLetterY && y < icons::kFloppyLetterY + 6;
+            if (inLetter) continue;
+            const gemui::Color want = icons::kFloppy.at(x, y)       ? gemui::colors::kBlack
+                                      : icons::kFloppyMask.at(x, y) ? gemui::colors::kWhite
+                                                                    : gemui::colors::kGreen;
+            picture += square(left + kZoom * x, kZoom * y) != want;
+        }
+    CHECK(picture == 0);
+    CHECK(surface.at(0, gemui::DeskIcon::kPicture) == gemui::colors::kWhite);
+    CHECK(surface.at(gemui::DeskIcon::kW - 1, gemui::DeskIcon::kH - 1) == gemui::colors::kWhite);
+    // The name and its box twice as big too: each pixel of the name as Painter::text writes it in the 72 × 8
+    // box of the AES, a 2 × 2 square of the 144 × 16 box.
+    static_assert(gemui::DeskIcon::kW == 144 && gemui::DeskIcon::kNameH == 16);
+    gemui::Surface one(gemui::DeskIcon::kW / kZoom, gemui::DeskIcon::kNameH / kZoom, gemui::colors::kWhite);
+    gemui::Painter p1(one);
+    const double w1 = gemui::Font::width("FLOPPY DISK", 8, 0, gemui::Face::kSmall);
+    p1.text("FLOPPY DISK", std::floor((72 - w1) / 2), 0, 8, gemui::colors::kBlack, 0, gemui::Face::kSmall);
+    int name = 0, dark = 0;
+    for (int y = 0; y < 8; ++y)
+        for (int x = 0; x < 72; ++x) {
+            dark += one.at(x, y) == gemui::colors::kBlack;
+            name += square(kZoom * x, gemui::DeskIcon::kPicture + kZoom * y) != one.at(x, y);
+        }
+    CHECK(dark > 40);
+    CHECK(name == 0);
 }

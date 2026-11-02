@@ -15,6 +15,7 @@ void EngineStatusTap::prepare(uint32_t sampleRate) noexcept {
     period_ = std::max<uint32_t>(1, sampleRate / 30);
     elapsed_ = 0;
     ring_.fill(0);
+    sideRing_.fill(0);
     ringPos_ = 0;
     outPeak_.fill(0);
 }
@@ -23,6 +24,7 @@ void EngineStatusTap::capture(ymengine::Engine& engine, const ParamValues& value
                            const float* right, uint32_t n) noexcept {
     for (uint32_t i = 0; i < n; ++i) {
         ring_[ringPos_] = 0.5f * (left[i] + right[i]);
+        sideRing_[ringPos_] = 0.5f * (right[i] - left[i]);
         ringPos_ = (ringPos_ + 1) % kScopeSamples;
         outPeak_[0] = std::max(outPeak_[0], std::fabs(left[i]));
         outPeak_[1] = std::max(outPeak_[1], std::fabs(right[i]));
@@ -39,18 +41,19 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
     EngineStatus& t = buffer_.back();
     t.serial = ++serial_;
 
-    // The right side of a stereo DMA sample has its own fader, mute and solo.
+    // The right side of a stereo track has its own fader, mute and solo with Link off.
     auto on = [&](int k, Track f) { return value(values, k, f) >= 0.5f; };
+    auto apart = [&](int k) { return engine.trackStereo(k) && !on(k, Track::Link); };
     bool solo = false;
-    for (int k = 0; k < kTracks; ++k)
-        solo = solo || on(k, Track::Solo) || (on(k, Track::SoloR) && engine.trackStereo(k));
+    for (int k = 0; k < kTracks; ++k) solo = solo || on(k, Track::Solo) || (on(k, Track::SoloR) && apart(k));
     auto side = [&](int k, Track level, Track mute, Track soloed) {
         return value(values, k, level) > 0 && !on(k, mute) && (!solo || on(k, soloed));
     };
+    // A switched-off track sounds only when it is played live (the focused track, or routing by channel): its
+    // LED lights as well, since the LED shows what is heard.
     auto audible = [&](int k) {
-        const Track levelR = on(k, Track::Link) ? Track::Level : Track::LevelR;
-        return on(k, Track::On) && (side(k, Track::Level, Track::Mute, Track::Solo) ||
-                                    (engine.trackStereo(k) && side(k, levelR, Track::MuteR, Track::SoloR)));
+        return side(k, Track::Level, Track::Mute, Track::Solo) ||
+               (apart(k) && side(k, Track::LevelR, Track::MuteR, Track::SoloR));
     };
     const int focus = std::clamp(intValue(values, Global::FocusTrack), 1, kTracks) - 1;
 
@@ -84,7 +87,7 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
     // The newest kEnvPoints, newest first. Several points are polyphony: a monophonic track (Voicing Monophonic, or
     // any track of the 3-channel modes, one voice per channel) shows its newest note alone, though the one before may
     // still end its release (Indus, 24/10/2026 14:51).
-    const bool mono = intValue(values, Global::VoiceMode) != 0 || intValue(values, focus, Track::Voicing) == 1;
+    const bool mono = !studioMode(voiceMode(values)) || intValue(values, focus, Track::Voicing) == 1;
     const int shown = std::min(drawnCount, mono ? 1 : kEnvPoints);
     std::partial_sort(drawn.begin(), drawn.begin() + shown, drawn.begin() + drawnCount,
                       [](const auto& a, const auto& b) { return a.first > b.first; });
@@ -104,11 +107,15 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
     const auto split = ring_.begin() + ringPos_;
     std::copy(split, ring_.end(), t.scope.begin());
     std::copy(ring_.begin(), split, t.scope.begin() + (ring_.end() - split));
+    std::copy(sideRing_.begin() + ringPos_, sideRing_.end(), t.scopeSide.begin());
+    std::copy(sideRing_.begin(), sideRing_.begin() + ringPos_, t.scopeSide.begin() + (ring_.end() - split));
     t.outPeak = outPeak_;
     outPeak_.fill(0);
     engine.takeMeters(meters_);
     t.peak = meters_.peak;
     t.peakR = meters_.peakR;
+    t.panL = meters_.panL;
+    t.panR = meters_.panR;
     const size_t pos = meters_.scopePos;
     auto oldestFirst = [pos](const auto& from, auto& to) {
         std::copy(from.begin() + std::ptrdiff_t(pos), from.end(), to.begin());
@@ -119,8 +126,8 @@ void EngineStatusTap::publish(ymengine::Engine& engine, const ParamValues& value
         oldestFirst(meters_.side[size_t(k)], t.trackSide[size_t(k)]);
     }
     t.dmaSlots = engine.dmaPlayingSlots();
-    t.digiPreview = int8_t(engine.digidrumPreviewSlot());
-    t.dmaPreview = int8_t(engine.dmaPreviewSlot());
+    t.digiPreview = int16_t(engine.digidrumPreviewSlot());
+    t.dmaPreview = int16_t(engine.dmaPreviewSlot());
     for (int k = 0; k < kTracks; ++k) t.program[size_t(k)] = uint8_t(engine.program(k));
     t.manualCut = engine.manualCuts();
     buffer_.publish();

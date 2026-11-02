@@ -1,11 +1,12 @@
-// STYM2149 — pluginui: Instruments window, the project's 32 instruments
+// STYM2149 — pluginui: Instruments window, the project's 127 instruments
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// A STYM2149 window (the prototype has no instruments), in the style of the Patches window: 32 slots numbered $01 to
-// $20 in two columns. Click: an instrument loads into the focused track, an empty slot receives the sound of the
-// focused track (name asked); right click: Store channel, Load into channel, Rename, Clear, Save to Patches, Load
-// from Patches. Melodic steps play an instrument through the INS row of the Step Sequencer.
+// A STYM2149 window (the prototype has no instruments), in the style of the Patches window: 127 slots numbered 1 to
+// 127 (32 in earlier versions; in decimal, $01 to $7F before), 32 to a page in two columns, the arrows under
+// them turning the pages. Click: an instrument loads into the focused track, an empty slot receives the sound of the
+// focused track (name asked); right click: Store channel, Load into channel, Rename, Clear, Save to Patches, Load from
+// Patches. Melodic steps play an instrument through the INS row of the Step Sequencer.
 // Opening: Edit > Instruments, Ctrl+T, or the last entry of the INS row's menu.
 #pragma once
 #include <array>
@@ -37,12 +38,20 @@ public:
     // Slot labels from the state (called by MainWindow::refresh); nothing while the window is closed.
     void refresh();
 
-    // Rectangle of an element (captures, tests): "insWin", "insHint", "insSlot0" to "insSlot31".
-    std::optional<gemui::Rect> rectOf(std::string_view id) const;
-    // Text of a slot (tests).
-    std::string slotText(int k) const { return slots_[size_t(k)].text(); }
+    // Slots to a page and pages: 1-32, 33-64, 65-96, 97-127 (in decimal).
+    static constexpr int kPageSlots = 32;
+    static constexpr int kPages = (plugin::kInstruments + kPageSlots - 1) / kPageSlots;
+    // Page shown (0 to kPages - 1); show() opens on that of the focused track's instrument.
+    int page() const noexcept { return page_; }
+    void setPage(int page);
 
-    // Actions on slot k (0 to 31), also those of the menu.
+    // Rectangle of an element (captures, tests): "insWin", "insHint", "insSlot0" to "insSlot31" (the buttons of the
+    // page), "insPrev", "insPage", "insNext".
+    std::optional<gemui::Rect> rectOf(std::string_view id) const;
+    // Text of button i of the page (tests).
+    std::string slotText(int i) const { return slots_[size_t(i)].text(); }
+
+    // Actions on slot k (0 to 126), also those of the menu.
     void storeChannel(int k);   // name asked, then the sound of the focused track
     void loadIntoChannel(int k);
     void rename(int k);
@@ -63,7 +72,10 @@ private:
     MainWindow& m_;
     Paragraph hint_{"Click: load into the focused channel, or store it in an empty slot. Right click for actions."};
     Rule sep_;
-    std::array<gemui::Button, plugin::kInstruments> slots_;
+    std::array<gemui::Button, kPageSlots> slots_;  // button i: slot page_ * kPageSlots + i
+    gemui::Button prev_{"<"}, next_{">"};
+    gemui::Label pageLab_;  // "01-20": the slots of the page
+    int page_ = 0;
 };
 
 }  // namespace stym::pluginui

@@ -2,24 +2,26 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Eight samples of signed bytes (mono, or stereo interleaved left then right) copied into fixed storage: the audio
-// thread allocates nothing. The DMA voices (Generator::Dma) read them; the preview of the DMA window plays their part,
-// once or in a loop, at the rate of the slot, at the pace of the host (byte held until the next one), outside
-// the output chain like the preview of a Digidrum.
+// Samples of signed bytes (mono, or stereo interleaved left then right), read where their owner keeps them (shared,
+// the audio thread neither copies nor allocates) or copied into the bank by setSample (outside the audio
+// thread). The DMA voices (Generator::Dma) read them; the preview of the DMA window plays their part, once or in a
+// loop, at the rate of the slot, at the pace of the host (byte held until the next one), outside the output
+// chain like the preview of a Digidrum.
 #pragma once
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <span>
+#include <vector>
 
 #include "ymengine/Dma.h"
 #include "ymengine/Params.h"
 
 namespace stym::ymengine::detail {
 
-// Held by the engine (Engine::Impl::dmaBank) and used on its thread: the samples are copied in with setSample, the
-// DMA voices keep a pointer to the bytes of their slot (data), the preview has its own position.
+// Held by the engine (Engine::Impl::dmaBank) and used on its thread: the samples are given with share or setSample,
+// the DMA voices keep a pointer to the bytes of their slot (data), the preview has its own position.
 class DmaBank {
 public:
     // A byte at ±128 is worth ±kScale, the peak of a YM channel alone at its loudest (index 31 of the table of one
@@ -35,25 +37,32 @@ public:
         }
     }
     const DmaParams& params() const noexcept { return params_; }
-    const DmaSlot& slot(int k) const noexcept { return params_.slots[size_t(k & 7)]; }
+    static int clampSlot(int k) noexcept { return std::clamp(k, 0, kDmaSlotsMax - 1); }
+    const DmaSlot& slot(int k) const noexcept { return params_.slots[size_t(clampSlot(k))]; }
 
-    // Copy (truncated to kDmaMaxBytes). The preview of this slot stops; the voices playing it are stopped by the
+    // The bytes of slot k, read where they are (the owner keeps them until the slot is given again), or a copy kept
+    // by the bank (setSample allocates). The preview of this slot stops; the voices playing it are stopped by the
     // engine.
-    void setSample(int k, std::span<const int8_t> bytes) noexcept {
-        if (k < 0 || k >= kDmaSlots) return;
-        const size_t n = std::min<size_t>(bytes.size(), kDmaMaxBytes);
-        std::copy_n(bytes.begin(), n, data_[size_t(k)].begin());
-        len_[size_t(k)] = uint32_t(n);
+    void share(int k, std::span<const int8_t> bytes) noexcept {
+        if (k < 0 || k >= kDmaSlotsMax) return;
+        data_[size_t(k)] = bytes.first(std::min<size_t>(bytes.size(), UINT32_MAX));
         if (preview_ == k) preview_ = -1;
     }
-    uint32_t sampleBytes(int k) const noexcept { return k >= 0 && k < kDmaSlots ? len_[size_t(k)] : 0; }
+    void setSample(int k, std::span<const int8_t> bytes) {
+        if (k < 0 || k >= kDmaSlotsMax) return;
+        own_[size_t(k)].assign(bytes.begin(), bytes.end());
+        share(k, own_[size_t(k)]);
+    }
+    std::span<const int8_t> bytes(int k) const noexcept {
+        return k >= 0 && k < kDmaSlotsMax ? data_[size_t(k)] : std::span<const int8_t>{};
+    }
+    uint32_t sampleBytes(int k) const noexcept { return uint32_t(bytes(k).size()); }
     // Frames (one stereo frame: two bytes).
     uint32_t frames(int k) const noexcept {
-        if (k < 0 || k >= kDmaSlots) return 0;
-        const uint32_t n = len_[size_t(k)];
-        return params_.slots[size_t(k)].stereo ? n / 2 : n;
+        const uint32_t n = sampleBytes(k);
+        return n && params_.slots[size_t(k)].stereo ? n / 2 : n;
     }
-    const int8_t* data(int k) const noexcept { return data_[size_t(k & 7)].data(); }
+    const int8_t* data(int k) const noexcept { return data_[size_t(clampSlot(k))].data(); }
     // Frames played of slot k, from its Start to its End.
     SampleSpan part(int k) const noexcept { return sampleSpan(slot(k).start, slot(k).end, frames(k)); }
 
@@ -108,8 +117,8 @@ public:
 
 private:
     DmaParams params_{};
-    std::array<std::array<int8_t, kDmaMaxBytes>, kDmaSlots> data_{};
-    std::array<uint32_t, kDmaSlots> len_{};  // bytes of each slot
+    std::array<std::span<const int8_t>, kDmaSlotsMax> data_{};  // bytes of each slot
+    std::array<std::vector<int8_t>, kDmaSlotsMax> own_{};      // those copied by setSample
     int preview_ = -1;  // slot being previewed, -1: none
     double pos_ = 0;    // frame of the preview (fractional)
     bool looping_ = false;  // the slot's Loop was on during the preview, which stops when Loop goes off

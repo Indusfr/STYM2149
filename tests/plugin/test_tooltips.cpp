@@ -126,7 +126,7 @@ TEST_CASE("Tooltips: every line is translated, with characters of the GEM font",
     });
     setPlain(p, "delayOn", 1.0f);
     std::set<std::string> lines;
-    for (int mode = 0; mode < 3; ++mode)
+    for (int mode = 0; mode < 4; ++mode)  // 16 ch, 3ch, 2x3ch, 32 ch
         for (int computer = 0; computer < 2; ++computer) {
             setPlain(p, "voiceMode", float(mode));
             setPlain(p, "computer", float(computer));
@@ -136,7 +136,7 @@ TEST_CASE("Tooltips: every line is translated, with characters of the GEM font",
             }
         }
     setPlain(p, "voiceMode", 0.0f);
-    setPlain(p, "delaySync", 0.0f);  // 16 ch, Time in ms instead of the Division
+    setPlain(p, "delaySync", 0.0f);  // 32 ch, Time in ms instead of the Division
     collect(lines, editor);
     w.doDemo();
     collect(lines, editor);

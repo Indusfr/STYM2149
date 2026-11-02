@@ -23,6 +23,7 @@
 #include "UiHost.h"
 #include "gemui/Desktop.h"
 #include "gemui/Font.h"
+#include "gemui/Look.h"
 #include "plugincore/Mapping.h"
 #include "plugincore/Parameters.h"
 #include "pluginui/Widgets.h"
@@ -98,6 +99,18 @@ int darkest(pluginui::MainWindow& w, const gemui::Rect& r) {
     return dark;
 }
 
+// Black pixels of r that a GEM grey would have taken away: none in a greyed-out area, whose ink is kept one
+// pixel in two (gemui::ditherKeeps).
+int undotted(pluginui::MainWindow& w, const gemui::Rect& r) {
+    w.tick(0);
+    w.desktop().paint();
+    const gemui::Surface& s = w.desktop().surface();
+    int n = 0;
+    for (int y = r.y; y < r.bottom(); ++y)
+        for (int x = r.x; x < r.right(); ++x) n += s.row(y)[x] == gemui::colors::kBlack && !gemui::ditherKeeps(x, y);
+    return n;
+}
+
 }  // namespace
 
 TEST_CASE("Track tabs: a click focuses the track, a click on the focused tab turns it on or off",
@@ -127,9 +140,78 @@ TEST_CASE("Track tabs: a click focuses the track, a click on the focused tab tur
     for (int t = 1; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == 0.0f);
 }
 
+TEST_CASE("Track tabs: the 32 tracks scroll with < and >, the focused track's tab brought into view",
+          "[ui][tracks]") {
+    UiHost h;
+    h.p(Global::VoiceMode) = 3;  // 32 ch
+    pluginui::MainWindow w(h);
+    auto shown = [&w] {
+        std::vector<int> out;
+        for (int t = 0; t < plugin::kTracks; ++t)
+            if (w.rectOf("tab" + std::to_string(t))) out.push_back(t);
+        return out;
+    };
+    auto enabled = [&w](std::string_view id) {
+        const gemui::Widget* b = w.widgetOf(id);
+        REQUIRE(b);
+        return b->enabled();
+    };
+    // 32 channels: the first tabs, side by side up to < and >, which stand before All on.
+    const std::vector<int> first = shown();
+    REQUIRE(first.size() >= 16);
+    REQUIRE(first.size() < size_t(plugin::kTracks));
+    for (size_t k = 0; k < first.size(); ++k) CHECK(first[k] == int(k));
+    REQUIRE(w.rectOf("tabPrev"));
+    REQUIRE(w.rectOf("tabNext"));
+    CHECK(w.rectOf("tab" + std::to_string(first.back()))->right() < w.rectOf("tabPrev")->x);
+    CHECK(w.rectOf("tabPrev")->right() < w.rectOf("tabNext")->x);
+    CHECK(w.rectOf("tabNext")->right() < w.rectOf("allOn")->x);
+    CHECK_FALSE(enabled("tabPrev"));
+    CHECK(enabled("tabNext"));
+
+    // > and <: one tab further each way; the focused track does not change.
+    click(w, "tabNext");
+    CHECK(shown().front() == 1);
+    CHECK(shown().back() == first.back() + 1);
+    CHECK(enabled("tabPrev"));
+    click(w, "tabPrev");
+    CHECK(shown() == first);
+    CHECK(h.p(Global::FocusTrack) == 1.0f);
+
+    // The focused track's tab comes into view: track 32 (Left from track 1), the last tab against <.
+    key(w, gemui::Key::Left);
+    REQUIRE(h.p(Global::FocusTrack) == float(plugin::kTracks));
+    CHECK(shown().back() == plugin::kTracks - 1);
+    CHECK_FALSE(w.rectOf("tab0"));
+    CHECK_FALSE(enabled("tabNext"));
+    click(w, "tab" + std::to_string(plugin::kTracks - 1));  // the focused tab: on
+    CHECK(h.p(plugin::kTracks - 1, Track::On) == 1.0f);
+    // Back to track 1: its tab in view again.
+    key(w, gemui::Key::Right);
+    CHECK(shown() == first);
+
+    // 16 ch and a 3-voice mode: the 16 tabs, no arrows.
+    for (const float mode : {0.0f, 1.0f}) {
+        h.p(Global::VoiceMode) = mode;
+        w.tick(0);
+        CHECK(shown().size() == 16);
+        CHECK_FALSE(w.rectOf("tabPrev"));
+        CHECK_FALSE(w.rectOf("tabNext"));
+    }
+}
+
 TEST_CASE("All on / All off: every track of the mode, 4 in 3ch, 8 with two chips", "[ui][tracks]") {
     {
         UiHost h;
+        pluginui::MainWindow w(h);
+        click(w, "allOn");  // 16 ch: the 16 tracks; those of 32 ch keep their state
+        for (int t = 0; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == (t < 16 ? 1.0f : 0.0f));
+        click(w, "allOff");
+        for (int t = 0; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == 0.0f);
+    }
+    {
+        UiHost h;
+        h.p(Global::VoiceMode) = 3;  // 32 ch
         pluginui::MainWindow w(h);
         click(w, "allOn");
         for (int t = 0; t < plugin::kTracks; ++t) CHECK(h.p(t, Track::On) == 1.0f);
@@ -303,14 +385,14 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     h.take();
 
     // Third white key: the menu takes the left side of the key; too tall for the room below the keyboard, it opens
-    // above it (openGemMenu). Positions measured in the prototype at the same zoom.
+    // above it (openGemMenu), its 2 px frame on the key's top rule and its 2 px shadow above (GEM look).
     press(w, whiteKey(w, 2), gemui::MouseButton::Right);
     const gemui::MenuList* m = topMenu(w);
     REQUIRE(m);
     CHECK(m->box().x == 267.4375);  // 200 + 2 × 33.71875
-    CHECK(m->box().y == 392);       // 716 − 326 + 2: its frame on the key's top rule
-    CHECK(m->box().w == 207);
-    CHECK(m->box().h == 326);
+    CHECK(m->box().y == 456);       // 716 − 260 − 2 + 2: its frame on the key's top rule, its shadow above it
+    CHECK(m->box().w == 212);
+    CHECK(m->box().h == 260);       // the 16 tracks of 16 ch, 16 px each, in the 2 px frame
     CHECK(h.take().empty());
     const std::vector<std::string> labels = menuLabels(w);
     REQUIRE(labels.size() == 16);
@@ -337,10 +419,23 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     press(w, {kb->x + 66, kb->y + 5}, gemui::MouseButton::Right);
     REQUIRE(topMenu(w));
     CHECK(topMenu(w)->box().x == 256.625);
-    CHECK(topMenu(w)->box().y == 392);
+    CHECK(topMenu(w)->box().y == 456);
     CHECK(topMenu(w)->checked() == 2);
     key(w, gemui::Key::Escape);
     CHECK(h.take().empty());
+
+    // 32 ch: the 32 tracks, still in one column above the keyboard with 16 px entries.
+    {
+        UiHost h32;
+        h32.p(Global::VoiceMode) = 3;
+        pluginui::MainWindow w32(h32);
+        press(w32, whiteKey(w32, 2), gemui::MouseButton::Right);
+        REQUIRE(topMenu(w32));
+        CHECK(topMenu(w32)->box().y == 200);  // 716 − 516 − 2 + 2
+        CHECK(topMenu(w32)->box().h == 516);
+        CHECK(menuLabels(w32).size() == size_t(plugin::kTracks));
+        key(w32, gemui::Key::Escape);
+    }
 
     // 3ch: the voices of the chip.
     UiHost h3;
@@ -369,14 +464,14 @@ TEST_CASE("Keyboard destination: the tracks in a menu under the key or pad right
     press(wp, centre(wp.pads().padRect(2)), gemui::MouseButton::Right);
     REQUIRE(topMenu(wp));
     CHECK(topMenu(wp)->box().x == 437);
-    CHECK(topMenu(wp)->box().y == 390);  // 714 − 326 + 2
+    CHECK(topMenu(wp)->box().y == 454);  // 714 − 260 − 2 + 2
     CHECK(menuLabels(wp)[0] == "Channel 1 [Chipdrum]");
     key(wp, gemui::Key::Escape);
     const gemui::Rect pad0 = wp.pads().padRect(0);
     press(wp, {pad0.right() + 1, pad0.y + 10}, gemui::MouseButton::Right);
     REQUIRE(topMenu(wp));
     CHECK(topMenu(wp)->box().x == 200);
-    CHECK(topMenu(wp)->box().y == 390);
+    CHECK(topMenu(wp)->box().y == 454);
     CHECK(hp.take().empty());
 }
 
@@ -456,7 +551,7 @@ TEST_CASE("Drum pads during playback: only the hits the engine plays light up (3
         w.tick(0);
         return std::pair{w.pads().held(0), w.pads().held(1)};
     };
-    CHECK(lit(0, 0) == std::pair{true, true});   // 16 ch, polyphonic: both hits
+    CHECK(lit(0, 0) == std::pair{true, true});   // 32 ch, polyphonic: both hits
     CHECK(lit(0, 1) == std::pair{true, false});  // monophonic
     CHECK(lit(1, 0) == std::pair{true, false});  // Authentic 3ch
     CHECK(lit(2, 0) == std::pair{true, false});  // Dual chip 2x3ch
@@ -617,9 +712,9 @@ TEST_CASE("ADSR not applicable: the ADSR and ADSR ENVELOPE frames greyed out wit
     const auto adsr = w.rectOf("adsrFrame"), curve = w.rectOf("curveFrame");
     REQUIRE(adsr);
     REQUIRE(curve);
-    // Drum track: no black left in either frame, frame lines and titles included.
-    CHECK(darkest(w, *adsr) >= 150);
-    CHECK(darkest(w, *curve) >= 150);
+    // Drum track: both frames in the GEM grey, frame lines and titles included.
+    CHECK(undotted(w, *adsr) == 0);
+    CHECK(undotted(w, *curve) == 0);
     CHECK(w.rectOf("adsrInert") == adsr);
     CHECK(w.rectOf("curveInert") == curve);
 
@@ -634,8 +729,8 @@ TEST_CASE("ADSR not applicable: the ADSR and ADSR ENVELOPE frames greyed out wit
     // frame.
     h.p(0, Track::Generator) = float(Generator::SyncBuzzer);
     h.p(0, Track::AdsrMode) = 1;
-    CHECK(darkest(w, *adsr) >= 150);
-    CHECK(darkest(w, *curve) >= 150);
+    CHECK(undotted(w, *adsr) == 0);
+    CHECK(undotted(w, *curve) == 0);
     const auto hint = w.rectOf("adsrHint");
     REQUIRE(hint);
     CHECK(hint->right() <= adsr->right());
@@ -808,7 +903,7 @@ TEST_CASE("SOURCE: what the sound does not use is greyed out with its reason (si
 TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteenth DAW test, items 169 and 170)",
           "[ui][source][env]") {
     UiHost h;
-    h.p(Global::Computer) = 1;  // the STE, for the DMA type in 16 ch
+    h.p(Global::Computer) = 1;  // the STE, for the DMA type in 32 ch
     pluginui::MainWindow w(h);
     h.p(0, Track::Noise) = 1;
     h.p(0, Track::VolMode) = 1;
@@ -855,6 +950,16 @@ TEST_CASE("SOURCE and ENVELOPE of a DMA or percussion track greyed out (thirteen
     CHECK_FALSE(w.rectOf("envInert"));
 }
 
+TEST_CASE("Main window: the copy's number in the title from the second copy of the standalone application on",
+          "[ui][windows]") {
+    UiHost h;
+    CHECK(pluginui::MainWindow(h).mainTitle() == "STYM2149");
+    h.copy = 2;
+    CHECK(pluginui::MainWindow(h).mainTitle() == "STYM2149 (2)");
+    h.copy = 12;
+    CHECK(pluginui::MainWindow(h).mainTitle() == "STYM2149 (12)");
+}
+
 TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the session (third DAW test, item 25)",
           "[ui][windows]") {
     using pluginui::MainWindow;
@@ -890,7 +995,7 @@ TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the s
         CHECK(f.right() == MainWindow::kWidth);
         CHECK(f.bottom() == MainWindow::kHeight);
         w.moveMainTo(-50, -50);  // below the menu bar of the desktop (ninth DAW test, item 101)
-        CHECK(w.mainPlace() == gemui::Point{0, MainWindow::kMenuH});
+        CHECK(w.mainPlace() == gemui::Point{0, gemui::MenuBar::height()});
         w.moveMainTo(home.x + 10, home.y + 20);
     }
     // A new editor (the plugin keeps the session): the main window reopens at its place.
@@ -899,12 +1004,18 @@ TEST_CASE("Main window: moved by its title bar, kept on the desktop and in the s
     CHECK(w.rectOf("fxSel"));
 }
 
-TEST_CASE("Ctrl+D: the DMA generator on the STE, the demo pattern left to the File menu", "[ui][kbd]") {
+TEST_CASE("Shift+Ctrl+D: the DMA generator on the STE, the demo pattern left to the File menu",
+          "[ui][kbd]") {
+    auto shiftCtrl = [](pluginui::MainWindow& win, char32_t c) {
+        gemui::KeyEvent e = charKey(c, true);
+        e.mods.shift = true;
+        return win.desktop().keyDown(e);
+    };
     // ST: no DMA; the key does nothing else (no demo pattern, no box).
     UiHost h;
     h.state.seq.cur().edit(0).pat[0] = 5;
     pluginui::MainWindow w(h);
-    CHECK(ctrlKey(w, U'd'));
+    CHECK(shiftCtrl(w, U'd'));
     CHECK(h.p(0, Track::Generator) != float(int(Generator::Dma)));
     CHECK_FALSE(w.desktop().hasModal());
     CHECK(h.state.seq.cur().lane(1).pat[2] < 0);
@@ -912,8 +1023,90 @@ TEST_CASE("Ctrl+D: the DMA generator on the STE, the demo pattern left to the Fi
     UiHost ste;
     ste.values[size_t(plugin::paramIndex(Global::Computer))] = 1;
     pluginui::MainWindow ws(ste);
-    CHECK(ctrlKey(ws, U'd'));
+    CHECK_FALSE(ctrlKey(ws, U'd'));  // without Shift: nothing
+    CHECK(ste.p(0, Track::Generator) != float(int(Generator::Dma)));
+    CHECK(shiftCtrl(ws, U'd'));
     CHECK(ste.p(0, Track::Generator) == float(int(Generator::Dma)));
+    // Without Shift, ^C and ^V no longer pick Chipdrum and Chip Voice (they copy and paste in the grid).
+    CHECK_FALSE(ctrlKey(ws, U'c'));
+    CHECK(ste.p(0, Track::Generator) == float(int(Generator::Dma)));
+    CHECK(shiftCtrl(ws, U'c'));
+    CHECK(ste.p(0, Track::Generator) == float(int(Generator::Chipdrum)));
+}
+
+TEST_CASE("Shift+Ctrl+F picks FM Voice, Ctrl+F alone opens the Effects window", "[ui][kbd]") {
+    UiHost h;
+    pluginui::MainWindow w(h);
+    gemui::KeyEvent e = charKey(U'f', true);
+    e.mods.shift = true;
+    CHECK(w.desktop().keyDown(e));
+    CHECK(h.p(0, Track::Generator) == float(int(Generator::Fm)));
+    CHECK_FALSE(w.rectOf("echoWin"));
+    CHECK(ctrlKey(w, U'f'));
+    CHECK(h.p(0, Track::Generator) == float(int(Generator::Fm)));
+    CHECK(w.rectOf("echoWin"));
+}
+
+TEST_CASE("Edit menu: the generators of the focused track with their Shift + ^ keys, no Cut/Copy/Paste/Select all ",
+          "[ui][kbd]") {
+    // The entries of the menu from the first generator to the rule before Undo.
+    auto generators = [](pluginui::MainWindow& win, std::vector<std::string>& keys, int& marked) {
+        win.openMenu(2);
+        const std::vector<gemui::MenuItem>& items = topMenu(win)->items();
+        const std::vector<std::string> edit = menuLabels(win);
+        const size_t from = size_t(std::find(edit.begin(), edit.end(), "Chip Voice") - edit.begin());
+        const size_t undo = size_t(std::find(edit.begin(), edit.end(), "Undo") - edit.begin());
+        REQUIRE(from < undo);
+        REQUIRE(undo < edit.size());
+        CHECK(edit[from - 1] == "---");
+        std::vector<std::string> names;
+        keys.clear();
+        marked = -1;
+        for (size_t k = from; k + 1 < undo; ++k) {
+            names.push_back(items[k].separator ? "---" : items[k].label);
+            keys.push_back(items[k].key);
+            if (items[k].marked) marked = int(k);
+        }
+        CHECK(edit[undo - 1] == "---");
+        return std::pair{names, int(from)};
+    };
+    // ST: six generators (FM Voice after Sync Buzzer), the drums after a rule, the current one marked; no DMA.
+    // The clipboard entries are gone.
+    UiHost h;
+    pluginui::MainWindow w(h);
+    std::vector<std::string> keys;
+    int marked = -1;
+    const auto [names, from] = generators(w, keys, marked);
+    CHECK(names == std::vector<std::string>{"Chip Voice", "SID Voice", "Sync Buzzer", "FM Voice", "---", "Chipdrum",
+                                            "Digidrum"});
+    CHECK(keys == std::vector<std::string>{"\u2191^V", "\u2191^S", "\u2191^U", "\u2191^F", "", "\u2191^C",
+                                           "\u2191^I"});
+    CHECK(marked == from);  // Chip Voice
+    for (const char* gone : {"Generator", "Cut", "Copy", "Paste", "Select all"}) {
+        INFO(gone);
+        const std::vector<std::string> edit = menuLabels(w);
+        CHECK(std::find(edit.begin(), edit.end(), gone) == edit.end());
+    }
+    // Every entry takes the column of the marks: "✓ " before the current generator, two spaces before the others.
+    CHECK(topMenu(w)->items()[size_t(from)].marked);
+    CHECK_FALSE(topMenu(w)->items()[0].marked);
+    // Picked: the focused track plays it, as with the GENERATOR button or Shift+Ctrl+S.
+    pickItem(w, from + 1);
+    CHECK(h.p(0, Track::Generator) == float(int(Generator::Sid)));
+    generators(w, keys, marked);
+    CHECK(marked == from + 1);
+    w.desktop().closePopups();
+
+    // STE: the DMA last, after a rule, with Shift+Ctrl+D.
+    UiHost ste;
+    ste.values[size_t(plugin::paramIndex(Global::Computer))] = 1;
+    pluginui::MainWindow ws(ste);
+    const auto [steNames, steFrom] = generators(ws, keys, marked);
+    REQUIRE(steNames.size() == 9);
+    CHECK(steNames[7] == "---");
+    CHECK(steNames[8] == "DMA");
+    CHECK(keys[8] == "\u2191^D");
+    (void)steFrom;
 }
 
 TEST_CASE("Typed and shown decimals do not depend on the C locale of the host", "[ui][env][locale]") {
@@ -1110,4 +1303,169 @@ TEST_CASE("The units of the typed values stay in normal video under the pointer 
     w.echoWindow().close();
     w.pickGenerator(int(Generator::SyncBuzzer));
     check("genFinev", w.rectOf("genFinev"), "c");
+}
+
+namespace {
+
+// Rows of the oscilloscope's canvas holding a black pixel in columns [x0, x1): the top and the bottom of the trace.
+std::pair<int, int> traceRows(const pluginui::Canvas& c, int x0, int x1) {
+    int top = c.height(), bottom = -1;
+    for (int y = 0; y < c.height(); ++y)
+        for (int x = x0; x < x1; ++x)
+            if (c.at(x, y) == gemui::colors::kBlack) {
+                top = std::min(top, y);
+                bottom = std::max(bottom, y);
+            }
+    return {top, bottom};
+}
+
+// A square wave of ±a, 64 samples per period.
+template <size_t N>
+void square(std::array<float, N>& to, float a, int period = 64) {
+    for (size_t i = 0; i < N; ++i) to[i] = (int(i) % period) < period / 2 ? a : -a;
+}
+
+}  // namespace
+
+TEST_CASE("Oscilloscope: gain, Main / Track source, left and right halves, Merge",
+          "[ui][scope]") {
+    // Indus, 29/10/2026 10:54: the trace looked flat; a button for the main output; a stereo source in two halves,
+    // left and right; a Merge button.
+    UiHost h;
+    pluginui::MainWindow w(h);
+    const auto scope = w.rectOf("scope"), src = w.rectOf("scopeSrc"), merge = w.rectOf("scopeMerge");
+    REQUIRE(scope);
+    REQUIRE(src);
+    REQUIRE(merge);
+    // Merge at the left of the oscilloscope, Main / Track at its right: it is centred in the window.
+    const auto regs = w.rectOf("regs");
+    CHECK(src->x > scope->right());
+    CHECK(merge->right() < scope->x);
+    CHECK(merge->y == src->y);
+    CHECK(merge->w == src->w);
+    CHECK(src->right() == regs->right());  // the row ends with the register monitor
+    CHECK(merge->x == regs->x);
+    CHECK(scope->x - regs->x == regs->right() - scope->right());
+    const auto* srcBtn = dynamic_cast<const gemui::Button*>(w.widgetOf("scopeSrc"));
+    const auto* mergeBtn = dynamic_cast<const gemui::Button*>(w.widgetOf("scopeMerge"));
+    REQUIRE(srcBtn);
+    REQUIRE(mergeBtn);
+    CHECK(srcBtn->text() == "Main");
+    CHECK_FALSE(mergeBtn->on());
+    CHECK(mergeBtn->enabledFlag());  // 32 channels: a stereo output
+    const pluginui::Canvas& c = w.scope().canvas();
+    CHECK(c.width() == scope->w - 24);
+
+    // A single voice at volume 15 with the track's defaults: 0.287 on the main output, 90 % of the half height.
+    plugin::EngineStatus t;
+    square(t.scope, 0.287f);
+    t.serial = 1;
+    h.status = t;
+    w.tick(0);
+    // A stereo output in two halves even when it plays the same on both sides (Indus, 29/10/2026 20:03).
+    CHECK(w.scope().split());
+    {
+        const int half = pluginui::Scope::splitHalf(c.width());
+        CHECK(traceRows(c, 0, half) == traceRows(c, c.width() - half, c.width()));
+    }
+    click(w, "scopeMerge");
+    CHECK_FALSE(w.scope().split());
+    auto [top, bottom] = traceRows(c, 0, c.width());
+    CHECK(top >= 2);
+    CHECK(top <= 6);
+    CHECK(bottom >= 84);
+    click(w, "scopeMerge");
+
+    // Stereo: left −0.1, right +0.2 around the same square: two halves.
+    square(t.scopeSide, 0.1f);
+    t.serial = 2;
+    h.status = t;
+    w.tick(0);
+    CHECK(w.scope().split());
+    const int half = pluginui::Scope::splitHalf(c.width());
+    CHECK(traceRows(c, 0, half).first > traceRows(c, c.width() - half, c.width()).first);  // the right one is taller
+    // Each half in a frame of its own, white between the two frames; the right trace's 2 px pen may reach one
+    // pixel left of its half, under its frame.
+    CHECK(traceRows(c, half, c.width() - half - 1).second == -1);
+    const auto [left, right] = w.scope().splitFrames();
+    CHECK(left.x == scope->x);
+    CHECK(right.right() == scope->right());
+    CHECK(left.y == scope->y);
+    CHECK(right.y == scope->y);
+    CHECK(left.h == scope->h);
+    CHECK(right.h == scope->h);
+    CHECK(right.x - left.right() >= 8);
+    CHECK(std::abs(left.w - right.w) <= 1);
+    w.desktop().paint();
+    const gemui::Surface& sf = w.desktop().surface();
+    auto column = [&](int x) {  // black pixels of screen column x over the oscilloscope's height
+        int n = 0;
+        for (int y = scope->y; y < scope->bottom(); ++y) n += sf.at(x, y) == gemui::colors::kBlack;
+        return n;
+    };
+    for (int x = left.right(); x < right.x; ++x) CHECK(column(x) == 0);  // the gap: no frame across it
+    CHECK(column(left.right() - 1) == scope->h);                       // right edge of the left frame
+    CHECK(column(right.x) == scope->h);                                // left edge of the right frame
+    // Merge: one trace again, kept as a preference.
+    click(w, "scopeMerge");
+    CHECK(h.prefs["scopeMerge"] == "1");
+    CHECK(mergeBtn->on());
+    CHECK_FALSE(w.scope().split());
+    click(w, "scopeMerge");
+    CHECK(h.prefs["scopeMerge"] == "0");
+    CHECK(w.scope().split());
+
+    // Track: the focused track's oscilloscope, 128 points, mono for a chip voice.
+    t.trackScope[0].fill(0);
+    square(t.trackScope[1], 0.591f, 16);
+    t.serial = 3;
+    h.status = t;
+    w.tick(0);
+    click(w, "scopeSrc");
+    CHECK(h.prefs["scopeSource"] == "track");
+    CHECK(srcBtn->text() == "Track");
+    CHECK_FALSE(w.scope().split());
+    CHECK_FALSE(mergeBtn->enabledFlag());  // a chip voice is mono: nothing to merge
+    std::tie(top, bottom) = traceRows(c, 0, c.width());
+    CHECK(top >= 40);  // track 1 is silent
+    CHECK(bottom <= 50);
+    h.p(Global::FocusTrack) = 2;
+    w.tick(0);
+    std::tie(top, bottom) = traceRows(c, 0, c.width());
+    CHECK(top <= 6);  // track 2 at 0.591, the same height as the main output's 0.287
+    CHECK(bottom >= 84);
+    click(w, "scopeSrc");
+    CHECK(h.prefs["scopeSource"] == "main");
+    CHECK(srcBtn->text() == "Main");
+}
+
+TEST_CASE("Oscilloscope: Merge greyed for a mono source", "[ui][scope]") {
+    // Indus, 29/10/2026 13:59: Merge greyed when the track is mono. The main output is mono on the ST in 3
+    // channels; a track is stereo only when it plays a stereo DMA sample, as the Mixer draws it.
+    UiHost h;
+    h.p(Global::VoiceMode) = 1;
+    pluginui::MainWindow w(h);
+    const auto* merge = dynamic_cast<const gemui::Button*>(w.widgetOf("scopeMerge"));
+    REQUIRE(merge);
+    CHECK_FALSE(merge->enabledFlag());
+    // The STE: its DMA tracks have their pan, the output is stereo.
+    h.p(Global::Computer) = 1;
+    w.tick(0);
+    CHECK(merge->enabledFlag());
+    // Track: track 5 plays slot 2, mono, then stereo.
+    click(w, "scopeSrc");
+    h.p(Global::FocusTrack) = 5;
+    h.p(4, Track::Generator) = float(int(ymengine::Generator::Dma));
+    h.state.tracks[4].patch.dmaSlot = 2;
+    ++h.serial;
+    w.tick(0);
+    CHECK_FALSE(merge->enabledFlag());
+    h.state.dma.slots[2].stereo = true;
+    ++h.serial;
+    w.tick(0);
+    CHECK(merge->enabledFlag());
+    // Back to track 1, a chip voice.
+    h.p(Global::FocusTrack) = 1;
+    w.tick(0);
+    CHECK_FALSE(merge->enabledFlag());
 }

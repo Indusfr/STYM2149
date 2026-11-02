@@ -89,7 +89,7 @@ ParamValues isolated(const ParamValues& values, int track) {
     for (int t = 0; t < kTracks; ++t)
         for (const Track f : {Track::Solo, Track::SoloR}) v[size_t(paramIndex(t, f))] = t == track ? 1.0f : 0.0f;
     v[size_t(paramIndex(track, Track::Mute))] = 0.0f;
-    v[size_t(paramIndex(track, Track::MuteR))] = 0.0f;  // both sides of a stereo DMA sample
+    v[size_t(paramIndex(track, Track::MuteR))] = 0.0f;  // both sides of a stereo track
     return v;
 }
 
@@ -97,7 +97,7 @@ ParamValues isolated(const ParamValues& values, int track) {
 
 std::string stemName(const ParamValues& values, int track) {
     const VoiceMode mode = voiceMode(values);
-    if (mode != VoiceMode::Studio16) {
+    if (!studioMode(mode)) {
         const int chips = mode == VoiceMode::Dual3 ? 2 : 1;
         if (dmaTrack(mode, steMachine(values), track)) return "DMA" + std::to_string(track - 4 * chips + 1);
         if (chips == 2 && track < 8) return kVoiceNames2[size_t(track)];

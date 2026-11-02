@@ -123,6 +123,10 @@ public:
     // Box covered by the widget and its visible children, which can overflow it (a hint text past its frame, as in
     // CSS); its own box if it clips them. The area of its opacity group.
     Rect extent() const noexcept;
+    // Pixels the widget paints: its bounds, and the overhang to the right and below (a GEM shadow).
+    Rect drawnBounds() const noexcept {
+        return overhang_ ? Rect{bounds_.x, bounds_.y, bounds_.w + overhang_, bounds_.h + overhang_} : bounds_;
+    }
 
     // Desktop of the tree's root; nullptr while the widget is not in a desktop's tree.
     Desktop* desktop() const noexcept;
@@ -134,6 +138,9 @@ public:
     virtual void paint(Painter&) {}
     virtual void paintOver(Painter&) {}
     virtual double opacity() const noexcept { return 1; }
+    // Its own painting hides all of r (desktop coordinates): the desktop leaves out what a modal box covers so (an
+    // animated picture repainted at each frame).
+    virtual bool covers(const Rect&) const noexcept { return false; }
 
     // Mouse: only the widgets that accept it receive it (the deepest one under the pointer). After a press, the widget
     // keeps the mouse until the release.
@@ -172,8 +179,13 @@ public:
     // not confirmed (its owner may be changing the window).
     virtual void focusDropped() {}
 
+protected:
+    // Pixels painted past the right and bottom edges (a GEM shadow): repainted and drawn with the widget.
+    void setOverhang(int px);
+
 private:
     friend class Desktop;
+    int overhang_ = 0;
     Rect bounds_;  // box_ rounded edge by edge
     Box box_;
     bool visible_ = true, enabled_ = true, inert_ = false, onTop_ = false;

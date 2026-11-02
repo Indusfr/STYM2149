@@ -29,19 +29,41 @@ inline int intValue(const ParamValues& v, int track, Track f) noexcept {
 }
 
 ymengine::VoiceMode voiceMode(const ParamValues& v) noexcept;
-// Clock of the chosen chip (ChipClock): the Custom clock plays ChipClockHz in 16 ch and 2 MHz in the other modes.
+// Clock of the chosen chip (ChipClock): the Custom clock plays ChipClockHz in 16 and 32 ch and 2 MHz in the other modes.
 ymcore::MasterClock chipClock(const ParamValues& v) noexcept;
 // Frequency of the Custom clock (ChipClockHz, clamped), whatever the mode.
 uint32_t customClockHz(const ParamValues& v) noexcept;
-// Number of chips of the mode (0 in 16 channels).
+// Number of chips of the mode (0 in 16 and 32 channels).
 int chipCount(ymengine::VoiceMode mode) noexcept;
 MidiRouting midiRouting(const ParamValues& v) noexcept;
+// Drum pads: the pad (0 to 15) that a note of a MIDI channel (0 to 15) plays, -1 for none. On the Drum Pads
+// channel, notes 36 to 51, the two rows of eight of a GM pad bank: 36 to 43 the Chipdrum sounds, 44 to 51 the Digidrum
+// samples. None with the channel Off, or with MPE on (its notes use every channel).
+inline constexpr int kDrumPadFirstNote = 36;
+// Record button (Indus, 28/10/2026 02:12): CC 117 on channel 16, the Record button of a Novation Launchkey in
+// DAW mode; a press (value 64 or more) switches the sequencer's Rec on or off, the release (0) does nothing.
+inline constexpr int kRecordCcChannel = 15, kRecordCc = 117;
+inline constexpr bool isRecordCc(uint8_t status, uint8_t cc) noexcept {
+    return status == (0xB0 | kRecordCcChannel) && cc == kRecordCc;
+}
+int drumPadChannel(const ParamValues& v) noexcept;  // 1 to 16; 0: off
+int drumPadOf(const ParamValues& v, int channel, int note) noexcept;
+// Curves of the velocity and of the aftertouch of a MIDI controller (Indus, 28/10/2026 10:03-10:05), each its
+// own setting: Linear leaves the value; Soft lifts the light touches (square root), Hard lowers them (square), S-curve
+// flattens both ends (smoothstep). 0 and 127 stay where they are. They apply to what a controller plays and records,
+// not to the on-screen keyboard nor to an imported MIDI file.
+enum class Curve : uint8_t { Linear, Soft, Hard, SCurve };
+int curved(Curve c, int value) noexcept;  // 0 to 127
+// A note-on's velocity (1 to 127) through the Velocity curve, 1 at the least; a pressure (0 to 127) through the
+// Aftertouch curve.
+int curvedVelocity(const ParamValues& v, int velocity) noexcept;
+int curvedPressure(const ParamValues& v, int pressure) noexcept;
 
 // STE machine (Computer parameter): STE DMA sound.
 bool steMachine(const ParamValues& v) noexcept;
 // DMA tracks in 3 channels with the STE machine: the eight tracks that follow those of the chips (5 to 12, or 9 to 16).
 bool dmaTrack(ymengine::VoiceMode mode, bool ste, int track) noexcept;
-// Tracks played: 16 in 16 channels; in 3 channels, four per chip, plus the eight DMA tracks with the STE machine.
+// Tracks played: 32 in 32 channels; in 3 channels, four per chip, plus the eight DMA tracks with the STE machine.
 int trackCount(ymengine::VoiceMode mode, bool ste) noexcept;
 int trackCount(const ParamValues& v) noexcept;
 
@@ -51,7 +73,7 @@ int trackCount(const ParamValues& v) noexcept;
 bool generatorAllowed(ymengine::VoiceMode mode, bool ste, int track, ymengine::Generator g) noexcept;
 // Generator played: the parameter's, or the imposed role (Digidrum for the Digidrum track, DMA for a DMA track, Chip
 // Voice instead of a Digidrum on a hardware channel or of a DMA without the STE machine). The parameter is not
-// modified: going back to 16 channels finds the user's setting again, as the prototype does (ch3Saved).
+// modified: going back to 32 channels finds the user's setting again, as the prototype does (ch3Saved).
 ymengine::Generator effectiveGenerator(const ParamValues& v, int track) noexcept;
 // Gate played by a track, in % of the step: the global gate when Gate All is on, otherwise the track's.
 // The GAT of a step keeps priority in the engine; a drum track has no gate.
@@ -78,7 +100,7 @@ ConfigKey configKey(const ParamValues& v) noexcept;
 // Preparation of an engine for `key`: chip clock, host rate (Hz), output mode (sinc above clk/8), board chain
 // with the STE bass and treble, and the separate outputs (bit n = track n).
 ymengine::EngineConfig engineConfig(const ConfigKey& key, const ParamValues& v, uint32_t hostRate,
-                                    uint16_t trackOutputs) noexcept;
+                                    uint32_t trackOutputs) noexcept;
 
 // Controllers of the prototype (onCC): parameter value produced by a CC, in plain units.
 // Envelope period of CC 74: position ef = round(v / 127 × 4000) of the "Env freq" slider, EP of the prototype

@@ -5,7 +5,7 @@
 // A STYM2149 window (the prototype has none). Rec arms a take on the chosen chip (2: dual chip
 // only): it starts with the host's playback (in Standalone, the sequencer's) and stops with it, one frame of R0 to
 // R13 per replay tick; a click while it is armed or rolling stops it. The last take is kept with the project; Clear
-// deletes it after confirmation; the Export row writes it as YM6, SNDH or VBL dump. In 16-channel
+// deletes it after confirmation; the Export row writes it as YM6, SNDH or VBL dump. In 32-channel
 // mode, no registers: the window says so.
 #pragma once
 #include <array>

@@ -14,6 +14,7 @@
 #pragma once
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -23,7 +24,8 @@
 
 namespace stym::pluginui {
 
-// Owned by MainWindow, used on the message thread. Its text is constant: it is laid out once, by the constructor.
+// Owned by MainWindow, used on the message thread. Its text is constant: it is laid out by the constructor, and again
+// when the interface language changes (relayout).
 class HelpWindow : public gemui::FloatWindow {
 public:
     static constexpr int kX = 120, kY = 70, kW = 560;  // #helpWin: left 120, top 70, width 560
@@ -41,7 +43,7 @@ public:
     // Text laid out in a body whose content box (inside the padding) is `width` px wide: positions from the top
     // left corner of the body's scrolled content (padding included), content size padding included.
     struct Line {
-        std::string_view text;
+        std::string text;      // in the interface language
         double x = 0, y = 0;   // top left of the line's 16 px box
         bool heading = false;  // drawn with the h4 letter spacing
     };
@@ -56,6 +58,8 @@ public:
 
     // openHelp: opens the window in front of the others, where it was left.
     void show();
+    // Laid out again in the interface language just chosen.
+    void relayout();
     gemui::ScrollPane& body() noexcept { return pane_; }
     const Layout& layout() const noexcept { return text_.layout(); }
     // Box of a part (captures, tests): "helpWin", "helpBody".
@@ -77,6 +81,7 @@ private:
 
     gemui::ScrollPane pane_;
     Text text_;
+    bool laidOut_ = false;
 };
 
 }  // namespace stym::pluginui

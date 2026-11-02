@@ -175,7 +175,7 @@ TEST_CASE("LFO: noise period, envelope period, SID ratio, pitch and pan", "[engi
         r.play(57);
         CHECK(r.frames(2, [](const auto& i) { return i.tonePeriod; }) == std::vector<double>{double(tp), double(tp)});
     }
-    SECTION("Pan: percent of the panning, 16 channels") {
+    SECTION("Pan: percent of the panning, 32 channels") {
         Rig r;
         r.t.patch.lfo.target = LfoTarget::Pan;
         r.t.patch.lfo.depth = 50;

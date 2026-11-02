@@ -7,6 +7,8 @@
 #include <cstdlib>
 
 #include "gemui/Font.h"
+#include "gemui/Language.h"
+#include "gemui/Look.h"
 
 namespace stym::gemui {
 
@@ -121,7 +123,9 @@ void Painter::glyph(int index, int x, int baseline, int px, Color c, int quarter
 // normal); a character outside the GEM font makes the line box taller and moves the baseline down (Font::lineBox).
 void Painter::text(std::string_view utf8, double x, double top, int px, Color c, double letterSpacing,
                    Face face) noexcept {
-    textAt(utf8, x, snap(top + Font::lineBox(utf8, px, face).ascent), px, c, letterSpacing, face);
+    const std::string_view shown = uiText(utf8);  // translated once
+    const RawText raw;
+    textAt(shown, x, snap(top + Font::lineBox(shown, px, face).ascent), px, c, letterSpacing, face);
 }
 
 bool Outline::inside(double x, double y) const noexcept {
@@ -172,6 +176,7 @@ void Painter::shade(const Rect& r, Color c, double alpha) noexcept {
 // not add up along the line. Spaces only advance.
 void Painter::textAt(std::string_view utf8, double x, int baseline, int px, Color c, double letterSpacing,
                      Face face) noexcept {
+    utf8 = uiText(utf8);
     double pen = x;
     for (size_t pos = 0; pos < utf8.size();) {
         const char32_t cp = nextCodepoint(utf8, pos);
@@ -195,16 +200,22 @@ void Painter::beginOpacity(const Rect& r, double alpha) {
     groups_.push_back(std::move(g));
 }
 
+// In the GEM look, whatever the opacity, the group is a GEM grey: one pixel in two of what was painted, the
+// others giving back what lay below.
 void Painter::endOpacity() {
     if (groups_.empty()) return;
     const Group g = std::move(groups_.back());
     groups_.pop_back();
+    const bool dither = !prototypeLook();
     for (int y = 0; y < g.r.h; ++y) {
         Color* p = s_->row(g.r.y + y) + g.r.x;
         const Color* u = g.under.data() + size_t(y) * size_t(g.r.w);
         // A pixel the group left as it was is skipped: blended with itself it would not change.
-        for (int x = 0; x < g.r.w; ++x)
-            if (p[x] != u[x]) p[x] = mix(p[x], u[x], g.alpha);
+        for (int x = 0; x < g.r.w; ++x) {
+            if (p[x] == u[x]) continue;
+            if (!dither) p[x] = mix(p[x], u[x], g.alpha);
+            else if (!ditherKeeps(g.r.x + x, g.r.y + y)) p[x] = u[x];
+        }
     }
 }
 

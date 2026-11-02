@@ -133,6 +133,7 @@ TEST_CASE("YM6: two effects per frame, digidrums, cut, read back by parseYm and 
     info.title = "STYM2149 song";
     info.author = "Indus";
     info.comment = "Made with STYM2149";
+    info.digidrums.resize(3);
     info.digidrums[2] = drum;
     ymio::Ym6Report rep;
     const std::vector<uint8_t> b = ymio::ym6File(f, info, &rep);

@@ -5,7 +5,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "gemui/Menu.h"
@@ -47,7 +49,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -241,4 +242,119 @@ TEST_CASE("Step Sequencer: grown past the bottom of the desktop, the window move
     s.refresh();
     click(w, "seqOver");
     CHECK(s.bounds().y == w.desktop().workTop());
+}
+
+TEST_CASE("Step Sequencer: the Track button between Launch and Bank chooses the track edited", "[ui][seq]") {
+    // Indus, 28/10/2026 10:31: a button between Launch and Bank that selects the track edited.
+    TestHost h;
+    MainWindow w(h);
+    w.sequencer().show();
+    const auto launch = w.rectOf("seqLaunch"), track = w.rectOf("seqTrack"), bank = w.rectOf("seqBankA");
+    REQUIRE(launch);
+    REQUIRE(track);
+    REQUIRE(bank);
+    CHECK(track->x > launch->right());
+    CHECK(track->right() < bank->x);
+    CHECK(track->y < launch->bottom());
+    // Right after its "Track" label, 8 px away like the other label + button pairs (Indus, 29/10/2026 10:54):
+    // Launch, 8 px gap and 14 px margin, the label, 8 px gap, the button.
+    CHECK(std::abs(track->x - (launch->right() + 8 + 14 + int(gemui::Font::width("Track", 16)) + 8)) <= 1);
+    const auto* b = dynamic_cast<const gemui::Button*>(w.widgetOf("seqTrack"));
+    REQUIRE(b);
+    CHECK(b->text() == "1");
+    auto menu = [&w]() {
+        click(w, "seqTrack");
+        const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+        REQUIRE(m);
+        return m->items();
+    };
+    std::vector<gemui::MenuItem> items = menu();
+    REQUIRE(items.size() == 16);  // the tracks of 16 ch; 32 in 32 ch
+    CHECK(items[0].label == "1 [Chip Voice]");
+    CHECK(items[15].label == "16 [Chip Voice]");
+    items[2].pick();
+    w.desktop().closePopups();
+    w.tick(0);
+    CHECK(h.v("focusTrack") == 3.0f);
+    CHECK(b->text() == "3");
+    CHECK(w.trackTitle(2) == "3");
+    // Authentic 3ch, Computer ST: the four voices of the chip.
+    h.values[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = 1;
+    h.values[size_t(plugin::paramIndex(plugin::Global::FocusTrack))] = 1;
+    w.tick(10);
+    items = menu();
+    w.desktop().closePopups();
+    REQUIRE(items.size() == 4);
+    CHECK(items[0].label.rfind("A [", 0) == 0);
+    CHECK(items[3].label.rfind("Digi [", 0) == 0);
+    CHECK(b->text() == "A");
+}
+
+TEST_CASE("Step Sequencer: a longer track name keeps Bank and Pattern on the transport's row", "[ui][seq]") {
+    // Indus, 29/10/2026 15:43: on a DMA or Digidrum track, the banks moved right and the patterns went under
+    // the transport buttons. The Track button keeps the width of the mode's longest name, shortened where the row
+    // lacks room.
+    TestHost h;
+    MainWindow w(h);
+    // Song mode with an entry: the Song arrows join the transport, the row is at its fullest. An 8-character name
+    // (kTrackNameMax) on track 1 for the 16-track mode.
+    h.editExtras([](plugin::NonParamState& s) {
+        s.global.songMode = true;
+        s.seq.song.entries = {ymseq::SongEntry{0, 1, 0}};
+        s.trackNames[0] = "WWWWWWWW";
+    });
+    w.tick(0);
+    w.sequencer().show();
+    const auto* b = dynamic_cast<const gemui::Button*>(w.widgetOf("seqTrack"));
+    REQUIRE(b);
+    // The Song button stays in reverse video while Song mode is on (Indus, 29/10/2026 20:11).
+    const auto* songBtn = dynamic_cast<const gemui::Button*>(w.widgetOf("songMode"));
+    REQUIRE(songBtn);
+    CHECK(songBtn->on());
+    h.editExtras([](plugin::NonParamState& s) { s.global.songMode = false; });
+    w.tick(0);
+    CHECK_FALSE(songBtn->on());
+    h.editExtras([](plugin::NonParamState& s) { s.global.songMode = true; });
+    w.tick(0);
+    CHECK(songBtn->on());
+    double tick = 0;
+    auto show = [&](float mode, float computer, int track) {
+        h.values[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = mode;
+        h.values[size_t(plugin::paramIndex(plugin::Global::Computer))] = computer;
+        h.values[size_t(plugin::paramIndex(plugin::Global::FocusTrack))] = float(track);
+        w.tick(tick += 10);
+        const auto play = w.rectOf("trPlay"), track_ = w.rectOf("seqTrack"), bankA = w.rectOf("seqBankA"),
+                   pat1 = w.rectOf("seqPat1"), pat8 = w.rectOf("seqPat8");
+        REQUIRE(play);
+        REQUIRE(track_);
+        REQUIRE(bankA);
+        REQUIRE(pat1);
+        REQUIRE(pat8);
+        CHECK(pat1->y < play->bottom());  // on the transport's row
+        CHECK(pat8->right() <= w.sequencer().bounds().right());
+        CHECK(track_->right() < bankA->x);
+        // The track's instrument, its number alone with the Song arrows, between them.
+        const auto ins = w.rectOf("seqInsNum");
+        REQUIRE(ins);
+        CHECK(ins->x > track_->right());
+        CHECK(ins->right() < bankA->x);
+        CHECK_FALSE(w.rectOf("seqInsOpen"));
+        return std::pair{track_->w, bankA->x};
+    };
+    // 16 tracks: the long name is shortened to what the row leaves, the other tracks keep that width.
+    const auto named = show(0, 0, 1);  // FocusTrack counts from 1
+    CHECK(b->text().size() < 8);
+    CHECK(std::string("WWWWWWWW").starts_with(b->text()));
+    CHECK(show(0, 0, 2) == named);
+    CHECK(b->text() == "2");
+    // Authentic 3ch, then Computer STE, then Dual chip: "Digi", "DMA1", "Digi1" do not move Bank and Pattern.
+    for (const auto& [mode, computer, wide, name] :
+         {std::tuple{1.0f, 0.0f, 4, "Digi"}, {1.0f, 1.0f, 5, "DMA1"}, {2.0f, 0.0f, 4, "Digi1"}}) {
+        CAPTURE(name);
+        const auto a = show(mode, computer, 1);
+        const auto d = show(mode, computer, wide);
+        CHECK(b->text() == name);
+        CHECK(d == a);
+        CHECK(d.second == named.second);
+    }
 }

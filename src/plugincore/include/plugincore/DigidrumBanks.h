@@ -2,9 +2,9 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// A bank keeps the eight Digidrum slots (name, playback, conversion, 8-bit source and played 4-bit values) under a
-// name. The library is shared by all projects, like the Patches one: a JSON file next to the
-// preferences file:
+// A bank keeps the Digidrum slots of a project (name, playback, conversion, 8-bit source and played 4-bit values) under
+// a name: eight at least, up to the last one used (127 at most). The library is shared by all projects, like
+// the Patches one: a JSON file next to the preferences file:
 //   {"kind": "digidrumlib", "version": 1, "banks": [{"name": ..., "slots": [{"name", "rate", "root", "cents",
 //    "loop", "loopStart", "loopEnd", "convert" ("linear" or "ym"), "data" (one hexadecimal digit per 4-bit value),
 //    "source" (signed bytes in base64)}, ...]}, ...]}
@@ -22,17 +22,17 @@
 
 namespace stym::plugin {
 
-// A named bank: the eight slots of the editor and the 4-bit values they play.
+// A named bank: the slots of the editor and the 4-bit values they play (as many of both).
 struct DigidrumBank {
     std::string name;
-    std::array<DigidrumSlotState, ymengine::kDigidrumSlots> slots{};
-    std::array<std::vector<uint8_t>, ymengine::kDigidrumSlots> nibbles{};
+    std::vector<DigidrumSlotState> slots;
+    std::vector<SharedSamples<uint8_t>> nibbles;
     bool operator==(const DigidrumBank&) const = default;
 };
 
-// The eight slots of the state, named.
+// The slots of the state, named: eight at least, up to the last one used.
 DigidrumBank captureBank(const std::string& name, const NonParamState& state);
-// A bank into the state: the eight slots replaced.
+// A bank into the state: every slot replaced, those past the bank's emptied.
 void applyBank(const DigidrumBank& bank, NonParamState& state);
 
 // The library file (format above). Reading fails only when the text is not JSON or not a bank library; a bank

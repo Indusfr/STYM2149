@@ -148,6 +148,8 @@ public:
     // Called by Widget::remove and Widget::setVisible(false) before forget, on a widget still alive: a press it holds
     // ends (mouseCancel), an input it has the focus for is cancelled (focusDropped).
     void release(const Widget* w);
+    // Widget that a press at p would reach (files dropped on a sample's drawing), nullptr if none.
+    const Widget* widgetAt(Point p) const { return target(p); }
 
 private:
     struct Timer {

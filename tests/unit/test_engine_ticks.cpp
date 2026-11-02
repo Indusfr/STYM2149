@@ -96,9 +96,11 @@ TEST_CASE("Ticks: groove, ticks added to the rows in a loop; speed changed durin
     CHECK(std::fabs(ln[0].second - 960 * 6) < 1e-6);
     CHECK(std::fabs(ln[1].second - 960 * 5) < 1e-6);
     CHECK(std::fabs(ln[2].second - 960 * 6) < 1e-6);
-    CHECK(ln[1].first == 960 * 6);
-    CHECK(ln[2].first == 960 * 11);
-    CHECK(ln[3].first == 960 * 17);
+    // A row starts at the sample whose phase reaches its tick (the phase counts the sample being played), never one
+    // later through the rounding of the sums.
+    CHECK(ln[1].first == 960 * 6 - 1);
+    CHECK(ln[2].first == 960 * 11 - 1);
+    CHECK(ln[3].first == 960 * 17 - 1);
 
     // Speed 3: the following rows last 3 (+1) ticks.
     const size_t before = ln.size();

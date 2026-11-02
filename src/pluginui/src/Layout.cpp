@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "gemui/Controls.h"
+
 namespace stym::pluginui {
 
 double flexRow(double x, double y, double width, std::vector<FlexItem>& items, double gap, bool wrap) {
@@ -52,6 +54,19 @@ double flexRow(double x, double y, double width, std::vector<FlexItem>& items, d
         top += h + (li + 1 < lines.size() ? gap : 0);
     }
     return top - y;
+}
+
+double placeSlotRows(const SlotRows& r, double x, double y, double width, double lw) {
+    auto btn = [](gemui::Button& b) { return FlexItem{&b, b.naturalWidth(), double(b.naturalHeight())}; };
+    auto lab = [](gemui::Label& l, double w) { return FlexItem{&l, w, 16}; };
+    std::vector<FlexItem> slots = {lab(r.labSlot, lw), btn(r.prev)};
+    for (gemui::Button& b : r.slots) slots.push_back(btn(b));
+    slots.push_back(btn(r.next));
+    double h = flexRow(x, y, width, slots, 4, false);
+    if (!r.gauge.visible()) return h + 10;
+    std::vector<FlexItem> mem = {lab(r.labMemory, lw), {&r.gauge, 160, 12}, lab(r.memText, r.memText.naturalWidth())};
+    h += 6 + flexRow(x, y + h + 6, width, mem, 8, false) + 10;
+    return h;
 }
 
 }  // namespace stym::pluginui

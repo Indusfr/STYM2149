@@ -273,7 +273,7 @@ TEST_CASE("Exported SNDH: init (out-of-range subsong) and exit (MFP restored, so
     for (size_t i = 0; i < drum.size(); ++i) drum[i] = uint8_t(i % 16);
     const ymio::SndhSubsong subs[2] = {{fx, {}}, {plain, {}}};
     ymio::SndhWriteInfo info;
-    info.digidrums[0] = drum;
+    info.digidrums = {drum};
     const ymio::SndhWriteResult w = ymio::sndhFile(subs, info);
     INFO(w.error);
     REQUIRE(!w.data.empty());

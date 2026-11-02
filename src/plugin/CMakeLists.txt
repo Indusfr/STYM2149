@@ -42,7 +42,7 @@ string(SUBSTRING "${STYM_BUILD_COMMIT}" 0 7 STYM_BUILD_COMMIT_SHORT)
 configure_file(BuildId.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp @ONLY)
 
 target_sources(STYM2149 PRIVATE PluginProcessor.cpp PluginEditor.cpp JucePainter.cpp KeyboardLayout.cpp
-                                StandaloneApp.cpp ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp)
+                                StandaloneApp.cpp StandaloneSlot.cpp ${CMAKE_CURRENT_BINARY_DIR}/BuildId.cpp)
 # Keyboard layout of the system: Carbon's input sources on macOS, Xlib loaded at run time on Linux.
 if(APPLE)
   target_link_libraries(STYM2149 PRIVATE "-framework Carbon")

@@ -87,12 +87,13 @@ struct Rig {
     }
 };
 
-// Metronome beep expected j samples after its start (decaying sine, see EngineImpl.h).
+// Metronome beep expected j samples after its start at 100 % (decaying sine, see EngineImpl.h), twice the beep of
+// before (Indus, 29/10/2026 20:08).
 double clickAt(bool first, int j) {
     const double gain = first ? 0.4 : 0.24;
     const double ramp = std::round(0.045 * kRate);
     const double mul = std::pow(0.0001 / gain, 1.0 / ramp);
-    return gain * std::pow(mul, j) * std::sin(2 * 3.141592653589793 * (first ? 1760 : 880) / kRate * j);
+    return 2 * gain * std::pow(mul, j) * std::sin(2 * 3.141592653589793 * (first ? 1760 : 880) / kRate * j);
 }
 
 struct Click {
@@ -601,7 +602,8 @@ TEST_CASE("Metronome: one beep per beat, higher on the first beat", "[engine][se
     }
 }
 
-TEST_CASE("Metronome: its level scales the beeps, 0 mutes them", "[engine][seq][metronome]") {
+TEST_CASE("Metronome: its level scales the beeps, 0 mutes them, 100 twice as loud as before",
+          "[engine][seq][metronome]") {
     auto run = [](bool metro, uint8_t level) {
         Rig r(SeqClock::Internal);
         r.g.tempo = 120;
@@ -623,5 +625,6 @@ TEST_CASE("Metronome: its level scales the beeps, 0 mutes them", "[engine][seq][
         CHECK(std::fabs(double(half[i]) - off[i] - d / 2) < 1e-6);
         CHECK(mute[i] == off[i]);
     }
-    CHECK(peak > 0.3);
+    CHECK(peak > 0.7);  // 0.8 at the start of the bar, twice the 0.4 of before (Indus, 29/10/2026 20:08)
+    CHECK(peak <= 0.8 + 1e-6);
 }

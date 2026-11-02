@@ -6,11 +6,12 @@
 // of four fixed rates, then mixes it with the YM before the LMC1992 (bass, treble). A feature of STYM2149 of its own
 // (a maxYMiser feature), active with the STE machine (GlobalParams::ste, Indus's table of
 // 16/10/2026):
-// - a bank of eight samples of 32 KB at most, each with its rate, mono or stereo, its root note and fine tune,
-//   the part played (Start, End) and its loop;
+// - a bank of samples, each with its rate, mono or stereo, its root note and fine tune, the part played
+//   (Start, End) and its loop: up to kDmaSlotsMax of any length, the memory of the chosen STE limiting their
+//   total in the 3-channel modes (plugincore/SteMemory.h);
 // - a DMA sound type (Generator::Dma): each DMA track plays a sample of the bank, its voices mixed in software into
 //   the stream like the STE module players. In 3-channel mode, eight DMA tracks follow those of the YM (tracks 5 to
-//   12 in Authentic 3ch, 9 to 16 in Dual chip), one voice each; in 16-channel mode, any track can be DMA;
+//   12 in Authentic 3ch, 9 to 16 in Dual chip), one voice each; in 32-channel mode, any track can be DMA;
 // - pitch by resampling the stream (read step = frequency of the note / frequency of the root note, nearest byte,
 //   no interpolation), the stream staying at the rate of the sample.
 #pragma once
@@ -19,9 +20,9 @@
 
 namespace stym::ymengine {
 
-inline constexpr int kDmaSlots = 8;
-inline constexpr int kDmaTracks = 8;             // DMA tracks in 3-channel mode (STE machine)
-inline constexpr uint32_t kDmaMaxBytes = 32768;  // 32 KB per sample (16 KB per channel in stereo)
+// Samples of the bank: 127, as many as a Program Change reaches (eight, then 255, in earlier versions).
+inline constexpr int kDmaSlotsMax = 127;
+inline constexpr int kDmaTracks = 8;      // DMA tracks in 3-channel mode (STE machine)
 inline constexpr int kDmaRates = 4;
 // STE rates (public STE documentation): **TO CONFIRM** on hardware (pitch test planned).
 inline constexpr std::array<double, kDmaRates> kDmaRateHz = {6258, 12517, 25033, 50066};
@@ -38,9 +39,9 @@ struct DmaSlot {
     bool operator==(const DmaSlot&) const = default;
 };
 
-// Settings of the eight slots (Engine::setDma).
+// Settings of the slots (Engine::setDma).
 struct DmaParams {
-    std::array<DmaSlot, kDmaSlots> slots{};
+    std::array<DmaSlot, kDmaSlotsMax> slots{};
     bool operator==(const DmaParams&) const = default;
 };
 

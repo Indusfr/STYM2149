@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "plugincore/MidiLearn.h"
+#include "plugincore/MidiMonitor.h"
 #include "plugincore/State.h"
 #include "plugincore/EngineStatus.h"
 #include "pluginui/Session.h"
@@ -50,6 +51,10 @@ public:
     // arrival: true and `message` filled while some are left (lit keys, recording into the sequencer, like press and
     // release in the prototype).
     virtual bool hostNote(std::array<uint8_t, 3>& message) = 0;
+    // MIDI monitor (Options > MIDI monitor): every message received from the host, learned ones included, in
+    // order of arrival, but the MIDI clock and active sensing; a SysEx as its first data bytes and its length.
+    // true and `message` filled while some are left. A host without MIDI (tests) has none.
+    virtual bool monitorMidi(plugin::MonitorMessage& /*message*/) { return false; }
     // MIDI learn: learned CCs and notes, which the host keeps for the interface instead of the engine,
     // and armed control (the next CC or the next note played is taken for it, once). The caught messages come back
     // through learnMidi, in order of arrival: true and `message` filled while some are left.
@@ -73,6 +78,9 @@ public:
 
     // Context.
     virtual bool standalone() const = 0;
+    // Number of this copy of the standalone application, shown after STYM2149 in the main window's title from
+    // 2 on; 1 in a host.
+    virtual int copyNumber() const { return 1; }
     virtual std::string midiStatus() const = 0;  // text of the "MIDI:" indicator
     virtual std::string version() const = 0;
     virtual void quit() = 0;                     // standalone application only
@@ -80,14 +88,16 @@ public:
     // none: the host chooses.
     virtual bool hasAudioSettings() const = 0;
     virtual void openAudioSettings() = 0;
-    // Opens the choice of an audio file for a Digidrum slot (asynchronous; the host converts the sample and stores it
-    // in the non-automatable state: 4-bit values and 8-bit source at the slot's rate, name taken from the file, loop
-    // over the whole sample).
-    virtual void loadDigidrum(int slot) = 0;
-    // Opens the choice of a file for a slot of the DMA track (asynchronous): audio file resampled at the
-    // slot's rate, mono or stereo depending on its setting, or raw file (.raw, .spl, .sam) taken byte for byte. A host
-    // without files (tests) does nothing.
-    virtual void loadDmaSample(int /*slot*/) {}
+    // Sample files: the audio formats the host decodes, as the filters of a file dialog ("*.wav;*.aiff").
+    virtual std::string audioFilePatterns() const { return "*.wav;*.aif;*.aiff"; }
+    // Loads an audio file into a Digidrum slot, chosen in the Digidrums window or dropped on its drawing: the
+    // host converts the sample (4-bit values and 8-bit source at the slot's rate, name taken from the file, the whole
+    // sample played) and hands it to MainWindow::applySampleLoad; an alert when the file cannot be decoded. A
+    // host without files (tests) does nothing.
+    virtual void loadDigidrum(int /*slot*/, const std::string& /*path*/) {}
+    // The same for a slot of the DMA sound: audio file resampled at the slot's rate, mono or stereo
+    // depending on its setting, or raw file (.raw, .spl, .sam) taken byte for byte.
+    virtual void loadDmaSample(int /*slot*/, const std::string& /*path*/) {}
 
     // Register recorder: state (take armed or rolling, its chip and its frames), take kept with the
     // project (frames, replay tick, chip), arming on a chip and stop, clearing of the kept take. A host without an
@@ -109,8 +119,7 @@ public:
     // Copy of the kept take (export of the Recorder window); empty if there is none.
     virtual plugin::RegisterTake recordedTake() const { return {}; }
 
-    // YM Player: tune read from File > Import > YM dump (YM dump or SNDH), played in place of the
-    // engine output. loadYm returns the alert of a refused file (empty: loaded, stopped). A host without an engine
+    // YM Player: tune read from File > Play, played in place of the engine output. loadYm returns the alert of a refused file (empty: loaded, stopped). A host without an engine
     // (tests) loads nothing.
     struct YmPlayer {
         bool loaded = false, playing = false, sndh = false;
@@ -123,6 +132,14 @@ public:
         bool operator==(const YmPlayer&) const = default;
     };
     virtual std::string loadYm(std::string_view /*bytes*/, const std::string& /*fileName*/) { return "Unsupported file"; }
+    // A project played in the YM Player instead of a tune (File > Play, a maxYMiser, YM-Tracker, XM or MOD song
+    // converted, or a STYM2149 file): a second engine plays it from the start of its Song (`song`) or of its current
+    // pattern, then stops; the plugin's project is untouched. `name`: the name line. Returns the alert of a refusal
+    // (empty: loaded, stopped).
+    virtual std::string playProject(const plugin::ParamValues& /*values*/, const plugin::NonParamState& /*extras*/,
+                                    bool /*song*/, const std::string& /*name*/) {
+        return "Unsupported file";
+    }
     virtual YmPlayer ymPlayer() const { return {}; }
     virtual void ymPlay(bool /*on*/) {}
     virtual void ymRewind() {}
@@ -170,6 +187,17 @@ public:
     // Non-automatable state of a new project (File > New): the defaults, with the sequencer clock the plugin
     // starts with (Host sync in a host, Free run in the standalone application).
     virtual plugin::NonParamState newExtras() const { return {}; }
+    // Configuration of the standalone application (Indus, 01/11/2026 18:25): the whole state the application
+    // reopens at its start (parameters, non-automatable state and the recorder's take, as a host saves them), which
+    // Quit no longer keeps. configuration() gives the bytes of a configuration file; loadConfiguration puts the state
+    // of such a file in place and returns "" (the reason otherwise: unreadable, newer, another kind);
+    // keepConfiguration remembers `path` as this copy's configuration file and `bytes` as the state reopened at the
+    // next start; configurationFile() is that file ("" before the first Save or Load). A plugin in a host has none:
+    // the host keeps the state with its project.
+    virtual std::string configuration() const { return {}; }
+    virtual std::string loadConfiguration(std::string_view /*bytes*/) { return "No configuration here"; }
+    virtual void keepConfiguration(const std::string& /*path*/, std::string_view /*bytes*/) {}
+    virtual std::string configurationFile() const { return {}; }
 
     // Files: asynchronous native dialogs (STYM2149_SPEC.md §8: FileChooser, never from the audio thread), then
     // reading or writing of a whole file. Absolute paths in UTF-8. The callback comes on the message thread with the

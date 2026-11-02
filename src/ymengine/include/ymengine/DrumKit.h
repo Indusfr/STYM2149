@@ -4,7 +4,7 @@
 //
 // Synthesis taken from the prototype (worklet, buildDrums and buildChipDrums; KIT_BANKS banks): eight adjustable
 // instruments, rendered in two ways.
-// - 16-channel mode: one 4-bit sample at 7 800 Hz per instrument, played like a digidrum.
+// - 32-channel mode: one 4-bit sample at 7 800 Hz per instrument, played like a digidrum.
 // - 3-channel mode: a table of VBL frames (tone period, noise, mixer, volume) written to the registers.
 // Both are identical to the prototype (tests [kit], data taken from the prototype by tools/proto_golden).
 #pragma once
@@ -62,7 +62,7 @@ public:
     // the audio thread when the kit changes during playback.
     void build(const KitParams& kit, uint32_t vblHz, ymcore::MasterClock clock) noexcept;
 
-    // 4-bit sample (16-channel mode) and VBL frames (3-channel mode) of a slot; empty outside 0-7.
+    // 4-bit sample (32-channel mode) and VBL frames (3-channel mode) of a slot; empty outside 0-7.
     std::span<const uint8_t> sample(int slot) const noexcept;
     std::span<const ChipDrumFrame> frames(int slot) const noexcept;
 

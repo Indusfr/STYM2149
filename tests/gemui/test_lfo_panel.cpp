@@ -134,7 +134,7 @@ TEST_CASE("LFO: shape and target menus, the depth kept in proportion", "[ui][lfo
     click(w, "lfoTo");
     CHECK(menuLabels(w) ==
           std::vector<std::string>{"Volume", "Noise period", "Env period", "SID ratio", "Pitch", "Pan"});
-    CHECK_FALSE(topMenu(w)->items()[5].disabled);  // 16 channels
+    CHECK_FALSE(topMenu(w)->items()[5].disabled);  // 32 channels
     pickItem(w, 1);
     CHECK(lfo(h).target == LfoTarget::NoisePeriod);
     CHECK(lfo(h).depth == 8);  // 4 of 15 → 8 of 31
@@ -248,7 +248,7 @@ TEST_CASE("LFO: nothing on a percussion track, Pan greyed in the 3-channel modes
     click(w3, "lfoTo");
     const gemui::MenuItem& pan = topMenu(w3)->items()[5];
     CHECK(pan.disabled);
-    CHECK(pan.why == "Pan: 16 channels only; the 3-channel modes are mono");
+    CHECK(pan.why == "Pan: 16 and 32 channels only; the 3-channel modes are mono");
     pickItem(w3, 5);
     CHECK(lfo(h3).target == LfoTarget::Volume);
 }
@@ -313,12 +313,12 @@ TEST_CASE("LFO: the targets that move nothing on the track greyed, with the reas
     CHECK(panel.slider("lfoDepth")->enabled());
     CHECK(panel.button("lfoSync")->enabled());
     CHECK(panel.button("lfoTo")->tip() ==
-          "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 channels)");
+          "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 and 32 channels)");
 
     // 3 channels: Pan as well.
     h.values[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = 1;
     w.tick(0);
-    CHECK(whys().back() == "Pan: 16 channels only; the 3-channel modes are mono");
+    CHECK(whys().back() == "Pan: 16 and 32 channels only; the 3-channel modes are mono");
     CHECK(whys().front() == buzzVol);
 }
 

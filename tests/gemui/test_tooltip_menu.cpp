@@ -79,9 +79,20 @@ const char* const kDutch = "\xEF\xBB\xBF# Dutch tooltips\r\n"
                            "msgid \"Volume\"\r\n"
                            "msgstr \"\"\r\n"
                            "\r\n"
-                           "msgctxt \"x\"\r\n"
                            "msgid \"Say \\\"hi\\\"\"\r\n"
-                           "msgstr \"Zeg \\\"hoi\\\"\"\r\n";
+                           "msgstr \"Zeg \\\"hoi\\\"\"\r\n"
+                           "\r\n"
+                           "msgctxt \"ui\"\r\n"
+                           "msgid \"Track {1}\"\r\n"
+                           "msgstr \"Spoor {1}\"\r\n"
+                           "\r\n"
+                           "msgctxt \"ui\"\r\n"
+                           "msgid \"File\"\r\n"
+                           "msgstr \"Bestand\"\r\n"
+                           "\r\n"
+                           "msgctxt \"other\"\r\n"
+                           "msgid \"Edit\"\r\n"
+                           "msgstr \"Bewerken\"\r\n";
 
 // Settings > Language: its menu opened by a click, which reads the language files again, then closed.
 struct LanguageMenu {
@@ -114,7 +125,7 @@ pluginui::TipFile installed(const std::string& name) {
 
 }  // namespace
 
-TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines, escapes and fuzzy entries",
+TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines, escapes, fuzzy entries and contexts ",
           "[ui][tips]") {
     using pluginui::parseTipFile;
     const auto nl = parseTipFile(kDutch, "whatever");
@@ -125,6 +136,8 @@ TEST_CASE("Tooltip language files: a PO file read with its header, quoted lines,
     CHECK(nl->lines == std::vector<Line>{{"Click to type a value", "Klik om een waarde te typen"},
                                           {"Track {1}", "Spoor {1}"},
                                           {"Say \"hi\"", "Zeg \"hoi\""}});
+    // The interface lines are those of context "ui"; another context is left out.
+    CHECK(nl->uiLines == std::vector<Line>{{"Track {1}", "Spoor {1}"}, {"File", "Bestand"}});
     const pluginui::TipBook book(*nl);
     CHECK(book.translate("Click to type a value\nTrack 12\nNo such line") ==
           "Klik om een waarde te typen\nSpoor 12\nNo such line");

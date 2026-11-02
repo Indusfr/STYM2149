@@ -81,7 +81,7 @@ PatchEntry instrumentEntry(const Instrument& ins) {
 Instrument instrumentFromEntry(const PatchEntry& e) {
     static const NonParamState kFresh;  // new tracks (mkCh)
     const PatchChange c = patchChange(e, kFresh, 0);
-    ParamValues v = defaultValues();  // 16 channels: the generator stays the entry's
+    ParamValues v = defaultValues();  // 16 and 32 channels: the generator stays the entry's
     for (const auto& [i, x] : c.params) v[size_t(i)] = x;
     v[size_t(paramIndex(Global::Computer))] = 1;  // STE machine: the DMA type stays too
     const ymengine::TrackParams t = toTrack(v, 0, c.track);

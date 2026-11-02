@@ -8,6 +8,7 @@
 #include <cstdio>
 
 #include "gemui/Alert.h"
+#include "gemui/Language.h"
 #include "plugincore/DmaSample.h"
 #include "pluginui/Layout.h"
 #include "pluginui/MainWindow.h"
@@ -30,6 +31,8 @@ constexpr double kPad = 8, kGap = 8;  // padding of the content and gap between 
 constexpr double kGainDb = 3;         // step of the -3 dB and +3 dB tools
 // Rate presets in Hz; the first is the prototype's rate (its tooltip says so).
 constexpr std::array<double, 3> kPresetHz = {7800, 8000, 11025};
+// Entries of the Stereo menu, in the order of plugin::DigiStereo.
+constexpr std::array<const char*, 3> kStereoNames = {"Left", "Right", "Mix"};
 
 std::string signedText(int v) { return v > 0 ? "+" + std::to_string(v) : std::to_string(v); }
 
@@ -47,21 +50,31 @@ void DigidrumWindow::build() {
         l->setFace(Face::kSmall);
         l->setColor(colors::kHint);
     }
-    for (int k = 0; k < ymengine::kDigidrumSlots; ++k) {
+    // Eight slots to a page, each as wide as "255" (the widest number before the count became 127).
+    for (int k = 0; k < 8; ++k) {
         Button& b = slots_[size_t(k)];
         b.setText(std::to_string(k + 1));
         b.setPadding(2, 6);
+        b.setMinWidth(b.widthFor("255"));
     }
-    name_.setTip("Name of this slot, 16 characters (shown in its tip and kept in banks)");
-    banksBtn_.setTip("Save the 8 slots as a named bank, load or delete a bank (library shared by all projects)");
+    prev_.setTip("The eight slots before");
+    next_.setTip("The eight slots after");
+    gauge_.setTip("Memory the samples take out of what the Atari leaves them; red: some do not fit and are silent");
+    // The name typed in place (Indus, 30/10/2026 02:55), in the font of the labels, from the left.
+    name_.setPx(14);
+    name_.setLeftAligned(true);
+    name_.setTip("Name of this slot, 16 characters (shown in its tip and kept in banks): type it, Enter keeps it");
+    banksBtn_.setTip("Save the slots as a named bank, load or delete a bank (library shared by all projects)");
     rate_.setRange(ymengine::kDigidrumRateMin, ymengine::kDigidrumRateMax, 1);
-    rate_.setTip("Timer rate at the root note (the values are kept: the pitch moves). A file loads at this rate.");
+    rate_.setTip("Timer rate at the root note (Resample off: the values are kept, the pitch moves). A file loads at "
+                 "this rate.");
     rate_.setId("digRate");
     for (size_t k = 0; k < presets_.size(); ++k) {
         presets_[k].setText(std::to_string(int(kPresetHz[k])));
         presets_[k].setTip("Rate " + std::to_string(int(kPresetHz[k])) + " Hz" +
                            (k == 0 ? " (the prototype's rate)" : ""));
     }
+    resample_.setTip("Resample on: a new rate resamples the sample, which keeps its length and its pitch");
     root_.setRange(0, 127, 1);
     root_.setTip("Root note: the note that plays this slot at its rate");
     root_.setId("digRoot");
@@ -76,7 +89,9 @@ void DigidrumWindow::build() {
     finev_.setPadChars(1);
     ratev_.setUnit(" Hz");  // the units stay in normal video under the pointer
     finev_.setUnit(" ct");
-    load_.setTip("Load an audio file into this slot (first channel, resampled to the rate, 3 s at most)");
+    load_.setTip("Load an audio file into this slot (a stereo file as Stereo says, resampled to the rate); a file "
+                 "dropped on the drawing loads too");
+    stereo_.setTip("What Load takes from a stereo file: its left channel, its right channel, or both mixed");
     play_.setTip("Play this slot's part at its rate, through the chip's volume table: once, or with Loop on in a loop "
                  "until Play or Loop is clicked again");
     play_.setId("digPlay");
@@ -96,10 +111,10 @@ void DigidrumWindow::build() {
     gainUp_.setTip("Raise the 8-bit source by 3 dB (clipped)");
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{
              &hint_,   &hint2_,  &sep_,     &labSlot_,  &labName_, &name_,      &labRate_,  &rate_,   &ratev_,
-             &labRoot_, &root_,  &rootv_,   &labFine_,  &fine_,    &finev_,     &banksBtn_, &labSample_, &wave_,
+             &labRoot_, &root_,  &rootv_,   &labFine_,  &fine_,    &finev_,     &banksBtn_, &labStereo_, &stereo_, &labSample_, &wave_,
              &load_,   &play_,   &clear_,   &loop_,     &labStart_, &start_,    &startv_,   &labEnd_, &end_,
              &endv_,   &labConvert_, &linear_, &ym_,    &labTools_, &normalize_, &reverse_, &fade_,   &sign_,
-             &gainDown_, &gainUp_})
+             &gainDown_, &gainUp_, &prev_, &next_, &labMemory_, &gauge_, &memText_, &resample_})
         add(*w);
     for (auto& b : slots_) add(b);
     for (auto& b : presets_) add(b);
@@ -110,13 +125,56 @@ void DigidrumWindow::wire() {
         stopPreview();  // a loop never plays on behind a closed window
         m_.syncWindowButtons();
     };
-    for (int k = 0; k < ymengine::kDigidrumSlots; ++k) slots_[size_t(k)].onClick = [this, k] { selectSlot(k); };
-    name_.onClick = [this] { rename(); };
+    for (int k = 0; k < 8; ++k) slots_[size_t(k)].onClick = [this, k] { selectSlot(slot() / 8 * 8 + k); };
+    prev_.onClick = [this] { selectSlot(std::max(0, slot() - 8)); };
+    next_.onClick = [this] { selectSlot(std::min(ymengine::kDigidrumSlotsMax - 1, slot() + 8)); };
+    name_.onChange = [this] {  // 16 characters at most
+        if (name_.text().size() > plugin::kDigidrumNameMax)
+            name_.setText(name_.text().substr(0, plugin::kDigidrumNameMax));
+    };
+    name_.onEnter = [this] { m_.desk_.setKeyFocus(nullptr); };  // the field left: onCommit
+    name_.onCommit = [this] { commitName(); };
     banksBtn_.onClick = [this] { banksMenu(); };
+    // Stereo: an option of the window, kept in the preferences like the other settings of the interface; it
+    // applies to the next file loaded.
+    stereo_.setPopup(true);  // a GEM pop-up button, with its shadow
+    stereo_.onClick = [this] {
+        std::vector<MenuItem> items;
+        for (size_t k = 0; k < kStereoNames.size(); ++k) {
+            MenuItem m;
+            m.label = kStereoNames[k];
+            m.pick = [this, k] {
+                m_.host_.setPreference(plugin::kDigiStereoPref, plugin::digiStereoName(plugin::DigiStereo(k)));
+                refresh();
+            };
+            items.push_back(std::move(m));
+        }
+        m_.popup(stereo_, std::move(items), int(stereoChoice()));
+    };
 
-    bindSlider(rate_, rateArmed_, [](DigidrumSlotState& s, double v) { s.play.rateHz = std::round(v); });
-    for (size_t k = 0; k < presets_.size(); ++k)
-        presets_[k].onClick = [this, k] { edit([k](DigidrumSlotState& s) { s.play.rateHz = kPresetHz[k]; }); };
+    // The rate: one undo step per gesture, the source resampled from the slot as the gesture found it with
+    // Resample on; a preset or a typed rate makes one step each.
+    rate_.onGestureStart = [this] {
+        m_.dragging_ = &rate_;
+        rateArmed_ = true;
+    };
+    rate_.onGestureEnd = [this] {
+        m_.dragging_ = nullptr;
+        rateFrom_.reset();
+        refresh();
+    };
+    rate_.onChange = [this](double v) {
+        const bool push = rateArmed_ || m_.dragging_ != &rate_;
+        if (std::round(v) == state().play.rateHz) return;
+        rateArmed_ = false;
+        setRate(v, push);
+    };
+    for (size_t k = 0; k < presets_.size(); ++k) presets_[k].onClick = [this, k] { setRate(kPresetHz[k], true); };
+    // An option of the window, kept in the preferences like Resample of the DMA window.
+    resample_.onClick = [this] {
+        m_.host_.setPreference("digiResample", resampling() ? "0" : "1");
+        refresh();
+    };
     bindSlider(root_, rootArmed_,
                [](DigidrumSlotState& s, double v) { s.play.root = uint8_t(std::clamp(int(v), 0, 127)); });
     bindSlider(fine_, fineArmed_, [](DigidrumSlotState& s, double v) { s.play.cents = std::round(v); });
@@ -155,8 +213,8 @@ void DigidrumWindow::wire() {
 
     // Loading goes through the host (file dialog, audio decoding), asynchronous and without an undo step; the preview
     // is a command to the engine on the audio thread.
-    wave_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
-    load_.onClick = [this] { m_.host_.loadDigidrum(slot()); };
+    wave_.onClick = [this] { m_.chooseSample(false, slot()); };
+    load_.onClick = [this] { m_.chooseSample(false, slot()); };
     // With Loop on, Play starts the part in a loop and a click while it loops stops it, as does Loop switched off
     // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once.
     play_.onClick = [this] {
@@ -205,14 +263,14 @@ void DigidrumWindow::wire() {
 // the peaks a step up clipped.
 void DigidrumWindow::gain(double db) {
     const DigidrumSlotState& s0 = state();
-    const std::vector<int8_t> now = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source;
+    const std::vector<int8_t> now = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source.vec();
     const std::vector<int8_t> from = gainRun_.step(slot(), now, db);
     const double total = gainRun_.total();
     editBytes([&](DigidrumSlotState&, std::vector<int8_t>& src) {
         src = from;
         plugin::dmaGain(src, total);
     });
-    gainRun_.gave(state().source);
+    gainRun_.gave(state().source.vec());
 }
 
 // While a slider is held, MainWindow::dragging_ points to it so that refresh() does not move it under the pointer;
@@ -242,12 +300,16 @@ void DigidrumWindow::bindSlider(gemui::Slider& s, bool& armed,
 // ------------------------------------------------------------------------------------------- state
 
 int DigidrumWindow::slot() const noexcept {
-    return std::clamp(m_.host_.session().digiSlot, 0, ymengine::kDigidrumSlots - 1);
+    return std::clamp(m_.host_.session().digiSlot, 0, ymengine::kDigidrumSlotsMax - 1);
 }
 
 void DigidrumWindow::selectSlot(int k) {
-    m_.host_.session().digiSlot = std::clamp(k, 0, ymengine::kDigidrumSlots - 1);
+    m_.host_.session().digiSlot = std::clamp(k, 0, ymengine::kDigidrumSlotsMax - 1);
     refresh();
+}
+
+plugin::DigiStereo DigidrumWindow::stereoChoice() const {
+    return plugin::digiStereoOf(m_.host_.preference(plugin::kDigiStereoPref, "mix"));
 }
 
 bool DigidrumWindow::looping() const noexcept { return previewing_ == slot() && state().play.loop; }
@@ -266,7 +328,9 @@ void DigidrumWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
 }
 
 const DigidrumSlotState& DigidrumWindow::state() const noexcept { return m_.extras_.digiSlots[size_t(slot())]; }
-const std::vector<uint8_t>& DigidrumWindow::nibbles() const noexcept { return m_.extras_.digidrums[size_t(slot())]; }
+const plugin::SharedSamples<uint8_t>& DigidrumWindow::nibbles() const noexcept {
+    return m_.extras_.digidrums[size_t(slot())];
+}
 
 // The step records the slot as it is now, before the change (undoEntryLike reads the current state); with `bytes`,
 // its source and 4-bit values too, otherwise its settings only.
@@ -293,7 +357,7 @@ void DigidrumWindow::edit(const std::function<void(DigidrumSlotState&)>& fn, boo
 void DigidrumWindow::editBytes(const std::function<void(DigidrumSlotState&, std::vector<int8_t>&)>& fn) {
     // Slot without a source (older state): source inferred from the values; kept as soon as it is used.
     const DigidrumSlotState s0 = state();
-    const std::vector<int8_t> src0 = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source;
+    const std::vector<int8_t> src0 = s0.source.empty() ? plugin::digidrumSourceOf(nibbles()) : s0.source.vec();
     DigidrumSlotState s = s0;
     std::vector<int8_t> src = src0;
     fn(s, src);
@@ -306,7 +370,7 @@ void DigidrumWindow::editBytes(const std::function<void(DigidrumSlotState&, std:
         s.play.loop = false;
         s.play.start = s.play.end = 0;
     }
-    if (s == s0 && src == src0 && n == nibbles()) return;
+    if (s == s0 && src == src0 && nibbles() == n) return;
     s.source = std::move(src);
     pushUndo(true);
     const size_t k = size_t(slot());
@@ -317,17 +381,55 @@ void DigidrumWindow::editBytes(const std::function<void(DigidrumSlotState&, std:
     m_.pullExtras();
 }
 
-void DigidrumWindow::rename() {
-    gemui::Alert::Spec spec;
-    spec.lines = {{"Slot " + std::to_string(slot() + 1) + " name, 16 chars:"}};
-    spec.promptButtons();
-    spec.inputText = state().name;
-    spec.inputChars = int(plugin::kDigidrumNameMax);
-    gemui::Alert::open(m_.desk_, std::move(spec), [this](int button, const std::string& text) {
-        if (button != gemui::Alert::kPromptOk) return;
-        const std::string name = plugin::cleanDigidrumName(text);
-        edit([&name](DigidrumSlotState& s) { s.name = name; });
+void DigidrumWindow::commitName() {
+    const int k = nameSlot_;
+    const std::string name = plugin::cleanDigidrumName(name_.text());
+    if (k < 0 || k >= ymengine::kDigidrumSlotsMax || name == m_.extras_.digiSlots[size_t(k)].name) {
+        refresh();  // the name as it is again (spaces trimmed, nothing typed)
+        return;
+    }
+    UndoEntry e;
+    e.kind = UndoEntry::Kind::Digi;
+    e.index = k;
+    m_.host_.session().undo.push(m_.undoEntryLike(e));
+    m_.host_.editExtras([k, &name](plugin::NonParamState& st) { st.digiSlots[size_t(k)].name = name; });
+    m_.pullExtras();
+}
+
+bool DigidrumWindow::resampling() const { return m_.host_.preference("digiResample", "0") == "1"; }
+
+void DigidrumWindow::setRate(double hz, bool push) {
+    hz = std::clamp(std::round(hz), ymengine::kDigidrumRateMin, ymengine::kDigidrumRateMax);
+    if (!resampling() || nibbles().empty()) {
+        rateFrom_.reset();
+        return edit([hz](DigidrumSlotState& s) { s.play.rateHz = hz; }, push);
+    }
+    // The slot before the change, its source inferred from the values for a slot from an older version: each change of the
+    // gesture resamples from it, so that the moves do not add up their losses.
+    if (push || !rateFrom_) {
+        rateFrom_ = state();
+        if (rateFrom_->source.empty()) rateFrom_->source = plugin::digidrumSourceOf(nibbles());
+    }
+    const DigidrumSlotState& from = *rateFrom_;
+    if (hz == state().play.rateHz) return;
+    DigidrumSlotState s = state();
+    std::vector<int8_t> src = plugin::dmaResample(from.source.vec(), false, from.play.rateHz, hz);
+    std::vector<uint8_t> n = plugin::digidrumNibbles(src, s.convert);
+    // Start and End on the same moments of the sample (End 0 stays at the end), within the new length.
+    const double ratio = hz / from.play.rateHz;
+    const auto len = uint32_t(n.size());
+    auto scale = [ratio](uint32_t v) { return uint32_t(std::lround(double(v) * ratio)); };
+    s.play.rateHz = hz;
+    s.play.end = std::min(scale(from.play.end), len);
+    s.play.start = std::min(scale(from.play.start), s.play.end ? s.play.end - 1 : 0);
+    s.source = std::move(src);
+    if (push) pushUndo(true);
+    const size_t k = size_t(slot());
+    m_.host_.editExtras([&](plugin::NonParamState& st) {
+        st.digiSlots[k] = std::move(s);
+        st.digidrums[k] = std::move(n);
     });
+    m_.pullExtras();
 }
 
 // ------------------------------------------------------------------------------------------- banks
@@ -375,17 +477,20 @@ void DigidrumWindow::saveBank(const std::string& name) {
 }
 
 void DigidrumWindow::loadBank(const std::string& name) {
-    // The eight slots replaced: not an undo step (like loading a sample).
+    // The slots replaced: not an undo step (like loading a sample); after an alert when samples would then go past the
+    // memory of the Atari.
     loadLibrary();
     const auto it = std::find_if(banks_.begin(), banks_.end(),
                                  [&name](const plugin::DigidrumBank& x) { return x.name == name; });
     if (it == banks_.end()) return;
-    const plugin::DigidrumBank bank = *it;
-    m_.host_.editExtras([&bank](plugin::NonParamState& s) {
+    auto apply = [bank = *it](plugin::NonParamState& s) {
         plugin::applyBank(bank, s);
         plugin::sanitize(s);
+    };
+    m_.confirmMemory(apply, [this, apply] {
+        m_.host_.editExtras(apply);
+        m_.pullExtras();
     });
-    m_.pullExtras();
 }
 
 void DigidrumWindow::deleteBank(const std::string& name) {
@@ -434,7 +539,7 @@ void DigidrumWindow::banksMenu() {
         MenuItem l;
         l.label = nm;
         l.pick = [this, nm] {
-            confirm("Replace the 8 slots with bank \"" + nm + "\"?", "Load", [this, nm] { loadBank(nm); });
+            confirm("Replace the slots with bank \"" + nm + "\"?", "Load", [this, nm] { loadBank(nm); });
         };
         load.sub.push_back(std::move(l));
         MenuItem d;
@@ -469,21 +574,43 @@ void DigidrumWindow::refresh() {
     if (!isOpen()) return;
     const int k = slot();
     const DigidrumSlotState& s = state();
-    const std::vector<uint8_t>& n = nibbles();
+    const plugin::SharedSamples<uint8_t>& n = nibbles();
     const bool latin = m_.host_.preference("noteNames", "0") == "1";
     const auto names = latin ? ymseq::NoteNames::Latin : ymseq::NoteNames::English;
+    stereo_.setText(kStereoNames[size_t(stereoChoice())]);
 
-    for (int i = 0; i < ymengine::kDigidrumSlots; ++i) {
-        Button& b = slots_[size_t(i)];
+    // The page of the chosen slot: its eight slots, one past the memory of the Atari crossed out (silent).
+    const plugin::SteMemory mem = m_.memory();
+    const int page = k / 8, last = (ymengine::kDigidrumSlotsMax - 1) / 8;
+    for (int j = 0; j < 8; ++j) {
+        const int i = page * 8 + j;
+        Button& b = slots_[size_t(j)];
+        b.setVisible(i < ymengine::kDigidrumSlotsMax);
+        if (i >= ymengine::kDigidrumSlotsMax) continue;
+        b.setText(std::to_string(i + 1));
         b.setOn(i == k);
+        b.setCrossed(mem.digiMuted[size_t(i)]);
         const DigidrumSlotState& o = m_.extras_.digiSlots[size_t(i)];
         const size_t len = m_.extras_.digidrums[size_t(i)].size();
         std::string tip = "Slot " + std::to_string(i + 1);
         if (!o.name.empty()) tip += " \"" + o.name + "\"";
         tip += len ? ": " + std::to_string(len) + " values" : std::string(": empty");
+        if (mem.digiMuted[size_t(i)]) tip += ", silent: past the memory of the Atari";
         b.setTip(tip);
     }
-    name_.setText(s.name.empty() ? std::string("(none)") : s.name);
+    prev_.setEnabled(page > 0);
+    next_.setEnabled(page < last);
+    // The memory in the 3-channel modes only (Indus, 30/10/2026 02:47): none limits the others.
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labMemory_, &gauge_, &memText_})
+        w->setVisible(mem.limited);
+    gauge_.set(mem.used, mem.total, mem.budget, mem.limited);
+    memText_.setText(m_.memoryText());
+    memText_.setColor(mem.over() ? colors::kClip : colors::kBlack);
+    // The name, unless it is being typed.
+    if (m_.desk_.keyFocus() != &name_) {
+        name_.setText(s.name);
+        nameSlot_ = k;
+    }
     const ymengine::SampleSpan part = ymengine::sampleSpan(s.play.start, s.play.end, uint32_t(n.size()));
     wave_.setSample(k, n, s.play.rateHz, s.play.loop, part.start, part.end, s.name);
 
@@ -492,6 +619,7 @@ void DigidrumWindow::refresh() {
     std::snprintf(buf, sizeof buf, "%.0f Hz", s.play.rateHz);
     if (!ratev_.editing()) ratev_.setText(buf);
     for (size_t i = 0; i < presets_.size(); ++i) presets_[i].setOn(s.play.rateHz == kPresetHz[i]);
+    resample_.setOn(resampling());
     if (m_.dragging_ != &root_) root_.setValue(s.play.root);
     if (!rootv_.editing()) rootv_.setText(ymseq::absNoteName(s.play.root, names));
     if (m_.dragging_ != &fine_) fine_.setValue(s.play.cents);
@@ -534,7 +662,17 @@ void DigidrumWindow::layout() {
     auto sld = [](gemui::Slider& s, double w) { return FlexItem{&s, w, 16}; };
     auto val = [](gemui::ValueField& v, double w) { return FlexItem{&v, w, 16}; };
 
-    const double col1 = 262, col2 = 360;
+    // Slot column: its labels as wide as the widest of them in the interface language, the column wider
+    // by what they add to the English ones.
+    const double lw = std::max({labSlot_.naturalWidth(), labName_.naturalWidth(), labRate_.naturalWidth(),
+                                labRoot_.naturalWidth(), labFine_.naturalWidth(), labStereo_.naturalWidth(),
+                                labMemory_.naturalWidth()});
+    double englishLw = 0;
+    {
+        const gemui::RawText raw;
+        englishLw = Font::width("Name", 14);
+    }
+    const double col1 = 262 + std::max(0.0, lw - englishLw), col2 = 360;
     const double x2 = x + col1 + 24;
     const double contentW = std::max({col1 + 24 + col2, hint_.naturalWidth(), hint2_.naturalWidth()});
 
@@ -546,26 +684,33 @@ void DigidrumWindow::layout() {
     sep_.setBox({x - kPad, y, contentW + 2 * kPad, 2});
     y += 2 + 8;
 
-    // Slot column: labels as wide as "Name", typed values as wide as the longest rate; the presets line up under the
-    // Rate slider.
+    // Across the window: the page of eight slots between its arrows; the memory the samples take and its gauge
+    // in the 3-channel modes.
+    y += placeSlotRows({labSlot_, prev_, slots_, next_, labMemory_, gauge_, memText_}, x, y, contentW, lw);
+
+    // Slot column: labels as wide as the widest of them, typed values as wide as the longest rate; the presets line
+    // up under the Rate slider.
     const double y0 = y;
     double y1 = y0;
-    const double lw = Font::width("Name", 14), vw = Font::width("20000 Hz", 14);
-    std::vector<FlexItem> sl = {lab(labSlot_, lw)};
-    for (auto& b : slots_) sl.push_back(btn(b));
-    y1 += flexRow(x, y1, col1, sl, 4, false) + 6;
-    std::vector<FlexItem> nm = {lab(labName_, lw), btn(name_)};
+    const double vw = Font::width("20000 Hz", 14);
+    const double nameW = std::round(Font::advance(name_.px())) * double(plugin::kDigidrumNameMax);
+    std::vector<FlexItem> nm = {lab(labName_, lw), {&name_, nameW, 16}};
     y1 += flexRow(x, y1, col1, nm, kGap, false) + 10;
     std::vector<FlexItem> rt = {lab(labRate_, lw), sld(rate_, 134), val(ratev_, vw)};
     y1 += flexRow(x, y1, col1, rt, kGap, false) + 6;
     std::vector<FlexItem> pr;
     for (auto& b : presets_) pr.push_back(btn(b));
     pr.front().marginLeft = lw + kGap;
-    y1 += flexRow(x, y1, col1, pr, 4, false) + 6;
+    y1 += flexRow(x, y1, col1, pr, 4, false) + 4;
+    std::vector<FlexItem> rs = {btn(resample_)};  // under the presets, as in the DMA window
+    rs.front().marginLeft = lw + kGap;
+    y1 += flexRow(x, y1, col1, rs, 4, false) + 6;
     std::vector<FlexItem> rr = {lab(labRoot_, lw), sld(root_, 134), val(rootv_, vw)};
     y1 += flexRow(x, y1, col1, rr, kGap, false) + 6;
     std::vector<FlexItem> fn = {lab(labFine_, lw), sld(fine_, 134), val(finev_, vw)};
     y1 += flexRow(x, y1, col1, fn, kGap, false) + 10;
+    std::vector<FlexItem> st = {lab(labStereo_, lw), btn(stereo_)};
+    y1 += flexRow(x, y1, col1, st, kGap, false) + 10;
     std::vector<FlexItem> bk = {btn(banksBtn_)};
     y1 += flexRow(x, y1, col1, bk, kGap, false);
 
@@ -578,10 +723,11 @@ void DigidrumWindow::layout() {
     y2 += flexRow(x2 + col2 - ioW, y2, ioW, io, 4, false) + 6;
     wave_.setBox({x2, y2, 360, 72});
     y2 += 72 + 8;
-    const double lw2 = Font::width("Tools", 14);
-    std::vector<FlexItem> lp = {btn(loop_), lab(labStart_), sld(start_, 104), val(startv_, Font::width("00000", 14))};
+    const double lw2 = std::max(labConvert_.naturalWidth(), labTools_.naturalWidth());
+    const double fw = Font::width("0000000", 14);  // typed values: 4 MB of memory at most in the 3-channel modes
+    std::vector<FlexItem> lp = {btn(loop_), lab(labStart_), sld(start_, 104), val(startv_, fw)};
     y2 += flexRow(x2, y2, col2, lp, kGap, false) + 6;
-    std::vector<FlexItem> le = {lab(labEnd_), sld(end_, 104), val(endv_, Font::width("00000", 14))};
+    std::vector<FlexItem> le = {lab(labEnd_), sld(end_, 104), val(endv_, fw)};
     le.front().marginLeft = loop_.naturalWidth() + kGap + labStart_.naturalWidth() - labEnd_.naturalWidth();
     y2 += flexRow(x2, y2, col2, le, kGap, false) + 10;
     std::vector<FlexItem> cv = {lab(labConvert_, lw2), btn(linear_), btn(ym_)};
@@ -609,7 +755,8 @@ std::optional<Rect> DigidrumWindow::rectOf(std::string_view id) const {
         const int k = id.back() - '0';
         return k >= 0 && k < n ? k : -1;
     };
-    if (const int k = digit("digSlot", ymengine::kDigidrumSlots); k >= 0) return slots_[size_t(k)].bounds();
+    if (const int k = digit("digSlot", int(slots_.size())); k >= 0)
+        return slots_[size_t(k)].visible() ? std::optional<Rect>(slots_[size_t(k)].bounds()) : std::nullopt;
     if (const int k = digit("digPreset", int(presets_.size())); k >= 0) return presets_[size_t(k)].bounds();
     struct Named {
         std::string_view id;
@@ -623,7 +770,9 @@ std::optional<Rect> DigidrumWindow::rectOf(std::string_view id) const {
                            {"digReverse", &reverse_},   {"digFade", &fade_},        {"digSign", &sign_},
                            {"digGainDown", &gainDown_}, {"digGainUp", &gainUp_},    {"digRateV", &ratev_},
                            {"digRootV", &rootv_},       {"digFineV", &finev_},      {"digStartV", &startv_},
-                           {"digEndV", &endv_}};
+                           {"digEndV", &endv_},         {"digStereo", &stereo_},    {"digPrev", &prev_},
+                           {"digNext", &next_},         {"digMemory", &memText_},   {"digGauge", &gauge_},
+                           {"digResample", &resample_}};
     for (const Named& n : named)
         if (id == n.id) return n.w->visible() ? std::optional<Rect>(n.w->bounds()) : std::nullopt;
     return std::nullopt;

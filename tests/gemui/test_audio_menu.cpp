@@ -193,18 +193,15 @@ TEST_CASE("Export pattern > WAV: Tab moves the focus to Cancel then Export, Ente
     CHECK(h.saves[0].title == "Export the pattern as WAV");
 }
 
-TEST_CASE("Export song > Stems (ZIP): empty Song refused, ZIP of the playing tracks, alert", "[ui][wav]") {
+TEST_CASE("Export song > Stems (ZIP): greyed without a Song, ZIP of the playing tracks, alert", "[ui][wav]") {
     FileHost h;
     project(h);
     MainWindow w(h);
     double now = 0;
     w.tick(now);
-    fileMenu(w, "Export song", "Stems (ZIP)");
-    CHECK(alertText(w) == "Song is empty. Add entries first.");
-    dismiss(w);
-    fileMenu(w, "Export song", "WAV");
-    CHECK(alertText(w) == "Song is empty. Add entries first.");
-    dismiss(w);
+    const gemui::MenuItem song = fileEntry(w, "Export song");  // empty Song
+    CHECK(song.disabled);
+    CHECK(song.why == "The Song is empty: add entries in the Song window");
 
     h.state.seq.song.entries = {{0, 2, 0}};
     ++h.serial;

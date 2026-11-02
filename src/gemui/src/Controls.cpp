@@ -12,6 +12,8 @@
 
 #include "gemui/Desktop.h"
 #include "gemui/Font.h"
+#include "gemui/Language.h"
+#include "gemui/Look.h"
 
 namespace stym::gemui {
 namespace {
@@ -152,19 +154,30 @@ void Label::setBackground(Color c) {
     repaint();
 }
 
-double Label::naturalWidth() const noexcept { return Font::width(text_, px_, spacing_, face_); }
+void Label::setRaw(bool raw) {
+    if (raw == raw_) return;
+    raw_ = raw;
+    repaint();
+}
+
+double Label::naturalWidth() const noexcept {
+    const RawText raw(raw_);
+    return Font::width(text_, px_, spacing_, face_);
+}
 
 double Label::opacity() const noexcept { return dim_ ? opacity_ * kOpacityLabelOff : opacity_; }
 
 // The text starts from the box's fractional position (as in the browser) and is centred vertically on a line of px.
 void Label::paint(Painter& p) {
+    const RawText raw(raw_);
     if (opaque(background_)) p.fill(bounds(), background_);
     const Box& b = box();
     double x = b.x;
     if (align_ == Align::Center) x = b.x + (b.w - naturalWidth()) / 2;
     else if (align_ == Align::Right) x = b.x + b.w - naturalWidth();
     const double top = b.y + (b.h - px_) / 2;
-    p.text(text_, x, top, px_, dim_ ? colors::kGreyDisabled : color_, spacing_, face_);
+    // Dim: grey in the prototype; in the GEM look, its own colour dotted by the label's opacity group.
+    p.text(text_, x, top, px_, dim_ && prototypeLook() ? colors::kGreyDisabled : color_, spacing_, face_);
 }
 
 // ------------------------------------------------------------------------------------------------ Button
@@ -214,6 +227,38 @@ void Button::setPending(bool p) {
     repaint();
 }
 
+void Button::setExit(bool e) {
+    if (e == exit_) return;
+    exit_ = e;
+    repaint();
+}
+
+// The shadow overhangs the box by 2 px to the right and below, in the GEM look only.
+void Button::setPopup(bool p) {
+    if (p == popup_) return;
+    popup_ = p;
+    setOverhang(p && !prototypeLook() ? kGemShadow : 0);
+    repaint();
+}
+
+double Button::opacity() const noexcept {
+    if (!prototypeLook()) return 1.0;
+    return enabled() && !greyed_ ? 1.0 : offOpacity_;
+}
+
+void Button::setCrossed(bool c) {
+    if (c == crossed_) return;
+    crossed_ = c;
+    repaint();
+}
+
+void Button::setGreyed(bool g) {
+    if (g == greyed_) return;
+    greyed_ = g;
+    if (g) pressed_ = false;
+    repaint();
+}
+
 void Button::setPadding(int padY, int padX) {
     padY_ = padY;
     padX_ = padX;
@@ -228,6 +273,12 @@ void Button::setMinWidth(double w) {
 // Border and padding of the classes quoted at the top of the class (.btn, .dflt, .chtabs .btn), unless setPadding
 // set others.
 int Button::border() const noexcept { return style_ == Style::Default ? 4 : 2; }
+// GEM borders, measured on Devpac 3: 1 px for a button, 2 px for an EXIT one (Cancel), 3 px for the default.
+// Indus, 01/11/2026 22:10: 2 px for every button, pop-up buttons included; the default one keeps its 3 px.
+int Button::drawnBorder() const noexcept {
+    if (prototypeLook()) return border();
+    return style_ == Style::Default ? 3 : 2;
+}
 int Button::padX() const noexcept {
     if (padX_ >= 0) return padX_;
     return style_ == Style::Default ? 8 : style_ == Style::Tab ? 7 : 10;
@@ -237,14 +288,24 @@ int Button::padY() const noexcept {
     return style_ == Style::Default ? 1 : style_ == Style::Tab ? 2 : 3;
 }
 
+void Button::setRaw(bool raw) {
+    if (raw == raw_) return;
+    raw_ = raw;
+    repaint();
+}
+
 // Text, then the icon after an 8 px gap (no gap without text).
-double Button::contentWidth() const noexcept {
-    double w = Font::width(text_, px_, 0, face_);
-    if (icon_) w += (text_.empty() ? 0 : 8) + icon_->w;
+double Button::contentWidth(std::string_view text) const noexcept {
+    const RawText raw(raw_);
+    double w = Font::width(text, px_, 0, face_);
+    if (icon_) w += (text.empty() ? 0 : 8) + icon_->w;
     return w;
 }
 
-double Button::naturalWidth() const noexcept { return std::max(minWidth_, contentWidth() + 2 * (border() + padX())); }
+double Button::naturalWidth() const noexcept { return widthFor(text_); }
+double Button::widthFor(std::string_view text) const noexcept {
+    return std::max(minWidth_, contentWidth(text) + 2 * (border() + padX()));
+}
 
 // Height of the line: that of the text, or of the icon if it is taller; a button without text only has its icon (the
 // prototype's svg in display:block: 11 px in .tbar). A glyph outside the font ("♪" of a Song block) enlarges the
@@ -255,6 +316,7 @@ int Button::lineHeight() const noexcept {
 }
 
 Font::LineBox Button::fallbackGrowth() const noexcept {
+    const RawText raw(raw_);
     const Font::LineBox lb = Font::lineBox(text_, px_), nb = Font::lineBox({}, px_);
     return {lb.ascent - nb.ascent, lb.descent - nb.descent};
 }
@@ -266,13 +328,24 @@ int Button::naturalHeight() const noexcept {
 }
 
 void Button::paint(Painter& p) {
+    const RawText raw(raw_);
     const Rect r = bounds();
+    const bool gem = !prototypeLook();
     // Reverse video while on, or while pressed (until the release, wherever the pointer is).
     const bool inverse = on_ || pressed_;
-    const Color ink = inverse ? colors::kWhite : !enabled() && !classOff_ ? colors::kButtonTextOff : colors::kBlack;
+    const bool off = !enabled() || greyed_;
+    // Disabled: the browser's grey text in the prototype; in the GEM look, black text dotted below.
+    const Color ink = inverse ? colors::kWhite : off && !classOff_ && !gem ? colors::kButtonTextOff : colors::kBlack;
     p.fill(r, inverse ? colors::kBlack : colors::kWhite);
+    // The layout keeps the prototype's border (bw); the GEM look draws its own inside the same box.
     const int bw = border();
-    p.frame(r, bw, colors::kBlack);
+    p.frame(r, drawnBorder(), colors::kBlack);
+    if (gem && popup_) {
+        // GEM shadow (Devpac 3's pop-up buttons): 2 px to the right from one pixel below the top, 2 px below from one
+        // pixel right of the left edge.
+        p.fill({r.right(), r.y + 1, kGemShadow, r.h + 1}, colors::kBlack);
+        p.fill({r.x + 1, r.bottom(), r.w + 1, kGemShadow}, colors::kBlack);
+    }
     int bottom = bw;
     if (style_ == Style::Tab && sel_) {
         bottom = 4;
@@ -295,13 +368,27 @@ void Button::paint(Painter& p) {
     const int line = lineHeight();
     const double inner = b.h - bw - bottom - 2 * padY();
     const double lineTop = b.y + bw + padY() + (inner - line) / 2;
-    const double x = b.x + (b.w - contentWidth()) / 2;
+    const double x = b.x + (b.w - contentWidth(text_)) / 2;
     // Fallback glyph: the line grows to its measurements and the baseline moves down with its ascent (Painter::text
     // places it below the whole line box).
+    const bool dotted = gem && off;
+    if (dotted) p.beginOpacity(r.inset(drawnBorder()), offOpacity_);  // a GEM grey whatever the opacity
     p.text(text_, x, lineTop + (line - px_ - fallbackGrowth().height()) / 2.0, px_, ink, 0, face_);
     if (icon_) {
         const double ix = x + Font::width(text_, px_, 0, face_) + (text_.empty() ? 0 : 8);
         p.bitmap(*icon_, snap(ix), snap(lineTop + (line - icon_->h) / 2.0), ink);
+    }
+    if (dotted) p.endOpacity();
+    if (crossed_) {
+        // One pixel per step along each diagonal of the inner box, over the text.
+        const int db = drawnBorder(), below = style_ == Style::Tab && sel_ ? 4 : db;
+        const int x0 = r.x + db, y0 = r.y + db, w = r.w - 2 * db, h = r.h - db - below;
+        const int n = std::max(w, h);
+        for (int i = 0; i < n; ++i) {
+            const int dx = n > 1 ? i * (w - 1) / (n - 1) : 0, dy = n > 1 ? i * (h - 1) / (n - 1) : 0;
+            p.pixel(x0 + dx, y0 + dy, ink);
+            p.pixel(x0 + w - 1 - dx, y0 + dy, ink);
+        }
     }
 }
 
@@ -310,13 +397,13 @@ void Button::mouseDown(const MouseEvent& e) {
         if (onContext) onContext(e.pos);
         return;
     }
-    if (e.button != MouseButton::Left) return;
+    if (e.button != MouseButton::Left || greyed_) return;
     pressed_ = true;
     repaint();
 }
 
 void Button::click() {
-    if (!enabled() || !onClick) return;
+    if (!enabled() || greyed_ || !onClick) return;
     const std::function<void()> f = onClick;  // the action may destroy the button
     f();
 }
@@ -706,6 +793,7 @@ std::string ValueField::maskRead() const {
 // then after the last decimal; without a point, at the n-th free position for n digits typed; after the mask's last
 // digit position once that part is full (before a unit that follows it, " Hz").
 int ValueField::caretChar() const {
+    const RawText raw;  // typed text
     if (mask_.empty()) return Font::length(free_);
     std::vector<int> left, right;
     const size_t dot = mask_.find('.');
@@ -760,6 +848,7 @@ bool ValueField::keyDown(const KeyEvent& e) {
     } else if (e.key == Key::Character && e.ch >= 0x20 && e.ch < 0x7F) {
         if (selected_) free_.clear();
         selected_ = false;
+        const RawText raw;
         if (Font::length(free_) < cols_) free_ += char(e.ch);
     }
     repaint();
@@ -793,6 +882,7 @@ void ValueField::paint(Painter& p) {
     // exactly as wide as its mask; centred in a centred field), the selected old value in reverse video, otherwise a
     // 1 px text cursor.
     if (editing_) {
+        const RawText raw;  // typed text, drawn as it is
         const std::string shown = mask_.empty() ? free_ : maskDisplay();
         const double tw = mask_.empty() ? Font::width(shown, px_, 0, face_) : cols_ * cw;
         const double x = centered_      ? b.x + (b.w - tw) / 2
@@ -862,6 +952,11 @@ void TextField::setPx(int px) {
     repaint();
 }
 
+void TextField::setLeftAligned(bool on) {
+    left_ = on;
+    repaint();
+}
+
 double TextField::naturalHeight() const noexcept { return Font::lineBox("0", px_).height(); }
 
 void TextField::mouseDown(const MouseEvent& e) {
@@ -899,6 +994,7 @@ void TextField::focusLost() {
 }
 
 void TextField::paint(Painter& p) {
+    const RawText raw;  // typed by the user
     const Rect r = bounds();
     const Box& b = box();
     p.fill(r, colors::kWhite);
@@ -913,8 +1009,12 @@ void TextField::paint(Painter& p) {
         if (z > a) p.fill({a, y, z - a, 2}, colors::kBlack);
     }
     const double lh = naturalHeight();
-    p.text(text_, b.x + b.w - Font::width(text_, px_), b.y + (b.h - lh) / 2, px_, colors::kBlack);
-    if (focused_) p.fill({r.right() - 1, r.y, 1, r.h}, colors::kBlack);  // text cursor
+    const double tx = left_ ? b.x : b.x + b.w - Font::width(text_, px_);
+    p.text(text_, tx, b.y + (b.h - lh) / 2, px_, colors::kBlack);
+    if (focused_) {  // text cursor: after the last character
+        const int cx = left_ ? std::min(snap(b.x + typed * cw), r.right() - 1) : r.right() - 1;
+        p.fill({cx, r.y, 1, r.h}, colors::kBlack);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------- GroupBox
@@ -979,6 +1079,13 @@ void GroupBox::paint(Painter& p) {
 void WindowFrame::paint(Painter& p) {
     const Rect r = bounds();
     p.fill(r, colors::kWhite);
+    if (!prototypeLook()) {
+        // GEM's OUTLINED box (the dialogs of Devpac 3, the alerts): a 1 px outline, 2 px of white, the box's
+        // 2 px border; the content keeps its place (kInset).
+        p.frame(r, 1, colors::kBlack);
+        p.frame(r.inset(3), 2, colors::kBlack);
+        return;
+    }
     p.frame(r, 2, colors::kBlack);
     p.frame(r.inset(4), 2, colors::kBlack);
 }
@@ -1152,20 +1259,54 @@ bool DeskIcon::hit(Point p) const noexcept {
     return picture.contains(p) || Rect{b.x, b.y + kPicture, kW, kNameH}.contains(p);
 }
 
-// The picture centred at the top of the 72 px box, the name in the 8 px box below it, centred on a whole pixel.
+// The picture centred at the top of the box, the name in the box below it, centred on a whole pixel. Everything at
+// kZoom: a rectangle kZoom px high for each run of lit pixels of a row of the picture, a square of kZoom
+// px for each pixel of the letter and of the name, at kZoom times its place in the icon of the AES.
 void DeskIcon::paint(Painter& p) {
     const Rect b = bounds();
     const int px = b.x + (kW - kPicture) / 2;
-    if (mask_) p.bitmap(*mask_, px, b.y, colors::kWhite);
-    if (data_) p.bitmap(*data_, px, b.y, colors::kBlack);
+    auto zoomed = [&p, px, &b](const Bitmap& m, Color c) {
+        for (int r = 0; r < m.h; ++r)
+            for (int k = 0; k < m.w;) {
+                if (!m.at(k, r)) {
+                    ++k;
+                    continue;
+                }
+                const int k0 = k;
+                while (k < m.w && m.at(k, r)) ++k;
+                p.fill({px + kZoom * k0, b.y + kZoom * r, kZoom * (k - k0), kZoom}, c);
+            }
+    };
+    if (mask_) zoomed(*mask_, colors::kWhite);
+    if (data_) zoomed(*data_, colors::kBlack);
     if (letter_) {  // the top of the 6×6 cell at letterAt_
-        const int g = Font::glyph(char32_t(uint8_t(letter_)));
-        const int top = Font::raster(8, g, 0, Face::kSmall).top;
-        p.glyph(g, px + letterAt_.x, b.y + letterAt_.y - top, 8, colors::kBlack, 0, Face::kSmall);
+        const Font::Raster g = Font::raster(8, Font::glyph(char32_t(uint8_t(letter_))), 0, Face::kSmall);
+        for (int r = 0; r < g.count; ++r)
+            for (int k = 0; k < 16; ++k)
+                if (g.bits(r) & (0x8000 >> k))
+                    p.fill({px + kZoom * (letterAt_.x + g.shift + k), b.y + kZoom * (letterAt_.y + r), kZoom, kZoom},
+                           colors::kBlack);
     }
     p.fill({b.x, b.y + kPicture, kW, kNameH}, colors::kWhite);
-    const double w = Font::width(name_, 8, 0, Face::kSmall);
-    p.text(name_, b.x + std::floor((kW - w) / 2), b.y + kPicture, 8, colors::kBlack, 0, Face::kSmall);
+    // The name as Painter::text draws it in its 72 × 8 box (translated, centred, on the baseline of its line box),
+    // each pixel at kZoom.
+    const std::string_view shown = uiText(name_);
+    const int left = int(std::floor((kW / kZoom - Font::width(shown, 8, 0, Face::kSmall)) / 2));
+    const int baseline = Font::lineBox(shown, 8, Face::kSmall).ascent;
+    double pen = left;
+    for (size_t pos = 0; pos < shown.size();) {
+        const char32_t cp = nextCodepoint(shown, pos);
+        const GlyphPos at = glyphPos(pen);
+        pen += Font::advance(cp, 8, Face::kSmall);
+        if (cp == ' ' || cp == 0xA0) continue;
+        const Font::Raster g = Font::raster(8, Font::glyph(cp), at.quarter, Face::kSmall);
+        for (int r = 0; r < g.count; ++r)
+            for (int k = 0; k < 16; ++k)
+                if (g.bits(r) & (0x8000 >> k))
+                    p.fill({b.x + kZoom * (at.x + g.shift + k), b.y + kPicture + kZoom * (baseline + g.top + r), kZoom,
+                            kZoom},
+                           colors::kBlack);
+    }
 }
 
 Point DeskIcon::landing(Point pointer) const noexcept { return snapped({pointer.x - grab_.x, pointer.y - grab_.y}); }

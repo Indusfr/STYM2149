@@ -1,6 +1,6 @@
 // STYM2149 — echo of the notes (eighth DAW test, item 98): repeats at each division of the tempo, quieter each
 // time, in every mode; in 3 channels a repeat takes the channel of its target track only when it plays no note of its
-// own, none for a Sync Buzzer; the register recorder keeps the repeats; 16 channels: voices of the pool; panic.
+// own, none for a Sync Buzzer; the register recorder keeps the repeats; 32 channels: voices of the pool; panic.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -225,13 +225,15 @@ TEST_CASE("Echo: the register recorder keeps the repeats", "[engine][echo][3ch][
     CHECK(g.e.stopCapture() > 0);
 }
 
-TEST_CASE("Echo: 16 channels: repeats in the voices of the pool, the oldest gives way; the panic clears them",
+TEST_CASE("Echo: 16 and 32 channels: repeats in the voices of the pool, the oldest gives way; the panic clears them",
           "[engine][echo]") {
     Rig g(VoiceMode::Studio16);
     g.e.setTrack(0, echoTrack(true, 8, 1, -1, 10));  // 1/32: 3000 samples
-    for (int n = 0; n < 20; ++n) g.noteOn(0, 48 + n, 0);
+    const int notes = Engine::kLaneVoices + 4;
+    for (int n = 0; n < notes; ++n) g.noteOn(0, 40 + n, 0);
     g.runTo(3000 + 10);
-    // 20 notes: 16 track voices and 4 of the pool; the 12 voices of the pool left take the repeats.
+    // Four notes more than the track voices (32) take 4 voices of the pool; the 12 voices of the pool left
+    // take the repeats.
     int echoes = 0;
     for (int i = 0; i < Engine::kVoices; ++i)
         if (g.e.voice(i).on && g.e.voice(i).tag == VoiceTag::Echo) {
@@ -259,7 +261,8 @@ TEST_CASE("Echo: off, the settings of the echo change nothing", "[engine][echo]"
     }
 }
 
-TEST_CASE("Echo: none for a Sync Buzzer in 3 channels, a Sync Buzzer in 16 channels has it (ninth DAW test, item 115)",
+TEST_CASE("Echo: none for a Sync Buzzer in 3 channels, a Sync Buzzer in 16 and 32 channels has it (ninth DAW test, "
+          "item 115)",
           "[engine][echo][3ch]") {
     for (const VoiceMode mode : {VoiceMode::Authentic3, VoiceMode::Dual3, VoiceMode::Studio16}) {
         CAPTURE(int(mode));

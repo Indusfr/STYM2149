@@ -63,7 +63,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::map<std::string, std::string, std::less<>> prefs;
     std::string preference(std::string_view k, std::string_view fallback) const override {
         const auto it = prefs.find(k);
@@ -134,7 +133,9 @@ public:
         for (gemui::Widget* c : p->children()) {
             if (auto* s = dynamic_cast<gemui::Slider*>(c)) slider_ = s;
             if (auto* f = dynamic_cast<gemui::TextField*>(c)) field_ = f;
-            if (auto* b = dynamic_cast<gemui::Button*>(c)) (b->text() == "Set" ? set_ : none_) = b;
+            if (auto* b = dynamic_cast<gemui::Button*>(c))
+                (b->text() == "Set" ? set_ : b->text() == "Fade" ? fade_ : none_) = b;
+            if (auto* v = dynamic_cast<gemui::ValueField*>(c)) fadeMs_ = v;
         }
         REQUIRE(slider_);
         REQUIRE(field_);
@@ -150,6 +151,8 @@ public:
         if (field_->onChange) field_->onChange();
     }
     void set() { set_->click(); }
+    gemui::Button* fade() { return fade_; }  // Note cut only
+    gemui::ValueField* fadeMs() { return fadeMs_; }  // and the length of its fade
     void none() {
         CHECK(none_->text() == "None");
         none_->click();
@@ -159,7 +162,8 @@ private:
     std::string tip_;
     gemui::Slider* slider_ = nullptr;
     gemui::TextField* field_ = nullptr;
-    gemui::Button *set_ = nullptr, *none_ = nullptr;
+    gemui::Button *set_ = nullptr, *none_ = nullptr, *fade_ = nullptr;
+    gemui::ValueField* fadeMs_ = nullptr;
 };
 
 }  // namespace
@@ -192,7 +196,7 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
     CHECK(h.prefs["seqCmdRow"] == "0");
     CHECK(g.laneRect(0, SeqLane::Cmd).w == 0);
     // The rows of their own of the eleventh DAW test go with it while none of their commands is written.
-    for (const SeqLane r : {SeqLane::Bpm, SeqLane::Vib, SeqLane::Dly, SeqLane::NoteCut}) {
+    for (const SeqLane r : {SeqLane::Bpm, SeqLane::Vib, SeqLane::Dly, SeqLane::NoteCut, SeqLane::Tik}) {
         CAPTURE(int(r));
         CHECK(g.laneRect(0, r).w == 0);
     }
@@ -229,11 +233,9 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
         }
         // Arpeggio and Pitch Slide retired (items 131 and 135); Vibrato, BPM, Envelope Shape, Note Delay
         // and Note Cut in rows of their own (items 132, 133 and 138 to 140); Envelope Restart, Sample Offset and Fine
-        // Tune too (twelfth DAW test, items 146, 152 and 153).
-        CHECK(names ==
-              std::vector<std::string>{"Ticks per Line", "Sync Mark", "Volume Slide", "Buzzer Slide", "Noise Slide"});
-        // Values to start from: the song's ticks per line, sync mark 1.
-        CHECK(b.field(SeqCmd::Speed).text() == "6");
+        // Tune too (twelfth DAW test, items 146, 152 and 153), and Ticks per Line (the TIK row).
+        CHECK(names == std::vector<std::string>{"Sync Mark", "Volume Slide", "Buzzer Slide", "Noise Slide"});
+        // Value to start from: sync mark 1.
         CHECK(b.field(SeqCmd::Sync).text() == "1");
     }
     CHECK(key(w, gemui::Key::Enter));  // Cancel
@@ -252,14 +254,14 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
         b.direction(SeqCmd::VolSlide).click();  // up 4
         CHECK(b.direction(SeqCmd::VolSlide).text() == "Up");
         CHECK(b.entry(SeqCmd::VolSlide).value == 0x40);
-        CHECK(b.field(SeqCmd::Speed).onCommit("40"));  // brought down to 31
-        CHECK(b.field(SeqCmd::Speed).text() == "31");
+        CHECK(b.field(SeqCmd::Sync).onCommit("300"));  // brought down to 255
+        CHECK(b.field(SeqCmd::Sync).text() == "255");
         CHECK_FALSE(b.field(SeqCmd::VolSlide).onCommit("G1"));
         b.button(CmdBox::kOk).click();
     }
     CHECK_FALSE(w.desktop().hasModal());
     CHECK(lane0(h).cmdAt(SeqCmd::VolSlide, 3) == seqCmd(SeqCmd::VolSlide, 0x40));
-    CHECK(lane0(h).cmdAt(SeqCmd::Speed, 3) == seqCmd(SeqCmd::Speed, 31));
+    CHECK(lane0(h).cmdAt(SeqCmd::Sync, 3) == seqCmd(SeqCmd::Sync, 255));
     CHECK(g.laneText(3, SeqLane::Cmd) == "MUL");
 
     // The box shows the step's commands; Off takes one out.
@@ -268,26 +270,24 @@ TEST_CASE("CMD row: preference of the Resolution menu, input, eraser", "[ui][seq
         CmdBox& b = cmdBox(w);
         CHECK(b.entry(SeqCmd::VolSlide).on);
         CHECK(b.entry(SeqCmd::VolSlide).value == 0x40);
-        CHECK(b.entry(SeqCmd::Speed).value == 31);
+        CHECK(b.entry(SeqCmd::Sync).value == 255);
         b.onOff(SeqCmd::VolSlide).click();
         CHECK_FALSE(b.entry(SeqCmd::VolSlide).on);
         CHECK(b.onOff(SeqCmd::VolSlide).text() == "Off");
         b.button(CmdBox::kOk).click();
     }
     CHECK(lane0(h).cmdAt(SeqCmd::VolSlide, 3) == 0);
-    CHECK(g.laneText(3, SeqLane::Cmd) == "TIK");
+    CHECK(g.laneText(3, SeqLane::Cmd) == "SYN");
 
-    // A sync mark, ticks per line taken out.
+    // Another sync mark.
     press(w, centre(cell));
     {
         CmdBox& b = cmdBox(w);
         CHECK(b.field(SeqCmd::Sync).onCommit("5"));
         CHECK(b.entry(SeqCmd::Sync).on);
-        b.onOff(SeqCmd::Speed).click();
         b.button(CmdBox::kOk).click();
     }
     CHECK(lane0(h).cmdAt(SeqCmd::Sync, 3) == seqCmd(SeqCmd::Sync, 5));
-    CHECK(lane0(h).cmdAt(SeqCmd::Speed, 3) == 0);
     CHECK(g.laneText(3, SeqLane::Cmd) == "SYN");
 
     // Escape cancels; every row off clears the step.
@@ -335,6 +335,7 @@ TEST_CASE("CMD row: the commands of the rows of their own stay out of it (eleven
         st.seq.cur().bpm[3] = 0x8c;
     });
     h.prefs["seqCmdRow"] = "0";
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 1;  // the VIB row: Vibrato Off by default
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
@@ -403,7 +404,7 @@ TEST_CASE("CMD box: slides (tenth DAW test, item 130)", "[ui][seq][commands]") {
         CHECK(b.field(SeqCmd::EnvSlide).onCommit("40"));  // brought down to 15
         CHECK(b.slider(SeqCmd::EnvSlide).value() == 15);
         CHECK(b.entry(SeqCmd::EnvSlide).value == 0xF0);
-        // 16 channels: the Buzzer Slide's button opens its Curve menu, Down picked there.
+        // 32 channels: the Buzzer Slide's button opens its Curve menu, Down picked there.
         b.direction(SeqCmd::EnvSlide).click();
         REQUIRE(labels(w) == std::vector<std::string>{"Up", "Down", "---", "Curve"});
         press(w, centre(menu(w).itemRect(1)));
@@ -450,8 +451,11 @@ TEST_CASE("VIB row: shown with the vibrato of the track On, a step starts or sto
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
-    // Vibrato On by default: the row is shown, between GEN and SLD.
-    REQUIRE(h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] != 0.0F);
+    // Vibrato Off by default (Indus, 30/10/2026 03:57): the row is hidden; On, it is shown between GEN and SLD.
+    REQUIRE(h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] == 0.0F);
+    CHECK(g.laneRect(2, SeqLane::Vib).w == 0);
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 1;
+    w.tick(10);
     const gemui::Rect cell = g.laneRect(2, SeqLane::Vib);
     REQUIRE(cell.w > 0);
     CHECK(cell.y > g.laneRect(2, SeqLane::Fx).y);
@@ -509,9 +513,11 @@ TEST_CASE("BPM row: the pattern's, under VOL behind a separator, in the standalo
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
     REQUIRE(g.laneRect(2, SeqLane::Bpm).w > 0);
-    // Under VOL, a separator between them (4 px of black between two 2 px lines).
-    const gemui::Rect vol = g.laneRect(2, SeqLane::Vol);
-    CHECK(g.laneRect(2, SeqLane::Bpm).y == vol.bottom() + 2 + 4 + 2);
+    // Under VOL, the rows shared by the tracks, TIK then BPM, behind a separator (4 px of black between two
+    // 2 px lines; between VOL and TIK).
+    const gemui::Rect vol = g.laneRect(2, SeqLane::Vol), tik = g.laneRect(2, SeqLane::Tik);
+    CHECK(tik.y == vol.bottom() + 2 + 4 + 2);
+    CHECK(g.laneRect(2, SeqLane::Bpm).y == tik.bottom() + 2);
     CHECK(g.laneText(2, SeqLane::Bpm) == "140");
     CHECK(g.tipAt({g.bounds().x + 10, g.laneRect(2, SeqLane::Bpm).y + 5}) ==
           "BPM: one row for every track of the pattern");
@@ -567,6 +573,7 @@ TEST_CASE("ENV row: shown when the envelope plays, the shapes 8 to F (item 138)"
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::Generator))] = float(ymengine::Generator::Chip);
     h.values[size_t(plugin::paramIndex(0, plugin::Track::VolMode))] = 0;
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 1;  // the VIB row: Vibrato Off by default
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
@@ -699,7 +706,8 @@ TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 an
     CHECK(g.laneText(4, SeqLane::Dly) == "2");
     CHECK(g.laneText(4, SeqLane::Cmd) == "-");
 
-    // Note cut: from tick 0; a tick typed beyond the line is kept (up to 255).
+    // Note cut: from tick 0; a tick typed beyond the line is brought back to its last tick, as the slider
+    // (Indus, 30/10/2026 03:37).
     press(w, centre(cut));
     {
         ValueBox b(w);
@@ -717,11 +725,11 @@ TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 an
         b.type("300");
         b.set();
     }
-    CHECK(lane0(h).cmdAt(SeqCmd::Cut, 4) == seqCmd(SeqCmd::Cut, 255));
+    CHECK(lane0(h).cmdAt(SeqCmd::Cut, 4) == seqCmd(SeqCmd::Cut, 5));
     press(w, centre(dly));
     ValueBox(w).none();
     CHECK(lane0(h).cmdAt(SeqCmd::Delay, 4) == 0);
-    CHECK(lane0(h).cmdAt(SeqCmd::Cut, 4) == seqCmd(SeqCmd::Cut, 255));
+    CHECK(lane0(h).cmdAt(SeqCmd::Cut, 4) == seqCmd(SeqCmd::Cut, 5));
     CHECK(g.laneText(4, SeqLane::Dly) == "-");
 
     // A drum track has them too.
@@ -732,6 +740,51 @@ TEST_CASE("DLY and CUT rows: a tick of the line, None takes it out (items 139 an
     CHECK(g.laneRect(4, SeqLane::Vib).w == 0);
 }
 
+TEST_CASE("TIK row: ticks per line out of the CMD row, crossed in BPM timing", "[ui][seq][commands]") {
+    TestHost h;
+    h.state.global.timing = ymengine::SeqTiming::Ticks;
+    h.state.global.speed = 6;
+    MainWindow w(h);
+    w.sequencer().show();
+    const pluginui::SeqGrid& g = w.sequencer().grid();
+    const gemui::Rect tik = g.laneRect(4, SeqLane::Tik);
+    REQUIRE(tik.w > 0);
+    CHECK(tik.y > g.laneRect(4, SeqLane::Vol).y);
+    CHECK(g.tipAt(centre(g.laneRect(5, SeqLane::Tik))) ==
+          "TIK: replay ticks of each line from this step on, for every track (Ticks timing)");
+
+    // From 1 to 31, starting from the song's ticks per line.
+    press(w, centre(tik));
+    {
+        ValueBox b(w);
+        CHECK(b.titleTip() == "Replay ticks of each line from this step on, for every track (Ticks timing)");
+        CHECK(b.slider().min() == 1);
+        CHECK(b.slider().max() == ymengine::kSpeedMax);
+        CHECK(b.field().text() == "6");
+        b.type("40");
+        b.set();
+    }
+    CHECK(lane0(h).cmdAt(SeqCmd::Speed, 4) == seqCmd(SeqCmd::Speed, ymengine::kSpeedMax));
+    CHECK(g.laneText(4, SeqLane::Tik) == "31");
+    CHECK(g.laneText(4, SeqLane::Cmd) == "-");  // no longer a command of the box
+    CHECK_FALSE(g.laneCrossed(4, SeqLane::Tik));
+
+    // BPM timing: a line lasts by the tempo, the value is crossed.
+    h.state.global.timing = ymengine::SeqTiming::Bpm;
+    h.editExtras([](plugin::NonParamState&) {});
+    w.tick(20);
+    CHECK(g.laneCrossed(4, SeqLane::Tik));
+    CHECK(g.tipAt(centre(tik)) == "TIK: replay ticks of each line from this step on, for every track (Ticks "
+                                  "timing)\n31: BPM timing: a line lasts by the tempo");
+    CHECK_FALSE(g.laneCrossed(5, SeqLane::Tik));
+
+    // None takes it out.
+    press(w, centre(tik));
+    ValueBox(w).none();
+    CHECK(lane0(h).cmdAt(SeqCmd::Speed, 4) == 0);
+    CHECK(g.laneText(4, SeqLane::Tik) == "-");
+}
+
 TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has none on (twelfth DAW test, items 142 "
           "to 145)",
           "[ui][seq][commands]") {
@@ -739,6 +792,7 @@ TEST_CASE("LFO, MOD and ARP rows: switches like VIB, gone where the track has no
     h.state.tracks[0].patch.lfo.on = true;
     h.state.tracks[0].patch.ornamentOn = true;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::ArpOn))] = 1;
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 1;  // the VIB row: Vibrato Off by default
     MainWindow w(h);
     w.sequencer().show();
     const pluginui::SeqGrid& g = w.sequencer().grid();
@@ -914,6 +968,7 @@ TEST_CASE("Control rows in the order of what they do to the note (thirteenth DAW
     h.state.instruments[0].used = true;  // INS
     h.values[size_t(plugin::paramIndex(0, plugin::Track::VolMode))] = 1;  // ENV
     h.values[size_t(plugin::paramIndex(0, plugin::Track::ArpOn))] = 1;    // ARP
+    h.values[size_t(plugin::paramIndex(0, plugin::Track::VibOn))] = 1;    // VIB (Off by default)
     h.state.tracks[0].patch.lfo.on = true;                                 // LFO
     h.state.tracks[0].patch.ornamentOn = true;                             // MOD
     h.editExtras([](plugin::NonParamState& st) {
@@ -931,12 +986,13 @@ TEST_CASE("Control rows in the order of what they do to the note (thirteenth DAW
     std::sort(shown.begin(), shown.end());
     std::vector<SeqLane> order;
     for (const auto& [y, r] : shown) order.push_back(r);
-    // Pitch, sound, modulations, slide, timing, the other commands, the mix, then the pattern's BPM.
+    // Pitch, sound, modulations, slide, timing, the other commands, the mix, then the cadence: TIK and the
+    // pattern's BPM.
     CHECK(order == std::vector<SeqLane>{SeqLane::Tun, SeqLane::Ins, SeqLane::Fx, SeqLane::Mix, SeqLane::Env,
                                         SeqLane::Smp, SeqLane::Afl, SeqLane::Vib, SeqLane::Lfo, SeqLane::Mod,
                                         SeqLane::Slide, SeqLane::Slc, SeqLane::Cnd, SeqLane::Dly, SeqLane::Rtg,
                                         SeqLane::Gat, SeqLane::NoteCut, SeqLane::Cmd, SeqLane::Pnr, SeqLane::Vol,
-                                        SeqLane::Bpm});
+                                        SeqLane::Tik, SeqLane::Bpm});
 }
 
 TEST_CASE("Impossible cells crossed from the sound of the step, empty ones too (thirteenth DAW test, item 165)",
@@ -1033,7 +1089,7 @@ TEST_CASE("SRC row: the Env entries after a separator, shown as E, TE, NE and TN
     CHECK(ctrl(w, U'z'));  // the menu's pick is one undo step
 }
 
-TEST_CASE("CMD box: the Curve of the Buzzer and Noise slides in 16 channels, Up/Down in 3 channels",
+TEST_CASE("CMD box: the Curve of the Buzzer and Noise slides in 16 and 32 channels, Up/Down in 3 channels",
           "[ui][seq][commands]") {
     TestHost h;
     h.editExtras([](plugin::NonParamState& st) {
@@ -1060,7 +1116,7 @@ TEST_CASE("CMD box: the Curve of the Buzzer and Noise slides in 16 channels, Up/
         CHECK(b.curve(SeqCmd::EnvSlide) == 1);
         CHECK(b.direction(SeqCmd::EnvSlide).text() == "Up EXP");
         CHECK(b.direction(SeqCmd::NoiseSlide).text() == "Down");
-        CHECK(b.direction(SeqCmd::NoiseSlide).tip().find("Curve (16 channels)") == 0);
+        CHECK(b.direction(SeqCmd::NoiseSlide).tip().find("Curve (16 and 32 channels)") == 0);
         // The menu over the box: Up and Down, the current one marked, then the shapes of the CRV row.
         b.direction(SeqCmd::NoiseSlide).click();
         REQUIRE(labels(w) == std::vector<std::string>{"Up", "Down", "---", "Curve"});
@@ -1382,4 +1438,108 @@ TEST_CASE("VOL box: Slide glides the step to the next step's volume, drawn as a 
     REQUIRE(b);
     CHECK_FALSE(b->enabled());
     w.desktop().closePopups();
+}
+
+TEST_CASE("Note cut box: Fade, the 5 ms fade of every CUT in 16 and 32 ch; typed ticks within the line ",
+          "[ui][seq][commands]") {
+    TestHost h;
+    h.state.global.timing = ymengine::SeqTiming::Ticks;
+    h.state.global.speed = 6;
+    MainWindow w(h);
+    w.sequencer().show();
+    const pluginui::SeqGrid& g = w.sequencer().grid();
+    const gemui::Rect cut = g.laneRect(4, SeqLane::NoteCut), dly = g.laneRect(4, SeqLane::Dly);
+    REQUIRE(cut.w > 0);
+
+    // Off by default; a click switches it for the whole project at once, the box staying open.
+    press(w, centre(cut));
+    {
+        ValueBox b(w);
+        REQUIRE(b.fade());
+        CHECK_FALSE(b.fade()->on());
+        CHECK(b.fade()->enabled());
+        b.fade()->click();
+        CHECK(h.state.global.cutFade);
+        CHECK(b.fade()->on());
+        b.none();
+    }
+    press(w, centre(cut));
+    {
+        ValueBox b(w);
+        CHECK(b.fade()->on());
+        b.fade()->click();
+        CHECK_FALSE(h.state.global.cutFade);
+        b.none();
+    }
+    // Note delay has no Fade, and its field stops at the line too.
+    press(w, centre(dly));
+    {
+        ValueBox b(w);
+        CHECK_FALSE(b.fade());
+        b.type("9");
+        CHECK(b.slider().value() == 5);
+        b.set();
+    }
+    CHECK(lane0(h).cmdAt(SeqCmd::Delay, 4) == seqCmd(SeqCmd::Delay, 5));
+
+    // 3ch and 2x3ch cut as an Atari does: Fade greyed.
+    h.values[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = float(ymengine::VoiceMode::Authentic3);
+    w.tick(10);
+    const gemui::Rect cut3 = g.laneRect(0, SeqLane::NoteCut);
+    REQUIRE(cut3.w > 0);
+    press(w, centre(cut3));
+    ValueBox b(w);
+    REQUIRE(b.fade());
+    CHECK_FALSE(b.fade()->enabled());
+}
+
+TEST_CASE("Note cut: the cell shows F after the tick when the CUT fades; length of the fade typed in the box",
+          "[ui][seq][commands]") {
+    TestHost h;
+    h.state.global.timing = ymengine::SeqTiming::Ticks;
+    h.state.global.speed = 6;
+    MainWindow w(h);
+    w.sequencer().show();
+    const pluginui::SeqGrid& g = w.sequencer().grid();
+    const gemui::Rect cut = g.laneRect(4, SeqLane::NoteCut);
+    REQUIRE(cut.w > 0);
+    press(w, centre(cut));
+    {
+        ValueBox b(w);
+        REQUIRE(b.fadeMs());
+        CHECK(b.fadeMs()->text() == "5 ms");  // 5 ms by default
+        CHECK(b.fadeMs()->opacity() < 1.0);    // greyed while Fade is off
+        b.type("3");
+        b.set();
+    }
+    w.tick(10);
+    CHECK(g.laneText(4, SeqLane::NoteCut) == "3");
+    press(w, centre(cut));
+    {
+        ValueBox b(w);
+        b.fade()->click();
+        CHECK(b.fadeMs()->opacity() == 1.0);
+        REQUIRE(b.fadeMs()->onCommit);
+        CHECK(b.fadeMs()->onCommit("20"));
+        CHECK(h.state.global.cutFadeMs == 20);
+        CHECK(b.fadeMs()->text() == "20 ms");
+        CHECK(b.fadeMs()->onCommit("500"));  // kept within 1 to 100 ms
+        CHECK(h.state.global.cutFadeMs == 100);
+        b.none();
+    }
+    w.tick(10);
+    CHECK(h.state.global.cutFade);
+    CHECK(lane0(h).cmdAt(SeqCmd::Cut, 4) == 0);  // None took it out
+    press(w, centre(cut));
+    {
+        ValueBox b(w);
+        b.type("4");
+        b.set();
+    }
+    w.tick(10);
+    CHECK(g.laneText(4, SeqLane::NoteCut) == "4F");
+    // 3ch cuts as an Atari does, Fade or not: no F.
+    h.values[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = float(ymengine::VoiceMode::Authentic3);
+    w.tick(10);
+    CHECK(g.laneText(4, SeqLane::NoteCut) == "4");
 }

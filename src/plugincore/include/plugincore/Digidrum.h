@@ -2,9 +2,11 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Loading as in the prototype (#drumFile): first channel only, linear resampling to 7800 Hz (the next sample counts
-// as 0 after the end), 4-bit quantisation round(v × 7.5 + 7.5) clamped to 0-15, 3 s at most (DRUM_LEN_MAX). The
-// browser first decoded the file at the rate of its audio context; here, we start from the rate of the file.
+// Loading as in the prototype (#drumFile): linear resampling to 7800 Hz (the next sample counts as 0 after the end),
+// 4-bit quantisation round(v × 7.5 + 7.5) clamped to 0-15, the whole file (the prototype kept 3 s, DRUM_LEN_MAX; the
+// memory of the Atari limits the samples). The browser first decoded the file at the rate of its audio
+// context; here, we start from the rate of the file. The prototype took the first channel of a stereo file; the Stereo
+// menu of the Digidrums window chooses the left one, the right one or both mixed (Indus, 29/10/2026 01:41-01:43).
 //
 // Digidrum editor: each slot has a name, its playback (rate at the root note, fine tune, held loop:
 // ymengine::DigidrumSlot), a 4-bit conversion mode and, since loading, a signed 8-bit source at the slot rate, from
@@ -22,12 +24,11 @@
 #include <string_view>
 #include <vector>
 
+#include "plugincore/SharedSamples.h"
 #include "ymengine/Params.h"
 
 namespace stym::plugin {
 
-// 3 s at the loading rate of the prototype (DRUM_LEN_MAX).
-inline constexpr size_t kDigidrumMaxSamples = 3 * 7800;
 inline constexpr size_t kDigidrumNameMax = 16;
 
 // How the 4-bit values are computed from the 8-bit source (see above).
@@ -38,12 +39,17 @@ struct DigidrumSlotState {
     std::string name;                 // 16 printable characters at most
     ymengine::DigidrumSlot play{};    // rate, root note, fine tune, loop
     DigiConvert convert = DigiConvert::Linear;
-    std::vector<int8_t> source;       // signed 8-bit at the slot rate; empty: the 4-bit values only
+    SharedSamples<int8_t> source;     // signed 8-bit at the slot rate; empty: the 4-bit values only
     bool operator==(const DigidrumSlotState&) const = default;
 };
 
-// Maximum samples for a rate: 3 s (DRUM_LEN_MAX), 65535 at most.
-size_t digidrumMaxSamples(double rateHz) noexcept;
+// Channel of a stereo file that a slot loads, kept in the preferences under kDigiStereoPref as its name.
+enum class DigiStereo : uint8_t { Left, Right, Mix };
+inline constexpr std::string_view kDigiStereoPref = "digiStereo";
+std::string_view digiStereoName(DigiStereo s) noexcept;  // "left", "right", "mix"
+DigiStereo digiStereoOf(std::string_view name) noexcept;  // Mix for an unknown name
+// The channel loaded: `left`, `right` (left when empty: a mono file) or their mean, as long as the shorter one.
+std::vector<float> digidrumChannel(std::span<const float> left, std::span<const float> right, DigiStereo s);
 
 // 4-bit values of the prototype (Linear) at rate `rateHz` (7800 Hz: loading as in the prototype).
 std::vector<uint8_t> toDigidrum(std::span<const float> channel, double sampleRate, double rateHz = 7800);
@@ -54,6 +60,9 @@ uint8_t digidrumNibble(int8_t source, DigiConvert mode) noexcept;
 std::vector<uint8_t> digidrumNibbles(std::span<const int8_t> source, DigiConvert mode);
 // Source derived from 4-bit values (inverse linear conversion): round((n - 7.5) / 7.5 × 127).
 std::vector<int8_t> digidrumSourceOf(std::span<const uint8_t> nibbles);
+// Source of 4-bit values played as they are at the YM levels (a YM-Tracker digidrum): for each value, the byte
+// nearest to the output of its level that the YmLevels conversion brings back to it.
+std::vector<int8_t> digidrumSourceOfLevels(std::span<const uint8_t> nibbles);
 // Playback settings of a slot for the engine: `play` with the value of silence of its conversion (rest).
 // Without allocation: the driver calls it on the audio thread.
 ymengine::DigidrumSlot digidrumEngineSlot(const DigidrumSlotState& s) noexcept;

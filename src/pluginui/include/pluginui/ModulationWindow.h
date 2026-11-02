@@ -12,7 +12,8 @@
 // step of the track (pushCur of the prototype); a mouse stroke makes only one.
 //
 // The sequences (PER, NP, MIX, GEN, FIX and OUT rows inside the table, pitch settings and vibrato table below it:
-// SequencesPanel), formerly a window of their own (fifth DAW test). Clear empties the sequence rows too.
+// SequencesPanel), formerly a window of their own (fifth DAW test). Clear empties the sequence rows too. Under
+// the pitch matrix, the Track button of the Step Sequencer.
 // Below them, the LFO of the track (sixth DAW test, item 59, LfoPanel).
 #pragma once
 #include <array>
@@ -120,12 +121,15 @@ public:
     bool tableKey(const gemui::KeyEvent& e);
 
     // Rectangle of a control by the prototype's id (captures, tests): "ornWin", "ornOn", "ornLen", "ornLenv",
-    // "ornLoop", "ornRate", "ornClear", "orngrid"; those of the sequences ("seqx..." ids, SequencesPanel::rectOf) and
+    // "ornLoop", "ornRate", "ornClear", "orngrid", "ornTrack"; those of the sequences ("seqx..." ids, SequencesPanel::rectOf) and
     // of the LFO ("lfo..." ids, LfoPanel::rectOf).
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     const OrnGrid& grid() const noexcept { return grid_; }
     const SequencesPanel& sequences() const noexcept { return seqx_; }
     const LfoPanel& lfo() const noexcept { return lfo_; }
+    // The instrument name is being typed for a track that is no longer the focused one (MainWindow::refresh leaves
+    // the field, which stores the name for that track).
+    bool instrumentNameStale() const noexcept;
 
 private:
     void build();
@@ -159,6 +163,15 @@ private:
                12};
     Rule sep_;
     OrnGrid grid_;
+    // The track edited, in the middle zone under the pitch matrix: the Step Sequencer's Track button (Indus, 29/10/2026
+    // 10:54).
+    gemui::Label labTrack_{"Track"};
+    gemui::Button trackSel_;
+    // The track's instrument, as at the bottom of the GENERATOR frame (Indus, 29/10/2026 14:03): in the column
+    // of the note's pitch, on the line of Track, its name under it.
+    gemui::Button insOpen_{"Instrument"}, insNum_;
+    NameField insName_;
+    int insNameTrack_ = 0;
     SequencesPanel seqx_{m_};
     LfoPanel lfo_{m_};
 };

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <vector>
 
@@ -247,7 +248,7 @@ int main() {
                 g_watch = true;
                 STYM_RT_ENTER();
                 e.reset();
-                for (int s = 0; s < ymengine::kDigidrumSlots; ++s) e.setUserSample(s, nibbles);
+                for (int s = 0; s < ymengine::kDigidrumSlotsMax; ++s) e.shareUserSample(s, nibbles);
                 e.setKit(ymengine::kKitBanks[3].kit);
                 for (int t = 0; t < ymengine::kTracks; ++t) e.setTrack(t, tracks[t]);
                 int pass = 0;
@@ -344,7 +345,11 @@ int main() {
             ParamValues v = defaultValues();
             for (int t = 0; t < 16; ++t) v[size_t(paramIndex(t, Track::On))] = 1;
             Snapshot snap;
-            for (auto& smp : snap.state.digidrums) smp.assign(2000, 7);
+            // 127 Digidrums and 8 DMA samples on 512 KB: over the memory of the Atari in the 3-channel modes, the
+            // last ones silent, switched as the voice mode and the samples change.
+            for (auto& smp : snap.state.digidrums) smp = std::vector<uint8_t>(2000, 7);
+            for (size_t k = 0; k < 8; ++k) snap.state.dmaSamples[k] = std::vector<int8_t>(20000, int8_t(k * 9));
+            snap.state.steRam = 0;
             d.prepare({rate, uint16_t(rate == 44100 ? 0xffff : 0)}, v, snap);
             std::vector<float> l(1024), r(1024);
             std::vector<std::vector<float>> sep(16, std::vector<float>(1024));
@@ -405,10 +410,29 @@ int main() {
                     std::printf("driver: YM Player silent at %u Hz\n", rate);
                 }
                 if (b == 1400) d.ymClose();
+                // A project played apart: the second driver renders in the audio thread too.
+                if (b == 1410) {
+                    auto project = std::make_shared<Driver::PlayerProject>();
+                    project->extras.seq.cur().steps = 16;
+                    ymseq::Lane& lane = project->extras.seq.cur().edit(0);
+                    for (int k = 0; k < 16; k += 2) {
+                        lane.pat[size_t(k)] = int16_t(k % 12);
+                        lane.oct[size_t(k)] = int8_t(ymseq::octaveCode(4, 3));
+                    }
+                    d.ymLoadProject(project);
+                    d.ymPlay(true);
+                }
+                if (b == 1499 && d.ymStatus().frames == 0) {
+                    ok = false;
+                    std::printf("driver: project played apart silent at %u Hz\n", rate);
+                }
                 if (b % 101 == 0) {
                     snap.kitVersion++;
                     snap.state.kit = ymengine::kKitBanks[next() % 13].kit;
-                    snap.sampleVersion[next() % 8]++;
+                    snap.state.digidrums[next() % uint32_t(ymengine::kDigidrumSlotsMax)] =
+                        std::vector<uint8_t>(500 + next() % 3000, uint8_t(next() % 16));
+                    snap.state.dmaSamples[next() % 8] = std::vector<int8_t>(next() % 40000, int8_t(next() % 100));
+                    snap.state.steRam = uint8_t(next() % 4);
                     d.publish(snap);
                 }
             }

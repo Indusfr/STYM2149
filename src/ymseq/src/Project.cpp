@@ -73,6 +73,9 @@ bool Project::select(int idx, bool playing) {
 void Project::applied(int idx) {
     if (idx < 0 || idx >= kPatterns) return;
     ensure(idx);
+    // The bank shown follows the player into another bank (a Song across banks, Indus 29/10/2026) when it showed the
+    // bank of the pattern played until then; a bank opened by hand meanwhile stays shown.
+    if (viewBank == current / kBankSize) viewBank = idx / kBankSize;
     current = idx;
     pending = -1;
 }

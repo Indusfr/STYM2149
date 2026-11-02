@@ -187,13 +187,13 @@ TEST_CASE("Recorder: disarming before the start and during a take", "[recorder][
     CHECK(take->frames.size() == 25);
 }
 
-TEST_CASE("Recorder: 16 channels waits for 3-channel mode; mode or engine change, end of take",
+TEST_CASE("Recorder: 16 and 32 channels wait for 3-channel mode; mode or engine change, end of take",
           "[recorder][driver]") {
     Rig g(0);
     REQUIRE(g.d.armRecorder(0));
     g.host.playing = true;
     g.blocks(10);
-    CHECK(g.d.recorderState() == RecState::Armed);  // no registers in 16 channels
+    CHECK(g.d.recorderState() == RecState::Armed);  // no registers in 32 channels
     g.v[size_t(paramIndex(Global::VoiceMode))] = 1;
     g.blocks(10);  // mode change fade, then start
     CHECK(g.d.recorderState() == RecState::Rolling);

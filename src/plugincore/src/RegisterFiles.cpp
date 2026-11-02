@@ -9,6 +9,7 @@
 
 #include "plugincore/Mapping.h"
 #include "plugincore/RegisterExport.h"
+#include "plugincore/SteMemory.h"
 #include "ymio/SndhWriter.h"
 #include "ymio/YmWriter.h"
 
@@ -48,16 +49,36 @@ uint32_t timerFrames(std::span<const RegisterFrame> frames) {
     return n;
 }
 
+// Voice frames of the FM Voice: only the SNDH plays its steps; the YM formats keep the note's period, which the
+// frame holds.
+uint32_t fmFrames(std::span<const RegisterFrame> frames) {
+    uint32_t n = 0;
+    for (const RegisterFrame& f : frames)
+        for (const RegisterFrame::Effect& e : f.fx) n += e.on && e.gen == Generator::Fm;
+    return n;
+}
+
 uint32_t dmaFrames(std::span<const DmaFrame> dma) {
     uint32_t n = 0;
     for (const DmaFrame& d : dma) n += d.on;
     return n;
 }
 
+// Slots up to the last sample of the project.
+template <class Samples>
+size_t usedSlots(const Samples& all) {
+    size_t n = 0;
+    for (size_t k = 0; k < all.size(); ++k)
+        if (!all[k].empty()) n = k + 1;
+    return n;
+}
+
 // The part of each Digidrum that the engine plays, Start to End: a player plays its sample from the beginning.
-std::array<std::span<const uint8_t>, 8> digidrums(const NonParamState& x) {
-    std::array<std::span<const uint8_t>, 8> out{};
-    for (size_t k = 0; k < out.size() && k < x.digidrums.size(); ++k) {
+// Those that do not fit in the memory of the Atari are left out (empty), the engine not playing them.
+std::vector<std::span<const uint8_t>> digidrums(const NonParamState& x, const SteMemory& mem) {
+    std::vector<std::span<const uint8_t>> out(usedSlots(x.digidrums));
+    for (size_t k = 0; k < out.size(); ++k) {
+        if (mem.digiMuted[k]) continue;
         const std::span<const uint8_t> all = x.digidrums[k];
         const ymengine::DigidrumSlot& p = x.digiSlots[k].play;
         const ymengine::SampleSpan part = ymengine::sampleSpan(p.start, p.end, uint32_t(all.size()));
@@ -89,9 +110,12 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         return out;
     }
     const bool atari = sameClock(s.clock, kAtariClock);
-    const uint32_t frozen = timerFrames(s.frames), dma = dmaFrames(s.dma);
+    const uint32_t frozen = timerFrames(s.frames), fm = fmFrames(s.frames), dma = dmaFrames(s.dma);
+    const SteMemory mem = steMemory(x, voiceMode(values), steMachine(values));
     if (format != RegisterFormat::Sndh && dma)
         out.notes.push_back("DMA sound of the STE is not in this format: " + count(dma, "frame", "frames") + ".");
+    if (format != RegisterFormat::Sndh && fm)
+        out.notes.push_back("FM Voice frames played as the note alone: " + std::to_string(fm) + ".");
     if (s.take && s.ste && format == RegisterFormat::Sndh)
         out.notes.push_back("The Recorder keeps no DMA sound: the SNDH has none.");
     switch (format) {
@@ -125,7 +149,7 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         info.clock = s.clock;
         info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob
         info.comment = "Made with STYM2149";
-        info.digidrums = digidrums(x);
+        info.digidrums = digidrums(x, mem);
         ymio::Ym6Report rep;
         const std::vector<uint8_t> ym6 = ymio::ym6File(s.frames, info, &rep);
         out.bytes = ymio::packLzh(o.name.empty() ? registerFileName(format, s.take) : o.name, ym6, o.dosTime);
@@ -143,10 +167,16 @@ RegisterFile write(RegisterFormat format, const Source& s, const ParamValues& va
         info.clock = s.clock;
         info.ste = s.ste && !s.take;  // a take has no DMA sound to play
         info.title = s.take ? "STYM2149 take" : "STYM2149 song";  // "PRISM song" of sndhBlob
-        info.digidrums = digidrums(x);
-        for (size_t k = 0; k < info.dma.size() && k < x.dmaSamples.size(); ++k) {
-            // The bytes up to End: the capture gives the first frame read, Start included.
+        info.digidrums = digidrums(x, mem);
+        info.dma.resize(usedSlots(x.dmaSamples));
+        for (size_t k = 0; k < info.dma.size(); ++k) {
+            // The bytes up to End: the capture gives the first frame read, Start included. Those that do not
+            // fit in the memory of the STE are left out.
             const ymengine::DmaSlot& d = x.dma.slots[k];
+            if (mem.dmaMuted[k]) {
+                info.dma[k] = {{}, d.rate, d.stereo, d.loop};
+                continue;
+            }
             const std::span<const int8_t> all = x.dmaSamples[k];
             const size_t ch = d.stereo ? 2 : 1;
             const ymengine::SampleSpan part = ymengine::sampleSpan(d.start, d.end, uint32_t(all.size() / ch));

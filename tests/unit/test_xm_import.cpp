@@ -96,16 +96,17 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out", "[xm
     NonParamState st;
     const XmImport r = run(m, VoiceMode::Studio16, st);
     CHECK(r.channels == 2);
-    CHECK(r.on[0]);
-    CHECK(r.on[1]);
-    CHECK_FALSE(r.on[2]);
+    CHECK(r.on[4]);  // tracks 5 and 6: 8 channels or fewer
+    CHECK(r.on[5]);
+    CHECK_FALSE(r.on[6]);
+    CHECK_FALSE(r.on[0]);
     CHECK(r.patterns == 1);
     CHECK(r.instruments == 1);
     CHECK(r.title == "xm test");
 
     const ymseq::Pattern& p = st.seq.patterns[0];
     CHECK(p.steps == 8);
-    const ymseq::Lane& a = p.lane(0);
+    const ymseq::Lane& a = p.lane(4);
     CHECK(a.pat[0] == 0);
     CHECK(a.oct[0] == 4);  // octave 4, track at octave 3
     CHECK(a.ins[0] == 1);
@@ -122,7 +123,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out", "[xm
     CHECK((a.tie[5] && a.tie[6] && a.tie[7]));
     CHECK(std::all_of(a.pnr.begin(), a.pnr.end(), [](uint8_t v) { return v == 0; }));  // channel in the centre
 
-    const ymseq::Lane& b = p.lane(1);
+    const ymseq::Lane& b = p.lane(5);
     CHECK(b.tie[0] == 1);  // note from the previous position: tied
     CHECK(b.pat[1] == 4);
     CHECK(b.oct[1] == 0);  // octave 3: that of the track
@@ -131,7 +132,7 @@ TEST_CASE("XM import: notes, ties, release, volume, panning; 0xy left out", "[xm
     CHECK(b.pnr[7] == 201);  // panning held over the lines of the note
     CHECK(b.vol[4] == 11);
     CHECK((b.vol[5] == 8 && b.vol[7] == 8));  // C20 during the note: VOL of the held lines
-    CHECK(p.lane(2).empty());
+    CHECK(p.lane(6).empty());
 
     CHECK(r.ticks);
     CHECK(r.vblRate == 0);  // 125 BPM: 50 Hz
@@ -181,7 +182,7 @@ TEST_CASE("XM import: Axy, 9xx, EDx, ECx and E5x as commands of the CMD row; 1xx
     put(m, 0, 9, 0, {49, 1, 0, 0x0, 0x00});  // a note without E5x: the sample's tune again
     NonParamState st;
     const XmImport r = run(m, VoiceMode::Studio16, st);
-    const ymseq::Lane& a = st.seq.patterns[0].lane(0);
+    const ymseq::Lane& a = st.seq.patterns[0].lane(4);
     CHECK(a.cmdAt(SeqCmd::VolSlide, 0) == seqCmd(SeqCmd::VolSlide, 0x04));
     CHECK(a.cmdAt(SeqCmd::VolSlide, 1) == seqCmd(SeqCmd::VolSlide, 0x04));
     CHECK(a.cmdAt(SeqCmd::VolSlide, 2) == seqCmd(SeqCmd::VolSlide, 0x00));
@@ -201,6 +202,7 @@ TEST_CASE("XM import: tracks of the mode (STE DMA)", "[xmimport]") {
     CHECK(plugin::xmImportTracks(VoiceMode::Authentic3) == std::vector<int>{4, 5, 6, 7, 8, 9, 10, 11});
     CHECK(plugin::xmImportTracks(VoiceMode::Dual3) == std::vector<int>{8, 9, 10, 11, 12, 13, 14, 15});
     CHECK(plugin::xmImportTracks(VoiceMode::Studio16).size() == 16);
+    CHECK(plugin::xmImportTracks(VoiceMode::Studio32).size() == 32);
 
     XmModule m = module(10, {4});
     m.instruments = {instrument("x", {tone(100)})};
@@ -210,7 +212,148 @@ TEST_CASE("XM import: tracks of the mode (STE DMA)", "[xmimport]") {
     CHECK(r.channels == 8);
     for (int t = 0; t < 16; ++t) CHECK(r.on[size_t(t)] == (t >= 4 && t < 12));
     CHECK(st.seq.patterns[0].lane(4).ins[0] == 1);
-    CHECK(has(r, "Channels beyond the 8 DMA tracks: 2."));
+    CHECK(has(r, "Channels beyond the 8 DMA tracks: 2 left out."));
+}
+
+TEST_CASE("XM import: a module of more channels than the mode has tracks asks for 16 or 32 ch",
+          "[xmimport]") {
+    XmModule m = module(12, {4});
+    m.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 10; ++c) put(m, 0, 0, c, {49, 1, 0, 0, 0});  // 10 of the 12 channels play
+    NonParamState a;
+    const XmImport three = run(m, VoiceMode::Authentic3, a);
+    CHECK(three.played == 10);
+    CHECK(three.channels == 8);
+    CHECK(three.mode == VoiceMode::Authentic3);
+    CHECK(plugin::xmWantsStudio(three));
+    CHECK(plugin::xmStudioMode(three) == VoiceMode::Studio16);  // 16 ch plays its 10 channels
+
+    NonParamState b;
+    const XmImport sixteen = run(m, VoiceMode::Studio16, b);
+    CHECK(sixteen.played == 10);
+    CHECK(sixteen.channels == 10);
+    CHECK_FALSE(plugin::xmWantsStudio(sixteen));
+    for (int t = 0; t < 16; ++t) CHECK(sixteen.on[size_t(t)] == (t < 10));
+
+    // The settings follow the mode of the result, whatever the project was in.
+    ParamValues v = plugin::defaultValues();
+    v[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = 1.0f;  // Authentic 3ch
+    plugin::xmImportValues(sixteen, v);
+    CHECK(plugin::voiceMode(v) == VoiceMode::Studio16);
+    CHECK(plugin::intValue(v, 9, plugin::Track::Generator) == int(ymengine::Generator::Dma));
+    plugin::xmImportValues(three, v);
+    CHECK(plugin::voiceMode(v) == VoiceMode::Authentic3);
+
+    // Eight channels or fewer: no question.
+    XmModule eight = module(8, {4});
+    eight.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 8; ++c) put(eight, 0, 0, c, {49, 1, 0, 0, 0});
+    NonParamState c;
+    CHECK_FALSE(plugin::xmWantsStudio(run(eight, VoiceMode::Dual3, c)));
+
+    // More than 16: 16 ch asks too, for 32 ch; 32 ch never asks.
+    XmModule wide = module(20, {4});
+    wide.instruments = {instrument("x", {tone(100)})};
+    for (int ch = 0; ch < 20; ++ch) put(wide, 0, 0, ch, {49, 1, 0, 0, 0});
+    NonParamState d, e, f;
+    const XmImport in16 = run(wide, VoiceMode::Studio16, d);
+    CHECK(in16.channels == 16);
+    CHECK(plugin::xmWantsStudio(in16));
+    CHECK(plugin::xmStudioMode(in16) == VoiceMode::Studio32);
+    CHECK(plugin::xmStudioMode(run(wide, VoiceMode::Authentic3, e)) == VoiceMode::Studio32);
+    const XmImport in32 = run(wide, VoiceMode::Studio32, f);
+    CHECK(in32.channels == 20);
+    CHECK_FALSE(plugin::xmWantsStudio(in32));
+    for (int t = 0; t < plugin::kTracks; ++t) CHECK(in32.on[size_t(t)] == (t < 20));
+    plugin::xmImportValues(in32, v);
+    CHECK(plugin::voiceMode(v) == VoiceMode::Studio32);
+}
+
+TEST_CASE("XM import: 8 channels or fewer in 16 or 32 ch go to tracks 5 to 12, those of the DMA in 3ch",
+          "[xmimport]") {
+    CHECK(plugin::xmImportTracks(VoiceMode::Studio16, 8) == std::vector<int>{4, 5, 6, 7, 8, 9, 10, 11});
+    CHECK(plugin::xmImportTracks(VoiceMode::Studio16, 9).front() == 0);
+    CHECK(plugin::xmImportTracks(VoiceMode::Authentic3, 4) == std::vector<int>{4, 5, 6, 7, 8, 9, 10, 11});
+
+    XmModule m = module(4, {4});
+    m.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 4; ++c) put(m, 0, 0, c, {49, 1, 0, 0, 0});
+    NonParamState st;
+    const XmImport r = run(m, VoiceMode::Studio16, st);
+    CHECK(r.channels == 4);
+    for (int t = 0; t < plugin::kTracks; ++t) CHECK(r.on[size_t(t)] == (t >= 4 && t < 8));
+    CHECK(st.seq.patterns[0].lane(4).ins[0] == 1);
+    CHECK(st.seq.patterns[0].lane(7).ins[0] == 1);
+    ParamValues v = plugin::defaultValues();
+    plugin::xmImportValues(r, v);
+    CHECK(plugin::intValue(v, 4, plugin::Track::Generator) == int(ymengine::Generator::Dma));
+    CHECK(plugin::intValue(v, 0, plugin::Track::On) == 0);
+
+    // Nine channels: from track 1.
+    XmModule nine = module(9, {4});
+    nine.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 9; ++c) put(nine, 0, 0, c, {49, 1, 0, 0, 0});
+    NonParamState st9;
+    const XmImport r9 = run(nine, VoiceMode::Studio16, st9);
+    for (int t = 0; t < plugin::kTracks; ++t) CHECK(r9.on[size_t(t)] == (t < 9));
+}
+
+TEST_CASE("XM import: channels beyond the tracks share those of channels that never play at the same time",
+          "[xmimport]") {
+    // 32 channels play a short sample (100 frames: 12 ms, a line lasting 120 ms) on line 0, two more on line 2 (a
+    // module of more than 32 channels: 64 at most in an XM).
+    XmModule m = module(34, {4});
+    m.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 32; ++c) put(m, 0, 0, c, {49, 1, 0, 0, 0});
+    put(m, 0, 2, 32, {61, 1, 0, 0, 0});
+    put(m, 0, 2, 33, {63, 1, 0, 0, 0});
+    NonParamState st;
+    const XmImport r = run(m, VoiceMode::Studio32, st);
+    CHECK(r.played == 34);
+    CHECK(r.channels == 32);
+    CHECK(r.shared == 2);
+    // Channel 32 on the track of channel 0, channel 33 on that of channel 1 (channel 32 sounds on line 2 of track 1).
+    const ymseq::Lane& a = st.seq.patterns[0].lane(0);
+    const ymseq::Lane& b = st.seq.patterns[0].lane(1);
+    CHECK(a.pat[0] == 0);
+    CHECK(a.pat[2] == 0);  // C-5 (61): C of octave 5
+    CHECK(a.tie[1] == 0);  // channel 0's sample has ended: the line is left to the other channel
+    CHECK(b.pat[2] == 2);  // D-5 (63)
+    CHECK(has(r, "Channels on the track of one that never plays at the same time: 2."));
+    CHECK_FALSE(has(r, "Channels beyond the 32 DMA tracks: 2 left out."));
+
+    // A looping sample sounds until its release: a channel that plays while every track sounds is left out.
+    XmModule loop = module(33, {4});
+    loop.instruments = {instrument("pad", {tone(1000, 1, 0, 1000)})};
+    for (int c = 0; c < 32; ++c) put(loop, 0, 0, c, {49, 1, 0, 0, 0});
+    put(loop, 0, 2, 32, {61, 1, 0, 0, 0});
+    NonParamState st2;
+    const XmImport r2 = run(loop, VoiceMode::Studio32, st2);
+    CHECK(r2.channels == 32);
+    CHECK(r2.shared == 0);
+    CHECK(has(r2, "Channels beyond the 32 DMA tracks: 1 left out."));
+
+    // Released on line 1, channel 0 leaves its track to channel 32 from line 2.
+    put(loop, 0, 1, 0, {ymio::kXmKeyOff, 0, 0, 0, 0});
+    NonParamState st3;
+    const XmImport r3 = run(loop, VoiceMode::Studio32, st3);
+    CHECK(r3.shared == 1);
+    CHECK(st3.seq.patterns[0].lane(0).tie[0] == 1);
+    CHECK(st3.seq.patterns[0].lane(0).tie[1] == 0);
+    CHECK(st3.seq.patterns[0].lane(0).pat[2] == 0);
+
+    // In 3ch, the 8 DMA tracks are shared the same way.
+    XmModule ten = module(10, {4});
+    ten.instruments = {instrument("x", {tone(100)})};
+    for (int c = 0; c < 8; ++c) put(ten, 0, 0, c, {49, 1, 0, 0, 0});
+    put(ten, 0, 2, 8, {49, 1, 0, 0, 0});
+    put(ten, 0, 3, 9, {49, 1, 0, 0, 0});
+    NonParamState st4;
+    const XmImport r4 = run(ten, VoiceMode::Authentic3, st4);
+    CHECK(r4.channels == 8);
+    CHECK(r4.shared == 2);
+    CHECK(st4.seq.patterns[0].lane(4).ins[2] == 1);
+    CHECK(st4.seq.patterns[0].lane(4).ins[3] == 1);  // channel 9 sounds after channel 8's sample has ended
 }
 
 TEST_CASE("XM import: Song walked like Fasttracker II (jumps, pattern ends, restart)", "[xmimport]") {
@@ -291,9 +434,9 @@ TEST_CASE("XM import: BPM timing, tempo of each entry, BPM row within a pattern 
     CHECK(st.seq.song.entries == want);
     CHECK(st.seq.patterns[0].bpm[2] == 0xA8);
     CHECK(st.seq.patterns[2].bpm[1] == 0xFF);
-    CHECK(st.seq.patterns[0].lane(0).cmdAt(SeqCmd::Tempo, 2) == 0);
-    CHECK_FALSE(st.seq.patterns[1].lane(0).hasCmd(0));  // no Sxx in BPM timing; the first line is the entry's tempo
-    CHECK_FALSE(st.seq.patterns[2].lane(0).hasCmd(0));
+    CHECK(st.seq.patterns[0].lane(4).cmdAt(SeqCmd::Tempo, 2) == 0);
+    CHECK_FALSE(st.seq.patterns[1].lane(4).hasCmd(0));  // no Sxx in BPM timing; the first line is the entry's tempo
+    CHECK_FALSE(st.seq.patterns[2].lane(4).hasCmd(0));
     CHECK(has(r, "Tempos clamped to 20-300 BPM: 1."));
     CHECK(has(r, "BPM row tempos clamped to 32-255 BPM: 1."));
     const std::vector<std::string> msg = plugin::xmImportMessage(r, "t.xm");
@@ -313,7 +456,7 @@ TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track", "[xmimpor
     const XmImport r = run(m, VoiceMode::Studio16, st);
     CHECK(r.ticks);
     CHECK(r.vblRate == 1);  // 150 BPM: 60 Hz
-    const ymseq::Lane& l = st.seq.patterns[0].lane(0);
+    const ymseq::Lane& l = st.seq.patterns[0].lane(4);
     CHECK(l.cmdAt(SeqCmd::Speed, 2) == ymengine::seqCmd(SeqCmd::Speed, 3));
     CHECK(l.cmdAt(SeqCmd::Speed, 4) == ymengine::seqCmd(SeqCmd::Speed, 4));
     CHECK(l.cmdAt(SeqCmd::Arp, 6) == 0);
@@ -322,39 +465,47 @@ TEST_CASE("XM import: Ticks timing, Fxx as Sxx on the imported track", "[xmimpor
                        [](const std::string& n) { return n.starts_with("Speed changes without"); }));
 }
 
-TEST_CASE("XM import: eight instruments at most, the most played; names of the DMA slots", "[xmimport]") {
-    XmModule m = module(1, {64});
-    for (int i = 1; i <= 10; ++i) {
+TEST_CASE("XM import: 127 instruments at most, the most played; names of the DMA slots",
+          "[xmimport]") {
+    // 128 instruments, as many as an XM holds: the first played once, the others twice.
+    XmModule m = module(1, {256});
+    for (int i = 1; i <= 128; ++i) {
         XmSample s = tone(100);
         if (i % 2) s.name.clear();  // a sample without a name: that of its instrument
         m.instruments.push_back(instrument("ins" + std::to_string(i), {s}));
     }
-    m.instruments.push_back(instrument("empty", {}));
     int row = 0;
-    for (int i = 1; i <= 10; ++i)
-        for (int k = 0; k < i; ++k) put(m, 0, row++, 0, {49, uint8_t(i), 0, 0, 0});
-    put(m, 0, row, 0, {49, 11, 0, 0, 0});
+    for (int i = 1; i <= 128; ++i)
+        for (int k = 0; k < (i == 1 ? 1 : 2); ++k) put(m, 0, row++, 0, {49, uint8_t(i), 0, 0, 0});
     NonParamState st;
-    st.instruments[9].used = true;
-    st.instruments[9].name = "kept";
     const XmImport r = run(m, VoiceMode::Studio16, st);
-    CHECK(r.instruments == 8);
-    for (int k = 0; k < 8; ++k) {
-        CHECK(st.instruments[size_t(k)].name == "ins" + std::to_string(k + 3));
+    CHECK(r.instruments == 127);  // the instruments of a project (8, the DMA slots, then 32, in earlier versions)
+    for (int k = 0; k < 127; ++k) {
+        CHECK(st.instruments[size_t(k)].name == "ins" + std::to_string(k + 2));
         CHECK(st.instruments[size_t(k)].patch.dmaSlot == k);
-        CHECK(st.dmaNames[size_t(k)] == ((k + 3) % 2 ? "ins" + std::to_string(k + 3) : std::string("tone")));
+        CHECK(st.dmaNames[size_t(k)] == ((k + 2) % 2 ? "ins" + std::to_string(k + 2) : std::string("tone")));
     }
-    CHECK(st.instruments[9].name == "kept");  // beyond the imported instruments: nothing changes
-    const ymseq::Lane& l = st.seq.patterns[0].lane(0);
+    CHECK(st.dmaSamples[126].size() == st.dmaSamples[0].size());  // past the former eight slots
+    const ymseq::Lane& l = st.seq.patterns[0].lane(4);
     CHECK(l.pat[0] == -1);  // instrument 1: without a slot
-    CHECK(l.ins[1 + 2] == 1);  // instrument 3: $01
-    CHECK(l.ins[54] == 8);
-    CHECK(l.pat[55] == -1);
-    CHECK(has(r, "Instruments without a DMA slot (8 at most): 2, 3 notes left out."));
+    CHECK(l.ins[1] == 1);  // instrument 2: $01
+    CHECK(l.ins[254] == 127);  // instrument 128: $7F
+    CHECK(has(r, "Instruments beyond the 127 of a project: 1, 1 note left out."));
+}
+
+TEST_CASE("XM import: a note of an instrument without a sample is left out", "[xmimport]") {
+    XmModule m = module(1, {16});
+    m.instruments = {instrument("tone", {tone(100)}), instrument("empty", {})};
+    put(m, 0, 0, 0, {49, 1, 0, 0, 0});
+    put(m, 0, 1, 0, {49, 2, 0, 0, 0});
+    NonParamState st;
+    const XmImport r = run(m, VoiceMode::Studio16, st);
+    CHECK(r.instruments == 1);
+    CHECK(st.seq.patterns[0].lane(4).pat[1] == -1);
     CHECK(has(r, "Notes without a sample: 1."));
 }
 
-TEST_CASE("XM import: samples, STE rates, loops and cuts", "[xmimport]") {
+TEST_CASE("XM import: samples, STE rates, loops, whole samples", "[xmimport]") {
     XmModule m = module(1, {6});
     m.instruments = {instrument("unrolled", {tone(200, 1, 100, 50)}), instrument("pingpong", {tone(100, 2, 0, 100)}),
                      instrument("fits", {tone(20000, 0, 0, 0, 19)}), instrument("lower", {tone(40000, 0, 0, 0, 19)}),
@@ -365,15 +516,18 @@ TEST_CASE("XM import: samples, STE rates, loops and cuts", "[xmimport]") {
     const XmImport r = run(m, VoiceMode::Studio16, st);
     REQUIRE(r.instruments == 5);
     CHECK(st.dma.slots[0] == ymengine::DmaSlot{0, false, 60, false});
-    CHECK(st.dmaSamples[0].size() == ymengine::kDmaMaxBytes);  // attack and loop turns unrolled
+    CHECK(st.dmaSamples[0].size() >= 32 * 1024);  // attack and loop turns unrolled to 32 KB
+    CHECK(st.dmaSamples[0].size() < 32 * 1024 + 50);
     CHECK(st.dma.slots[1] == ymengine::DmaSlot{0, false, 60, true});
     CHECK(st.dmaSamples[1].size() == size_t(198 * 6258 / 8363));  // forward (100) and back (98)
     CHECK(st.dma.slots[2].rate == 2);  // 25 060 Hz: 25 033 Hz
     CHECK(st.dmaSamples[2].size() == 19977);
-    CHECK(st.dma.slots[3].rate == 1);  // 39 956 bytes at 25 033 Hz: 12 517 Hz
-    CHECK(st.dma.slots[4] == ymengine::DmaSlot{0, false, 60, false});
-    CHECK(st.dmaSamples[4].size() == ymengine::kDmaMaxBytes);
-    CHECK(has(r, "Samples cut to 32 KB: 1."));
+    CHECK(st.dma.slots[3].rate == 2);  // 39 955 bytes at 25 033 Hz, whole (once 12 517 Hz)
+    CHECK(st.dmaSamples[3].size() == 39955);
+    CHECK(st.dma.slots[4] == ymengine::DmaSlot{0, false, 60, true});  // whole, its loop kept (once cut)
+    CHECK(st.dmaSamples[4].size() == size_t(300000.0 * 6258 / 8363));
+    CHECK_FALSE(std::any_of(r.notes.begin(), r.notes.end(),
+                            [](const std::string& n) { return n.find("cut") != std::string::npos; }));
     CHECK(has(r, "Loops unrolled to 32 KB (the STE loops whole samples): 1."));
 }
 
@@ -425,4 +579,53 @@ TEST_CASE("XM import: the imported project plays the DMA sound (16 voices and Au
         // 16 lines of 6 ticks at 50 Hz: 1.92 s.
         CHECK(std::abs(double(total) - 1.92 * 48000) < 48);
     }
+}
+
+TEST_CASE("XM import: a resolution change that fits the notes keeps the volume of held notes",
+          "[xmimport]") {
+    // Indus, 29/10/2026 15:46: on a DMA track, 1/16 to 1/8 then back to 1/16 (Fit both times) made the samples
+    // stutter: the new held steps had no VOL and played at full level between two steps at the module's volume.
+    XmModule m = module(1, {16});
+    m.instruments = {instrument("x", {tone(40000)})};
+    put(m, 0, 0, 0, {49, 1, 0, 0, 0});
+    put(m, 0, 8, 0, {56, 1, 0, 0, 0});
+    NonParamState st;
+    const XmImport r = run(m, VoiceMode::Studio16, st);
+    ParamValues v = plugin::defaultValues();
+    v[size_t(plugin::paramIndex(plugin::Global::VoiceMode))] = 0.0f;
+    v[size_t(plugin::paramIndex(plugin::Global::Computer))] = 1;
+    v[size_t(plugin::paramIndex(plugin::Global::VblRate))] = float(r.vblRate);
+    for (int t = 0; t < plugin::kTracks; ++t) {
+        v[size_t(plugin::paramIndex(t, plugin::Track::On))] = r.on[size_t(t)] ? 1.0f : 0.0f;
+        if (r.on[size_t(t)])
+            v[size_t(plugin::paramIndex(t, plugin::Track::Generator))] = float(int(ymengine::Generator::Dma));
+    }
+    // Levels set on the held steps ('A' records of the sequencer log), and the attacks ('T').
+    auto levels = [&] {
+        std::vector<double> out;
+        int attacks = 0;
+        plugin::OfflineRender render(plugin::OfflineRender::Source::Song, 48000, v, st);
+        std::vector<float> l(plugin::OfflineRender::kChunk), rr(plugin::OfflineRender::kChunk);
+        ymengine::Outputs o;
+        o.left = l.data();
+        o.right = rr.data();
+        while (render.render(o, plugin::OfflineRender::kChunk))
+            for (const auto& rec : render.log()) {
+                if (rec.op == 'A') out.push_back(rec.x);
+                attacks += rec.op == 'T';
+            }
+        CHECK(attacks == 2);
+        return out;
+    };
+    const std::vector<double> before = levels();
+    REQUIRE(before.size() == 14);  // 7 held steps after each note
+    // What SeqWindow::setResolution does with Fit: 1/16 to 1/8, then back.
+    st.seq.fitResolution(1, 2);
+    st.global.resolution = 1;
+    st.global.timing = ymengine::SeqTiming::Bpm;
+    st.seq.fitResolution(2, 1);
+    st.global.resolution = 2;
+    const std::vector<double> after = levels();
+    REQUIRE(after.size() == 14);
+    for (const double x : after) CHECK(x == before.front());
 }

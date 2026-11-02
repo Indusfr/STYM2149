@@ -35,9 +35,9 @@ constexpr std::array<const char*, ymengine::kLfoTargets> kTargets = {"Volume",  
 // In the order of kLfoDivisionTicks.
 constexpr std::array<const char*, ymengine::kLfoDivisions> kDivisions = {
     "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/32T", "1/64"};
-constexpr const char* kPanWhy = "Pan: 16 channels only; the 3-channel modes are mono";
+constexpr const char* kPanWhy = "Pan: 16 and 32 channels only; the 3-channel modes are mono";
 constexpr const char* kToTip =
-    "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 channels)";
+    "What the LFO moves: volume, noise period, envelope period, SID ratio, pitch, or pan (16 and 32 channels)";
 constexpr const char* kDivTip = "LFO cycle: a division of the tempo";
 
 // Rate to the hundredth below 1 Hz, to the tenth above, within its range.
@@ -193,8 +193,11 @@ void LfoPanel::wire() {
     on_.onClick = [this] { edit([](TrackLfo& l) { l.on = !l.on; }); };
     sync_.onClick = [this] { edit([](TrackLfo& l) { l.sync = !l.sync; }); };
     retrig_.onClick = [this] { edit([](TrackLfo& l) { l.retrig = !l.retrig; }); };
+    shape_.setPopup(true);  // a GEM pop-up button, with its shadow
     shape_.onClick = [this] { shapeMenu(); };
+    to_.setPopup(true);  // a GEM pop-up button, with its shadow
     to_.onClick = [this] { targetMenu(); };
+    div_.setPopup(true);  // a GEM pop-up button, with its shadow
     div_.onClick = [this] { divisionMenu(); };
     // Sliders: every move applies, one undo step per gesture (armed on press, MainWindow::pressed). While a slider is
     // held, MainWindow::dragging_ points to it so that refresh() does not move it under the pointer.

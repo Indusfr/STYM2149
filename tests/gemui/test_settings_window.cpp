@@ -2,7 +2,9 @@
 // Options menu held in submenus (Sound engine, Keyboard layout, Note names, Renderer, Pixels, Tooltips) and the Tuning
 // of A4: frames, values shown on the buttons, the window following the parameters, the A4 typed in Hz,
 // preferences stored, the window kept open from one opening of the editor to the next; Cancel and OK, the box
-// that Cancel opens before changes are lost, the unit of Tuning A4 left out of the pointer's reverse video.
+// that Cancel opens before changes are lost, the unit of Tuning A4 left out of the pointer's reverse video;
+// the Custom size of the MIDI monitor; the velocity and aftertouch curves, greyed out while
+// their setting is Off.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -55,10 +57,10 @@ TEST_CASE("Settings: Options > Settings... opens the window, the Options menu ke
     pluginui::MainWindow w(h);
     w.openMenu(3);
     CHECK(menuLabels(w) == std::vector<std::string>{"Audio/MIDI settings", "---", "MIDI learn", "Clear MIDI map", "---",
-                                                    "Oscilloscope", "Register monitor", "Note monitor", "---",
-                                                    "Settings..."});
+                                                    "Oscilloscope", "Register monitor", "Note monitor",
+                                                    "MIDI monitor", "---", "Settings..."});
     CHECK_FALSE(w.settingsWindow().isOpen());
-    pickItem(w, 9);
+    pickItem(w, 10);
     REQUIRE(w.settingsWindow().isOpen());
 
     // Three frames side by side, SOUND ENGINE, MIDI and INTERFACE, inside the window and the desktop.
@@ -108,11 +110,15 @@ TEST_CASE("Settings: Options > Settings... opens the window, the Options menu ke
         {"setResampling", "Sinc"},   {"setBass", "0 dB"},               {"setTreble", "0 dB"},
         {"setSoftClip", "On"},       {"setTimer", "MFP"},               {"setVbl", "50 Hz (PAL)"},
         {"setQuantize", "Off"},
-        {"setRouting", "Omni"},      {"setVelocity", "Accent"},         {"setBendTarget", "Pitch"},
-        {"setBend", "2 st"},         {"setWheelTarget", "Vibrato"},     {"setWheel", "50 ct"},
-        {"setAftertouch", "Vibrato"}, {"setMpe", "Off"},                {"setMpeBend", "48 st"},
-        {"setMpeSlide", "Volume"},   {"setPixels", "Smooth"},           {"setRenderer", "Software"},
-        {"setNoteNames", "English (C D E)"}, {"setLayout", "Auto (detect)"}, {"setTips", "On"},
+        {"setRouting", "Omni"},      {"setVelocity", "Accent"},         {"setVelocityCurve", "Linear"},
+        {"setBendTarget", "Pitch"},  {"setBend", "2 st"},               {"setWheelTarget", "Vibrato"},
+        {"setWheel", "50 ct"},       {"setAftertouch", "Vibrato"},      {"setAftertouchCurve", "Linear"},
+        {"setMpe", "Off"},           {"setMpeBend", "48 st"},
+        {"setMpeSlide", "Volume"},   {"setDrumPads", "Channel 10"},     {"setPixels", "Smooth"},
+        {"setRenderer", "Software"},
+        {"setNoteNames", "English (C D E)"}, {"setLayout", "Auto (detect)"}, {"setMidiLines", "500 lines"},
+        {"setInfoDemo", "On"},  // in this window, On by default
+        {"setTips", "On"},
         {"setLanguage", "English"}};
     for (const auto& [id, text] : values) {
         CAPTURE(id);
@@ -164,7 +170,8 @@ TEST_CASE("Settings: the window follows the parameters, the STE settings greyed 
     CHECK(button(w, "setBend").text() == "12 st");
 }
 
-TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only", "[ui][settings]") {
+TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 and 32 ch only, turned off by a 3-voice mode ",
+          "[ui][settings]") {
     UiHost h;
     pluginui::MainWindow w(h);
     w.settingsWindow().show();
@@ -191,12 +198,30 @@ TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only", "
         CHECK_FALSE(button(w, id).enabled());
         CHECK(button(w, id).tip() == "MPE: set MPE to On");
     }
+    // Drum pads: Off or a channel, 10 by default.
+    const gemui::MenuItem pads = setting(w, "setDrumPads");
+    REQUIRE(pads.sub.size() == 17);
+    CHECK(pads.sub.front().label == "Off");
+    CHECK(pads.sub[1].label == "Channel 1");
+    CHECK(pads.sub.back().label == "Channel 16");
+    CHECK(pads.subCur == 10);
+    click(w, "setDrumPads");
+    pickItem(w, 0);
+    CHECK(h.p(Global::DrumPads) == 0.0f);
+    click(w, "setDrumPads");
+    pickItem(w, 10);
+    CHECK(h.p(Global::DrumPads) == 10.0f);
+    CHECK(button(w, "setDrumPads").enabled());
     click(w, "setMpe");
     pickItem(w, 1);
     w.tick(0);
     CHECK(h.p(Global::Mpe) == 1.0f);
     CHECK(button(w, "setMpeBend").enabled());
     CHECK(button(w, "setMpeSlide").enabled());
+    // MPE on: every channel is a note's, the pads are off (their channel kept).
+    CHECK_FALSE(button(w, "setDrumPads").enabled());
+    CHECK(button(w, "setDrumPads").tip() == "Drum pads: off with MPE, whose notes use every channel");
+    CHECK(button(w, "setDrumPads").text() == "Channel 10");
     // The MPE bend ranges: small ones, then the octaves; a value from the state outside them is listed too.
     const gemui::MenuItem bends = setting(w, "setMpeBend");
     REQUIRE(bends.sub.size() == 14);
@@ -214,15 +239,102 @@ TEST_CASE("Settings > MIDI: the targets of the expression, MPE in 16 ch only", "
     CHECK(menuLabels(w) == std::vector<std::string>{"Volume", "Envelope", "Vibrato"});
     pickItem(w, 2);
     CHECK(h.p(Global::MpeSlide) == 2.0f);
-    // Authentic 3ch: MPE greyed out, 16 ch only.
-    h.p(Global::VoiceMode) = 1;
-    w.tick(0);
-    for (const char* id : {"setMpe", "setMpeBend", "setMpeSlide"}) {
+    // Authentic 3ch: MPE does not act, 16 and 32 ch only; the change of voice mode turns it Off.
+    auto mode = [&w](int i) {
+        click(w, "setOk");  // the Voices button of the SYSTEM frame lies under the window
+        click(w, "modeSel");
+        pickItem(w, i);
+        w.settingsWindow().show();
+        w.tick(0);
+    };
+    REQUIRE(h.p(Global::Mpe) == 1.0f);
+    mode(0);  // the Voices menu: 3ch, 2x3ch, 16 ch, 32 ch
+    CHECK(h.p(Global::VoiceMode) == 1.0f);
+    CHECK(h.p(Global::Mpe) == 0.0f);
+    CHECK(button(w, "setMpe").text() == "Off");
+    CHECK_FALSE(button(w, "setMpe").enabled());
+    CHECK(button(w, "setMpe").tip() == "MPE: 16 and 32 ch only");
+    for (const char* id : {"setMpeBend", "setMpeSlide"}) {
         CAPTURE(id);
         CHECK_FALSE(button(w, id).enabled());
-        CHECK(button(w, id).tip() == "MPE: 16 ch only");
+        CHECK(button(w, id).tip() == "MPE: 16 and 32 ch only");
     }
-    CHECK(button(w, "setMpe").text() == "On");
+    CHECK(button(w, "setDrumPads").enabled());  // MPE does not act in 3 ch: the pads do
+    // Back to 16 ch: MPE stays Off, and can be turned on again; in 32 ch as well.
+    mode(2);
+    CHECK(h.p(Global::VoiceMode) == 0.0f);
+    CHECK(h.p(Global::Mpe) == 0.0f);
+    CHECK(button(w, "setMpe").enabled());
+    mode(3);
+    CHECK(h.p(Global::VoiceMode) == 3.0f);
+    CHECK(button(w, "setMpe").enabled());
+    // Dual chip 2x3ch too.
+    h.p(Global::Mpe) = 1;
+    w.tick(0);
+    mode(1);
+    CHECK(h.p(Global::Mpe) == 0.0f);
+    CHECK_FALSE(button(w, "setMpe").enabled());
+}
+
+TEST_CASE("Settings > MIDI: a curve for the velocity and one for the aftertouch, each under its setting",
+          "[ui][settings]") {
+    UiHost h;
+    pluginui::MainWindow w(h);
+    w.settingsWindow().show();
+    // Under Velocity and under Aftertouch, in the MIDI frame.
+    CHECK(w.rectOf("setVelocityCurve")->y > w.rectOf("setVelocity")->bottom());
+    CHECK(w.rectOf("setVelocityCurve")->bottom() < w.rectOf("setBendTarget")->y);
+    CHECK(w.rectOf("setAftertouchCurve")->y > w.rectOf("setAftertouch")->bottom());
+    CHECK(w.rectOf("setAftertouchCurve")->bottom() < w.rectOf("setMpe")->y);
+    const std::vector<std::string> curves = {"Linear", "Soft", "Hard", "S-curve"};
+    click(w, "setVelocityCurve");
+    CHECK(menuLabels(w) == curves);
+    CHECK(topMenu(w)->checked() == 0);
+    pickItem(w, 2);
+    CHECK(h.p(Global::VelocityCurve) == 2.0f);
+    CHECK(h.p(Global::AftertouchCurve) == 0.0f);  // each its own
+    click(w, "setAftertouchCurve");
+    CHECK(menuLabels(w) == curves);
+    pickItem(w, 3);
+    CHECK(h.p(Global::AftertouchCurve) == 3.0f);
+    CHECK(h.p(Global::VelocityCurve) == 2.0f);
+    w.tick(0);
+    CHECK(button(w, "setVelocityCurve").text() == "Hard");
+    CHECK(button(w, "setAftertouchCurve").text() == "S-curve");
+    CHECK(button(w, "setVelocityCurve").tip().starts_with("Velocity curve: how the force of a key"));
+    // Cancel puts both back.
+    click(w, "setCancel");
+    discard(w);
+    CHECK(h.p(Global::VelocityCurve) == 0.0f);
+    CHECK(h.p(Global::AftertouchCurve) == 0.0f);
+}
+
+TEST_CASE("Settings > MIDI: each curve greyed out while its setting is Off", "[ui][settings]") {
+    UiHost h;
+    pluginui::MainWindow w(h);
+    w.settingsWindow().show();
+    CHECK(button(w, "setVelocityCurve").enabled());
+    CHECK(button(w, "setAftertouchCurve").enabled());
+    h.p(Global::VelocityCurve) = 2;
+    h.p(Global::Velocity) = 2;  // Off
+    w.tick(0);
+    CHECK_FALSE(button(w, "setVelocityCurve").enabled());
+    CHECK(button(w, "setVelocityCurve").tip() == "Velocity curve: set Velocity to Accent or Vol 4-bit");
+    CHECK(button(w, "setVelocityCurve").text() == "Hard");  // the curve chosen kept
+    CHECK(button(w, "setAftertouchCurve").enabled());  // each its own
+    h.p(Global::Aftertouch) = 0;  // Off
+    w.tick(0);
+    CHECK_FALSE(button(w, "setAftertouchCurve").enabled());
+    CHECK(button(w, "setAftertouchCurve").tip() == "Aftertouch curve: set Aftertouch to one of its targets");
+    // A greyed curve opens no menu.
+    click(w, "setVelocityCurve");
+    CHECK(topMenu(w) == nullptr);
+    h.p(Global::Velocity) = 1;  // Vol 4-bit
+    h.p(Global::Aftertouch) = 2;  // Volume
+    w.tick(0);
+    CHECK(button(w, "setVelocityCurve").enabled());
+    CHECK(button(w, "setAftertouchCurve").enabled());
+    CHECK(button(w, "setVelocityCurve").tip().starts_with("Velocity curve: how the force of a key"));
 }
 
 TEST_CASE("Settings > Tuning A4: typed in Hz, 350 to 480 Hz with two decimals",
@@ -289,10 +401,16 @@ TEST_CASE("Settings: Note names and Keyboard layout stored as preferences, the w
     REQUIRE(names.sub.size() == 2);
     CHECK(names.sub[1].label == "Latin (Do Re Mi)");
     CHECK(names.subCur == 0);
+    CHECK(w.settingsWindow().shownLabel("setA4") == "Tuning A4");
     names.sub[1].pick();
     CHECK(h.prefs["noteNames"] == "1");
     CHECK(button(w, "setNoteNames").text() == "Latin (Do Re Mi)");
     CHECK(setting(w, "setNoteNames").subCur == 1);
+    // The label of Tuning A4 follows the note names.
+    CHECK(w.settingsWindow().shownLabel("setA4") == "Tuning La4");
+    setting(w, "setNoteNames").sub[0].pick();
+    CHECK(w.settingsWindow().shownLabel("setA4") == "Tuning A4");
+    setting(w, "setNoteNames").sub[1].pick();
 
     gemui::MenuItem layout = setting(w, "setLayout");
     REQUIRE(layout.sub.size() == 4);
@@ -302,6 +420,92 @@ TEST_CASE("Settings: Note names and Keyboard layout stored as preferences, the w
     CHECK(h.prefs["kbdLayout"] == "azerty");
     CHECK(w.keyLayout() == "azerty");
     CHECK(button(w, "setLayout").text() == "AZERTY");
+}
+
+TEST_CASE("Settings > MIDI monitor: the lines it keeps, 500 by default, stored as a preference",
+          "[ui][settings]") {
+    // Indus, 28/10/2026 08:19: the MIDI monitor as a buffer, its size chosen in Settings.
+    UiHost h;
+    pluginui::MainWindow w(h);
+    w.settingsWindow().show();
+    CHECK(w.rectOf("setMidiLines")->y > w.rectOf("setLayout")->bottom());
+    CHECK(w.rectOf("setMidiLines")->bottom() < w.rectOf("setUiLanguage")->y);
+    gemui::MenuItem lines = setting(w, "setMidiLines");
+    REQUIRE(lines.sub.size() == 5);
+    CHECK(lines.sub[0].label == "100 lines");
+    CHECK(lines.sub[3].label == "5000 lines");
+    CHECK(lines.sub[4].label == "Custom...");
+    CHECK(lines.subCur == 1);
+    CHECK(w.midiMonitor().kept() == 500);
+    lines.sub[0].pick();
+    CHECK(h.prefs["midiLines"] == "100");
+    CHECK(w.midiMonitor().kept() == 100);
+    CHECK(button(w, "setMidiLines").text() == "100 lines");
+    setting(w, "setMidiLines").sub[3].pick();
+    CHECK(w.midiMonitor().kept() == 5000);
+    {
+        pluginui::MainWindow w2(h);  // kept for the next opening
+        CHECK(w2.midiMonitor().kept() == 5000);
+    }
+    // A value that is not a number from 1 to 100 000: 500.
+    for (const char* bad : {"0", "100001", "12x", "", "-5"}) {
+        h.prefs["midiLines"] = bad;
+        pluginui::MainWindow w3(h);
+        CHECK(w3.midiMonitor().kept() == 500);
+    }
+}
+
+TEST_CASE("Settings > MIDI monitor > Custom: lines typed from 1 to 100 000", "[ui][settings]") {
+    // Indus, 28/10/2026 10:02: a Custom size of the buffer; 100 000 at the most (his choice on the card, 10:20).
+    UiHost h;
+    pluginui::MainWindow w(h);
+    w.settingsWindow().show();
+    auto custom = [&w](const std::string& text, bool ok = true) {
+        setting(w, "setMidiLines").sub[4].pick();
+        const gemui::Alert* a = topAlert(w);
+        REQUIRE(a);
+        CHECK(a->text() == "Lines the MIDI monitor keeps\n(1 to 100000):");
+        for (int i = 0; i < 12; ++i) key(w, gemui::Key::Backspace);
+        for (const char c : text) w.desktop().keyDown(charKey(char32_t(c)));
+        key(w, ok ? gemui::Key::Enter : gemui::Key::Escape);
+        REQUIRE_FALSE(w.desktop().topModal());
+    };
+    custom("2500");
+    CHECK(h.prefs["midiLines"] == "2500");
+    CHECK(w.midiMonitor().kept() == 2500);
+    gemui::MenuItem lines = setting(w, "setMidiLines");
+    CHECK(lines.subCur == 4);
+    CHECK(lines.sub[4].label == "Custom 2500 lines...");
+    CHECK(button(w, "setMidiLines").text() == "Custom 2500 lines");
+    custom("100 000");  // the spaces left out
+    CHECK(w.midiMonitor().kept() == 100000);
+    custom("250000");  // clamped
+    CHECK(w.midiMonitor().kept() == 100000);
+    custom("0");
+    CHECK(w.midiMonitor().kept() == 1);
+    custom("");  // nothing typed: nothing changes
+    custom("12a");
+    custom("77", false);  // Cancel
+    CHECK(w.midiMonitor().kept() == 1);
+    // One of the choices typed: its entry checked, Custom shown without a number.
+    custom("1000");
+    lines = setting(w, "setMidiLines");
+    CHECK(lines.subCur == 2);
+    CHECK(lines.sub[4].label == "Custom...");
+    w.settingsWindow().ok();
+    h.prefs["midiLines"] = "42";
+    {
+        pluginui::MainWindow w2(h);  // read at the next opening
+        CHECK(w2.midiMonitor().kept() == 42);
+    }
+    // Cancel of the window puts the value at the opening back.
+    w.settingsWindow().show();
+    custom("7");
+    CHECK(w.midiMonitor().kept() == 7);
+    w.settingsWindow().cancel();
+    discard(w);
+    CHECK(h.prefs["midiLines"] == "42");
+    CHECK(w.midiMonitor().kept() == 42);
 }
 
 TEST_CASE("Settings: the window open again at the next opening of the editor, where it was",
@@ -360,6 +564,7 @@ TEST_CASE("Settings: Cancel puts back the settings changed in the window, OK kee
         setting(w, "setPixels").sub[0].pick();
         setting(w, "setNoteNames").sub[1].pick();
         setting(w, "setLayout").sub[2].pick();
+        setting(w, "setMidiLines").sub[0].pick();
         setting(w, "setTips").sub[1].pick();
         setting(w, "setLanguage").sub[3].pick();
         w.tick(0);
@@ -384,6 +589,8 @@ TEST_CASE("Settings: Cancel puts back the settings changed in the window, OK kee
     CHECK(h.prefs["noteNames"] == "0");
     CHECK(h.prefs["kbdLayout"] == "auto");
     CHECK(w.keyLayout() != "azerty");
+    CHECK(h.prefs["midiLines"] == "500");
+    CHECK(w.midiMonitor().kept() == 500);
     CHECK(w.desktop().tooltips());
     CHECK(h.prefs["tooltips"] == "1");
     CHECK(h.prefs["tipLanguage"] == "en");

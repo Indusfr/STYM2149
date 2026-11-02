@@ -24,9 +24,9 @@ STYM2149 is a stack of static libraries. Only `src/plugin` includes JUCE; every 
 | Module (CMake target) | Responsibility | Key files |
 |---|---|---|
 | `src/ymcore` (`ymcore`) | YM2149F model at clk/8 (250 kHz at 2 MHz), ported from AtariAudio 1.26; measured 32×32×32 mixing table (DAC); timestamped register writes; chip → host rate (`OutputMode::Raw` Kaiser sinc, `RawBox` AtariAudio averaging, `Retro` last internal step); DC removal; ST/STE board filters | `Ym2149.h`, `ChipRenderer.h`, `SincResampler.h`, `RegisterQueue.h`, `BoardFilters.h`, `TickStreamOutput.h`, `ChipConfig.h` |
-| `src/ymengine` (`ymengine`) | Voice engine: 16 lane + 80 chord + 16 pool voices (`Engine::kVoices`, `Engine.h`); modes `Studio16` (virtual channels, stereo), `Authentic3` and `Dual3` (real chips, mono like the ST; stereo with the STE DMA sound); MFP 68901 timers; generators Chip, SID, Digidrum, Sync Buzzer, Chipdrum, DMA (STE); ADSR, vibrato, LFO, arpeggio, slides; echo of the notes (repeats on `VoiceTag::Echo` voices, every mode) and the 16 ch stereo delay fed by send buses (`StereoDelay`); sequencer playback; register capture | `Engine.h`, `src/EngineImpl.h`, `src/StereoDelay.h`, `src/Sequencer.cpp`, `VirtualChannel.h`, `Mfp68901.h`, `DrumKit.h`, `Dma.h`, `Pitch.h`, `Sequence.h`, `Params.h` |
+| `src/ymengine` (`ymengine`) | Voice engine: 32 lane + 160 chord + 16 pool voices, 208 in all (`Engine::kVoices`, `Engine.h`; 32 tracks); modes `Studio16` and `Studio32` (16 or 32 virtual channels, stereo; `studioMode`, `studioTracks`), `Authentic3` and `Dual3` (real chips, mono like the ST; stereo with the STE DMA sound); MFP 68901 timers; generators Chip, SID, Digidrum, Sync Buzzer, Chipdrum, DMA (STE); ADSR, vibrato, LFO, arpeggio, slides; echo of the notes (repeats on `VoiceTag::Echo` voices, every mode) and the 16 ch stereo delay fed by send buses (`StereoDelay`); sequencer playback; register capture | `Engine.h`, `src/EngineImpl.h`, `src/StereoDelay.h`, `src/Sequencer.cpp`, `VirtualChannel.h`, `Mfp68901.h`, `DrumKit.h`, `Dma.h`, `Pitch.h`, `Sequence.h`, `Params.h` |
 | `src/ymseq` (`ymseq`) | Sequencer editing model: patterns of up to 256 steps (32 patterns, 4 banks × 8), lane edits, euclidean generator, Song (extended with Rest/Note-off/Loop), Ticks timing, CMD row, undo history (50 steps) | `Pattern.h`, `Edit.h`, `Song.h`, `Project.h`, `Undo.h`, `Timing.h`, `Commands.h`, `Euclid.h` |
-| `src/ymio` (`ymio`) | File formats (section 5): YM, LHA, SNDH (+ICE), SMF, WAV, ZIP, XM, register dumps | `YmFile.h`, `YmPlayer.h`, `Sndh.h`, `SndhWriter.h`, `YmWriter.h`, `Lzh.h`, `Smf.h`, `Wav.h`, `Zip.h`, `Xm.h` |
+| `src/ymio` (`ymio`) | File formats (section 5): YM, LHA, SNDH (+ICE), SMF, WAV, ZIP, XM, MOD, S3M, OKT, register dumps | `YmFile.h`, `YmPlayer.h`, `Sndh.h`, `SndhWriter.h`, `YmWriter.h`, `Lzh.h`, `Smf.h`, `Wav.h`, `Zip.h`, `Xm.h`, `Mod.h`, `S3m.h`, `Okt.h` |
 | `src/plugincore` (`stym_plugincore`) | Plugin core without JUCE: parameter table, parameter→engine mapping, plugin state, `Driver` (runs the engine on the audio thread), lock-free primitives, offline render, exports/imports, MIDI learn, `EngineStatus` | `Parameters.h`, `Mapping.h`, `State.h`, `Driver.h`, `Mailbox.h`, `TripleBuffer.h`, `EngineStatus.h`, `Offline.h` |
 | `src/gemui` (`gemui`) | GEM desktop drawn pixel by pixel into a framebuffer: widgets, EmuTOS fonts, `Painter`/`Surface`, menus, alerts, scroll panes, tooltips. No dependency at all | `Desktop.h`, `Widget.h`, `Controls.h`, `Painter.h`, `Surface.h`, `Font.h`, `Menu.h`, `Alert.h`, `Scroll.h` |
 | `src/pluginui` (`stym_pluginui`) | The editor: `MainWindow` and 18 floating window classes, the `Host` interface, `EditorSession`, File menu, export jobs, tooltip languages | `MainWindow.h`, `Host.h`, `Session.h`, `FileMenu.cpp`, `BackgroundJob.h`, `TipLanguage.h`, `TipCatalog.cpp` |
@@ -72,7 +72,7 @@ Tools and tests: `stym_tools_common` (PNG codec, file reading) ← `ym2wav` (+`y
 | Thread | Entry points | What runs there |
 |---|---|---|
 | Audio (host) | `StymProcessor::processBlock` (`src/plugin/PluginProcessor.cpp:176`) | Reads the host parameters into `values_`; drains the screen/command FIFO; converts host MIDI (MIDI-learn messages go to `learnFifo_`, note on/off and CC 120/123 are copied to `hostNoteFifo_`); reads the play head into `HostTransport`; `Driver::process` (`Driver.cpp:804`): takes a new `Snapshot`, applies changed parameters (`sync`), runs the register recorder, swaps the YM Player slot, plays MIDI events, renders in segments, renders the YM Player; then `EngineStatusTap::capture` |
-| Message (JUCE) | `ServiceTimer` at 30 Hz → `serviceMessageThread` (`PluginProcessor.cpp:58`, `:363`); `StymEditor` timer at 30 Hz → `frame()` (`PluginEditor.cpp:131`, `:225`); mouse/keyboard callbacks | Tells the host about parameters changed by MIDI CCs (with gestures); `Driver::service` (builds engines requested by the audio thread, destroys retired objects); collects a finished recorder take; updates latency. Editor: `MainWindow::tick` (`MainWindow.cpp:1114`) re-reads parameters, non-parameter state (`extrasVersion`), `EngineStatus`, host notes and learn messages, then repaints. File dialogs, imports (YM/SNDH, MIDI, XM, JSON, Digidrum and DMA audio samples) run here, in the dialog callbacks |
+| Message (JUCE) | `ServiceTimer` at 30 Hz → `serviceMessageThread` (`PluginProcessor.cpp:58`, `:363`); `StymEditor` timer at 30 Hz → `frame()` (`PluginEditor.cpp:131`, `:225`); mouse/keyboard callbacks | Tells the host about parameters changed by MIDI CCs (with gestures); `Driver::service` (builds engines requested by the audio thread, destroys retired objects); collects a finished recorder take; updates latency. Editor: `MainWindow::tick` (`MainWindow.cpp:1114`) re-reads parameters, non-parameter state (`extrasVersion`), `EngineStatus`, host notes and learn messages, then repaints. File dialogs, imports (YM/SNDH, MIDI, tracker songs, Patches library, Digidrum and DMA audio samples) run here, in the dialog callbacks |
 | Any host thread | `prepareToPlay`, `getStateInformation`, `setStateInformation` | Under `controlLock_` (`PluginProcessor.h:171`), which the audio thread never takes |
 | Export worker | `pluginui::BackgroundJob` (`BackgroundJob.h`), started by `MainWindow::startJob` (`FileMenu.cpp:295`) | One job at a time: MIDI, WAV/stems and register exports. The job works on copies of the parameters and `NonParamState`, renders with its own `OfflineRender` (a second `Driver` and engine, `Offline.h`), honours a cancel flag; `done` runs on the message thread from `MainWindow::tick` via `poll()`. The desktop shows the busy pointer meanwhile |
 | SNDH worker | `ymio::SndhStream` (`src/ymio/include/ymio/Sndh.h`) | One thread per `SndhStream` (started on the message thread when an SNDH playback is prepared): AtariAudio's 68000 machine runs about 0.5 s ahead (`Options::lookahead`) and fills a single-producer ring read by `SndhPlayer` on the audio thread |
@@ -119,7 +119,7 @@ How tests enforce them:
 | Parameters changed by a CC | audio → message | `notifyFifo_{1024}`; the timer calls `setValueNotifyingHost` inside a gesture | `PluginProcessor.cpp:357-370` |
 | Non-parameter settings | message → audio | `Mailbox<Snapshot> snapshots_` | `Driver.h:255`, `Driver::publish` (`Driver.cpp:176`), `takeSnapshot` (`:279`) |
 | Engine rebuilds | audio → message (request), message → audio (engine) | atomic `request_` (serial, active flag, `ConfigKey`), then `Mailbox<EngineSlot> built_` | `Driver.h:280-281`, `service` (`Driver.cpp:182`) |
-| YM Player | message → audio | `Mailbox<YmSlot> ymBox_`; status atomics (`ymOn_`, `ymPosition_`, `ymRegsLo_/Hi_`…) | `Driver.h:256-270` |
+| YM Player | message → audio | `Mailbox<YmSlot> ymBox_`; status atomics (`ymOn_`, `ymPosition_`, `ymRegsLo_/Hi_`, `ymEnded_`…). A slot holds a tune's `YmPlayback`, or for File > Play... of a project an `OfflineRender` (a second `Driver`) built on the message thread from a copy of the project, rendered in the audio thread without allocating and stopped at its end | `Driver.h` (`ymLoad`, `ymLoadProject`) |
 | Register recorder | both | `std::atomic<RecBuffer*> recIn_/recOut_`, `recState_`, `recStop_` | `Driver.h:249-254` |
 | Engine status | audio → editor | `TripleBuffer<EngineStatus>` inside `EngineStatusTap` | `EngineStatus.h:50` |
 | SNDH capture | worker → audio | SPSC ring with atomic `head_`, `tail_`, `ready_` | `ymio/Sndh.h` (`SndhStream`) |
@@ -173,19 +173,20 @@ There are three kinds of persistent data; keep them apart.
 
 ### Parameters
 
-554 host parameters: 42 globals + 32 per track × 16 (`Parameters.h`; asserted in
+1102 host parameters: 46 globals + 33 per track × 32 (`Parameters.h`; asserted in
 `tests/unit/test_plugincore.cpp`, "Parameters: complete table"). The table is JUCE-free (`plugincore/Parameters.cpp`) and the processor
 builds JUCE parameters from it (`makeParameter`, `PluginProcessor.cpp:15`): `Bool`, `Choice`, `Int` (step 1,
 linear) or `Float` with a custom range (geometric for `envPeriod`).
 
 - IDs are stable and never renamed once published: globals in camelCase (`master`, `voiceMode`,
-  `chipClock`, …, `computer`, `chipClockHz`), track parameters `tNN_<field>` (`t01_level` … `t16_gate`). Display names
-  "T3 Env Period"; JUCE groups `global` and `t01`…`t16`.
+  `chipClock`, …, `computer`, `chipClockHz`), track parameters `tNN_<field>` (`t01_level` … `t32_link`). Display names
+  "T3 Env Period"; JUCE groups `global` and `t01`…`t32`.
 - `ParamSpec::version` is the JUCE `ParameterID` version (needed by AU): 1 for the first set, 2 for `freeTempo`,
-  `swing`, `gate`, `gateAll`, `tNN_gate`, 3 for `computer`, 4 for `chipClockHz` (`since(...)` in `Parameters.cpp`).
+  `swing`, `gate`, `gateAll`, `tNN_gate`, 3 for `computer`, 4 for `chipClockHz` (`since(...)` in `Parameters.cpp`), 12 for every parameter of tracks 17 to 32
+  and for `masterMono` and `tNN_mono`.
 - Not automatable: the six MIDI settings `midiRouting`, `velocity`, `bendRange`, `wheelDepth`, `arpClock`,
   `arpDivision` (`isMidiSetting`, `Parameters.cpp:146`), and `chipClockHz`, the frequency of the Custom chip clock
-  (16 ch only), since each value builds a new engine.
+  (16 and 32 ch only), since each value builds a new engine.
 - Values travel "in clear" (table units) in `ParamValues`. The driver diffs them against the last applied values
   at each block start (`Driver::sync`); a prototype MIDI CC that changes a parameter splits the render at its
   sample and is reported to the host (`Driver::controlChange`, `Driver.cpp:547`).
@@ -193,13 +194,14 @@ linear) or `Float` with a custom range (geometric for `envPeriod`).
 ### Plugin state format
 
 `encodeState` / `decodeState` (`State.cpp:603`, `:832`); the full field layout is documented at the top of
-`State.h`. Little-endian: `"STYM"`, `u16` version (`kStateVersion = 1`), `u16` flags (0), then chunks
+`State.h`, and field by field in `docs/FILE_FORMAT.md`. Little-endian: `"STYM"`, `u16` version
+(`kStateVersion = 1`), `u16` flags (bits 0-3: `StateKind`, 0 for the host's state), then chunks
 `fourcc, u32 length, body`, written in this order:
 
 | Chunk | Written | Content |
 |---|---|---|
 | `PARM` | always | Count, then per parameter its ID string and `f32` value: state is matched by ID, not index |
-| `TRKX` | always | Per-track non-parameter fields (ornament, arpeggio, Digidrum slot, DMA slot…), each track with its own length |
+| `TRKX` | always | Per-track non-parameter fields (ornament, arpeggio, Digidrum pad and the Digidrum of each pad, DMA slot…), each track with its own length |
 | `GLBX` | always | Global non-parameter fields |
 | `KIT ` | always | Chipdrum kit, 8 × 5 `f64` |
 | `DIGI` | always | Digidrum samples, 4-bit values packed two per byte |
@@ -207,11 +209,20 @@ linear) or `Float` with a custom range (geometric for `envPeriod`).
 | `SEQS`, `PATN`, `SONG` | always | Sequencer settings, created patterns (non-empty cells only), Song entries |
 | `SNGX` | if a Song entry is special or a restart point | Extended Song |
 | `INST` | if an instrument exists | Project instruments as compact JSON (Patches format) |
-| `TSEQ` | if a track has instrument sequences | Sequences, timer waves, tuned buzzer, LFO, echo |
+| `TSEQ` | if a track has instrument sequences | Sequences, timer waves, tuned buzzer, LFO, echo, FM wave |
 | `TIMG` | if not default | Ticks timing and groove |
-| `DMAS` | if not default | STE DMA bank: the eight slots, then Start and End of each, then their names |
+| `DMAS` | if not default | STE DMA bank: eight slots, or up to the last sample loaded (127 at most), then Start and End of each, then their names |
 | `DIGS` | if not default | Digidrum editor slots (name, playback with Start and End, 8-bit source) |
+| `STEM` | if not 4 MB | Memory of the Atari the samples share in the 3-channel modes |
 | `RECD` | if a take exists | Register recorder take |
+| `RSYN` | if a frame of the take carries a Zxx | Zxx of the take |
+| `RFMW` | if a frame of the take plays an FM Voice | Steps of its FM Voice effects |
+| `RFMS` | if a frame of the take plays an FM Voice in Semitones | Steps of those effects, in semitones |
+
+The binary files of File > Load / Save are the same blob: a project (`.stym`, kind 0) is the state without
+the recorder take; a pattern (`.stympat`, kind 1) carries `PATN` alone, a Song (`.stymsng`, kind 2) `SEQS`, `PATN`,
+`SONG` and `SNGX`, a kit (`.stymkit`, kind 3) `KIT ` (`encodeNativeFile`, `readNativeFile` in `ProjectFiles.h`).
+`setStateInformation` refuses any kind but 0.
 
 Versioning: new data is added as new chunks or trailing fields while staying at version 1. Readers ignore
 unknown chunks and parameters, default missing ones, clamp values, and default missing trailing track fields. A
@@ -221,9 +232,9 @@ are read by `tests/unit/test_plugincore.cpp` (both) and `tests/plugin/test_proce
 `STYM_STATE_GOLDEN_OUT=<file>` writes the reference state to a file, to regenerate it on purpose. After a
 state load, a CLAP instance asks the host to rescan values (`is_clap`, `PluginProcessor.cpp:465`).
 
-JSON project files have their own versioning: STYM2149 additions sit under a `"stym"` key with `v: 1`; a preset's
-`"stym"` carries the full plugin state in base64 (without the recorder take), and newer files are read for what
-is known, with an alert (`plugincore/ProjectFiles.h`).
+The Patches library, the one JSON file a user exchanges, has its own versioning: STYM2149 additions sit under a
+`"stym"` key with `v: 1`, and a newer library is read for what is known, with an alert (`plugincore/ProjectFiles.h`).
+The JSON preset, pattern, Song and kit files of the prototype are no longer written nor read.
 
 ### Preferences
 
@@ -237,12 +248,32 @@ folder the first time `Preferences.settings` is created, leaving the Standalone 
 `filterState`, `windowX`...) where they are. `createPluginFilter` reads `midiMap` from it so learned CCs work
 with the editor closed (`PluginProcessor.cpp`).
 
+Several copies of the Standalone app may run at once. `StandaloneSlot` (`StandaloneSlot.cpp`) takes the lowest
+free number from 1 to 64, held by a `juce::InterProcessLock` named after the user for as long as the copy runs; copy
+N > 1 uses `STYM2149 (N).settings` in the same folder and the window title `STYM2149 (N)`, which the GEM title repeats
+(`Host::copyNumber`). A copy's file, created the first time, takes copy 1's audio device without its `MIDIINPUT`
+elements and copy 1's window place moved by 32 pixels (`seedSlotSettings`); the session is not copied. The MIDI learn
+map is the copy's own: `adoptMidiMap` gives copy 1 the `midiMap` of the preferences once and a new copy none, and
+`standaloneSettings()` points `createPluginFilter` and the editor (`preference`/`setPreference`) at the copy's file. A
+new copy whose seeded device is an ASIO driver shows a GEM alert at start (`usesAsio`, `asioNotice`,
+`StymEditor::showAlert`). The rest of `Preferences.settings` and the libraries stay shared by all copies and every
+plugin instance: the editor keeps the keys it changed and writes them half a second later after reading the file again
+(`StymEditor::writePreferences`), since JUCE's `PropertiesFile` writes the whole set it holds and would put back values
+another copy changed since. The libraries were already read again before each change.
+
+The Standalone app saves no state at Quit: our `StandaloneApp.cpp` window and `StymEditor::quit` no longer
+call `savePluginState`, and `systemRequestedQuit` asks with the Quit box. File > Configuration (`FileMenu.cpp`,
+`Host::configuration`, `loadConfiguration`, `keepConfiguration`) writes and reads the processor's state as a host
+would, and keeps the file's path in `configFile` and its bytes in `filterState` of the copy's settings, which JUCE's
+holder reloads at the next start. `forgetUnsavedSession` drops a `filterState` without `configFile`: the session that
+earlier versions saved at each Quit.
+
 | Key / file | Used for |
 |---|---|
 | `zoom` | Editor window size 50-200 %, 100 % = 5/8 of the desktop's logical size, set by resizing the window (absent: chosen from the screen size, `autoZoom`) |
 | `lastFolder` | Last folder of the file dialogs |
 | `tooltips`, `tipLanguage` | Tooltips on/off, tooltip language (`en`, built in, or the code of a language file: `fr`, `de`, `es`, `pt`, `it` installed, others added by the user) |
-| `midiMap` | MIDI learn map (JSON) |
+| `midiMap` | MIDI learn map (JSON); in the Standalone app, in each copy's settings file instead |
 | `noteNames`, `kbdLayout`, `seqCmdRow`, `wavFormat`, `wavRate` | Note naming, computer keyboard layout, display of the step command rows CMD, BPM, ENV, VIB, DLY and CUT (on when absent), WAV dialog defaults |
 | `deskIcons` | Places of the desktop icons A, B and trash |
 | `pixels` | `sharp` (absent) or `smooth`: glyphs and icons of the JUCE editor at a scale that is not whole (`JucePainter::Cache::setSharp`) |
@@ -259,18 +290,23 @@ project model lives in `plugincore`; dialogs and jobs in `pluginui/src/FileMenu.
 
 | Format | ymio API | Project-side code | Used by |
 |---|---|---|---|
-| YM2!, YM3!, YM3b, YM5!, YM6! (plain or LHA) | `parseYm` (`YmFile.h`), `YmPlayer` (frames + timer effects, YM2 digidrums via `src/Ym2Drums.h`) | `YmTune`, `YmPlayback` (`plugincore/YmTune.h`) | File > Import > YM dump (YM Player window), `ym2wav` |
+| YM2!, YM3!, YM3b, YM5!, YM6! (plain or LHA) | `parseYm` (`YmFile.h`), `YmPlayer` (frames + timer effects, YM2 digidrums via `src/Ym2Drums.h`) | `YmTune`, `YmPlayback` (`plugincore/YmTune.h`); `RegisterImport` | File > Play... (YM Player window), `ym2wav`; File > Import > SNDH / YM file (patterns, `ymimport`) |
 | LZH/LHA | `unpackLzh` (-lh0-, -lh4- to -lh7-, port of pylzh), `packLzh` (-lh5-) | `RegisterFiles` | YM loading, compressed YM6 export |
-| SNDH (plain or ICE!) | `parseSndh`, `SndhCapture`, `SndhStream`, `SndhPlayer` (`Sndh.h`); `iceDepack` (`Ice.h`) | `YmTune` | YM Player |
+| SNDH (plain or ICE!) | `parseSndh`, `SndhCapture`, `SndhStream`, `SndhPlayer` (`Sndh.h`); `iceDepack` (`Ice.h`) | `YmTune`; `RegisterImport` (frames written by the emulated play routine) | YM Player; File > Import > SNDH / YM file (patterns) |
+| maxYMiser song (.MYS) and voiceset (.MYV) | `parseMys`, `parseMyv`, `writeMys`, `writeMyv` (`MaxYm.h`); `MaxYmPlayer` (`MaxYmPlayer.h`: the replay routine, tick by tick) | `MaxYmImport` (frames of the player through `RegisterImport`, with the song's rows); `MaxYmExport` (capture of the register exports written as rows and instruments) | File > Import > Tracker song (told by its content), File > Export song > maxYMiser; `mymimport` |
+| TTrak module (.TPM), instrument (.TPI), 4-bit sample (.4BI) | `parseTtrakModule`, `writeTtrakModule`, `parseTtrakInstrument`, `writeTtrakInstrument`, `parseTtrak4bi` (`TTrak.h`); `TtrakPlayer` (`TTrakPlayer.h`: the replay routine, tick by tick) | `TTrakImport` (ticks of the player through `RegisterImport`, with the module's rows); `TTrakExport` (the Song captured by `SongCapture`, as for `MaxYmExport`, written as rows and instruments, played back by `TtrakPlayer`) | File > Import > Tracker song (told by its content), File > Play..., File > Export song > TTrak; `ttrakimport` |
 | SNDH writer | `sndhFile` (`SndhWriter.h`, 68000 routine via `src/Asm68k.h`) | `RegisterExport` (capture), `RegisterFiles` (writing) | Register exports (ST or STE) |
 | VBL source, YM3, YM6 writers | `vblSource`, `ym3File`, `ym6File` (`YmWriter.h`) | `RegisterExport` (capture), `RegisterFiles` (writing) | Song/pattern register export, recorder take export |
 | Standard MIDI File | `readSmf` (formats 0, 1), `writeSmf` (format 1) (`Smf.h`) | `MidiFiles` | MIDI import and export |
 | WAV 16/24-bit, 32-bit float | `WavWriter` (`Wav.h`) over `ByteSink` | `AudioExport` | WAV export |
 | ZIP (stored) | `ZipWriter` (`Zip.h`) | `AudioExport` | Stems export |
-| XM 1.04 | `parseXm` (`Xm.h`) | `XmImport` | XM import (patterns, Song, DMA instruments) |
-| JSON preset, pattern, Song, kit | — (`plugincore/Json.h`) | `ProjectFiles` | File > Load/Save, readable by the prototype |
+| XM 1.04 | `parseXm` (`Xm.h`) | `XmImport` (`importModule`, the format told by `moduleFormat`) | File > Import > Tracker song (patterns, Song, DMA instruments), File > Play... |
+| MOD (ProTracker, FLT8, 15-sample Soundtracker) | `parseMod` (`Mod.h`), read into the XM shape | `XmImport` | The way of the XM import |
+| S3M (Scream Tracker 3; AdLib parts left out) | `parseS3m` (`S3m.h`), read into the XM shape | `XmImport` | The way of the XM import |
+| OKT (Oktalyzer, split channels) | `parseOkt` (`Okt.h`), read into the XM shape | `XmImport` | The way of the XM import |
+| STYM2149 binary files (project, pattern, Song, kit) | — (`plugincore/State.h`) | `ProjectFiles` (`encodeNativeFile`, `readNativeFile`) | File > Load/Save, File > Play... |
 | Patches / Digidrum libraries | — | `Patches`, `DigidrumBanks` | Patches and Digidrum windows |
-| Audio files for samples | JUCE `AudioFormatManager::registerBasicFormats` | `Digidrum`, `DmaSample` conversions | `StymEditor::loadDigidrum` / `loadDmaSample` (`PluginEditor.cpp:441`, `:531`) |
+| Audio files for samples | JUCE `AudioFormatManager::registerBasicFormats` | `Digidrum`, `DmaSample` conversions | `StymEditor::loadDigidrum` / `loadDmaSample` (`PluginEditor.cpp:641`, `:750`), a file chosen by `MainWindow::chooseSample` or dropped on a drawing |
 
 Exports render offline (`OfflineRender`, `plugincore/Offline.h`): a second `Driver` plays the current pattern once
 or the Song to its end, with forced internal clock; register exports capture one frame per replay tick in
@@ -281,17 +317,25 @@ that replaces the target only on `commit()`.
 
 **gemui.** `Surface` is a framebuffer of 32-bit ARGB `Color` in logical pixels (`Surface.h`). `Painter`
 (`Painter.h`) fills, frames, tiles 4×4 patterns, draws lines, glyphs and 1-bit bitmaps, and opacity groups
-(`beginOpacity`/`endOpacity`) for greyed controls; never anti-aliased. `Widget` (`Widget.h`) is a tree of
-non-owned children with a rectangle, visibility, and a tooltip (`tip()`, `tipAt()`). `Desktop` (`Desktop.h`) stacks
-three layers (the root with its windows, owned by the caller; popup menus and modal alerts, owned by the desktop),
-knows only logical pixels and a time given by the caller, dispatches mouse and keyboard, runs timers on
-`tick(nowMs)`, and tracks up to `kMaxDirty = 16` disjoint dirty rectangles; `paint()` repaints them and exposes
-`painted()`. Controls reproduce the prototype's CSS rules (`Controls.h`: `Label`, `Button`, `Slider`, `ValueField`,
-`TextField`, `GroupBox`, `WindowFrame`, `TitleBar`, `FloatWindow`), plus `MenuBar`/`MenuList` (`Menu.h`),
-`Alert`, `ScrollPane` and `ScrollBar` (`Scroll.h`; a vertical `Slider` drawn with the pane's arrow cells).
-A horizontal `Slider` has an arrow at each end that moves it by one step and passes a right click to
-`onContext`. `DeskIcon` is a decorative desktop icon that a held press drags, and
-`Desktop::workTop` keeps the windows below the menu bar across the top of the desktop.
+(`beginOpacity`/`endOpacity`) for greyed controls (GEM's dotted grey); never anti-aliased. `Widget`
+(`Widget.h`) is a tree of non-owned children with a rectangle, visibility, and a tooltip (`tip()`, `tipAt()`).
+`Desktop` (`Desktop.h`) stacks three layers (the root with its windows, owned by the caller; popup menus and modal
+alerts, owned by the desktop), knows only logical pixels and a time given by the caller, dispatches mouse and
+keyboard, runs timers on `tick(nowMs)`, and tracks up to `kMaxDirty = 16` disjoint dirty rectangles; `paint()`
+repaints them and exposes `painted()`. Controls reproduce the prototype's CSS rules (`Controls.h`: `Label`,
+`Button`, `Slider`, `ValueField`, `TextField`, `GroupBox`, `WindowFrame`, `TitleBar`, `FloatWindow`), plus
+`MenuBar`/`MenuList` (`Menu.h`), `Alert`, `ScrollPane` and `ScrollBar` (`Scroll.h`; a vertical `Slider` drawn with
+the pane's arrow cells). A horizontal `Slider` has an arrow at each end that moves it by one step and
+passes a right click to `onContext`. `DeskIcon` is a decorative desktop icon that a held press drags,
+and `Desktop::workTop` keeps the windows below the menu bar across the top of the desktop.
+
+**Look.** The elements are drawn as GEM draws them on the Atari ST, measured on Devpac 3 screenshots:
+a 19 px menu bar, menus of 16 px rows in a 1 px frame, a 2 px shadow on pop-up buttons and their menus
+(`Button::setPopup`, `MenuList::open(..., overAnchor)`), button borders of 1, 2 (`Button::setExit`) or 3 px
+(default) drawn inside the layout's box, dotted grey for every opacity group, outlined alert and dialog boxes.
+`Look.h` keeps the prototype's look behind `prototypeLook()`; gemshot switches it on (`usePrototypeLook`) for the
+scenes compared with the prototype's screenshots, so the places stay the same and only the drawing and the menu
+geometry differ.
 
 **Fonts.** EmuTOS glyphs (GPL v2 or later): the 8×16 system font (bitmaps for 8 to 16 px, quarter-pixel origins)
 in `src/gemui/src/FontData.cpp`, and the 8×8 and 6×6 fonts for small texts in `FontDataSmall.cpp`. Both are
@@ -352,7 +396,7 @@ cmake -S . -B build-plugin -DCMAKE_BUILD_TYPE=Release -DSTYM_BUILD_PLUGIN=ON   #
 
 | Option | Default | Defined in | Effect |
 |---|---|---|---|
-| `STYM_BUILD_TOOLS` | ON | `CMakeLists.txt:13` | `ym2wav`, `ymbench` (`gemshot` and `tools/common` build with tools or tests) |
+| `STYM_BUILD_TOOLS` | ON | `CMakeLists.txt:13` | `ym2wav`, `ymbench`, `ymimport`, `mymimport` (`gemshot` and `tools/common` build with tools or tests) |
 | `STYM_BUILD_TESTS` | ON | `CMakeLists.txt:14` | `tests/` (Catch2 v3.7.1 fetched) and the `stym_atariaudio` oracle library |
 | `STYM_ORACLE_CRATE` | OFF | `CMakeLists.txt:15` | `oracle_crate`: ym2149-rs 0.9.1 built by `cargo` (`tests/oracle_crate/ymffi`) |
 | `STYM_BUILD_PLUGIN` | OFF | `CMakeLists.txt:16` | JUCE target `STYM2149` (Linux: VST3, LV2, Standalone; Windows: VST3, AAX, Standalone; macOS: AU, VST3, AAX, Standalone; CLAP everywhere) and the `plugin` test |
@@ -420,7 +464,7 @@ STYM2149-only scenes compared with renders in `tests/data/visual/stym` with no p
 ### Add a file format
 
 1. Parser/writer in `src/ymio` (span in, bounded, no JUCE), listed in `src/ymio/CMakeLists.txt`, with unit tests in
-   `tests/unit` (added to `stym_unit`) and samples in `tests/data/files`.
+   `tests/unit` (added to `stym_unit`) and samples under `tests/data`.
 2. Conversion to/from `ParamValues` + `NonParamState` in `src/plugincore` (models: `XmImport.cpp`,
    `MidiFiles.cpp`, `RegisterFiles.cpp`).
 3. Menu entry in `FileMenu.cpp`: `Host::chooseFileToOpen/Save`, `Host::readFile(path, maxBytes)` and apply on the

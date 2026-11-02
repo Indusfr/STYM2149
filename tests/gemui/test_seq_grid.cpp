@@ -768,6 +768,58 @@ TEST_CASE("Piano roll: Delete on a selection box removes the chord voices inside
     CHECK(lane().vp(3, 2) < 0);
 }
 
+TEST_CASE("Piano roll: the box takes a note it covers whole, framed in green all round (Indus, 28/10/2026 02:59 "
+          "and 10:09)",
+          "[ui][seq][pianoroll]") {
+    UiHost h;
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    putNote(l, 0, 0, 4);  // C3, steps 1-4
+    l.vp(2, 0) = 4;       // its chord voice E3, steps 1-3
+    l.vdur[0][0] = 3;
+    putNote(l, 6, 7);  // G3 at step 7, outside the box
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    const gemui::Surface& surf = w.desktop().surface();
+    auto at = [&surf](int x, int y) { return surf.at(x, y); };
+    // A box drawn with the right button over the first two steps of the C3 and the E3: they go on beyond it, it does
+    // not take them.
+    h.editor.tool = 0;  // Move
+    dragPath(w, {cell(w, 1, 7), cell(w, 0, 12)}, gemui::MouseButton::Right);
+    REQUIRE(grid(w).hasRect());
+    w.desktop().paint();
+    for (const int row : {12, 8}) {  // no frame on their steps out of the box
+        const gemui::Rect third = grid(w).noteRect(2, row);
+        CAPTURE(row);
+        CHECK(at(third.x + third.w / 2, third.y + 2) != gemui::colors::kGreen);
+        CHECK(at(third.x + third.w / 2, third.bottom() - 3) != gemui::colors::kGreen);
+    }
+    // Over their four steps: both taken; the E3 ends inside the box.
+    dragPath(w, {cell(w, 3, 7), cell(w, 0, 12)}, gemui::MouseButton::Right);
+    REQUIRE(grid(w).hasRect());
+    w.desktop().paint();
+    for (const int row : {12, 8}) {  // the root C3 (4 steps) and the voice E3 (3 steps)
+        const int last = row == 12 ? 3 : 2;
+        const gemui::Rect first = grid(w).noteRect(0, row), end = grid(w).noteRect(last, row);
+        CAPTURE(row);
+        // Left side on the first step, right side on the last.
+        CHECK(at(first.x + 2, first.y + first.h / 2) == gemui::colors::kGreen);
+        CHECK(at(end.right() - 3, end.y + end.h / 2) == gemui::colors::kGreen);
+        // Top and bottom on every step and across the gaps between them; no side in the middle of the note.
+        for (int c = 0; c <= last; ++c) {
+            const gemui::Rect r = grid(w).noteRect(c, row);
+            CAPTURE(c);
+            CHECK(at(r.x + r.w / 2, r.y + 2) == gemui::colors::kGreen);
+            CHECK(at(r.x + r.w / 2, r.bottom() - 3) == gemui::colors::kGreen);
+            if (c < last) CHECK(at(r.right(), r.y + 2) == gemui::colors::kGreen);
+            if (c > 0) CHECK(at(r.x + 2, r.y + r.h / 2) == gemui::colors::kBlack);
+        }
+        CHECK(at(end.right(), end.y + 2) != gemui::colors::kGreen);
+    }
+    // The G3 outside the box has no frame.
+    const gemui::Rect g = grid(w).noteRect(6, 5);
+    CHECK(at(g.x + g.w / 2, g.y + 2) == gemui::colors::kBlack);
+}
+
 TEST_CASE("Piano roll: moving a selection box does not erase the notes it passes over", "[ui][seq][pianoroll]") {
     UiHost h;
     ymseq::Lane& l = h.state.seq.cur().edit(0);
@@ -843,11 +895,7 @@ TEST_CASE("Piano roll: Paste on a drum track does not write a melodic note there
     h.p(Global::FocusTrack) = 2;  // the Chipdrum track
     w.tick(0);
     h.editor.curStep = 8;
-    w.openMenu(2);
-    const std::vector<std::string> items = menuLabels(w);
-    const auto at = std::find(items.begin(), items.end(), "Paste");
-    REQUIRE(at != items.end());
-    pickItem(w, int(at - items.begin()));
+    REQUIRE(ctrlKey(w, U'v'));  // ^V (formerly Edit > Paste)
     const ymseq::Lane& d = h.state.seq.cur().lane(1);
     for (int s = 0; s < ymseq::kSteps; ++s) {
         INFO("step " << s);
@@ -1042,6 +1090,33 @@ TEST_CASE("Piano roll: in 3 channels, the held part of a chord voice is greyed l
     REQUIRE(whites(4, 8) > 20);  // start of the voice: checkerboard
     CHECK(whites(5, 8) > 20);
     CHECK(whites(6, 8) > 20);
+}
+
+TEST_CASE("Piano roll: in 3 channels, a click on a greyed chord voice makes it the note played",
+          "[ui][seq][pianoroll]") {
+    // Indus, 28/10/2026 10:29: from 32 ch to 3 ch, a chord shows one black note and greyed voices; a greyed one can
+    // become the note played, the black one going grey, as on a Monophonic track.
+    for (const float mode : {1.0f, 2.0f}) {  // Authentic 3ch, 2x3ch
+        INFO("voice mode " << mode);
+        UiHost h;
+        h.p(Global::VoiceMode) = mode;
+        ymseq::Lane& l = h.state.seq.cur().edit(0);
+        putNote(l, 4, 0);  // C3 with an E3 voice
+        l.vp(2, 4) = 4;
+        l.vdur[0][4] = 1;
+        pluginui::MainWindow w(h);
+        w.sequencer().show();
+        w.tick(0);
+        h.take();
+        auto lane = [&h]() -> const ymseq::Lane& { return h.state.seq.cur().lane(0); };
+        press(w, cell(w, 4, 8));  // the greyed E3
+        CHECK(lane().pat[4] == 4);
+        CHECK(lane().vp(2, 4) == 0);  // the C3 now greyed
+        CHECK_FALSE(h.take().empty());  // heard
+        press(w, cell(w, 4, 12));  // and back
+        CHECK(lane().pat[4] == 0);
+        CHECK(lane().vp(2, 4) == 4);
+    }
 }
 
 // ---------------------------------------------------------------- twelfth DAW test
@@ -1252,4 +1327,148 @@ TEST_CASE("Piano roll: a press ends when the pattern or the track changes under 
     // The next press is a fresh one.
     press(w, cell(w, 12, 12));
     CHECK(h.state.seq.cur().lane(h.state.seq.current == 1 ? 0 : 1).pat[12] >= 0);
+}
+
+TEST_CASE("Grid: ^A selects every note, ^C ^X ^V copy, cut and paste them (Indus, 28/10/2026 02:09)",
+          "[ui][seq][clip]") {
+    UiHost h;
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    putNote(l, 0, 0, 2);  // C3, steps 1-2
+    putNote(l, 4, 7);     // G3
+    putNote(l, 9, 11);    // B3
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    setSteps(h, w, 32);
+    auto lane = [&h]() -> const ymseq::Lane& { return h.state.seq.cur().lane(0); };
+
+    // ^A: a box over every step of the track, from its lowest note to its highest.
+    REQUIRE(ctrlKey(w, U'a'));
+    REQUIRE(grid(w).hasRect());
+    const ymseq::RectBounds r = grid(w).rectBounds();
+    CHECK(r.a == 0);
+    CHECK(r.b == 31);
+    CHECK(r.r1 == 0);
+    CHECK(r.r2 == 11);
+    // ^C copies the three notes; Escape drops the box; ^V without a selection pastes them at the cursor.
+    REQUIRE(ctrlKey(w, U'c'));
+    REQUIRE(h.editor.rectClip);
+    CHECK(h.editor.rectClip->size() == 3);
+    key(w, gemui::Key::Escape);
+    REQUIRE_FALSE(grid(w).hasRect());
+    h.editor.curStep = 16;
+    REQUIRE(ctrlKey(w, U'v'));
+    CHECK(lane().pat[16] == 0);
+    CHECK(lane().tie[16] == 1);  // held over two steps, like the copied C3
+    CHECK(lane().tie[17] == 1);
+    CHECK(lane().tie[18] == 0);
+    CHECK(lane().pat[20] == 7);
+    CHECK(lane().pat[25] == 11);
+    CHECK(lane().pat[0] == 0);  // the copied notes stay
+    // ^A then ^X: every note cut, in one undo step.
+    REQUIRE(ctrlKey(w, U'a'));
+    REQUIRE(ctrlKey(w, U'x'));
+    for (int s = 0; s < 32; ++s) CHECK(lane().pat[size_t(s)] < 0);
+    ctrlKey(w, U'z');
+    CHECK(lane().pat[4] == 7);
+    CHECK(lane().pat[25] == 11);
+    // ^A selects them all again; the Edit menu has no Select all entry.
+    key(w, gemui::Key::Escape);
+    CHECK_FALSE(grid(w).hasRect());
+    REQUIRE(ctrlKey(w, U'a'));
+    CHECK(grid(w).hasRect());
+    w.openMenu(2);
+    const std::vector<std::string> items = menuLabels(w);
+    CHECK(std::find(items.begin(), items.end(), "Select all") == items.end());
+    w.desktop().closePopups();
+
+    // Shift + ^S still picks a generator with the grid in front; ^S alone does not.
+    key(w, gemui::Key::Escape);
+    CHECK_FALSE(ctrlKey(w, U's'));
+    CHECK(h.p(0, Track::Generator) == 0.0f);
+    gemui::KeyEvent e = charKey(U's', true);
+    e.mods.shift = true;
+    CHECK(w.desktop().keyDown(e));
+    CHECK(h.p(0, Track::Generator) == float(int(ymengine::Generator::Sid)));
+}
+
+TEST_CASE("Grid: ^A takes a note held beyond the last step, the box covering it whole", "[ui][seq][clip]") {
+    UiHost h;
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    putNote(l, 0, 0);
+    putNote(l, 14, 7, 4);  // G3 from step 15, held over two steps past the end
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    setSteps(h, w, 16);
+    REQUIRE(ctrlKey(w, U'a'));
+    REQUIRE(grid(w).hasRect());
+    CHECK(grid(w).rectBounds().a == 0);
+    CHECK(grid(w).rectBounds().b == 17);
+    REQUIRE(ctrlKey(w, U'c'));
+    REQUIRE(h.editor.rectClip);
+    CHECK(h.editor.rectClip->size() == 2);
+}
+
+TEST_CASE("Grid: Select all in the right-click menus of the Move tool (Indus, 28/10/2026 03:02)",
+          "[ui][seq][clip]") {
+    UiHost h;
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    putNote(l, 0, 0, 2);  // C3, steps 1-2
+    putNote(l, 4, 7);     // G3
+    h.editor.tool = 0;    // Move
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    setSteps(h, w, 32);
+    auto pickSelectAll = [&w] {
+        REQUIRE(topMenu(w));
+        const std::vector<std::string> items = menuLabels(w);
+        const auto all = std::find(items.begin(), items.end(), "Select all ^A");
+        REQUIRE(all != items.end());
+        pickItem(w, int(all - items.begin()));
+    };
+    // On a note, on an empty cell (no clipboard: the block menu), then in the box menu.
+    press(w, cell(w, 0, 12), gemui::MouseButton::Right);
+    pickSelectAll();
+    REQUIRE(grid(w).hasRect());
+    CHECK(grid(w).rectBounds().a == 0);
+    CHECK(grid(w).rectBounds().b == 31);
+    key(w, gemui::Key::Escape);
+    REQUIRE_FALSE(grid(w).hasRect());
+    press(w, cell(w, 9, 3), gemui::MouseButton::Right);
+    pickSelectAll();
+    REQUIRE(grid(w).hasRect());
+    press(w, cell(w, 4, 5), gemui::MouseButton::Right);
+    pickSelectAll();
+    CHECK(grid(w).hasRect());
+    CHECK(grid(w).rectBounds().r2 == 7);
+}
+
+TEST_CASE("Grid: ^A on a drum track selects a block of all the steps, ^C ^X copy and cut it",
+          "[ui][seq][clip]") {
+    UiHost h;
+    h.p(0, Track::Generator) = float(int(ymengine::Generator::Chipdrum));
+    ymseq::Lane& l = h.state.seq.cur().edit(0);
+    l.pat[0] = 0;  // Kick
+    l.pat[4] = 1;  // Snare
+    pluginui::MainWindow w(h);
+    w.sequencer().show();
+    setSteps(h, w, 32);
+    auto lane = [&h]() -> const ymseq::Lane& { return h.state.seq.cur().lane(0); };
+    REQUIRE(ctrlKey(w, U'a'));
+    REQUIRE(grid(w).hasBlock());
+    CHECK(grid(w).blockLo() == 0);
+    CHECK(grid(w).blockHi() == 31);
+    w.openMenu(2);  // the Edit menu has no clipboard entries any more, the keys stay
+    const std::vector<std::string> items = menuLabels(w);
+    CHECK(std::find(items.begin(), items.end(), "Block: Copy") == items.end());
+    key(w, gemui::Key::Escape);  // closes the menu
+    REQUIRE(grid(w).hasBlock());
+    REQUIRE(ctrlKey(w, U'c'));
+    REQUIRE(h.editor.blockClip);
+    CHECK(h.editor.blockClip->n == 32);
+    REQUIRE(ctrlKey(w, U'x'));  // every step cut, in one undo step
+    CHECK(lane().pat[0] < 0);
+    CHECK(lane().pat[4] < 0);
+    ctrlKey(w, U'z');
+    CHECK(lane().pat[0] == 0);
+    CHECK(lane().pat[4] == 1);
 }

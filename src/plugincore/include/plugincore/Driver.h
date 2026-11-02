@@ -19,8 +19,9 @@
 // - non-automatable settings: frozen copies published by the message thread (publish());
 // - register recorder: take armed by the message thread, started and stopped by the audio thread at the
 //   start of a block according to playback, handed back to the message thread;
-// - YM Player: playback prepared by the message thread (YmPlayback), played by the audio thread
-//   instead of the engine output, which keeps running without being heard.
+// - YM Player: playback prepared by the message thread (YmPlayback, or for a project a second
+//   driver, OfflineRender), played by the audio thread instead of the engine output, which keeps running
+//   without being heard.
 // Audio thread: process() does not allocate, lock or free anything (Mailbox), except outside real time.
 #pragma once
 #include <array>
@@ -29,6 +30,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include "plugincore/Mailbox.h"
@@ -41,6 +43,8 @@
 
 namespace stym::plugin {
 
+class OfflineRender;
+
 // Commands from the interface to the sequencer, played in their place among the events (data: see each command).
 enum class UiCommand : uint8_t {
     None,
@@ -52,6 +56,7 @@ enum class UiCommand : uint8_t {
     DrumPreview, // audition of an instrument of the Chipdrum kit (Audition): data[0] slot (0-7)
     DmaPreview,  // preview of a slot of the DMA bank: data[0] slot (0-7), data[1] 1: stop
     DigiPreview, // preview of a Digidrum slot (editor): data[0] slot (0-7), data[1] 1: stop
+    KeysOff,     // a MIDI input is gone (standalone): the keys it held are released
 };
 
 // One event of a block, given to process() in time order: a host MIDI message, a note or CC from the editor
@@ -67,13 +72,12 @@ struct MidiEvent {
     UiCommand command = UiCommand::None;  // interface command (data: its arguments), otherwise a MIDI message
 };
 
-// Non-automatable settings seen by the audio thread: frozen copy and versions (a number changes when the matching
-// part changes, so that only what is needed is redone).
+// Non-automatable settings seen by the audio thread: frozen copy and version of the kit (the number changes when the
+// kit changes, so that it is computed again only then). The samples need no version: the engine reads the bytes of the
+// copy (SharedSamples), and a sample changed is a new buffer.
 struct Snapshot {
     NonParamState state;
     uint64_t kitVersion = 0;
-    std::array<uint64_t, ymengine::kDigidrumSlots> sampleVersion{};
-    std::array<uint64_t, ymengine::kDmaSlots> dmaVersion{};  // samples of the DMA bank
     // Patterns and Song played (fillSequence of state.seq); the engine reads them while this copy is the current one.
     ymengine::SeqData seq;
     // Changes when the engine must take state.seq.current as its pattern (state reloaded, preparation).
@@ -96,7 +100,7 @@ public:
     // Settings of prepare(): host rate (Hz) and separate outputs.
     struct Setup {
         uint32_t sampleRate = 48000;
-        uint16_t trackOutputs = 0;  // separate outputs prepared (bit n = track n)
+        uint32_t trackOutputs = 0;  // separate outputs prepared (bit n = track n)
     };
 
     Driver();
@@ -151,12 +155,23 @@ public:
     // notes; during playback, the main output is the tune's (separate outputs silent). A change of chain, resampling
     // or rate prepares a new chip that resumes playback where it is.
     void ymLoad(std::shared_ptr<const YmTune> tune);
+    // A project played in place of a tune: a second driver (OfflineRender) plays it from the start of its Song
+    // (`song`) or of its current pattern, in stereo with its own settings, and stops at the end, where Play starts it
+    // again; the project of this driver is untouched. Position counted in frames of 1/50 s, length unknown.
+    struct PlayerProject {
+        ParamValues values = defaultValues();
+        NonParamState extras;
+        bool song = false;
+        std::string name;  // name line of the YM PLAYER window
+    };
+    void ymLoadProject(std::shared_ptr<const PlayerProject> project);
     void ymPlay(bool on);
     void ymRewind();
     void ymSubsong(int subsong);
     void ymClose();
     // Message thread: tune loaded (nullptr: none) and subsong.
     std::shared_ptr<const YmTune> ymTune() const noexcept { return ymTune_; }
+    std::shared_ptr<const PlayerProject> ymProject() const noexcept { return ymProject_; }
     int ymSubsong() const noexcept { return ymSubsong_; }
     // Any thread: playback running (also false after a crashed SNDH routine stopped), position, registers.
     bool ymPlaying() const noexcept { return ymOn_.load(std::memory_order_acquire); }
@@ -180,14 +195,12 @@ public:
     uint64_t droppedMidi() const noexcept { return droppedMidi_; }
 
 private:
-    // An engine, the configuration it was prepared for, and the versions of the kit, samples and pattern selection
-    // already given to it: compared with those of the Snapshot so that only what changed is applied again.
+    // An engine, the configuration it was prepared for, and the versions of the kit and pattern selection already
+    // given to it: compared with those of the Snapshot so that only what changed is applied again.
     struct EngineSlot {
         ymengine::Engine engine;
         ConfigKey key;
         uint64_t kitVersion = 0;
-        std::array<uint64_t, ymengine::kDigidrumSlots> sampleVersion{};
-        std::array<uint64_t, ymengine::kDmaSlots> dmaVersion{};
         uint64_t patternSerial = 0;
     };
     // Transition in progress: a fade of fadeLeft_ samples, after which the new mode or machine is applied
@@ -198,6 +211,7 @@ private:
     static std::unique_ptr<Snapshot> copyOf(const Snapshot& snapshot);
     void takeSnapshot() noexcept;
     void applySnapshotData() noexcept;
+    void applySamples() noexcept;
     void requestConfig(const ParamValues& values, bool offline) noexcept;
     void sync(const ParamValues& values) noexcept;
     void applyAll(const ParamValues& values) noexcept;
@@ -220,6 +234,8 @@ private:
     void postYm(bool continues);
     void takeYm() noexcept;
     void renderYm(const ParamValues& values, const ymengine::Outputs& out, uint32_t n) noexcept;
+    void renderYmProject(OfflineRender& r, const ymengine::Outputs& out, uint32_t n) noexcept;
+    std::unique_ptr<OfflineRender> projectRender() const;  // message thread: driver of ymProject_ at the host rate
 
     Setup setup_;
     // Audio thread.
@@ -239,6 +255,7 @@ private:
     uint32_t requestSerial_ = 0;         // + 1 each time wantKey_ changes (high half of request_)
     std::array<double, kTracks> bend_{}, wheel_{}, press_{};  // to replay on a new engine
     std::array<uint8_t, kTracks> program_{};        // Program Change of each track, replayed likewise
+    std::array<uint16_t, 16> keyPads_{};            // keys 36 to 51 of each channel held as drum pads
     uint64_t swaps_ = 0;
     // Render outside real time in this block, and the value the global settings were last applied with (the
     // metronome depends on it, globalFor).
@@ -279,6 +296,7 @@ private:
     // YM Player: current playback (null playback: no tune), replaced by the message thread.
     struct YmSlot {
         std::unique_ptr<YmPlayback> playback;
+        std::unique_ptr<OfflineRender> project;  // a project played instead
         bool continues = false;  // resumes the previous playback (output settings changed)
         uint32_t serial = 0;     // number of the playback (loading, back to the start, subsong)
     };
@@ -292,8 +310,10 @@ private:
     // Frames played, then registers R0-R7 and R8-R13 packed one byte each, so that ymStatus() reads them lock-free.
     std::atomic<uint64_t> ymFrames_{0}, ymRegsLo_{0}, ymRegsHi_{0};
     std::atomic<bool> ymFailed_{false};
+    std::atomic<bool> ymEnded_{false};  // the project played has reached its end
     // Message thread.
     std::shared_ptr<const YmTune> ymTune_;
+    std::shared_ptr<const PlayerProject> ymProject_;
     int ymSubsong_ = 1;
     std::shared_ptr<ymio::SndhStream> ymStream_;
     ConfigKey ymKey_{};    // configuration and host rate the current playback was built with (compared by service())

@@ -7,6 +7,8 @@
 #include <cmath>
 
 #include "plugincore/Instruments.h"
+#include "plugincore/Offline.h"
+#include "plugincore/SteMemory.h"
 
 namespace stym::plugin {
 
@@ -22,7 +24,9 @@ enum QType : uint8_t {
     qDigiPreview,  // preview of a Digidrum slot; value 1: stop it
     qProgram,      // Program Change
     qYmPlay,       // start of the YM Player (ymplay): manual play and sequencer released
-    qPressure, qNotePressure, qMpeBend, qMpePressure, qMpeSlide  // MIDI expression
+    qPressure, qNotePressure, qMpeBend, qMpePressure, qMpeSlide,  // MIDI expression
+    qPadOn, qPadOff,  // drum pads
+    qKeysOff          // the MIDI controller is gone
 };
 
 // Key on 29 bits: clock, chain and resampling on 2 bits each, then the frequency of the Custom clock on 23 bits;
@@ -57,7 +61,8 @@ bool isMixField(int f) noexcept {
     case Track::LevelR:
     case Track::MuteR:
     case Track::SoloR:
-    case Track::Link: return true;
+    case Track::Link:
+    case Track::Mono: return true;
     default: return false;
     }
 }
@@ -73,15 +78,18 @@ bool isEngineGlobal(int g) noexcept {
     case Global::SteTreble:
     case Global::Mpe:           // MPE: read by the driver
     case Global::MpeBendRange:
+    case Global::DrumPads:      // drum pads: read by the driver
+    case Global::VelocityCurve:  // curves of the controller: applied by the driver
+    case Global::AftertouchCurve:
     case Global::Gate:  // global gate: carried by the tracks (trackGate)
     case Global::GateAll: return false;
     default: return true;
     }
 }
 
-// MPE: in 16 ch only, where every note has its own channel of the chip.
+// MPE: in the studio modes only, where every note has its own channel of the chip.
 bool mpeOn(const ParamValues& v) noexcept {
-    return value(v, Global::Mpe) >= 0.5f && voiceMode(v) == VoiceMode::Studio16;
+    return value(v, Global::Mpe) >= 0.5f && studioMode(voiceMode(v));
 }
 
 // The same outputs from sample `at` of the block on, for a render segment that starts there.
@@ -134,15 +142,17 @@ std::unique_ptr<Driver::EngineSlot> Driver::build(const ConfigKey& key, const Pa
     e.setGlobal(g);
     for (int t = 0; t < kTracks; ++t) e.setTrack(t, toTrack(values, t, snap.state.tracks[size_t(t)]));
     e.setKit(snap.state.kit);
-    for (int i = 0; i < kDigidrumSlots; ++i) {
-        e.setUserSample(i, snap.state.digidrums[size_t(i)]);
+    for (int i = 0; i < kDigidrumSlotsMax; ++i)
         e.setDigidrumSlot(i, digidrumEngineSlot(snap.state.digiSlots[size_t(i)]));
-    }
     e.setDma(snap.state.dma);
-    for (int i = 0; i < kDmaSlots; ++i) e.setDmaSample(i, snap.state.dmaSamples[size_t(i)]);
+    // The samples of `snap`, those that do not fit in the memory of the Atari left out. The engine reads them
+    // where they are: before it plays, applySnapshotData points it again at those of the copy of the audio thread.
+    const SteMemory mem = steMemory(snap.state, voiceMode(values), steMachine(values));
+    for (int i = 0; i < kDigidrumSlotsMax; ++i)
+        if (!mem.digiMuted[size_t(i)]) e.shareUserSample(i, snap.state.digidrums[size_t(i)]);
+    for (int i = 0; i < kDmaSlotsMax; ++i)
+        if (!mem.dmaMuted[size_t(i)]) e.shareDmaSample(i, snap.state.dmaSamples[size_t(i)]);
     s->kitVersion = snap.kitVersion;
-    s->sampleVersion = snap.sampleVersion;
-    s->dmaVersion = snap.dmaVersion;
     e.prepare(engineConfig(key, values, setup_.sampleRate, setup_.trackOutputs));
     return s;
 }
@@ -189,6 +199,7 @@ void Driver::prepare(const Setup& setup, const ParamValues& values, const Snapsh
     wheel_.fill(0);
     press_.fill(0);
     program_.fill(0);
+    keyPads_.fill(0);
     qHead_ = qTail_ = 0;
     appliedValid_ = false;
     applyAll(values);
@@ -210,6 +221,13 @@ void Driver::prepare(const Setup& setup, const ParamValues& values, const Snapsh
         ymSlot_ = pending;
     }
     ymBox_.clear();
+    // A project played: its driver follows the host rate, from the start.
+    if (ymSlot_ && ymSlot_->project && ymProject_ &&
+        ymSlot_->project->sampleRate() != std::max<uint32_t>(8000, setup_.sampleRate)) {
+        ymSlot_->project = projectRender();
+        ymPosition_.store(0, std::memory_order_relaxed);
+        ymFrames_.store(0, std::memory_order_relaxed);
+    }
     if (ymSlot_ && ymSlot_->playback && ymTune_) {
         auto p = std::make_unique<YmPlayback>(ymTune_, ymSubsong_, ymRender_, ymStream_);
         p->continueFrom(*ymSlot_->playback);
@@ -306,7 +324,7 @@ void Driver::runRecorder(const ParamValues& values) noexcept {
         return;
     }
     // Armed: the take starts at the first block that plays in a 3-channel mode, outside a transition.
-    if (!playing || action_ != Action::None || voiceMode(values) == VoiceMode::Studio16) return;
+    if (!playing || action_ != Action::None || studioMode(voiceMode(values))) return;
     e.startCapture(rec_->take.chip, rec_->frames);
     if (!e.capturing()) return;  // chip absent (a single chip): the take stays armed
     rolling_ = true;
@@ -341,26 +359,17 @@ void Driver::takeSnapshot() noexcept {
 }
 
 void Driver::applySnapshotData() noexcept {
-    // Kit and samples: only what changed. setKit recomputes the kit on this thread (a few hundred microseconds,
-    // a known limit).
+    // Kit: only when it changed. setKit recomputes the kit on this thread (a few hundred microseconds, a known
+    // limit).
     EngineSlot& s = *slot_;
     if (s.kitVersion != snapshot_->kitVersion) {
         s.engine.setKit(snapshot_->state.kit);
         s.kitVersion = snapshot_->kitVersion;
     }
-    for (int i = 0; i < kDigidrumSlots; ++i)
-        if (s.sampleVersion[size_t(i)] != snapshot_->sampleVersion[size_t(i)]) {
-            s.engine.setUserSample(i, snapshot_->state.digidrums[size_t(i)]);
-            s.sampleVersion[size_t(i)] = snapshot_->sampleVersion[size_t(i)];
-        }
-    for (int i = 0; i < kDigidrumSlots; ++i)
+    for (int i = 0; i < kDigidrumSlotsMax; ++i)
         s.engine.setDigidrumSlot(i, digidrumEngineSlot(snapshot_->state.digiSlots[size_t(i)]));
     s.engine.setDma(snapshot_->state.dma);
-    for (int i = 0; i < kDmaSlots; ++i)
-        if (s.dmaVersion[size_t(i)] != snapshot_->dmaVersion[size_t(i)]) {
-            s.engine.setDmaSample(i, snapshot_->state.dmaSamples[size_t(i)]);
-            s.dmaVersion[size_t(i)] = snapshot_->dmaVersion[size_t(i)];
-        }
+    applySamples();
     s.engine.setSequence(&snapshot_->seq);
     s.engine.setInstruments(&snapshot_->instruments);
     if (s.patternSerial != snapshot_->patternSerial) {
@@ -409,6 +418,26 @@ void Driver::requestConfig(const ParamValues& values, bool offline) noexcept {
     }
 }
 
+// The engine reads the samples of the current copy, those that do not fit in the memory of the Atari in a 3-channel
+// mode replaced by nothing (silent): each slot whose bytes are not those it already reads is given again (the
+// voices playing it stop). Without allocation: the bytes stay those of the copy, kept until the next one is applied.
+void Driver::applySamples() noexcept {
+    Engine& e = slot_->engine;
+    const NonParamState& st = snapshot_->state;
+    const SteMemory mem = steMemory(st, appliedMode_, appliedSte_);
+    auto same = [](auto now, auto want) { return now.data() == want.data() && now.size() == want.size(); };
+    for (int i = 0; i < kDigidrumSlotsMax; ++i) {
+        const std::span<const uint8_t> want =
+            mem.digiMuted[size_t(i)] ? std::span<const uint8_t>{} : st.digidrums[size_t(i)].span();
+        if (!same(e.userSample(i), want)) e.shareUserSample(i, want);
+    }
+    for (int i = 0; i < kDmaSlotsMax; ++i) {
+        const std::span<const int8_t> want =
+            mem.dmaMuted[size_t(i)] ? std::span<const int8_t>{} : st.dmaSamples[size_t(i)].span();
+        if (!same(e.dmaSample(i), want)) e.shareDmaSample(i, want);
+    }
+}
+
 // Every parameter and track setting applied to the current engine, whatever changed.
 void Driver::applyAll(const ParamValues& values) noexcept {
     Engine& e = slot_->engine;
@@ -423,6 +452,7 @@ void Driver::applyAll(const ParamValues& values) noexcept {
     }
     appliedMode_ = voiceMode(values);
     appliedSte_ = steMachine(values);
+    applySamples();  // the memory of the Atari limits the samples in the 3-channel modes only
     applied_ = values;
     appliedValid_ = true;
     extrasDirty_ = false;
@@ -453,7 +483,8 @@ void Driver::sync(const ParamValues& values) noexcept {
     bool global = extrasDirty_ || offline_ != appliedOffline_;
     for (int g = 0; g < kGlobalParams && !global; ++g)
         if (isEngineGlobal(g) && changed(g)) global = true;
-    if (changed(paramIndex(Global::MidiRouting))) e.allNotesOff(0);  // the held notes change destination
+    // The held notes change destination.
+    if (changed(paramIndex(Global::MidiRouting)) || changed(paramIndex(Global::DrumPads))) e.allNotesOff(0);
     if (global) {
         e.setGlobal(globalFor(values));
         appliedOffline_ = offline_;
@@ -585,6 +616,9 @@ void Driver::renderTo(const Outputs& out, uint32_t to) noexcept {
         case qDigiPreview: q.value > 0 ? e.digidrumStopPreview(rel) : e.digidrumPreview(rel, q.a); break;
         case qDmaPreview: q.value > 0 ? e.dmaStopPreview(rel) : e.dmaPreview(rel, q.a); break;
         case qProgram: e.programChange(rel, q.a, q.track); break;
+        case qPadOn: e.drumPad(rel, q.a, q.b, q.track); break;
+        case qPadOff: e.drumPadOff(rel, q.a); break;
+        case qKeysOff: e.releaseKeys(rel); break;
         case qYmPlay: e.releaseForPlayer(rel); break;
         default: break;
         }
@@ -650,7 +684,7 @@ bool Driver::controlChange(ParamValues& values, int cc, int v, int channel, uint
 
     // Controllers of the prototype (onCC): parameters of the focused track, or of the channel's track. The same
     // arithmetic as onCC: most values 0-127 span the slider's range (v / 127 × span, Math.round), switches are on
-    // from 64, shape and focused track take v / 8.
+    // from 64, the shape takes v / 8 and the focused track v / 8 over 16 tracks, v / 4 over the 32 of 32 ch.
     const int t = perChannel ? channel : std::clamp(intValue(values, Global::FocusTrack), 1, kTracks) - 1;
     int index = -1;
     float nv = 0;
@@ -673,7 +707,10 @@ bool Driver::controlChange(ParamValues& values, int cc, int v, int channel, uint
     case 80: index = paramIndex(t, Track::ArpOn), nv = v >= 64 ? 1.0f : 0.0f; break;
     case 81: index = paramIndex(t, Track::ArpRate), nv = float(4 + jsRound(double(v) / 127.0 * 196.0)); break;
     case 83: index = paramIndex(Global::FreeTempo), nv = float(60 + jsRound(double(v) / 127.0 * 180.0)); break;
-    case 84: index = paramIndex(Global::FocusTrack), nv = float(std::min(kTracks - 1, v >> 3) + 1); break;
+    case 84:
+        index = paramIndex(Global::FocusTrack);
+        nv = float(voiceMode(values) == VoiceMode::Studio32 ? std::min(kTracks - 1, v >> 2) + 1 : (v >> 3) + 1);
+        break;
     case 7: index = paramIndex(Global::Master), nv = float(jsRound(double(v) / 127.0 * 100.0)); break;
     default: return false;  // the others are not assigned
     }
@@ -704,10 +741,14 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     case UiCommand::SeqSongJump: queue(at, qSeqSongJump, -1, 0, 0, double(e.data[0] | e.data[1] << 8)); return;
     case UiCommand::DrumPreview: queue(at, qDrumPreview, -1, std::min<int>(e.data[0], kDrumSlots - 1), 0, 0); return;
     case UiCommand::DmaPreview:
-        queue(at, qDmaPreview, -1, std::min<int>(e.data[0], kDmaSlots - 1), 0, e.data[1] ? 1 : 0);
+        queue(at, qDmaPreview, -1, std::min<int>(e.data[0], kDmaSlotsMax - 1), 0, e.data[1] ? 1 : 0);
         return;
     case UiCommand::DigiPreview:
-        queue(at, qDigiPreview, -1, std::min<int>(e.data[0], kDigidrumSlots - 1), 0, e.data[1] ? 1 : 0);
+        queue(at, qDigiPreview, -1, std::min<int>(e.data[0], kDigidrumSlotsMax - 1), 0, e.data[1] ? 1 : 0);
+        return;
+    case UiCommand::KeysOff:
+        keyPads_.fill(0);
+        queue(at, qKeysOff, -1, 0, 0, 0);
         return;
     }
     if (e.size == 0) return;
@@ -727,12 +768,57 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     const int ch = st & 0x0f;
     const int d1 = e.size > 1 ? e.data[1] & 0x7f : 0;
     const int d2 = e.size > 2 ? e.data[2] & 0x7f : 0;
+    // Velocity of a controller's note-on and its pressure through their curves; the on-screen keyboard plays
+    // as it is.
+    const int vel = e.screen ? d2 : curvedVelocity(values, d2);
+    auto pressure = [&values](int raw) { return double(curvedPressure(values, raw)) / 127.0; };
     // MPE: channels 2 to 16 (members) play a note each, with its own bend, pressure and CC74; channel 1 (the
     // master) and the other messages act on all the notes. The notes go where the keyboard plays (focused track or
     // Layer), per channel routing aside.
     const bool mpe = !e.screen && mpeOn(values);
     const int member = mpe ? ch : 0;
     const int track = !e.screen && !mpe && midiRouting(values) == MidiRouting::PerChannel ? ch : -1;
+    // Drum pads: the notes of their channel play the Chipdrum sounds and the Digidrum samples, those outside
+    // the pads nothing; the pressure of the pads is left out (it would move the vibrato of the melodic tracks).
+    if (!e.screen && drumPadChannel(values) == ch + 1) {
+        const int pad = drumPadOf(values, ch, d1);
+        switch (st & 0xf0) {
+        case 0x90:
+        case 0x80:
+            if (e.size < 3 || pad < 0) return;
+            if ((st & 0xf0) == 0x80 || d2 == 0) queue(at, qPadOff, -1, pad, 0, 0);
+            else if (action_ == Action::None) queue(at, qPadOn, -1, pad, vel, 0);
+            return;
+        case 0xa0:
+        case 0xd0: return;
+        default: break;
+        }
+    }
+    // Drum keys: the keys 36 to 51 (C2 to D#3) that reach a drum track (the channel's track with routing by
+    // channel, the focused track otherwise) play the drum pads, as on the Drum pads channel: pads sending on the
+    // keyboard's channel, or a host that sends every note on channel 1, play the kit. The release follows the key,
+    // even when the focused track has changed in between.
+    if (!e.screen && e.size >= 3 && ((st & 0xf0) == 0x90 || (st & 0xf0) == 0x80)) {
+        const int pad = d1 - kDrumPadFirstNote;
+        if (pad >= 0 && pad < ymengine::kDrumPads) {
+            const uint16_t bit = uint16_t(1u << pad);
+            uint16_t& keys = keyPads_[size_t(ch)];
+            if ((st & 0xf0) == 0x90 && d2 > 0) {
+                const int to = track >= 0 ? track : std::clamp(intValue(values, Global::FocusTrack), 1, kTracks) - 1;
+                const ymengine::Generator g = effectiveGenerator(values, to);
+                if (g == ymengine::Generator::Chipdrum || g == ymengine::Generator::Digidrum) {
+                    keys |= bit;
+                    if (action_ == Action::None) queue(at, qPadOn, track, pad, vel, 0);
+                    return;
+                }
+                keys &= uint16_t(~bit);
+            } else if (keys & bit) {
+                keys &= uint16_t(~bit);
+                queue(at, qPadOff, track, pad, 0, 0);
+                return;
+            }
+        }
+    }
     if (e.screen && (st & 0xf0) == 0xb0) {
         if (d1 == 120) queue(at, qManOff, -1, 0, 0, 0);
         else if (d1 == 123) queue(at, qAllOff, -1, 0, 0, 0);
@@ -744,7 +830,7 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
         if (d2 == 0) {
             queue(at, qNoteOff, track, d1, 0, member);
         } else if (action_ == Action::None) {  // during a transition fade, the notes are ignored
-            queue(at, qNoteOn, track, d1, d2, member);
+            queue(at, qNoteOn, track, d1, vel, member);
         }
         return;
     case 0x80:
@@ -783,7 +869,7 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     case 0xd0: {
         // Channel pressure: that of the tracks, kept for a new engine; that of an MPE member, of its notes.
         if (e.size < 2) return;
-        const double amount = double(d1) / 127.0;
+        const double amount = pressure(d1);
         if (member) {
             queue(at, qMpePressure, -1, member, 0, amount);
             return;
@@ -795,10 +881,10 @@ void Driver::midi(ParamValues& values, const MidiEvent& e, uint32_t at, const Ou
     }
     case 0xa0:  // polyphonic pressure: of one note (an MPE member has its channel pressure)
         if (e.size < 3 || member) return;
-        queue(at, qNotePressure, track, d1, 0, double(d2) / 127.0);
+        queue(at, qNotePressure, track, d1, 0, pressure(d2));
         return;
     case 0xc0: {
-        // Program Change n: instrument n (1 to 32) on the channel's track (per-channel routing), the focused
+        // Program Change n: instrument n (1 to 127) on the channel's track (per-channel routing), the focused
         // track (Omni) or all tracks (Layer, which plays them together); 0 gives the track its own sound back; above
         // 32, ignored. The on-screen keyboard does not send any.
         if (e.size < 2 || d1 > kInstruments) return;
@@ -831,28 +917,50 @@ void Driver::postYm(bool continues) {
         ymRate_ = setup_.sampleRate;
     } else {
         ymStream_ = nullptr;
+        if (ymProject_) slot->project = projectRender();
     }
     ymBox_.collect();
     ymBox_.post(std::move(slot));
 }
 
+std::unique_ptr<OfflineRender> Driver::projectRender() const {
+    const PlayerProject& p = *ymProject_;
+    return std::make_unique<OfflineRender>(p.song ? OfflineRender::Source::Song : OfflineRender::Source::Pattern,
+                                           setup_.sampleRate, p.values, p.extras);
+}
+
 void Driver::ymLoad(std::shared_ptr<const YmTune> tune) {
     ymOn_.store(false, std::memory_order_release);
     ymFailed_.store(false, std::memory_order_relaxed);
+    ymEnded_.store(false, std::memory_order_relaxed);
+    ymProject_ = nullptr;
     ymTune_ = std::move(tune);
     ymSubsong_ = ymTune_ ? ymTune_->defaultSubsong() : 1;
     postYm(false);
 }
 
+void Driver::ymLoadProject(std::shared_ptr<const PlayerProject> project) {
+    ymOn_.store(false, std::memory_order_release);
+    ymFailed_.store(false, std::memory_order_relaxed);
+    ymEnded_.store(false, std::memory_order_relaxed);
+    ymTune_ = nullptr;
+    ymProject_ = std::move(project);
+    ymSubsong_ = 1;
+    postYm(false);
+}
+
 void Driver::ymPlay(bool on) {
-    if (!ymTune_) return;
+    if (!ymTune_ && !ymProject_) return;
+    // A project played to its end starts again from the beginning.
+    if (on && ymEnded_.exchange(false, std::memory_order_acq_rel)) postYm(false);
     if (on) ymPlaySerial_.fetch_add(1, std::memory_order_acq_rel);
     ymOn_.store(on, std::memory_order_release);
 }
 
 void Driver::ymRewind() {
-    if (!ymTune_) return;
+    if (!ymTune_ && !ymProject_) return;
     ymFailed_.store(false, std::memory_order_relaxed);
+    ymEnded_.store(false, std::memory_order_relaxed);
     postYm(false);
     ymPlay(true);
 }
@@ -866,7 +974,9 @@ void Driver::ymSubsong(int subsong) {
 
 void Driver::ymClose() {
     ymOn_.store(false, std::memory_order_release);
+    ymEnded_.store(false, std::memory_order_relaxed);
     ymTune_ = nullptr;
+    ymProject_ = nullptr;
     postYm(false);
 }
 
@@ -900,6 +1010,10 @@ void Driver::takeYm() noexcept {
 // Output of the tune instead of the engine's: mono, output law of the engine in 3 channels (gain3 × volume × 1.2,
 // tanh saturation according to the setting), like the YM Player output of the prototype (tanh(Σ × master × 1.2)).
 void Driver::renderYm(const ParamValues& values, const Outputs& out, uint32_t n) noexcept {
+    if (OfflineRender* r = ymSlot_ ? ymSlot_->project.get() : nullptr) {
+        renderYmProject(*r, out, n);
+        return;
+    }
     YmPlayback* p = ymSlot_ ? ymSlot_->playback.get() : nullptr;
     if (!p || !ymOn_.load(std::memory_order_acquire) || n == 0 || !out.left) return;
     const int bass = intValue(values, Global::SteBass), treble = intValue(values, Global::SteTreble);
@@ -933,6 +1047,40 @@ void Driver::renderYm(const ParamValues& values, const Outputs& out, uint32_t n)
         ymFailed_.store(true, std::memory_order_relaxed);
         ymOn_.store(false, std::memory_order_release);
     }
+}
+
+// A project played: the stereo output of its driver, with its own settings; silence after its end, where
+// playback stops.
+void Driver::renderYmProject(OfflineRender& r, const Outputs& out, uint32_t n) noexcept {
+    if (!ymOn_.load(std::memory_order_acquire) || n == 0 || !out.left) return;
+    float* right = out.right ? out.right : out.left;
+    uint32_t done = 0;
+    while (done < n) {
+        Outputs o;
+        o.left = out.left + done;
+        o.right = right + done;
+        const uint32_t got = r.render(o, n - done);
+        if (got == 0) break;
+        done += got;
+    }
+    if (done < n) {
+        std::fill(out.left + done, out.left + n, 0.0f);
+        std::fill(right + done, right + n, 0.0f);
+        ymEnded_.store(true, std::memory_order_release);
+        ymOn_.store(false, std::memory_order_release);
+    }
+    for (float* t : out.track)
+        if (t) std::fill(t, t + n, 0.0f);
+    for (float* c : out.chip)
+        if (c) std::fill(c, c + n, 0.0f);
+    if (out.click) std::fill(out.click, out.click + n, 0.0f);
+    uint64_t lo = 0, hi = 0;
+    for (unsigned k = 0; k < 14; ++k) (k < 8 ? lo : hi) |= uint64_t(r.reg(k)) << (8 * (k < 8 ? k : k - 8));
+    ymRegsLo_.store(lo, std::memory_order_relaxed);
+    ymRegsHi_.store(hi, std::memory_order_relaxed);
+    const uint64_t frames = r.position() * 50 / r.sampleRate();
+    ymPosition_.store(uint32_t(frames), std::memory_order_relaxed);
+    ymFrames_.store(frames, std::memory_order_relaxed);
 }
 
 void Driver::process(ParamValues& values, std::span<const MidiEvent> midiIn, const Outputs& out, uint32_t n,

@@ -4,6 +4,7 @@
 #include "plugincore/MidiFiles.h"
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 
 #include "plugincore/Mapping.h"
@@ -39,35 +40,66 @@ std::vector<int> midiImportTracks(VoiceMode mode) {
     switch (mode) {
     case VoiceMode::Authentic3: return {0, 1, 2};
     case VoiceMode::Dual3: return {0, 1, 2, 4, 5, 6};
-    case VoiceMode::Studio16: break;
+    case VoiceMode::Studio16:
+    case VoiceMode::Studio32: break;
     }
-    std::vector<int> all(kTracks);
-    for (int t = 0; t < kTracks; ++t) all[size_t(t)] = t;
+    std::vector<int> all(size_t(studioTracks(mode)));
+    for (int t = 0; t < studioTracks(mode); ++t) all[size_t(t)] = t;
     return all;
 }
 
-std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mode, ymseq::Project& project) {
+std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mode, ymseq::Project& project,
+                                     const MidiImportOptions& options) {
     const std::optional<ymio::SmfSong> m = ymio::readSmf(file);
     if (!m || m->notes.empty()) return std::nullopt;
-    const double spq = m->division / 4.0;  // ticks per sixteenth note
+    const double spq = m->division / std::max(options.stepsPerQuarter, 0.25);  // ticks per step
     auto st = [spq](int64_t t) { return jsRound(double(t) / spq); };
     int64_t total = 0;
     for (const ymio::SmfNote& n : m->notes) total = std::max(total, st(n.end));
-    // Enough patterns of N steps for the last note end, 1 to 32.
-    const int N = project.steps();
-    const int nPat = int(std::clamp<int64_t>((total + N - 1) / N, 1, ymseq::kPatterns));
-    // Channels → tracks, in order of appearance in the note list (readSmf adds a note when it closes): melodic ones,
-    // then channel 10.
+    // The patterns from the current one. Their length: that of the file in whole bars, in one pattern
+    // up to 256 steps, otherwise in patterns of the most bars that 256 steps hold, the last one of the bars left; or
+    // (prototype) that of the current pattern. As many patterns as the file needs, up to the last one (32).
+    const int first = std::clamp(project.current, 0, ymseq::kPatterns - 1), room = ymseq::kPatterns - first;
+    int N = project.steps(), lastN = N, nPat = 1;
+    if (options.fit) {
+        const int bar = std::clamp(options.barSteps, 1, ymseq::kSteps);
+        const int64_t length = std::max<int64_t>(bar, (total + bar - 1) / bar * bar);
+        N = length <= ymseq::kSteps ? int(length) : ymseq::kSteps / bar * bar;
+        nPat = int(std::clamp<int64_t>((length + N - 1) / N, 1, room));
+        lastN = int(std::min<int64_t>(N, length - int64_t(nPat - 1) * N));
+    } else {
+        nPat = int(std::clamp<int64_t>((total + N - 1) / N, 1, room));
+    }
+    // Channels → tracks, in order of appearance in the note list (readSmf adds a note when it closes). A file with one
+    // channel fills the focused track, as drums when that track plays Chipdrum or Digidrum, whatever the
+    // channel. Otherwise the melodic channels, then channel 10, on the tracks of the mode.
     std::vector<int> chans;
     for (const ymio::SmfNote& n : m->notes)
         if (std::find(chans.begin(), chans.end(), n.channel) == chans.end()) chans.push_back(n.channel);
-    std::vector<int> order;
-    for (int c : chans)
-        if (c != 9) order.push_back(c);
-    for (int c : chans)
-        if (c == 9) order.push_back(c);
-    const std::vector<int> tracks = midiImportTracks(mode);
-    if (order.size() > tracks.size()) order.resize(tracks.size());
+    const bool one = chans.size() == 1 && options.track >= 0 && options.track < kTracks;
+    const int drumCh = one && options.trackDrums ? chans[0] : 9;
+    const bool percussion = std::find(chans.begin(), chans.end(), drumCh) != chans.end();
+    // Digidrum in 3 channels: channel 10 on a Digidrum track (the focused track's chip, or the first chip),
+    // after the channels of the chips; otherwise on the next track of the mode.
+    const bool digidrumTrack = percussion && !(one && options.trackDrums) && options.drums == Generator::Digidrum &&
+                               !studioMode(mode);
+    std::vector<int> order, tracks;
+    if (one) {
+        order = {chans[0]};
+        const bool chip = options.track < 4 * chipCount(mode);
+        tracks = {!digidrumTrack ? options.track : chip ? options.track / 4 * 4 + 3 : kMidiDigidrumTrack};
+    } else {
+        for (int c : chans)
+            if (c != 9) order.push_back(c);
+        if (percussion && !digidrumTrack) order.push_back(9);
+        tracks = midiImportTracks(mode);
+        if (order.size() > tracks.size()) order.resize(tracks.size());
+        tracks.resize(order.size());
+        if (digidrumTrack) {
+            order.push_back(9);
+            tracks.push_back(kMidiDigidrumTrack);
+        }
+    }
 
     // The rows of each imported channel over the whole file (nPat × N steps), cut into patterns afterwards. A step
     // without a note is -1 at VOL 15.
@@ -76,7 +108,7 @@ std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mo
         std::vector<int8_t> oct;
         std::vector<uint8_t> tie, vol;
     };
-    const size_t T = size_t(nPat) * size_t(N);
+    const size_t T = size_t(nPat - 1) * size_t(N) + size_t(lastN);
     std::vector<Rows> lanes(order.size(), Rows{std::vector<int16_t>(T, -1), std::vector<int8_t>(T, 0),
                                                std::vector<uint8_t>(T, 0), std::vector<uint8_t>(T, 15)});
     for (const ymio::SmfNote& n : m->notes) {
@@ -87,7 +119,7 @@ std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mo
         if (a >= int64_t(T)) continue;
         Rows& L = lanes[i];
         const auto s0 = size_t(a);
-        if (n.channel == 9) {
+        if (n.channel == drumCh) {
             L.pat[s0] = int16_t(gmSlot(n.note));
             L.oct[s0] = 0;
         } else {
@@ -104,41 +136,69 @@ std::optional<MidiImport> importMidi(std::span<const uint8_t> file, VoiceMode mo
         }
         L.vol[s0] = uint8_t(std::clamp<int64_t>(jsRound(n.velocity / 127.0 * 15), 1, 15));
         // The VOL of each step of a held note applies: the velocity over the whole note.
-        for (int64_t s = a + 1; s < std::min<int64_t>(b, int64_t(T)) && n.channel != 9; ++s)
+        for (int64_t s = a + 1; s < std::min<int64_t>(b, int64_t(T)) && n.channel != drumCh; ++s)
             if (L.pat[size_t(s)] < 0 && L.tie[size_t(s)]) L.vol[size_t(s)] = L.vol[s0];
     }
 
     MidiImport r;
     r.tracks = int(order.size());
+    r.first = first;
     r.patterns = nPat;
     r.steps = N;
+    r.lastSteps = lastN;
     r.bpm = m->bpm;
     r.truncated = total > int64_t(T);
+    r.percussion = percussion;
+    std::bitset<kTracks> filled;
     for (size_t i = 0; i < order.size(); ++i) {
+        filled.set(size_t(tracks[i]));
         r.on[size_t(tracks[i])] = true;
-        r.drum[size_t(tracks[i])] = order[i] == 9;
+        r.drum[size_t(tracks[i])] = order[i] == drumCh;
+        project.tracks[size_t(tracks[i])].length = 0;  // the filled tracks play the whole pattern
     }
-    // Tempo outside the range of the free tempo: carried by the Song entries (deviation).
-    const int entryBpm = r.bpm == std::clamp(r.bpm, 60, 240) ? 0 : r.bpm;
-    project.song.entries.clear();
+    // The tracks the file fills are replaced in the patterns it takes; the others keep their notes. A pattern
+    // whose other tracks hold notes keeps its length when the file's part is shorter (the part then repeats over it),
+    // and takes the part's length when it is longer (the other tracks then repeat their steps over the added ones);
+    // otherwise it takes the part's length, as before.
     for (int k = 0; k < nPat; ++k) {
-        ymseq::Pattern p;
-        p.steps = N;
+        const size_t idx = size_t(first + k);
+        ymseq::Pattern p =
+            project.used.test(idx) || int(idx) == project.current ? project.patterns[idx] : ymseq::Pattern{};
+        const int part = k == nPat - 1 ? lastN : N;
+        bool others = false;
+        for (int t = 0; t < kTracks && !others; ++t) others = !filled.test(size_t(t)) && p.lane(t).hasNotes(p.steps);
+        r.kept |= others;
+        const int steps = others ? std::max(p.steps, part) : part;
+        if (others && steps > p.steps) {
+            for (int t = 0; t < kTracks; ++t)
+                if (!filled.test(size_t(t)) && !p.lane(t).empty()) p.edit(t).repeat(p.steps, steps);
+            for (int s = p.steps; s < steps; ++s) p.bpm[size_t(s)] = p.bpm[size_t(s % p.steps)];
+        }
+        p.steps = steps;
         for (size_t i = 0; i < order.size(); ++i) {
             const Rows& L = lanes[i];
+            p.lanes[size_t(tracks[i])] = nullptr;
             ymseq::Lane& l = p.edit(tracks[i]);
-            for (int s = 0; s < N; ++s) {
+            for (int s = 0; s < part; ++s) {
                 const size_t g = size_t(k) * size_t(N) + size_t(s);
                 l.pat[size_t(s)] = L.pat[g];
                 l.oct[size_t(s)] = L.oct[g];
                 l.tie[size_t(s)] = L.tie[g];
                 l.vol[size_t(s)] = L.vol[g];
             }
+            l.repeat(part, steps);
         }
         p.compact();
-        project.patterns[size_t(k)] = std::move(p);
-        project.used.set(size_t(k));
-        project.song.entries.push_back({k, 1, entryBpm, ymseq::SongKind::Pattern, 0, false});
+        project.patterns[idx] = std::move(p);
+        project.used.set(idx);
+    }
+    // The Song: one entry per pattern taken when it was empty; otherwise it stays. A tempo outside the range
+    // of the free tempo is carried by those entries (deviation).
+    if (project.song.entries.empty()) {
+        const int entryBpm = r.bpm == std::clamp(r.bpm, 60, 240) ? 0 : r.bpm;
+        for (int k = 0; k < nPat; ++k)
+            project.song.entries.push_back({first + k, 1, entryBpm, ymseq::SongKind::Pattern, 0, false});
+        r.song = true;
     }
     return r;
 }
@@ -147,10 +207,14 @@ float midiImportTempo(const MidiImport& r) noexcept { return float(std::clamp(r.
 
 std::vector<std::string> midiImportMessage(const MidiImport& r, const std::string& fileName) {
     auto plural = [](int n, const char* word) { return std::to_string(n) + ' ' + word + (n > 1 ? "s" : ""); };
+    // The last pattern shorter: its length after the others'.
+    const std::string last = r.lastSteps != r.steps ? " (the last of " + std::to_string(r.lastSteps) + ")" : "";
     std::vector<std::string> lines = {"MIDI imported", "", fileName,
                                       plural(r.tracks, "track") + ", " + plural(r.patterns, "pattern") + " of " +
-                                          std::to_string(r.steps) + " steps, " + std::to_string(r.bpm) + " BPM."};
+                                          std::to_string(r.steps) + " steps" + last + ", " + std::to_string(r.bpm) +
+                                          " BPM."};
     if (r.truncated) lines.emplace_back("The file was longer and has been truncated.");
+    if (r.kept) lines.emplace_back("The other tracks and the tempo stay.");  // merged with other tracks
     return lines;
 }
 
@@ -160,7 +224,7 @@ MidiExportCapture::MidiExportCapture(const ParamValues& values, const NonParamSt
     : rate_(std::max<uint32_t>(1, sampleRate)) {
     const VoiceMode mode = voiceMode(values);
     const bool ste = steMachine(values);
-    studio_ = mode == VoiceMode::Studio16;
+    studio_ = studioMode(mode);
     for (int t = 0; t < kTracks; ++t) {
         const Generator g = effectiveGenerator(values, t);
         drum_[size_t(t)] = g == Generator::Digidrum || g == Generator::Chipdrum;
@@ -259,10 +323,10 @@ void MidiExportCapture::feed(std::span<const Engine::SeqLogRecord> log) {
         case 'S':
             if (voice) slideTo_[size_t(v)] = int(std::clamp<int64_t>(jsRound(r.x), 0, 127));
             break;
-        case 'L':  // arrival of a slide: the arrival note, at the accent logged in x (16 channels)
+        case 'L':  // arrival of a slide: the arrival note, at the accent logged in x (16 and 32 channels)
             if (voice && open_[size_t(v)].on && slideTo_[size_t(v)] >= 0 && !drum_[size_t(open_[size_t(v)].track)] &&
                 slideTo_[size_t(v)] != open_[size_t(v)].key) {
-                // In 16 channels the arrival note takes its velocity from the record's z; otherwise it keeps the
+                // In 16 and 32 channels the arrival note takes its velocity from the record's z; otherwise it keeps the
                 // velocity of the note it replaces.
                 const Open o = open_[size_t(v)];
                 close(v, r.sample);

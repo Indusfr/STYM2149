@@ -5,24 +5,36 @@
 // Fields, ranges and defaults of the prototype (mkCh, GLOB and the worklet), in the units of the plugin:
 // the envelope period is that of the chip (EP of the prototype × 32), durations are in milliseconds.
 #pragma once
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 #include "ymcore/ChipRenderer.h"
 
 namespace stym::ymengine {
 
-inline constexpr int kTracks = 16;
+inline constexpr int kTracks = 32;  // 16 in earlier versions
+// Range of the chip for the notes of a melodic track (PLAY_LO and MAP_HI of the prototype): B0 to C9. Below B0 the
+// 12-bit tone period saturates. A key played live out of it sounds on the drum tracks only.
+inline constexpr int kPlayLow = 23, kPlayHigh = 120;
+// Drum pads: pads 0 to 7 play the Chipdrum sounds, 8 to 15 the Digidrum samples, each at the note of the
+// on-screen pads, kPadNote + its sound (C3 to G3, as the drum rows of the sequencer at octave 3).
+inline constexpr int kDrumPads = 16, kPadNote = 48;
 inline constexpr int kOrnamentSteps = 64;     // steps of the Modulation table of a sound (ornament)
 inline constexpr int kArpSteps = 16;          // steps of the arpeggio table (Table mode)
 inline constexpr int kSlideTablePoints = 32;  // CURVE_N of the prototype
-inline constexpr int kDigidrumSlots = 8;      // slots of user Digidrum samples
+// User Digidrum samples (127; eight, then 255, in earlier versions), and the drum rows of a track that play
+// them: each row, or pad, plays the Digidrum chosen for it (TrackPatch::digiPads).
+inline constexpr int kDigidrumSlotsMax = 127;
+inline constexpr int kDigidrumPads = 8;
 // Digidrum: rate of a slot at its root note (7 800 Hz: drumRate of the prototype), range of
 // STYM2149 (Y34 shows 8 000 and 11 025 Hz).
 inline constexpr double kDigidrumRate = 7800;
 inline constexpr double kDigidrumRateMin = 2000, kDigidrumRateMax = 20000;
 inline constexpr double kDigidrumCentsMax = 100;  // fine tune of a slot, ± cents
-inline constexpr int kInstruments = 32;       // instruments of the project, $01 to $20
+// Instruments of the project, 1 to 127: Program Change 1 to 127 reaches each (32 in earlier versions).
+inline constexpr int kInstruments = 127;
 
 // Part of a sample of n values (or frames) that a slot plays, from start to end (end excluded): its Start and End,
 // End 0 or past a shorter sample meaning its end, a Start not before that end meaning its beginning.
@@ -58,17 +70,22 @@ struct DigidrumSlot {
     bool operator==(const DigidrumSlot&) const = default;
 };
 
-// Voice modes (STYM2149_SPEC.md §3.5).
+// Voice modes (STYM2149_SPEC.md §3.5). The values are those of the Voice Mode parameter: 32 ch came last.
 enum class VoiceMode : uint8_t {
-    Studio16,    // 16 tracks with independent virtual channels, stereo (16-channel mode of the prototype)
+    Studio16,    // 16 tracks with independent virtual channels, stereo (32-channel mode of the prototype)
     Authentic3,  // one chip: three channels and the Digidrum track, noise and envelope shared, mono
     Dual3,       // two chips of three channels
+    Studio32,    // 32 tracks, as Studio16 otherwise
 };
+// The studio modes, 16 ch and 32 ch: one virtual channel per track, stereo, no chip of its own.
+inline constexpr bool studioMode(VoiceMode m) noexcept { return m == VoiceMode::Studio16 || m == VoiceMode::Studio32; }
+// Tracks of a studio mode.
+inline constexpr int studioTracks(VoiceMode m) noexcept { return m == VoiceMode::Studio32 ? 32 : 16; }
 
 // Generator of a track (`effect` codes of the prototype; Dma: 8-bit sample of the STE DMA bank, specific to
-// STYM2149).
-enum class Generator : uint8_t { Chip = 0, Sid = 1, Digidrum = 2, SyncBuzzer = 3, Chipdrum = 4, Dma = 5 };
-inline constexpr int kGenerators = 6;
+// STYM2149; Fm: FM Voice, the tone period rewritten by the effect timer, as TTrak's FM timers).
+enum class Generator : uint8_t { Chip = 0, Sid = 1, Digidrum = 2, SyncBuzzer = 3, Chipdrum = 4, Dma = 5, Fm = 6 };
+inline constexpr int kGenerators = 7;
 
 // Frequency of the timer effects: quantised by the MFP 68901 (default, §3.3) or continuous ("Free").
 enum class TimerMode : uint8_t { Mfp, Free };
@@ -93,7 +110,7 @@ inline constexpr int kSpeedMax = 31;     // ticks per row (Sxx: 1 to $1F)
 inline constexpr int kGrooveSteps = 16;  // groove: ticks added to successive rows, looped
 inline constexpr int kGrooveMax = 15;
 
-// Effect of the velocity (STYM2149_SPEC.md §7). Accent: that of the prototype, audio gain in 16-channel mode and
+// Effect of the velocity (STYM2149_SPEC.md §7). Accent: that of the prototype, audio gain in 32-channel mode and
 // 4-bit volume in 3-channel mode (the only one possible on the chip). Volume: 4-bit volume in all modes. Off: ignored.
 enum class VelocityMode : uint8_t { Accent, Volume, Off };
 
@@ -126,9 +143,9 @@ struct SeqRows {
 inline constexpr int kPeriodDeltaMax = 127;
 inline constexpr int kChannelModes = 8;  // 0 Off to 7 Tone+Noise+Env
 
-// Generator of a step of the GEN row of the sequences: that of the note, or a melodic generator.
-enum class SeqGen : uint8_t { Note = 0, Chip = 1, Sid = 2, SyncBuzzer = 3 };
-inline constexpr int kSeqGens = 4;
+// Generator of a step of the GEN row of the sequences: that of the note, or a melodic generator (FM Voice).
+enum class SeqGen : uint8_t { Note = 0, Chip = 1, Sid = 2, SyncBuzzer = 3, Fm = 4 };
+inline constexpr int kSeqGens = 5;
 
 // Pitch matrix (X13, T9): which pitch modulations drive the square, the timer (SID, Sync Buzzer) and the
 // envelope period (buzzer). Sources: pitch rows of the table (ARP, PER, FIX), slide, vibrato (track and
@@ -165,6 +182,38 @@ constexpr bool sineForm(SidForm f) noexcept { return f == SidForm::Sine || f == 
 // The form saved as `v`; a value of a later version plays its bars, as Custom.
 constexpr SidForm sidFormOf(int v) noexcept { return v >= 0 && v < kSidForms ? SidForm(v) : SidForm::Custom; }
 inline constexpr int kSidWidth = 4, kSidWidthMax = kSidWaveSteps - 1;
+// FM Voice (Indus, 01/11/2026 11:16-11:19): each interrupt of the effect timer writes the next step of the FM
+// wave, a tone period = the note's period / its multiple. The multiples, low to high: an octave lower, the note, its
+// fifth, octave, twelfth (TTrak's four: ×1, ×3/2, ×2, ×3), two octaves, the third and the fifth above them. A wave of
+// fmWaveLen steps (1 to 16) plays in one period of the note at Timer Ratio 1, as the SID wave does.
+inline constexpr std::array<double, 8> kFmMultiples = {0.5, 1, 1.5, 2, 3, 4, 5, 6};
+inline constexpr int kFmMultipleCount = int(kFmMultiples.size());
+inline constexpr int kFmNote = 1, kFmOctave = 3;  // indices of the note and of its octave
+// Scale of the FM wave (Indus, 01/11/2026 12:48): Ratios, the multiples above (TTrak's); Semitones, each step
+// 0 to kFmSemitoneMax semitones above the note, as maxYMiser's Square FM plays them: the step's period is the note's ×
+// fmSemitoneFactor(t) / 65536, rounded down (the note's own for 0).
+enum class FmScale : uint8_t { Ratios, Semitones };
+inline constexpr int kFmScales = 2;
+inline constexpr int kFmSemitoneMax = 127;
+inline constexpr int kFmOctaveSemitones = 12;
+constexpr FmScale fmScaleOf(int v) noexcept { return v == 1 ? FmScale::Semitones : FmScale::Ratios; }
+// 65536 × 2^(-t / 12), rounded, 65535 at most (t from 1 to kFmSemitoneMax).
+inline uint32_t fmSemitoneFactor(int t) noexcept {
+    return uint32_t(std::min(65535L, std::lround(65536.0 * std::exp2(-double(t) / 12.0))));
+}
+// Semitones nearest to multiple m of kFmMultiples (x0.5: -12, x1.5: 7, x3: 19, x5: 28, x6: 31), and how many cents
+// the multiple lies above them.
+inline int fmSemitonesOf(int m) noexcept {
+    return int(std::lround(12 * std::log2(kFmMultiples[size_t(std::clamp(m, 0, kFmMultipleCount - 1))])));
+}
+inline double fmSemitoneCents(int m) noexcept {
+    return 1200 * std::log2(kFmMultiples[size_t(std::clamp(m, 0, kFmMultipleCount - 1))]) - 100.0 * fmSemitonesOf(m);
+}
+// Tone period of a step t semitones above the note of period tp.
+inline uint16_t fmSemitonePeriod(uint16_t tp, int t) noexcept {
+    t = std::clamp(t, 0, kFmSemitoneMax);
+    return t ? uint16_t((uint32_t(tp) * fmSemitoneFactor(t)) >> 16) : tp;
+}
 // Buzzer: N / D ratio of the tuned envelope, fine tune in cents.
 inline constexpr int kEnvRatioMax = 16, kEnvFineMax = 100;
 
@@ -172,7 +221,7 @@ inline constexpr int kEnvRatioMax = 16, kEnvFineMax = 100;
 // registers, so Authentic 3ch and the register exports keep it. It restarts at each note, like the vibrato, and goes
 // on over the notes of an arpeggio; with Retrig Off, it runs free: a note takes the phase of its track. It moves its target by depth on either side, in the unit of the target: 4-bit
 // volume steps, noise period steps, cents (envelope period, SID ratio, pitch; the pitch goes through the vibrato's row
-// of the pitch matrix), percent of the pan (16 channels).
+// of the pitch matrix), percent of the pan (16 and 32 channels).
 enum class LfoShape : uint8_t { Triangle, Sine, Square, SawUp, SawDown, Random };
 enum class LfoTarget : uint8_t { Volume, NoisePeriod, EnvPeriod, SidRatio, Pitch, Pan };
 inline constexpr int kLfoShapes = 6, kLfoTargets = 6;
@@ -186,11 +235,10 @@ inline constexpr int kLfoDivisions = int(kLfoDivisionTicks.size());
 inline constexpr std::array<int, kLfoTargets> kLfoDepthMax = {15, 31, 2400, 2400, 2400, 100};
 
 // Audio delay (eighth DAW test, item 98): a stereo echo fed by a send of each track, after its fader and its
-// pan, in 16 channels only (Indus, 22/10/2026: the 3-channel modes have the echo of the notes, which the chips play).
-// Its time is a division of the tempo (that of the host in Host sync, otherwise the sequencer's) or timeMs; each
-// repeat goes through the low-pass hiCutHz again.
-// Divisions in quarter notes, in the order of the menu: 1/2, 1/4D, 1/4, 1/4T, 1/8D, 1/8, 1/8T, 1/16D, 1/16, 1/16T,
-// 1/32.
+// pan, in 16 and 32 channels only (Indus, 22/10/2026: the 3-channel modes have the echo of the notes, which the chips
+// play). Its time is a division of the tempo (that of the host in Host sync, otherwise the sequencer's) or timeMs; each
+// repeat goes through the low-pass hiCutHz again. Divisions in quarter notes, in the order of the menu: 1/2, 1/4D, 1/4,
+// 1/4T, 1/8D, 1/8, 1/8T, 1/16D, 1/16, 1/16T, 1/32.
 inline constexpr std::array<double, 11> kDelayDivisionBeats = {2,     1.5, 1,     2.0 / 3, 0.75,   0.5,
                                                                1.0 / 3, 0.375, 0.25, 1.0 / 6, 0.125};
 inline constexpr int kDelayDivisions = int(kDelayDivisionBeats.size());
@@ -215,7 +263,7 @@ struct DelayParams {
 // tempo apart (kDelayDivisionBeats, at the tempo of the attack), each time `drop` steps of the 4-bit volume lower,
 // on the track `target` (-1: the same one) with the sound of the note. These are notes of the chip: Authentic 3ch
 // plays them and the register exports keep them. In 3 channels a repeat takes the channel of the target track only
-// while it plays no note of its own (a new note there always wins); in 16 channels it takes a free voice.
+// while it plays no note of its own (a new note there always wins); in 16 and 32 channels it takes a free voice.
 inline constexpr int kEchoRepeatsMax = 8, kEchoDropMax = 15;
 struct TrackEcho {
     bool on = false;
@@ -242,7 +290,7 @@ struct TrackLfo {
 // Sound settings of a track, frozen in the voice at the attack (setupVoice of the prototype).
 struct TrackPatch {
     bool toneOn = true, noiseOn = false;   // Source: Tone / Noise / Tone+Noise
-    bool mono = false;                     // Voicing: Mono = legato with a 45 ms slide (16-channel)
+    bool mono = false;                     // Voicing: Mono = legato with a 45 ms slide (32-channel)
     uint8_t noisePeriod = 8;               // R6, 1 to 31
     bool envelopeVolume = false;           // volume driven by the envelope (bit 4 of R8-R10)
     uint8_t volume = 13;                   // 0 to 15
@@ -251,10 +299,12 @@ struct TrackPatch {
     Generator generator = Generator::Chip;
     double sidRatio = 1.0;                 // pitch of the SID wave = note × ratio (0.25 to 8; 1 plays the note)
     uint8_t sidMinVolume = 0;              // low volume of the SID wave
-    uint8_t digidrumSlot = 0;              // slot played on the keyboard (0 to 7)
+    uint8_t digidrumSlot = 0;              // pad played on the keyboard (0 to 7): it plays digiPads[digidrumSlot]
+    // Digidrum played by each drum row and pad, 0 to kDigidrumSlotsMax - 1: sample k + 1 by default.
+    std::array<uint8_t, kDigidrumPads> digiPads = identityPads();
     double vibratoCents = 0;               // 0 to 200
     double vibratoHz = 6;                  // 1 to 20
-    bool vibratoOn = true;                 // vibrato On/Off of the track (sixth DAW test)
+    bool vibratoOn = false;                // vibrato On/Off of the track, Off by default
     bool ornamentOn = false;
     uint8_t ornamentLength = 8;            // 1 to 64
     bool ornamentLoop = true;              // Loop, otherwise Hold on the last step
@@ -269,8 +319,8 @@ struct TrackPatch {
     uint8_t fixedNote = 60;                // MIDI note of the FIX steps
     double detuneCents = 0;                // detune, -100 to +100
     double analogCents = 0;                // "analog" randomness: offset drawn at each note, 0 to ±50
-    bool hardSync = false;                 // square (16-channel) and timer restarted on tied notes too
-    uint8_t link = 0;                      // instrument chained at the end of a table in Hold (1 to 32), 0: none
+    bool hardSync = false;                 // square (32-channel) and timer restarted on tied notes too
+    uint8_t link = 0;                      // instrument chained at the end of a table in Hold (1 to 127), 0: none
     uint16_t pitchMatrix = kPitchMatrixDefault;
     // Timer waves. SID, by its form: Base, the square wave of the prototype (volume of the
     // note, low volume); Square, over sidWaveLen steps (its Steps, 2 to 16) the volume of the note on the first
@@ -289,6 +339,14 @@ struct TrackPatch {
     uint8_t sidWidth = kSidWidth;  // width of the Square, in steps
     std::array<uint8_t, kBuzzSteps> buzzShapes{};
     uint8_t buzzLen = 0;
+    // FM Voice: indices in kFmMultiples played one per interrupt over fmWaveLen steps (1 to 16); the note,
+    // then its octave, by default.
+    std::array<uint8_t, kSidWaveSteps> fmWave = fmDefault();
+    uint8_t fmWaveLen = 2;
+    // Its scale: Ratios plays fmWave, Semitones fmSemi (0 to kFmSemitoneMax semitones above the note per step,
+    // the note then its octave by default), each keeping its own wave; Steps (fmWaveLen) is shared.
+    FmScale fmScale = FmScale::Ratios;
+    std::array<uint8_t, kSidWaveSteps> fmSemi = fmSemiDefault();
     // Buzzer. Tuned envelope: the envelope period follows the note, the envelope plays the note ×
     // envRatioN / envRatioD (1 to 16), shifted by envFineCents (±100); envPeriod is no longer read. YM Pad: under
     // the envelope, the tone goes to period 0 (about -6 dB, a TTrak trick).
@@ -296,17 +354,33 @@ struct TrackPatch {
     uint8_t envRatioN = 1, envRatioD = 1;
     double envFineCents = 0;
     bool ymPad = false;
-    // DMA sample played, 0 to 7; -1: the one of the rank of the track (DMA track n: sample n in 3-channel
-    // mode, track n: sample ((n - 1) modulo 8) + 1 in 16-channel mode).
-    int8_t dmaSlot = -1;
+    // DMA sample played, 0 to kDmaSlotsMax - 1; -1: the one of the rank of the track (DMA track
+    // n: sample n in 3-channel mode, track n: sample ((n - 1) modulo 8) + 1 in 32-channel mode).
+    int16_t dmaSlot = -1;
     TrackLfo lfo;
     TrackEcho echo;
     bool operator==(const TrackPatch&) const = default;
+
+    static constexpr std::array<uint8_t, kSidWaveSteps> fmDefault() {
+        std::array<uint8_t, kSidWaveSteps> a{};
+        for (size_t i = 0; i < a.size(); ++i) a[i] = uint8_t(i % 2 ? kFmOctave : kFmNote);
+        return a;
+    }
+    static constexpr std::array<uint8_t, kSidWaveSteps> fmSemiDefault() {
+        std::array<uint8_t, kSidWaveSteps> a{};
+        for (size_t i = 0; i < a.size(); ++i) a[i] = uint8_t(i % 2 ? kFmOctaveSemitones : 0);
+        return a;
+    }
 
 private:
     static constexpr std::array<uint8_t, kOrnamentSteps> filled(uint8_t v) {
         std::array<uint8_t, kOrnamentSteps> a{};
         for (auto& x : a) x = v;
+        return a;
+    }
+    static constexpr std::array<uint8_t, kDigidrumPads> identityPads() {
+        std::array<uint8_t, kDigidrumPads> a{};
+        for (int k = 0; k < kDigidrumPads; ++k) a[size_t(k)] = uint8_t(k);
         return a;
     }
 };
@@ -327,7 +401,7 @@ struct TrackArp {
 struct TrackMix {
     bool enabled = false;          // track active (tab); the prototype activates track 1 at start
     double level = 0.75;           // 0 to 1
-    double pan = 0;                // -1 to 1 (16-channel only: the 3-channel mode is mono like the ST)
+    double pan = 0;                // -1 to 1 (32-channel only: the 3-channel mode is mono like the ST)
     bool mute = false, solo = false;
     double send = 0;               // send to the delay, 0 to 1, after the fader and the pan
     // Right side of a stereo DMA sample: its own fader (levelR, unless link: level), mute and solo. The left
@@ -335,6 +409,9 @@ struct TrackMix {
     bool link = true;
     double levelR = 0.75;
     bool muteR = false, soloR = false;
+    // A DMA track has a right side of its own, the other generators being mono (Indus, 31/10/2026 16:56);
+    // Mono takes it away: one fader, mute and solo, the sides of a stereo DMA sample mixed.
+    bool mono = false;
 };
 
 // Sequencer settings of a track.
@@ -362,18 +439,22 @@ struct Instrument {
 };
 using InstrumentBank = std::array<Instrument, kInstruments>;
 
+inline constexpr int kCutFadeMsDefault = 5, kCutFadeMsMax = 100;  // Fade of the CUT, in ms
+
 // Settings of the whole engine (Engine::setGlobal): voice mode and machine, output levels, replay tick, keyboard
 // playing, arpeggio clock, sequencer and slides.
 struct GlobalParams {
     VoiceMode mode = VoiceMode::Studio16;
     // Machine: STE adds the DMA sound (eight DMA tracks after those of the YM in 3-channel mode, DMA
-    // type possible on any track in 16-channel mode); ST, that of the prototype, has none.
+    // type possible on any track in 32-channel mode); ST, that of the prototype, has none.
     bool ste = false;
     double master = 0.7;
     // Second Master (seventh DAW test), that of Master while they are linked: the right output where it is
-    // stereo (16 channels, 3 channels with the STE), with the balance, -1 (left only) to +1 (right only); chip 2 in
-    // 2x3 channels (no balance there). The mono output of 3 channels with the ST and the YM Player take Master.
+    // stereo (16 and 32 channels, 3 channels with the STE), with the balance, -1 (left only) to +1 (right only); chip 2
+    // in 2x3 channels (no balance there). The mono output of 3 channels with the ST and the YM Player take Master.
     double master2 = 0.7, masterPan = 0;
+    // Master Mono: the stereo outputs carry the mean of their two sides, before the Masters and the balance.
+    bool masterMono = false;
     bool softClip = true;                      // tanh saturation of the output, like the prototype
     DelayParams delay;
     uint32_t vblHz = 50;                       // replay tick: 50, 60, 70, 100 or 200 Hz
@@ -381,7 +462,7 @@ struct GlobalParams {
     double a4Hz = 440.0;
     std::array<uint8_t, 2> digidrumChannel = {2, 2};  // channel taken by the Digidrum track of each chip (0 = A)
     int focusTrack = 0;                        // track played on the keyboard
-    bool layer = false;                        // play all the active tracks in layers
+    bool layer = false;                        // the focused track and every active track in layers
     TimerMode timer = TimerMode::Mfp;
     VelocityMode velocity = VelocityMode::Accent;
     // MIDI expression: what the bend, the wheel, the pressure and the MPE slide drive; the semitones of a bend
@@ -413,6 +494,11 @@ struct GlobalParams {
     bool metronome = false;                    // beep on each beat, higher on the first beat of the bar
     uint8_t metronomeLevel = 100;              // its level, 0 to 100 %
     bool quantizeVbl = false;                  // Quantize to VBL: notes and sequencer steps on frame boundaries
+    // Fade of the Note cut box: a CUT (Cxx, the CUT row of the drums, the end of a drum hit) fades out in 5 ms in 16
+    // and 32 channels instead of the prototype's cut (Indus, 30/10/2026 03:31-03:35).
+    bool cutFade = false;
+    // Its length in milliseconds, 1 to kCutFadeMsMax, 5 by default (Indus, 01/11/2026 11:26).
+    uint8_t cutFadeMs = kCutFadeMsDefault;
     uint16_t scaleMask = 0;                    // scale of the "Scale-locked" slides (12 bits, 0 = none)
     uint8_t scaleRoot = 0;                     // tonic, 0 = C; bit n of scaleMask: n semitones above it
     std::array<float, kSlideTablePoints> slideTable = linearTable();  // "Custom" curve
@@ -429,7 +515,7 @@ private:
 struct EngineConfig {
     ymcore::RenderConfig render;   // clock, LFSR, host rate, output mode, board filters
     uint64_t seed = 1;             // seed of the random draws (Random arpeggio, Random walk, jitter)
-    uint16_t trackOutputs = 0;     // separate outputs prepared: bit n = track n (Outputs::track)
+    uint32_t trackOutputs = 0;     // separate outputs prepared: bit n = track n (Outputs::track)
 };
 
 }  // namespace stym::ymengine

@@ -55,7 +55,7 @@ void tabMenuPick(pluginui::MainWindow& w, int track, int item) {
 // The Send of the delay goes with the pan: a setting of the Mixer, like the right side of a stereo DMA sample.
 constexpr bool notCopied(Track t) {
     return t == Track::On || t == Track::Pan || t == Track::Mute || t == Track::Solo || t == Track::Send ||
-           t == Track::LevelR || t == Track::MuteR || t == Track::SoloR || t == Track::Link;
+           t == Track::LevelR || t == Track::MuteR || t == Track::SoloR || t == Track::Link || t == Track::Mono;
 }
 
 // The plugin's driver playing what the editor wrote (Free run, separate outputs of tracks 1 to 4), in blocks of 256
@@ -256,7 +256,7 @@ TEST_CASE("Track tab context menu: Copy settings, Paste settings, Rename...; dis
     click(w, "tab2", gemui::MouseButton::Right);
     REQUIRE(menuLabels(w) == std::vector<std::string>{"Copy settings", "Paste settings", "---", "Rename..."});
     const gemui::MenuList* m = topMenu(w);
-    CHECK(m->bounds().y == tab->bottom() - 2);  // its frame on the tab's bottom rule
+    CHECK(m->bounds().y == tab->bottom() - 2);  // its 2 px frame on the tab's bottom rule (GEM)
     CHECK_FALSE(m->items()[3].disabled);
     CHECK(h.p(Global::FocusTrack) == 1.0f);
     CHECK(h.p(2, Track::On) == 0.0f);
@@ -354,7 +354,7 @@ TEST_CASE("Demo pattern in Authentic 3ch: tracks switched off during a tied note
         g.steps(16);  // one loop in 16 channels
 
         click(w, "modeSel");
-        pickItem(w, 1);
+        pickItem(w, 0);  // Authentic 3ch, first of the menu
         REQUIRE(h.p(Global::VoiceMode) == 1.0f);
         g.v = h.values;
         for (int n = 0; n < 4000 && !(g.d.engine().global().mode == ymengine::VoiceMode::Authentic3 &&

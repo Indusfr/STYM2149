@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "gemui/Alert.h"
+#include "gemui/Language.h"
 #include "plugincore/Digidrum.h"
 #include "plugincore/DmaBanks.h"
 #include "plugincore/DmaSample.h"
@@ -55,16 +56,25 @@ void DmaWindow::build() {
     }
     useSte_.setTip("Set Computer to STE (SYSTEM panel, or Options > Settings)");
     play_.setId("dmaPlay");
-    for (int k = 0; k < ymengine::kDmaSlots; ++k) {
+    // Eight slots to a page, each as wide as "127".
+    for (int k = 0; k < 8; ++k) {
         Button& b = slots_[size_t(k)];
         b.setText(std::to_string(k + 1));
         b.setPadding(2, 6);
+        b.setMinWidth(b.widthFor("127"));
     }
-    load_.setTip("Load an audio file (resampled to the rate) or raw 8-bit bytes (.raw, .spl, .sam) into this slot");
+    prev_.setTip("The eight slots before");
+    next_.setTip("The eight slots after");
+    gauge_.setTip("Memory the samples take out of what the Atari leaves them; red: some do not fit and are silent");
+    load_.setTip("Load an audio file (resampled to the rate) or raw 8-bit bytes (.raw, .spl, .sam) into this slot; a "
+                 "file dropped on the drawing loads too");
     play_.setTip("Play this sample at its rate, from Start to End: once, or with Loop on in a loop until Play or "
                  "Loop is clicked again");
     clear_.setTip("Empty this slot (name, sample, Start and End)");
-    name_.setTip("Name of this sample, 16 characters (taken from the file loaded)");
+    // The name typed in place (Indus, 30/10/2026 02:55), in the font of the labels, from the left.
+    name_.setPx(14);
+    name_.setLeftAligned(true);
+    name_.setTip("Name of this sample, 16 characters (taken from the file loaded): type it, Enter keeps it");
     name_.setId("dmaName");
     start_.setTip("First frame played (and of the loop)");
     end_.setTip("End of the part played (the frame after its last one)");
@@ -80,10 +90,9 @@ void DmaWindow::build() {
                       ymengine::kDmaRateHz[size_t(k)]);
         b.setTip(tip);
     }
-    resample_.setTip("Resample on: a new rate resamples the sample, which keeps its length and its pitch (32 KB at "
-                     "most)");
+    resample_.setTip("Resample on: a new rate resamples the sample, which keeps its length and its pitch");
     mono_.setTip("Mono: one byte per frame (a stereo sample is mixed down: left and right averaged)");
-    stereo_.setTip("Stereo: bytes interleaved left, right (a mono sample is doubled, 16 KB per side at most)");
+    stereo_.setTip("Stereo: bytes interleaved left, right (a mono sample is doubled)");
     loop_.setTip("Repeat the part from Start to End while the note sounds; otherwise the part plays once");
     root_.setRange(0, 127, 1);
     root_.setTip("Root note: the note that plays the sample at its rate");
@@ -112,12 +121,13 @@ void DmaWindow::build() {
     gainUp_.setTip("Raise the sample by 3 dB (clipped)");
     chanL_.setTip("Stereo: the tools work on the left channel");
     chanR_.setTip("Stereo: the tools work on the right channel");
-    banksBtn_.setTip("Save the 8 samples as a named bank, load or delete a bank (library shared by all projects)");
+    banksBtn_.setTip("Save the samples as a named bank, load or delete a bank (library shared by all projects)");
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{
              &status_, &useSte_, &hint_, &hint2_, &sep_, &labSlot_, &labName_, &name_, &labRate_, &labRoot_, &root_,
              &rootv_, &labFine_, &fine_, &finev_, &labSample_, &wave_, &load_, &play_, &clear_, &loop_, &labStart_,
              &start_, &startv_, &labEnd_, &end_, &endv_, &labFormat_, &mono_, &stereo_, &resample_, &labTools_,
-             &normalize_, &reverse_, &fade_, &sign_, &gainDown_, &gainUp_, &chanL_, &chanR_, &banksBtn_})
+             &normalize_, &reverse_, &fade_, &sign_, &gainDown_, &gainUp_, &chanL_, &chanR_, &banksBtn_, &prev_,
+             &next_, &labMemory_, &gauge_, &memText_})
         add(*w);
     for (auto& b : slots_) add(b);
     for (auto& b : rates_) add(b);
@@ -131,14 +141,22 @@ void DmaWindow::wire() {
     useSte_.onClick = [this] { m_.setComputer(1); };  // 1: STE
     // Loading goes through the host (file dialog, decoding or raw bytes), asynchronous and without an undo step; the
     // preview is a command to the engine on the audio thread.
-    for (int k = 0; k < ymengine::kDmaSlots; ++k)
-        slots_[size_t(k)].onClick = [this, k] {
-            sel_ = k;
-            refresh();
-        };
-    name_.onClick = [this] { rename(); };
-    wave_.onClick = [this] { m_.host_.loadDmaSample(sel_); };
-    load_.onClick = [this] { m_.host_.loadDmaSample(sel_); };
+    // The page of eight slots: a slot of it, or the arrows, which move the choice by eight.
+    auto select = [this](int k) {
+        sel_ = std::clamp(k, 0, ymengine::kDmaSlotsMax - 1);
+        refresh();
+    };
+    for (int k = 0; k < 8; ++k) slots_[size_t(k)].onClick = [this, k, select] { select(sel_ / 8 * 8 + k); };
+    prev_.onClick = [this, select] { select(sel_ - 8); };
+    next_.onClick = [this, select] { select(sel_ + 8); };
+    name_.onChange = [this] {  // 16 characters at most
+        if (name_.text().size() > plugin::kDigidrumNameMax)
+            name_.setText(name_.text().substr(0, plugin::kDigidrumNameMax));
+    };
+    name_.onEnter = [this] { m_.desk_.setKeyFocus(nullptr); };  // the field left: onCommit
+    name_.onCommit = [this] { commitName(); };
+    wave_.onClick = [this] { m_.chooseSample(true, sel_); };
+    load_.onClick = [this] { m_.chooseSample(true, sel_); };
     // With Loop on, Play starts the part in a loop and a click while it loops stops it, as does Loop switched off
     // (the engine stops a looping preview whose Loop goes off); otherwise each click plays the part once.
     play_.onClick = [this] {
@@ -229,13 +247,13 @@ void DmaWindow::tool(plugin::DmaTool t, double db) {
     const unsigned ch = toolCh_;
     if (t == plugin::DmaTool::Gain) {
         // The run's total from the bytes before its first step: a step down gives back the peaks a step up clipped.
-        const std::vector<int8_t> from = gainRun_.step(sel_ * 4 + int(ch), bytes(), db);
+        const std::vector<int8_t> from = gainRun_.step(sel_ * 4 + int(ch), bytes().vec(), db);
         const double total = gainRun_.total();
         editBytes([&](DmaSlot& s, std::vector<int8_t>& b) {
             b = from;
             plugin::dmaTool(b, s.stereo, ch, t, total);
         });
-        gainRun_.gave(bytes());
+        gainRun_.gave(bytes().vec());
         return;
     }
     editBytes([t, db, ch](DmaSlot& s, std::vector<int8_t>& b) {
@@ -272,7 +290,9 @@ void DmaWindow::bindSlider(gemui::Slider& s, bool& armed, std::function<void(Dma
 
 bool DmaWindow::ste() const noexcept { return m_.ste(); }
 const DmaParams& DmaWindow::params() const noexcept { return m_.extras_.dma; }
-const std::vector<int8_t>& DmaWindow::bytes() const noexcept { return m_.extras_.dmaSamples[size_t(sel_)]; }
+const plugin::SharedSamples<int8_t>& DmaWindow::bytes() const noexcept {
+    return m_.extras_.dmaSamples[size_t(sel_)];
+}
 uint32_t DmaWindow::frames() const noexcept {
     return uint32_t(bytes().size() / (params().slots[size_t(sel_)].stereo ? 2 : 1));
 }
@@ -300,7 +320,7 @@ void DmaWindow::edit(const std::function<void(DmaSlot&)>& fn, bool push) {
 void DmaWindow::editBytes(const std::function<void(DmaSlot&, std::vector<int8_t>&)>& fn) {
     DmaParams p = params();
     const int slot = sel_;
-    std::vector<int8_t> b = bytes();
+    std::vector<int8_t> b = bytes().vec();
     std::string name = m_.extras_.dmaNames[size_t(slot)];
     DmaSlot& s = p.slots[size_t(slot)];
     fn(s, b);
@@ -314,7 +334,7 @@ void DmaWindow::editBytes(const std::function<void(DmaSlot&, std::vector<int8_t>
         s.start = s.end = 0;
         name.clear();  // the name goes with the sample
     }
-    if (p == params() && b == bytes() && name == m_.extras_.dmaNames[size_t(slot)]) return;
+    if (p == params() && bytes() == b && name == m_.extras_.dmaNames[size_t(slot)]) return;
     pushUndo(slot);
     m_.host_.editExtras([&](plugin::NonParamState& st) {
         st.dma = p;
@@ -325,13 +345,14 @@ void DmaWindow::editBytes(const std::function<void(DmaSlot&, std::vector<int8_t>
 }
 
 void DmaWindow::setStereo(bool stereo) {
-    // Bytes kept: mono → stereo doubles each byte (16 KB per channel at most); stereo → mono averages the two channels.
+    // Bytes kept: mono → stereo doubles each byte (the memory of the Atari limiting the samples, once 16 KB per
+    // channel at most); stereo → mono averages the two channels.
     editBytes([stereo](DmaSlot& s, std::vector<int8_t>& b) {
         if (s.stereo == stereo) return;
         s.stereo = stereo;
         std::vector<int8_t> out;
         if (stereo) {
-            const size_t n = std::min(b.size(), size_t(ymengine::kDmaMaxBytes / 2));
+            const size_t n = b.size();
             out.reserve(2 * n);
             for (size_t i = 0; i < n; ++i) {
                 out.push_back(b[i]);
@@ -362,21 +383,16 @@ void DmaWindow::setRate(int k) {
     });
 }
 
-void DmaWindow::rename() {
-    gemui::Alert::Spec spec;
-    spec.lines = {{"Slot " + std::to_string(sel_ + 1) + " name, 16 chars:"}};
-    spec.promptButtons();
-    spec.inputText = m_.extras_.dmaNames[size_t(sel_)];
-    spec.inputChars = int(plugin::kDigidrumNameMax);
-    const int slot = sel_;
-    gemui::Alert::open(m_.desk_, std::move(spec), [this, slot](int button, const std::string& text) {
-        if (button != gemui::Alert::kPromptOk) return;
-        const std::string name = plugin::cleanDigidrumName(text);
-        if (name == m_.extras_.dmaNames[size_t(slot)]) return;
-        pushUndo(-1);  // the step keeps the names
-        m_.host_.editExtras([&](plugin::NonParamState& s) { s.dmaNames[size_t(slot)] = name; });
-        m_.pullExtras();
-    });
+void DmaWindow::commitName() {
+    const int slot = nameSlot_;
+    const std::string name = plugin::cleanDigidrumName(name_.text());
+    if (slot < 0 || slot >= ymengine::kDmaSlotsMax || name == m_.extras_.dmaNames[size_t(slot)]) {
+        refresh();  // the name as it is again (spaces trimmed, nothing typed)
+        return;
+    }
+    pushUndo(-1);  // the step keeps the names
+    m_.host_.editExtras([&](plugin::NonParamState& s) { s.dmaNames[size_t(slot)] = name; });
+    m_.pullExtras();
 }
 
 // ------------------------------------------------------------------------------------------- banks
@@ -425,18 +441,21 @@ void DmaWindow::saveBank(const std::string& name) {
 }
 
 void DmaWindow::loadBank(const std::string& name) {
-    // The eight samples replaced: not an undo step (like loading a file); a looping preview stops with its sample.
+    // The samples replaced: not an undo step (like loading a file), after an alert when samples would then go past the
+    // memory of the Atari; a looping preview stops with its sample.
     loadLibrary();
     const auto it = std::find_if(banks_.begin(), banks_.end(),
                                  [&name](const plugin::DmaBank& x) { return x.name == name; });
     if (it == banks_.end()) return;
-    const plugin::DmaBank bank = *it;
-    stopPreview();
-    m_.host_.editExtras([&bank](plugin::NonParamState& s) {
+    auto apply = [bank = *it](plugin::NonParamState& s) {
         plugin::applyDmaBank(bank, s);
         plugin::sanitize(s);
+    };
+    m_.confirmMemory(apply, [this, apply] {
+        stopPreview();
+        m_.host_.editExtras(apply);
+        m_.pullExtras();
     });
-    m_.pullExtras();
 }
 
 void DmaWindow::deleteBank(const std::string& name) {
@@ -485,7 +504,7 @@ void DmaWindow::banksMenu() {
         MenuItem l;
         l.label = nm;
         l.pick = [this, nm] {
-            confirm("Replace the 8 samples with bank \"" + nm + "\"?", "Load", [this, nm] { loadBank(nm); });
+            confirm("Replace the samples with bank \"" + nm + "\"?", "Load", [this, nm] { loadBank(nm); });
         };
         load.sub.push_back(std::move(l));
         MenuItem d;
@@ -507,7 +526,7 @@ void DmaWindow::banksMenu() {
 }
 
 void DmaWindow::showSlot(int slot) {
-    sel_ = std::clamp(slot, 0, ymengine::kDmaSlots - 1);
+    sel_ = std::clamp(slot, 0, ymengine::kDmaSlotsMax - 1);
     show();
 }
 
@@ -536,7 +555,7 @@ void DmaWindow::refresh() {
     if (!isOpen()) return;
     const bool steOn = ste();
     const DmaSlot& s = params().slots[size_t(sel_)];
-    const std::vector<int8_t>& b = bytes();
+    const plugin::SharedSamples<int8_t>& b = bytes();
     std::string where = "any track can use the DMA type";
     if (m_.mode3()) {
         // 3 channels: four tracks per chip (A, B, C and the Digidrum track), then the eight DMA tracks.
@@ -549,16 +568,37 @@ void DmaWindow::refresh() {
 
     const bool latin = m_.host_.preference("noteNames", "0") == "1";
     const auto names = latin ? ymseq::NoteNames::Latin : ymseq::NoteNames::English;
-    for (int k = 0; k < ymengine::kDmaSlots; ++k) {
-        Button& sb = slots_[size_t(k)];
+    // The page of the chosen slot: its eight slots, one past the memory of the Atari crossed out (silent).
+    const plugin::SteMemory mem = m_.memory();
+    const int page = sel_ / 8, last = (ymengine::kDmaSlotsMax - 1) / 8;
+    for (int j = 0; j < 8; ++j) {
+        const int k = page * 8 + j;
+        Button& sb = slots_[size_t(j)];
+        sb.setVisible(k < ymengine::kDmaSlotsMax);
+        if (k >= ymengine::kDmaSlotsMax) continue;
+        sb.setText(std::to_string(k + 1));
         sb.setOn(k == sel_);
+        sb.setCrossed(mem.dmaMuted[size_t(k)]);
         const size_t n = m_.extras_.dmaSamples[size_t(k)].size();
         const std::string& nm = m_.extras_.dmaNames[size_t(k)];
         sb.setTip("Slot " + std::to_string(k + 1) + (nm.empty() ? "" : " \"" + nm + "\"") + ": " +
-                  (n ? std::to_string(n) + " bytes" : "empty"));  // the name too
+                  (n ? std::to_string(n) + " bytes" : "empty") +  // the name too
+                  (mem.dmaMuted[size_t(k)] ? ", silent: past the memory of the Atari" : ""));
     }
+    prev_.setEnabled(page > 0);
+    next_.setEnabled(page < last);
+    // The memory in the 3-channel modes only (Indus, 30/10/2026 02:47): none limits the others.
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&labMemory_, &gauge_, &memText_})
+        w->setVisible(mem.limited);
+    gauge_.set(mem.used, mem.total, mem.budget, mem.limited);
+    memText_.setText(m_.memoryText());
+    memText_.setColor(mem.over() ? colors::kClip : colors::kBlack);
+    // The name, unless it is being typed.
     const std::string& name = m_.extras_.dmaNames[size_t(sel_)];
-    name_.setText(name.empty() ? std::string("(none)") : name);
+    if (m_.desk_.keyFocus() != &name_) {
+        name_.setText(name);
+        nameSlot_ = sel_;
+    }
     const uint32_t n = frames();
     const ymengine::SampleSpan part = ymengine::sampleSpan(s.start, s.end, n);
     wave_.setSample(sel_, b, ymengine::kDmaRateHz[s.rate], s.stereo, s.loop, part.start, part.end, name);
@@ -607,7 +647,16 @@ void DmaWindow::layout() {
     auto lab = [](gemui::Label& l, double w = 0) { return FlexItem{&l, w > 0 ? w : l.naturalWidth(), 16}; };
     auto sld = [](gemui::Slider& s, double w) { return FlexItem{&s, w, 16}; };
 
-    const double col1 = 262, col2 = 360;
+    // Slot column: its labels as wide as the widest of them in the interface language, the column wider
+    // by what they add to the English ones.
+    const double lw = std::max({labSlot_.naturalWidth(), labName_.naturalWidth(), labRate_.naturalWidth(),
+                                labRoot_.naturalWidth(), labFine_.naturalWidth(), labMemory_.naturalWidth()});
+    double englishLw = 0;
+    {
+        const gemui::RawText raw;
+        englishLw = Font::width("Name", 14);
+    }
+    const double col1 = 262 + std::max(0.0, lw - englishLw), col2 = 360;
     const double x2 = x + col1 + 24;
     std::vector<FlexItem> head = {lab(status_)};
     if (useSte_.visible()) head.push_back(btn(useSte_));
@@ -624,18 +673,18 @@ void DmaWindow::layout() {
     y += 12 + 8;
     sep_.setBox({x - kPad, y, contentW + 2 * kPad, 2});
     y += 2 + 8;
+    // Across the window, as in the Digidrums window: the page of eight slots between its arrows; the memory
+    // the samples take and its gauge in the 3-channel modes.
+    y += placeSlotRows({labSlot_, prev_, slots_, next_, labMemory_, gauge_, memText_}, x, y, contentW, lw);
 
-    // On the model of the Digidrums window (Indus, 26/10/2026). Slot column: labels as wide as "Name", the
-    // eight slots, the name, the four rates and the root note. Sample column: its label, with Load, Play and Clear
-    // flush right on the same line; the 360 × 72 drawing; Loop, Start and End, End's slider under Start's; format and
-    // tools.
+    // On the model of the Digidrums window (Indus, 26/10/2026). Slot column: labels as wide as the widest of
+    // them, the name, the four rates and the root note. Sample column: its label, with Load, Play and
+    // Clear flush right on the same line; the 360 × 72 drawing; Loop, Start and End, End's slider under Start's;
+    // format and tools.
     const double y0 = y;
     double y1 = y0;
-    const double lw = Font::width("Name", 14);
-    std::vector<FlexItem> sl = {lab(labSlot_, lw)};
-    for (auto& b : slots_) sl.push_back(btn(b));
-    y1 += flexRow(x, y1, col1, sl, 4, false) + 6;
-    std::vector<FlexItem> nm = {lab(labName_, lw), btn(name_)};
+    const double nameW = std::round(Font::advance(name_.px())) * double(plugin::kDigidrumNameMax);
+    std::vector<FlexItem> nm = {lab(labName_, lw), {&name_, nameW, 16}};
     y1 += flexRow(x, y1, col1, nm, kGap, false) + 10;
     std::vector<FlexItem> rt = {lab(labRate_, lw)};
     for (auto& b : rates_) rt.push_back(btn(b));
@@ -657,8 +706,8 @@ void DmaWindow::layout() {
     y2 += flexRow(x2 + col2 - ioW, y2, ioW, io, 4, false) + 6;
     wave_.setBox({x2, y2, col2, 72});
     y2 += 72 + 8;
-    const double lw2 = Font::width("Format", 14);
-    const double vw = Font::width("00000", 14);  // typed frames: 16384 stereo or 32768 mono at most
+    const double lw2 = std::max(labFormat_.naturalWidth(), labTools_.naturalWidth());
+    const double vw = Font::width("0000000", 14);  // typed frames: 4 MB of memory at most in the 3-channel modes
     std::vector<FlexItem> lp = {btn(loop_), lab(labStart_), sld(start_, 104), {&startv_, vw, 16}};
     y2 += flexRow(x2, y2, col2, lp, kGap, false) + 6;
     std::vector<FlexItem> le = {lab(labEnd_), sld(end_, 104), {&endv_, vw, 16}};
@@ -693,7 +742,8 @@ std::optional<Rect> DmaWindow::rectOf(std::string_view id) const {
         const int k = id.back() - '0';
         return k >= 0 && k < n ? k : -1;
     };
-    if (const int k = digit("dmaSlot", ymengine::kDmaSlots); k >= 0) return slots_[size_t(k)].bounds();
+    if (const int k = digit("dmaSlot", int(slots_.size())); k >= 0)
+        return slots_[size_t(k)].visible() ? std::optional<Rect>(slots_[size_t(k)].bounds()) : std::nullopt;
     if (const int k = digit("dmaRate", ymengine::kDmaRates); k >= 0) return rates_[size_t(k)].bounds();
     struct Named {
         std::string_view id;
@@ -708,7 +758,9 @@ std::optional<Rect> DmaWindow::rectOf(std::string_view id) const {
                            {"dmaStartV", &startv_},     {"dmaEndV", &endv_},     {"dmaNormalize", &normalize_},
                            {"dmaReverse", &reverse_},   {"dmaFade", &fade_},     {"dmaChanL", &chanL_},
                            {"dmaChanR", &chanR_},       {"dmaResample", &resample_},
-                           {"dmaFine", &fine_},         {"dmaFineV", &finev_},   {"dmaBanks", &banksBtn_}};
+                           {"dmaFine", &fine_},         {"dmaFineV", &finev_},   {"dmaBanks", &banksBtn_},
+                           {"dmaPrev", &prev_},         {"dmaNext", &next_},     {"dmaMemory", &memText_},
+                           {"dmaGauge", &gauge_}};
     for (const Named& n : named)
         if (id == n.id) return n.w->visible() ? std::optional<Rect>(n.w->bounds()) : std::nullopt;
     return std::nullopt;

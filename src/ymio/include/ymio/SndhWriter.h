@@ -10,8 +10,10 @@
 // - frames: changed registers (14-bit mask, like the prototype), then commands for the timer effects and the DMA.
 //   Each channel has its MFP timer: A, B and D (C stays with the system). SID: the volume toggles between the
 //   note level and 0; Sync Buzzer: R13 rewritten (the envelope restarts); Digidrum: the 4-bit values of the slot
-//   written one by one, then volume 0 at the end. Start at each retrigger of the take (the timer is stopped, loaded
-//   then restarted), otherwise new reload or prescaler value like the engine (MfpTimer);
+//   written one by one, then volume 0 at the end; FM Voice: the tone period of each step (the note's divided
+//   by the step's multiple) written in turn, the play leaving the channel's tone to it. Start at each retrigger of
+//   the take (the timer is stopped, loaded then restarted), otherwise new reload or prescaler value like the engine
+//   (MfpTimer);
 //   - chip writes are atomic (MOVEP); R7 keeps its bits 6 and 7 (the chip's I/O ports, wired on the Atari ST), read
 //     then rewritten with interrupts masked;
 // - STE machine: a single DMA channel, the most recent DMA note at each frame, its sample resampled at
@@ -52,8 +54,10 @@ struct SndhWriteInfo {
     ymcore::MasterClock clock{};  // clock of the capture; periods are converted to the Atari's 2 MHz
     bool ste = false;  // STE machine: DMA sound
     std::string title, composer;
-    std::array<std::span<const uint8_t>, 8> digidrums{};  // 4-bit values of the Digidrum slots
-    std::array<SndhDmaSample, 8> dma{};                   // slots of the DMA bank
+    // 4-bit values of the Digidrum slots and the slots of the DMA bank, as many as the project has (at most
+    // 255 each, the effects naming them by a byte).
+    std::vector<std::span<const uint8_t>> digidrums;
+    std::vector<SndhDmaSample> dma;
 };
 
 // What the SNDH does not render like the engine, in frames (channels included).

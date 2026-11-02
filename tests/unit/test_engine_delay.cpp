@@ -153,7 +153,7 @@ TEST_CASE("Delay: off, without send or in the 3-channel modes, the output does n
         const Out closed = render(mode, delayMs(50, 0.5), 24000, setup(0), fire);
         REQUIRE(closed.l == dry.l);
         REQUIRE(closed.r == dry.r);
-        // Authentic 3ch and Dual chip: no delay at all (16 channels only).
+        // Authentic 3ch and Dual chip: no delay at all (32 channels only).
         if (mode != VoiceMode::Studio16) {
             const Out on = render(mode, delayMs(50, 0.5), 24000, setup(1), fire, true);
             REQUIRE(on.l == render(mode, ymengine::DelayParams{}, 24000, setup(1), fire, true).l);
@@ -161,7 +161,7 @@ TEST_CASE("Delay: off, without send or in the 3-channel modes, the output does n
     }
 }
 
-TEST_CASE("Delay: 16 channels, the echo of a track comes at the time set, after the fader", "[engine][delay]") {
+TEST_CASE("Delay: 16 and 32 channels, the echo of a track comes at the time set, after the fader", "[engine][delay]") {
     const uint32_t delay = 4800;  // 100 ms
     auto setup = [](double send, double level) { return [=](Engine& e) { e.setTrack(0, track(send, level)); }; };
     const Out dry = render(VoiceMode::Studio16, ymengine::DelayParams{}, 24000, setup(1, 1), burst(0, 2400));

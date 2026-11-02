@@ -121,23 +121,26 @@ std::vector<uint8_t> ym6File(std::span<const RegisterFrame> frames, const Ym6Inf
     const size_t n = frames.size();
     const double hz = std::max<uint32_t>(1, info.frameHz);
     // Digidrums of the file: the engine slots played, then the "cuts" (one sample at a 4-bit level, which stops a
-    // digidrum before its end).
+    // digidrum before its end), in the order they come; the volume register holds their number on 5 bits, so the
+    // 33rd and those after are not carried (-1: the effect is dropped).
     std::vector<std::vector<uint8_t>> drums;
-    std::array<int, 8> drumOf{};
-    drumOf.fill(-1);
+    std::vector<int> drumOf(256, -1);
     std::array<int, 16> cutOf{};
     cutOf.fill(-1);
+    auto slotSamples = [&](uint8_t slot) {
+        return slot < info.digidrums.size() ? info.digidrums[slot] : std::span<const uint8_t>{};
+    };
     auto slotDrum = [&](uint8_t slot) {
-        const size_t k = slot & 7;
-        if (drumOf[k] < 0) {
-            drumOf[k] = int(drums.size());
-            drums.emplace_back(info.digidrums[k].begin(), info.digidrums[k].end());
+        if (drumOf[slot] < 0 && drums.size() < kYm6Drums) {
+            drumOf[slot] = int(drums.size());
+            const std::span<const uint8_t> d = slotSamples(slot);
+            drums.emplace_back(d.begin(), d.end());
         }
-        return drumOf[k];
+        return drumOf[slot];
     };
     auto cutDrum = [&](uint8_t level) {
         const size_t k = level & 15;
-        if (cutOf[k] < 0) {
+        if (cutOf[k] < 0 && drums.size() < kYm6Drums) {
             cutOf[k] = int(drums.size());
             drums.push_back({uint8_t(k)});
         }
@@ -186,20 +189,29 @@ std::vector<uint8_t> ym6File(std::span<const RegisterFrame> frames, const Ym6Inf
                 vol[size_t(v)] = 0;  // the digidrum continues: the player does not touch the channel volume
                 done[size_t(v)] = true;
             } else if (timerEffect(e)) {
-                const uint8_t value = e.gen == Generator::Digidrum ? uint8_t(slotDrum(e.value)) : e.value;
-                code(s, v, e.gen, value, e.timer);
+                const int value = e.gen == Generator::Digidrum ? slotDrum(e.value) : e.value;
+                if (value < 0) {
+                    ++rep.droppedEffects;
+                    sl.voice = -1;
+                    done[size_t(v)] = true;
+                    continue;
+                }
+                code(s, v, e.gen, uint8_t(value), e.timer);
                 sl.gen = e.gen;
-                if (e.gen == Generator::Digidrum)
-                    sl.drumEnd = now + drumLength(e.timer, info.digidrums[e.value & 7].size());
+                if (e.gen == Generator::Digidrum) sl.drumEnd = now + drumLength(e.timer, slotSamples(e.value).size());
             } else if (sl.gen == Generator::Digidrum) {
                 // The engine stopped the digidrum before its end: a sample at the channel level replaces it and the
                 // timer stops at once (one timer period of deviation). A channel in envelope mode (bit 4 of its volume
                 // register) gives level 0. MfpSetting{1, 1}: the shortest timer period.
                 const uint8_t reg = fr.reg[size_t(8 + v)];
                 const uint8_t level = (reg & 0x10) ? 0 : uint8_t(reg & 15);
-                code(s, v, Generator::Digidrum, uint8_t(cutDrum(level)), ymengine::MfpSetting{1, 1});
+                if (const int cut = cutDrum(level); cut >= 0) {
+                    code(s, v, Generator::Digidrum, uint8_t(cut), ymengine::MfpSetting{1, 1});
+                    ++rep.cutDrums;
+                } else {
+                    ++rep.droppedEffects;
+                }
                 sl.voice = -1;
-                ++rep.cutDrums;
             } else {
                 sl.voice = -1;  // without a code, the player stops the timer
             }
@@ -219,12 +231,16 @@ std::vector<uint8_t> ym6File(std::span<const RegisterFrame> frames, const Ym6Inf
                 ++rep.droppedEffects;
                 continue;
             }
-            const uint8_t value = e.gen == Generator::Digidrum ? uint8_t(slotDrum(e.value)) : e.value;
-            code(free, v, e.gen, value, e.timer);
+            const int value = e.gen == Generator::Digidrum ? slotDrum(e.value) : e.value;
+            if (value < 0) {
+                ++rep.droppedEffects;
+                continue;
+            }
+            code(free, v, e.gen, uint8_t(value), e.timer);
             Slot& sl = slots[size_t(free)];
             sl.voice = v;
             sl.gen = e.gen;
-            if (e.gen == Generator::Digidrum) sl.drumEnd = now + drumLength(e.timer, info.digidrums[e.value & 7].size());
+            if (e.gen == Generator::Digidrum) sl.drumEnd = now + drumLength(e.timer, slotSamples(e.value).size());
         }
 
         std::array<uint8_t, 16>& r = out[f];

@@ -7,6 +7,8 @@ add_library(gemui STATIC
   src/Font.cpp
   src/FontData.cpp
   src/FontDataSmall.cpp
+  src/Language.cpp
+  src/Look.cpp
   src/Menu.cpp
   src/Painter.cpp
   src/Scroll.cpp

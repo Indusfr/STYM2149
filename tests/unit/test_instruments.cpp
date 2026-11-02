@@ -108,7 +108,7 @@ TEST_CASE("Instruments: names, incomplete entry, engine table", "[instruments]")
     const Instrument a = instrumentFromEntry(e);
     CHECK(a.used);
     CHECK(a.patch.volume == 4);
-    CHECK(a.patch.generator == Generator::Dma);  // last type, kept whatever the machine
+    CHECK(a.patch.generator == Generator::Fm);  // last type (FM Voice)
     CHECK(a.patch.envPeriod == 12800);
     CHECK(a.arp.table == ymengine::TrackArp{}.table);
     CHECK(a.level == 0.75);
@@ -138,7 +138,7 @@ TEST_CASE("Instruments: INST chunk of the state, written only if there are instr
     ParamValues v = defaultValues();
     setTrack3(v, st.extras);
     st.extras.instruments[0] = captureInstrument("Lead", v, st.extras, 2);
-    st.extras.instruments[31] = captureInstrument("", v, st.extras, 0);
+    st.extras.instruments[126] = captureInstrument("", v, st.extras, 0);  // $7F, the last
     const std::vector<uint8_t> bytes = encodeState(st);
     CHECK(hasInst(bytes));
     const DecodeResult back = decodeState(bytes);
@@ -159,7 +159,7 @@ TEST_CASE("Instruments: INST chunk of the state, written only if there are instr
         s.insert(s.end(), text.begin(), text.end());
     };
     s.push_back(4);
-    entry(40, R"({"name":"x","patch":{}})");
+    entry(127, R"({"name":"x","patch":{}})");
     entry(3, "[1,2]");
     entry(5, R"({"name":"éé","patch":{"vol4":99}})");
     entry(6, "{");

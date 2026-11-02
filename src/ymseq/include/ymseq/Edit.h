@@ -152,7 +152,7 @@ public:
     void moveNoteTo(Moving& m, int c2, int row2) noexcept;
 
     // ---- rectangular selection
-    std::vector<RectNote> rectNotes(const RectBounds& r) const;  // roots and chord voices that start in the box
+    std::vector<RectNote> rectNotes(const RectBounds& r) const;  // roots and chord voices wholly in the box
     void rectClear(const RectBounds& r) noexcept;                 // removes them
     bool rectMove(RectBounds& r, int ds, int dr);         // false: outside the pattern, nothing is done
     // Writes the clip with its steps counted from r.a; a note that would not fit in the track is left out.
@@ -181,6 +181,10 @@ public:
     // MIDI note (0-127, Snap applied; percussion: pitch class folded onto the rows 0-7) written at step s, the
     // velocity (0-127) giving VOL 1-15.
     void recordAt(int s, int note, int velocity) noexcept;
+    // The same note added to step s as a chord voice of one step (keys held together while recording). Returns
+    // the voice that holds that pitch at s (1-6: the one already there, or the voice written), 0 when the step has no
+    // free voice.
+    int recordVoiceAt(int s, int note) noexcept;
 
 private:
     int transposedRow(int row, int semis) const noexcept;  // row + semis under Snap (snapTransposed)
@@ -200,8 +204,9 @@ inline int fitStep(int s, int num, int den) noexcept { return (2 * s * num + den
 // The track at a resolution num / den times finer, the notes keeping their time: the root at step s moves to
 // fitStep(s) with the rows of its step and ends at fitStep of its end (one step at least, before the next note); a
 // chord voice the same. When two notes land on the same step, the first one stays and the other is dropped with its
-// step; the rows of the steps without a root then move the same way, into the cells still empty. What lands beyond
-// the 256 steps is dropped.
+// step; the rows of the steps without a root then move the same way, into the cells still empty, and a held step that no
+// step of the source reaches takes the VOL, SRC, GEN and PAN of the step before. What lands beyond the 256
+// steps is dropped.
 Lane fitLane(const Lane& src, int num, int den);
 
 // Rows that follow a root moved in the grid, as with Copy and Paste (VOL, SRC, GEN, INS, SLD, CRV); a drum hit also

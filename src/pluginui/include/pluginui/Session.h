@@ -11,6 +11,7 @@
 #include <array>
 #include <bitset>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -61,6 +62,11 @@ struct TrackOrnament {
     bool ymPad = false;
     ymengine::TrackLfo lfo;
     ymengine::TrackEcho echo;
+    std::array<uint8_t, ymengine::kDigidrumPads> digiPads = ymengine::TrackPatch{}.digiPads;  // pads
+    std::array<uint8_t, ymengine::kSidWaveSteps> fmWave = ymengine::TrackPatch{}.fmWave;  // FM wave
+    uint8_t fmWaveLen = ymengine::TrackPatch{}.fmWaveLen;
+    ymengine::FmScale fmScale = ymengine::FmScale::Ratios;
+    std::array<uint8_t, ymengine::kSidWaveSteps> fmSemi = ymengine::TrackPatch{}.fmSemi;
 
     bool operator==(const TrackOrnament&) const = default;
     static TrackOrnament of(const ymengine::TrackPatch& p) {
@@ -69,7 +75,8 @@ struct TrackOrnament {
                 p.analogCents,  p.hardSync,       p.link,          p.pitchMatrix,  p.sidWave,
                 p.sidWaveLen,   p.sidForm,        p.sidWavePhase,  p.sidWavePeriod, p.sidWidth,
                 p.buzzShapes,   p.buzzLen,        p.envTuned,      p.envRatioN,    p.envRatioD,
-                p.envFineCents, p.ymPad,          p.lfo,           p.echo};
+                p.envFineCents, p.ymPad,          p.lfo,           p.echo,         p.digiPads,
+                p.fmWave,       p.fmWaveLen,      p.fmScale,       p.fmSemi};
     }
     void applyTo(ymengine::TrackPatch& p) const {
         p.ornamentOn = on;
@@ -101,6 +108,11 @@ struct TrackOrnament {
         p.ymPad = ymPad;
         p.lfo = lfo;
         p.echo = echo;
+        p.digiPads = digiPads;
+        p.fmWave = fmWave;
+        p.fmWaveLen = fmWaveLen;
+        p.fmScale = fmScale;
+        p.fmSemi = fmSemi;
     }
 };
 
@@ -116,27 +128,44 @@ struct UndoEntry {
     ymseq::Song song;                 // Song, Import, Grid
     std::vector<float> params;        // Track: parameters of the track; Mix: level, pan, mute, solo and send of
                                       // each track; Import: On and Generator of the tracks,
-                                      // FreeTempo, then (XM) Computer and VblRate
+                                      // FreeTempo, then (XM) Computer, VblRate and VoiceMode, or (YM, SNDH)
+                                      // VoiceMode, Mpe, VblRate, A4Hz and the Level of tracks 1 to 3
     ymengine::TrackArp arp;           // Track: arpeggio (Track, Land, mode, octaves, table, length)
     TrackOrnament orn;                // Track: Modulation table
+    uint8_t instrument = 0;           // Track: its instrument
     ymengine::KitParams kit;          // Kit: the eight instruments of the Chipdrum kit
-    ymengine::DmaParams dma;          // Dma, Import XM: settings of the track and of its samples
-    std::vector<int8_t> dmaBytes;     // Dma: bytes of sample `index`
-    std::array<std::string, ymengine::kDmaSlots> dmaNames;  // Dma, Import XM: names of the samples
+    // The bank of 127 samples is kept apart, shared by the steps that keep it (empty in the others), and
+    // the sample bytes are shared with the state they come from.
+    std::shared_ptr<const ymengine::DmaParams> dma;  // Dma, Import XM: settings of the samples
+    plugin::SharedSamples<int8_t> dmaBytes;          // Dma: bytes of sample `index`
+    std::vector<std::string> dmaNames;               // Dma, Import XM: names of the samples, all of them
     plugin::DigidrumSlotState digi;   // Digi: settings of slot `index` (and its source if digiBytes)
-    std::vector<uint8_t> digiNibbles; // Digi: 4-bit values played (if digiBytes)
+    plugin::SharedSamples<uint8_t> digiNibbles;  // Digi: 4-bit values played (if digiBytes)
     bool digiBytes = false;           // Digi: the step keeps the source and the values (otherwise settings only)
     std::vector<ymseq::Pattern> patterns;  // Import: patterns 0 to index-1; Grid: all of them
     std::bitset<ymseq::kPatterns> used;    // Import: created patterns
-    std::array<int, ymseq::kTracks> lengths{};  // Grid: own lengths of the tracks (ymseq::TrackSeq::length)
+    std::array<int, ymseq::kTracks> lengths{};  // Grid, Import: own lengths of the tracks (TrackSeq::length)
     int current = 0;                       // Import: current pattern
     // Import XM: instruments and DMA slots 0 to slots-1, sequencer rate (timing, speed).
     bool xm = false;
     int slots = 0;
     std::vector<plugin::Instrument> instruments;
-    std::vector<std::vector<int8_t>> dmaSamples;
+    std::vector<plugin::SharedSamples<int8_t>> dmaSamples;
     ymengine::SeqTiming timing = ymengine::SeqTiming::Bpm;  // Import XM, Grid
     uint8_t speed = 6;
+    // Import YM or SNDH: instruments 0 to slots-1, sequencer rate and groove.
+    bool registers = false;
+    uint8_t grooveLength = 1;
+    std::array<uint8_t, ymengine::kGrooveSteps> groove{};
+    // Import of a maxYMiser song with digidrums: the Digidrum slots, their 4-bit values and the channel of the
+    // Digidrum track.
+    bool digis = false;
+    std::vector<plugin::DigidrumSlotState> digiSlots;  // all of them
+    std::vector<plugin::SharedSamples<uint8_t>> digidrums;
+    uint8_t digidrumChannel = 2;
+
+    // The same settings of the samples, or none in both.
+    bool sameDma(const UndoEntry& o) const { return dma && o.dma ? *dma == *o.dma : dma == o.dma; }
 
     // Same kind, same index and same content in the fields that kind uses (patterns by content, sameContent). The
     // history skips a step equal to the current state (UndoHistory), and pushCur pushes none when nothing changed.
@@ -147,14 +176,16 @@ struct UndoEntry {
         case Kind::Song: return song == o.song;
         case Kind::Mix: return params == o.params;
         case Kind::Kit: return kit == o.kit;
-        case Kind::Dma: return dma == o.dma && dmaBytes == o.dmaBytes && dmaNames == o.dmaNames;
+        case Kind::Dma: return sameDma(o) && dmaBytes == o.dmaBytes && dmaNames == o.dmaNames;
         case Kind::Digi:
             return digiBytes == o.digiBytes && digi == o.digi && digiNibbles == o.digiNibbles;
         case Kind::Import:
             if (song != o.song || params != o.params || used != o.used || current != o.current ||
-                patterns.size() != o.patterns.size() || xm != o.xm || slots != o.slots ||
-                instruments != o.instruments || dma != o.dma || dmaSamples != o.dmaSamples || dmaNames != o.dmaNames ||
-                timing != o.timing || speed != o.speed)
+                lengths != o.lengths || patterns.size() != o.patterns.size() || xm != o.xm || slots != o.slots ||
+                instruments != o.instruments || !sameDma(o) || dmaSamples != o.dmaSamples || dmaNames != o.dmaNames ||
+                timing != o.timing || speed != o.speed || registers != o.registers ||
+                grooveLength != o.grooveLength || groove != o.groove || digis != o.digis || digiSlots != o.digiSlots ||
+                digidrums != o.digidrums || digidrumChannel != o.digidrumChannel)
                 return false;
             for (size_t i = 0; i < patterns.size(); ++i)
                 if (!patterns[i].sameContent(o.patterns[i])) return false;
@@ -168,7 +199,8 @@ struct UndoEntry {
         case Kind::Track:
             return params == o.params && arp.track == o.arp.track && arp.land == o.arp.land &&
                    arp.mode == o.arp.mode && arp.octaves == o.arp.octaves && arp.table == o.arp.table &&
-                   arp.length == o.arp.length && orn == o.orn;
+                   arp.length == o.arp.length && orn == o.orn &&
+                   instrument == o.instrument;
         }
         return false;
     }
@@ -188,6 +220,9 @@ struct EditorSession {
     // Snap, input note value (FIGS) and chord (CHORDS).
     int tool = 1;
     bool follow = true, ghost = true, overview = false, stepRec = false, record = false, snap = false;
+    // Launch: the MIDI keys and pads C2 to B2, on every channel, pick the patterns and the banks instead of
+    // playing; off when the plugin starts, like the other switches of the Step Sequencer.
+    bool launch = false;
     int figure = 0, chord = -1;
     // View: first step shown, absolute note at the bottom of the grid (C3), edit cursor (step, row 0 at the top).
     int viewStart = 0, viewAbsBase = 48;
@@ -211,6 +246,10 @@ struct EditorSession {
     std::optional<std::pair<ymseq::Row, ymseq::Lane>> rowClip;
     std::optional<ymseq::Pattern> patClip;
     std::optional<std::vector<ymseq::SongEntry>> songClip;
+    // Clipboard of the grid filled last (note, box or block of steps): what ^V pastes at the cursor without a
+    // selection.
+    enum class GridClip { None, Note, Rect, Block };
+    GridClip lastGridClip = GridClip::None;
 
     ymseq::UndoHistory<UndoEntry> undo;
 
@@ -218,11 +257,14 @@ struct EditorSession {
     std::map<std::string, WindowPlace> windows;
 
     // File of each kind (plugin::FileKind) chosen by the last Save or Save as: the one that Save rewrites (fileNames
-    // of the prototype, forgotten with the page); empty: Save opens the dialog.
+    // of the prototype, forgotten with the page), a binary file; empty: Save opens the dialog.
     std::array<std::string, plugin::kFileKinds> files{};
-    // Last file imported into the YM Player, last imported MIDI file and last imported XM module:
-    // suggested by the next dialog.
-    std::string ymFile, midiFile, xmFile;
+    // Patch library last exported (Export of the Patches window; Import suggests it too) and last file played (File >
+    // Play): suggested by the next dialog.
+    std::string patchFile, playFile;
+    // Last file of each entry of File > Import: MIDI file, Tracker song (XM, MOD, S3M, OKT,
+    // maxYMiser, YM-Tracker), SNDH / YM file: suggested by the next dialog.
+    std::string midiFile, trackerFile, sndhFile;
 };
 
 }  // namespace stym::pluginui

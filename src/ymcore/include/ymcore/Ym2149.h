@@ -22,7 +22,7 @@ extern const uint16_t (&kMixTable)[32 * 32 * 32];
 // One chip: the 16 registers and the tone, noise and envelope generators, advanced one internal step (8 master
 // cycles) at a time by tick(), which returns the mixed DAC level. It knows nothing of time or sample rates: its owner
 // (normally a ChipRenderer) decides when to write and when to step. No allocation, no lock: usable on the audio
-// thread. The 16-channel mode does not use it: ymengine::VirtualChannel reproduces one channel of it.
+// thread. The 32-channel mode does not use it: ymengine::VirtualChannel reproduces one channel of it.
 class Ym2149 {
 public:
     static constexpr unsigned kRegisterCount = 16;

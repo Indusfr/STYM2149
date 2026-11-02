@@ -70,7 +70,7 @@ void DrumKit::build(const KitParams& kit, uint32_t vblHz, ymcore::MasterClock cl
     const DrumParams& tom2 = kit.inst[7];
     constexpr double R = kSampleRate;
 
-    // ---- 4-bit samples (16-channel mode), in the order of the prototype: the generator and the state of the hats
+    // ---- 4-bit samples (32-channel mode), in the order of the prototype: the generator and the state of the hats
     // are shared from one instrument to the next.
     ProtoRng rng;
     double ph = 0, ph2 = 0, ph3 = 0, prev = 0, lpC = 0;

@@ -194,7 +194,7 @@ TEST_CASE("Buzzer: in 3-channel mode, R11-R12 get the tuned period and that of t
     r.run(480);
     CHECK(r.lastEnvPeriod() == tuned(57, 0.5));
 
-    // Matrix, table to the envelope: the period halved at the octave is written (16-channel and 3-channel).
+    // Matrix, table to the envelope: the period halved at the octave is written (32-channel and 3-channel).
     Rig m(ymengine::VoiceMode::Authentic3);
     ymengine::TrackParams t;
     t.mix.enabled = true;
@@ -227,7 +227,7 @@ TEST_CASE("Buzzer: YM Pad, tone at period 0 under the envelope, about -6 dB", "[
     CHECK(r.e.chip(0).chip().readRegister(0) == 0);
     CHECK(r.e.chip(0).chip().readRegister(1) == 0);
 
-    // 16-channel: same buzzer with and without YM Pad.
+    // 32-channel: same buzzer with and without YM Pad.
     auto level = [](bool pad) {
         Rig s(ymengine::VoiceMode::Studio16);
         ymengine::TrackParams b = buzz(1, 1, 0, 10);
@@ -294,7 +294,7 @@ TEST_CASE("Buzzer: tuning and YM Pad belong to the Sync Buzzer, Chip Voice keeps
     CHECK(s.e.voice(0).envPeriod == tuned(57, 0.5));
 }
 
-TEST_CASE("Env source: neither square nor noise, the envelope's own waveform at its frequency, in 16 ch and "
+TEST_CASE("Env source: neither square nor noise, the envelope's own waveform at its frequency, in 16 and 32 ch and "
           "Authentic 3ch (fifth DAW test, item 48)",
           "[engine][buzzer][3ch]") {
     for (const auto mode : {ymengine::VoiceMode::Studio16, ymengine::VoiceMode::Authentic3}) {

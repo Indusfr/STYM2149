@@ -51,7 +51,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -76,19 +75,20 @@ void click(MainWindow& w, const std::string& id) {
     press(w, centre(*r));
 }
 
-// Entry `index` of the curve menu opened below cell `cell`: 13 entries of 20 px and 4 separators of 8 px (before
-// entries 4, 7, 9 and 12) inside a 2 px border on the cell's bottom rule, or above it if it does not fit.
+// Entry `index` of the curve menu opened from cell `cell`: 13 entries and 4 separators (before entries 4, 7, 9 and 12),
+// clicked where the menu placed it.
 void pickCurve(MainWindow& w, const gemui::Rect& cell, int index) {
     REQUIRE(w.desktop().hasPopups());
+    REQUIRE(cell.w > 0);
     constexpr std::array<int, 4> seps = {4, 7, 9, 12};
-    const int h = 4 + 13 * 20 + 4 * 8;
-    int top = cell.bottom() - 2;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, cell.y - h + 2);
-    int y = top + 2;
-    for (int k = 0; k < index; ++k) y += 20;
+    int item = index;
     for (int s : seps)
-        if (s <= index) y += 8;
-    press(w, {cell.x + 20, y + 10});
+        if (s <= index) ++item;
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    press(w, {e.x + e.w / 2, e.y + e.h / 2});
     CHECK_FALSE(w.desktop().hasPopups());
 }
 

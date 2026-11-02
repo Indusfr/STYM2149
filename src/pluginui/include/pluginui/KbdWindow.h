@@ -16,6 +16,7 @@
 // have no role.
 #pragma once
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
@@ -140,7 +141,9 @@ private:
     // 0: melodic track, 1: Chipdrum, 2: Digidrum (pads).
     int drumKind() const noexcept;
     // Percussion track: what the pad keys show (kind, empty Digidrum slots), to rebuild the drawing when it changes.
-    int padSignature() const;
+    // [0]: drumKind() (3: not built yet); [1 + i]: pad i of a Digidrum track (see padSignature).
+    using PadSignature = std::array<uint16_t, 9>;
+    PadSignature padSignature() const;
 
     MainWindow& m_;
     Rule top_;  // 2 px border-top of .mixbody
@@ -160,7 +163,8 @@ private:
     };
     std::map<int, Held> held_;
     // Octave, pads (padSignature) and layout the drawing was built for: refresh() rebuilds it when one changes.
-    int builtOct_ = -1, builtPads_ = -1;
+    int builtOct_ = -1;
+    PadSignature builtPads_{3};
     std::string builtLayout_;
 };
 

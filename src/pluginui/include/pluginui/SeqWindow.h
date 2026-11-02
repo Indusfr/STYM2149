@@ -39,21 +39,23 @@ class SeqWindow;
 // their place on screen through kSeqLaneOrder: VIB (Vxx, item 132), BPM (item 133; the row of the
 // pattern, item 150), ENV (Exx and Rxx, items 138 and 146), DLY (Dxx, item 139), the Note
 // Cut row CUT (Cxx, item 140; the Cut flag of the prototype stays hidden), LFO (Lxx, item 142), MOD
-// (Mxx, item 143), SMP (Oxx, item 152) and TUN (Fxx, item 153). ARP holds Jxx (item 144).
+// (Mxx, item 143), SMP (Oxx, item 152), TUN (Fxx, item 153) and TIK (Sxx, out of the CMD row).
+// ARP holds Jxx (item 144).
 enum class SeqLane : uint8_t {
     Slt, Oct, Ton, Ins, Cmd, Mix, Fx, Afl, Tie, Cut, Slide, Slc, Gat, Pnr, Rtg, Cnd, Vol, Vib, Bpm, Env, Dly, NoteCut,
-    Lfo, Mod, Smp, Tun
+    Lfo, Mod, Smp, Tun, Tik
 };
-inline constexpr int kSeqLanes = 26;
+inline constexpr int kSeqLanes = 27;
 // Order on screen, by what the rows do to the note (thirteenth DAW test, item 166): its pitch (OCT, TON, TUN);
 // its sound (INS, GEN, then SRC, ENV and SMP, which GEN decides); its modulations (ARP, VIB, LFO, MOD); its slide
 // (SLD, CRV); its timing in the step (CND, DLY, RTG, GAT, HLD, CUT); the other commands (CMD); its place in the mix
-// (PAN, VOL); then BPM, shared by the tracks, under VOL behind a separator (item 150).
+// (PAN, VOL); then the cadence: TIK, the ticks of a line, and BPM, shared by the tracks, under it behind a
+// separator (item 150).
 inline constexpr std::array<SeqLane, kSeqLanes> kSeqLaneOrder = {
     SeqLane::Slt, SeqLane::Oct, SeqLane::Ton, SeqLane::Tun,   SeqLane::Ins,  SeqLane::Fx,  SeqLane::Mix,
     SeqLane::Env, SeqLane::Smp, SeqLane::Afl, SeqLane::Vib,   SeqLane::Lfo,  SeqLane::Mod, SeqLane::Slide,
     SeqLane::Slc, SeqLane::Cnd, SeqLane::Dly, SeqLane::Rtg,   SeqLane::Gat,  SeqLane::Tie, SeqLane::Cut,
-    SeqLane::NoteCut, SeqLane::Cmd, SeqLane::Pnr, SeqLane::Vol, SeqLane::Bpm};
+    SeqLane::NoteCut, SeqLane::Cmd, SeqLane::Pnr, SeqLane::Vol, SeqLane::Tik, SeqLane::Bpm};
 // Model row carried by a control row.
 ymseq::Row laneRow(SeqLane l) noexcept;
 // TUN: cents typed and shown, two digits and a sign in the cell (the engine takes ±100).
@@ -164,6 +166,8 @@ private:
         bool on = false, held = false, nend = false, rz = false, mute = false, psel = false, offsc = false,
              sel = false, cur = false, qtr = false, bar = false, dead = false, nope = false;
         bool ghost = false, gstart = false, gend = false;
+        // Step of a note the selection box takes, its first and its last step: one green frame round the whole note.
+        bool boxed = false, boxFirst = false, boxLast = false;
         int octave = 0;  // digit shown on a note (octOf)
     };
     // Control cell: its short text, on (toggle row set), dim (CRV value with no slide running at that step).
@@ -342,8 +346,9 @@ public:
     bool playing() const noexcept { return playing_; }
 
     // Keys of the prototype specific to the sequencer (order of its keydown handler): true = taken.
-    bool noteKey(const gemui::KeyEvent& e);    // note under the cursor: ^C ^X ^V ] [ \ J
-    bool rectKey(const gemui::KeyEvent& e);    // rectangular selection: arrows, Delete, Escape, ^C ^X ^V
+    bool clipKey(const gemui::KeyEvent& e);    // ^A ^C ^X ^V: select all, then editClip
+    bool noteKey(const gemui::KeyEvent& e);    // note under the cursor: ] [ \ J
+    bool rectKey(const gemui::KeyEvent& e);    // rectangular selection: arrows, Delete, Escape
     bool hasRect() const noexcept { return grid_.hasRect(); }
     bool cursorKey(const gemui::KeyEvent& e);  // ← → ↑ ↓, Enter, Delete when the window is open
     void togglePlay();                         // Play / Stop (Space, CC 82 on screen)
@@ -356,15 +361,22 @@ public:
     void undo();
     void redo();
     // Edit menu: cut, copy, paste (editClip) and what they target (editCutState).
+    // The selection box, the block of steps, otherwise the note under the cursor; Paste without a selection puts the
+    // clipboard filled last at the cursor.
     struct CutState {
         bool cut = false, paste = false;
-        std::string what;  // "Selection" or "Note"
+        std::string what;  // "Selection", "Block" or "Note"
     };
     CutState cutState() const;
     void editClip(int act);  // 0 copy, 1 cut, 2 paste
+    // Edit > Select all, ^A: every note of the track in a box (a block of all the steps on a percussion track,
+    // whose rows are instruments).
+    void selectAll();
     // Input from the keyboard or MIDI (stepRecord, recordNote): true if the note was written.
     bool stepRecord(int note, int velocity);
     void recordNote(int note, int velocity);
+    // Key released: the note it recorded while playing keeps the time the key was held.
+    void recordRelease(int note);
     // Alt held or released (scissors cursor).
     void setAlt(bool alt) { grid_.setAlt(alt); }
 
@@ -401,7 +413,7 @@ private:
     bool chipdrum() const noexcept;
     bool mode3() const noexcept;
     bool mono() const noexcept;
-    // Chord voices (PAT2 to PAT6) played: polyphonic track in 16-channel mode, like polyTrigger of the engine.
+    // Chord voices (PAT2 to PAT6) played: polyphonic track in 32-channel mode, like polyTrigger of the engine.
     // Elsewhere the grid greys them out and the piano, the keyboard drawing and the pads do not light them.
     bool chordsPlay() const noexcept;
     bool arpOn() const noexcept;
@@ -434,7 +446,7 @@ private:
         bool slid = false;         // held while it slides to the next note (SLD): only VOL acts
         bool slideTarget = false;  // a root that a slide reaches: no new attack
         bool continues = false;    // the note goes on after the step (TIE, or SLD towards the next note)
-        int ins = 0;               // instrument of the note (INS, 1 to 32), 0 for the sound of the track
+        int ins = 0;               // instrument of the note (INS, 1 to 127), 0 for the sound of the track
     };
     StepSound stepSound(int s) const;
     // A slide of the CMD box (Axy, Bxy, Nxy) written at step s can move a note of the track.
@@ -511,7 +523,8 @@ private:
     void fitTrSlider();
     // Popup menu under a control or a cell; checked: entry marked (-1: none).
     void popup(gemui::Widget& anchor, std::vector<gemui::MenuItem> items, int checked);
-    void popupAt(const gemui::Rect& anchor, std::vector<gemui::MenuItem> items, int checked);
+    // columns: a long list (the 127 instruments) in as many columns as the desktop's height needs.
+    void popupAt(const gemui::Rect& anchor, std::vector<gemui::MenuItem> items, int checked, bool columns = false);
     std::vector<gemui::MenuItem> figItems();  // input note values (FIGS), with their length in steps
 
     // Actions.
@@ -557,6 +570,24 @@ private:
     bool undoArmed_ = false;
     bool playing_ = false;
     double externalBpm_ = 0;
+    // Notes recorded while playing: the key, where it was written (track, pattern, step, voice: 1 the
+    // root, 2-6 a chord voice), the absolute step of the press and the part of that step already gone (0-1). A note
+    // stays after its key is released until the next step, so that the keys of a chord a little apart join it.
+    struct RecNote {
+        int note = 0, track = 0, pattern = 0, step = 0, voice = 1;
+        int64_t abs = 0;
+        double phase = 0;
+        int len = 1;        // length written, in steps
+        bool held = true;
+        bool hit = false;   // percussion: one step, whatever the key
+    };
+    std::vector<RecNote> recNotes_;
+    int64_t recAbs_ = -1;                   // absolute step played
+    double recStepAt_ = 0, recStepMs_ = 0;  // when it began (MainWindow::tick time) and how long the one before lasted
+    double recPhase() const noexcept;       // part of the played step gone, 0 when its length is not known yet
+    void recordClock(const ymengine::Engine::SeqStatus& s);
+    void recordHold();                      // held notes brought to the played step
+    void recordLength(RecNote& r, int n);
     std::function<void()> euclidSync_;  // Euclid open: the note follows the cursor
 
     // Row 1: tools, clipboard, actions.
@@ -571,6 +602,10 @@ private:
     gemui::ValueField stepsv_, bpmv_, gatev_, swingv_;
     // Global gate (not in the prototype): when lit, the Gate slider sets the gate of every track.
     gemui::Button gateAll_{"All"};
+    // The track's instrument, as at the bottom of the GENERATOR frame (Indus, 01/11/2026 20:21): the
+    // Instruments window and the number, whose menu loads an instrument into the track. On the transport's row,
+    // between Track and Bank (Indus, 20:43).
+    gemui::Button insOpen_{"Instrument"}, insNum_;
     // Row 4.
     gemui::Label labScale_{"Scale"}, labSig_{"Signature"}, labReso_{"Resolution"}, labNote_{"Note"},
         labChord_{"Chord"}, labPoly_{"Voicing"};
@@ -588,6 +623,10 @@ private:
     // Transport, banks, patterns.
     Rule sep_, tbarSep_;
     gemui::Button play_, rec_, loop_, start_, prev_, next_, metro_;
+    gemui::Button launch_{"Launch"};  // MIDI keys pick the patterns and banks
+    // Track edited, between Launch and Bank (Indus, 28/10/2026 10:31): its name; the menu lists the tracks.
+    gemui::Label labTrack_{"Track"};
+    gemui::Button trackSel_;
     gemui::Label labBank_{"Bank"}, labPattern_{"Pattern"};
     std::array<gemui::Button, 4> banks_;
     std::array<gemui::Button, 8> pats_;

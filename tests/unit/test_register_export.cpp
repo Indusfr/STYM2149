@@ -258,3 +258,31 @@ TEST_CASE("Register exports: recorder take", "[regexport]") {
     // Empty take: nothing written.
     CHECK_FALSE(exportTake(RegisterFormat::Ym3, RegisterTake{}, pr.v, pr.x, o).error.empty());
 }
+
+TEST_CASE("Register exports: FM Voice named as the note alone in VBL, YM3 and YM6, played by the SNDH",
+          "[regexport][fm]") {
+    Project pr;
+    param(pr.v, 0, Track::Generator) = float(int(Generator::Fm));
+    const auto vbl = exportSongRegisters(RegisterFormat::Vbl, pr.v, pr.x, {});
+    REQUIRE(vbl);
+    auto fmNote = [](const RegisterFile& f) {
+        for (const std::string& n : f.notes)
+            if (n.rfind("FM Voice frames played as the note alone: ", 0) == 0) return true;
+        return false;
+    };
+    CHECK(fmNote(*vbl));
+    for (const RegisterFormat fmt : {RegisterFormat::Ym3, RegisterFormat::Ym6}) {
+        const auto f = exportSongRegisters(fmt, pr.v, pr.x, {});
+        REQUIRE(f);
+        CHECK(fmNote(*f));
+    }
+    const auto sndh = exportSongRegisters(RegisterFormat::Sndh, pr.v, pr.x, {});
+    REQUIRE(sndh);
+    REQUIRE(sndh->error.empty());
+    CHECK_FALSE(fmNote(*sndh));
+    // Without the FM Voice: no such note.
+    param(pr.v, 0, Track::Generator) = float(int(Generator::Chip));
+    const auto plain = exportSongRegisters(RegisterFormat::Ym3, pr.v, pr.x, {});
+    REQUIRE(plain);
+    CHECK_FALSE(fmNote(*plain));
+}

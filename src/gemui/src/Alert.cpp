@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "gemui/Font.h"
+#include "gemui/Language.h"
 
 namespace stym::gemui {
 namespace {
@@ -59,6 +60,7 @@ Alert& Alert::open(Desktop& d, Spec spec, Done done) {
     a->layout(d);
     Alert& ref = *a;
     d.openModal(std::move(a), over);
+    if (ref.spec_.animate) ref.nextFrame();
     return ref;
 }
 
@@ -69,6 +71,7 @@ Alert& Alert::open(Desktop& d, Spec spec, Picked picked) {
     a->layout(d);
     Alert& ref = *a;
     d.openModal(std::move(a), over);
+    if (ref.spec_.animate) ref.nextFrame();
     return ref;
 }
 
@@ -78,6 +81,7 @@ Alert::Alert(Spec spec, Done done) : spec_(std::move(spec)), done_(std::move(don
     for (int i = 0; i < int(spec_.buttons.size()); ++i) {
         auto b = std::make_unique<Button>(spec_.buttons[size_t(i)],
                                           i == spec_.defaultButton && spec_.markDefault ? Button::Style::Default : Button::Style::Normal);
+        b->setExit(true);  // every button closes the box: GEM's EXIT border
         b->onClick = [this, i] { finish(i); };
         add(*b);
         buttons_.push_back(std::move(b));
@@ -99,6 +103,7 @@ Alert::Alert(Spec spec, Done done) : spec_(std::move(spec)), done_(std::move(don
 }
 
 Alert::~Alert() {
+    if (Desktop* d = desktop()) d->cancel(frame_);
     // The buttons are destroyed before the widget: detach them first.
     for (auto& b : buttons_) remove(*b);
     for (auto& row : options_)
@@ -116,7 +121,10 @@ void Alert::layout(const Desktop& d) {
     bool folded = false;
     for (const Line& l : spec_.lines) {
         const int chars = int(maxContent / Font::advance(l.px));
-        std::vector<std::string> parts = wrap(l.text, chars);
+        // Translated whole, then cut: the lines kept are drawn as they are.
+        const std::string shown = uiString(l.text);
+        const RawText raw;
+        std::vector<std::string> parts = wrap(shown, chars);
         folded = folded || parts.size() > 1;
         for (std::string& s : parts) {
             content = std::max(content, Font::width(s, l.px));
@@ -166,7 +174,10 @@ void Alert::layout(const Desktop& d) {
     const double w = content + 2 * kPadX + 4;
     const double h = 2 + kPadY + above + (buttons_.empty() ? (above > 0 ? -kParagraphGap : 0) : buttonsGap + buttonH) +
                      kPadY + 2;
-    const double x = d.width() / 2.0 - w / 2, y = d.height() * 0.38 - h / 2;
+    // A box too tall for that (the Information box with its demo) is centred so that its top stays visible.
+    const double x = d.width() / 2.0 - w / 2;
+    double y = d.height() * 0.38 - h / 2;
+    if (y < 0) y = std::max(0.0, (d.height() - h) / 2);
     setBox({x, y, w, h});
     pictureTop_ = y + 2 + kPadY;
     textTop_ = pictureTop_ + pictureH;
@@ -196,16 +207,20 @@ void Alert::paint(Painter& p) {
     WindowFrame::paint(p);
     const Box& b = box();
     const double contentX = b.x + 2 + kPadX, contentW = b.w - 4 - 2 * kPadX;
-    if (spec_.picture && spec_.pictureW > 0 && spec_.pictureH > 0 && spec_.pictureScale > 0) {
+    if (const Rect pr = pictureRect(); !pr.empty()) {
         const int k = spec_.pictureScale;
-        const int px = snap(contentX + (contentW - spec_.pictureW * k) / 2), py = snap(pictureTop_);
-        for (int j = 0; j < spec_.pictureH; ++j)
-            for (int i = 0; i < spec_.pictureW; ++i) {
-                const Color c = spec_.picture[size_t(j * spec_.pictureW + i)];
-                if (c >> 24) p.fill({px + i * k, py + j * k, k, k}, c);
-            }
+        if (spec_.animate) {
+            p.image(pr, spec_.picture, spec_.pictureW, spec_.pictureH);
+        } else {
+            for (int j = 0; j < spec_.pictureH; ++j)
+                for (int i = 0; i < spec_.pictureW; ++i) {
+                    const Color c = spec_.picture[size_t(j * spec_.pictureW + i)];
+                    if (c >> 24) p.fill({pr.x + i * k, pr.y + j * k, k, k}, c);
+                }
+        }
     }
     for (size_t i = 0; i < wrapped_.size(); ++i) {
+        const RawText raw;  // translated before being cut
         const Line& l = wrapped_[i];
         const double lineTop = textTop_ + double(i) * kLineHeight;
         // 25.6 px line: the baseline of the 16 px font is 4.8 + 13 px from the top.
@@ -221,6 +236,7 @@ void Alert::paint(Painter& p) {
     // Input field, centred: underscores at the free positions counted from the right, the text right-aligned, the
     // text cursor at the right edge (typing only adds at the end).
     if (spec_.input) {
+        const RawText raw;  // typed by the user
         const double cw = Font::advance(16);
         const double fw = spec_.inputChars * cw;
         const double fx = contentX + (contentW - fw) / 2;
@@ -247,6 +263,23 @@ void Alert::paint(Painter& p) {
     }
 }
 
+Rect Alert::pictureRect() const noexcept {
+    if (!spec_.picture || spec_.pictureW <= 0 || spec_.pictureH <= 0 || spec_.pictureScale <= 0) return {};
+    const Box& b = box();
+    const double contentX = b.x + 2 + kPadX, contentW = b.w - 4 - 2 * kPadX;
+    const int k = spec_.pictureScale;
+    return {snap(contentX + (contentW - spec_.pictureW * k) / 2), snap(pictureTop_), spec_.pictureW * k,
+            spec_.pictureH * k};
+}
+
+// Once a tick: the timer of 1 ms falls due at the next one, whatever the host's rate.
+void Alert::nextFrame() {
+    Desktop* d = desktop();
+    if (!d) return;
+    if (spec_.animate(d->now())) repaint(pictureRect());
+    frame_ = d->after(1, [this] { nextFrame(); });
+}
+
 // Every key is taken (a modal box keeps the keyboard); in a prompt box, printable ASCII and Backspace edit the text.
 bool Alert::keyDown(const KeyEvent& e) {
     if (e.key == Key::Tab) {
@@ -262,6 +295,7 @@ bool Alert::keyDown(const KeyEvent& e) {
         return true;
     }
     if (spec_.input) {
+        const RawText raw;
         if (e.key == Key::Backspace && !spec_.inputText.empty()) {
             // Last UTF-8 character.
             size_t n = spec_.inputText.size() - 1;

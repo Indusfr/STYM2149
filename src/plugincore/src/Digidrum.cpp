@@ -13,13 +13,19 @@ namespace stym::plugin {
 
 namespace {
 
+// Values of `channel` resampled to `rateHz`: floor(size × ratio), the whole file (the 3 s of the prototype lifted,
+// the memory of the Atari limiting the samples).
+size_t resampledSize(std::span<const float> channel, double sampleRate, double rateHz) noexcept {
+    if (channel.empty() || !(sampleRate > 0) || !(rateHz > 0) || !std::isfinite(rateHz / sampleRate)) return 0;
+    return size_t(std::floor(double(channel.size()) * (rateHz / sampleRate)));
+}
+
 // Linear resampling of the prototype at rate `rateHz`; `put(i, v)` receives each value. The output has
-// floor(size × ratio) values at most, and a value that is not finite counts as 0.
+// resampledSize values, and a value that is not finite counts as 0.
 template <class Put>
-size_t resample(std::span<const float> channel, double sampleRate, double rateHz, size_t maxN, Put put) {
-    if (channel.empty() || !(sampleRate > 0) || !(rateHz > 0)) return 0;
+size_t resample(std::span<const float> channel, double sampleRate, double rateHz, Put put) {
+    const size_t n = resampledSize(channel, sampleRate, rateHz);
     const double ratio = rateHz / sampleRate;
-    const size_t n = std::min(maxN, size_t(std::floor(double(channel.size()) * ratio)));
     auto at = [&](size_t i) {
         const float v = i < channel.size() ? channel[i] : 0.0f;
         return std::isfinite(v) ? double(v) : 0.0;
@@ -49,25 +55,33 @@ const std::array<double, 16>& ymLevels() noexcept {
 
 }  // namespace
 
-size_t digidrumMaxSamples(double rateHz) noexcept {
-    const double r = std::isfinite(rateHz) ? std::clamp(rateHz, ymengine::kDigidrumRateMin, ymengine::kDigidrumRateMax)
-                                           : ymengine::kDigidrumRate;
-    return std::min<size_t>(65535, size_t(std::floor(3 * r)));
+std::string_view digiStereoName(DigiStereo s) noexcept {
+    return s == DigiStereo::Left ? "left" : s == DigiStereo::Right ? "right" : "mix";
+}
+
+DigiStereo digiStereoOf(std::string_view name) noexcept {
+    return name == "left" ? DigiStereo::Left : name == "right" ? DigiStereo::Right : DigiStereo::Mix;
+}
+
+std::vector<float> digidrumChannel(std::span<const float> left, std::span<const float> right, DigiStereo s) {
+    if (right.empty() || s == DigiStereo::Left) return {left.begin(), left.end()};
+    if (s == DigiStereo::Right) return {right.begin(), right.end()};
+    std::vector<float> out(std::min(left.size(), right.size()));
+    for (size_t i = 0; i < out.size(); ++i) out[i] = (left[i] + right[i]) * 0.5f;
+    return out;
 }
 
 std::vector<uint8_t> toDigidrum(std::span<const float> channel, double sampleRate, double rateHz) {
-    std::vector<uint8_t> out(digidrumMaxSamples(rateHz));
-    const size_t n = resample(channel, sampleRate, rateHz, out.size(), [&](size_t i, double v) {
+    std::vector<uint8_t> out(resampledSize(channel, sampleRate, rateHz));
+    resample(channel, sampleRate, rateHz, [&](size_t i, double v) {
         out[i] = uint8_t(std::clamp(std::floor(v * 7.5 + 7.5 + 0.5), 0.0, 15.0));  // Math.round: half up
     });
-    out.resize(n);
     return out;
 }
 
 std::vector<int8_t> toDigidrumSource(std::span<const float> channel, double sampleRate, double rateHz) {
-    std::vector<int8_t> out(digidrumMaxSamples(rateHz));
-    const size_t n = resample(channel, sampleRate, rateHz, out.size(), [&](size_t i, double v) { out[i] = toByte(v); });
-    out.resize(n);
+    std::vector<int8_t> out(resampledSize(channel, sampleRate, rateHz));
+    resample(channel, sampleRate, rateHz, [&](size_t i, double v) { out[i] = toByte(v); });
     return out;
 }
 
@@ -93,6 +107,28 @@ std::vector<uint8_t> digidrumNibbles(std::span<const int8_t> source, DigiConvert
 std::vector<int8_t> digidrumSourceOf(std::span<const uint8_t> nibbles) {
     std::vector<int8_t> out(nibbles.size());
     for (size_t i = 0; i < nibbles.size(); ++i) out[i] = toByte((std::min<int>(nibbles[i], 15) - 7.5) / 7.5);
+    return out;
+}
+
+std::vector<int8_t> digidrumSourceOfLevels(std::span<const uint8_t> nibbles) {
+    static const std::array<int8_t, 16> table = [] {
+        std::array<int8_t, 16> t{};
+        const auto& lv = ymLevels();
+        for (int n = 0; n < 16; ++n) {
+            const double want = lv[size_t(n)] * 2 - 1;  // the level placed on -1..1, as the conversion does
+            int best = -128;
+            for (int b = -128; b <= 127; ++b) {
+                if (digidrumNibble(int8_t(b), DigiConvert::YmLevels) != n) continue;
+                if (digidrumNibble(int8_t(best), DigiConvert::YmLevels) != n ||
+                    std::abs(b / 127.0 - want) < std::abs(best / 127.0 - want))
+                    best = b;
+            }
+            t[size_t(n)] = int8_t(best);
+        }
+        return t;
+    }();
+    std::vector<int8_t> out(nibbles.size());
+    for (size_t i = 0; i < nibbles.size(); ++i) out[i] = table[std::min<size_t>(nibbles[i], 15)];
     return out;
 }
 

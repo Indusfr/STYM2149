@@ -3,7 +3,7 @@
 // length changed during playback, countdowns of the tracks by deadline, track switched off during playback, Env
 // entries of the SRC row, rows of the steps of a held note, ARP Off on a held note, one
 // envelope per note of the ARP row, releases that the next notes leave on a polyphonic track, a note
-// held live before Play, the 1/32T resolution.
+// held live before Play, the 1/32T resolution, the panning of the notes released by Stop.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -275,6 +275,60 @@ TEST_CASE("Sequencer: length changed during playback, the current step is kept",
     CHECK(st[6].stepAbs == 4);
 }
 
+TEST_CASE("Sequencer: MIDI Start, Stop and Continue play and stop it, but in Host sync", "[engine][seq]") {
+    // Free run: Start plays from the beginning, Stop stops, Continue plays again (from the beginning: no pause).
+    Rig r;
+    r.pattern(0, 16);
+    r.e.midiStart(0);
+    r.render(6000 * 3 + 10);
+    CHECK(r.e.seqStatus().playing);
+    auto st = r.steps();
+    REQUIRE(st.size() == 4);
+    CHECK(st[0].stepAbs == 0);
+    r.e.midiStop(0);
+    r.render(6000 * 2);
+    CHECK_FALSE(r.e.seqStatus().playing);
+    CHECK(r.steps().size() == 4);
+    r.e.midiContinue(0);
+    r.render(10);
+    CHECK(r.e.seqStatus().playing);
+    st = r.steps();
+    REQUIRE(st.size() == 5);
+    CHECK(st[4].stepAbs == 0);
+    // Start while playing: from the beginning again.
+    r.render(6000 * 2);
+    r.e.midiStart(0);
+    r.render(10);
+    st = r.steps();
+    CHECK(st.back().stepAbs == 0);
+    CHECK(r.e.seqStatus().playing);
+
+    // MIDI ext: Start switches Play on and the clock drives the steps; Stop pauses on the clock.
+    Rig m(SeqClock::Midi);
+    m.pattern(0, 16);
+    m.render(100);
+    CHECK_FALSE(m.e.seqStatus().playing);
+    m.e.midiStart(0);
+    for (int k = 0; k < 12; ++k) {  // two steps of six pulses
+        m.e.midiClock(0);
+        m.render(1000);
+    }
+    CHECK(m.e.seqStatus().playing);
+    CHECK(m.e.seqStatus().clockRunning);
+    CHECK(m.steps().size() == 2);
+    m.e.midiStop(0);
+    m.render(100);
+    CHECK_FALSE(m.e.seqStatus().clockRunning);
+
+    // Host sync: the host transport decides; the MIDI messages change nothing.
+    Rig h(SeqClock::Host);
+    h.pattern(0, 16);
+    h.e.midiStart(0);
+    h.render(6000 * 2);
+    CHECK_FALSE(h.e.seqStatus().playing);
+    CHECK(h.steps().empty());
+}
+
 TEST_CASE("Sequencer: MIDI clock, steps according to the resolution, Stop, SPP and Continue", "[engine][seq]") {
     Rig r(SeqClock::Midi);
     r.g.resolution = 1;  // 1/8: 12 pulses per step
@@ -482,17 +536,25 @@ TEST_CASE("Sequencer: 1/32T resolution, internal clock, MIDI clock and SPP", "[e
     }
 }
 
-TEST_CASE("Sequencer: MIDI Start and SPP without effect with the internal clock", "[engine][seq]") {
+TEST_CASE("Sequencer: SPP without effect with the internal clock, MIDI Start back to the first step",
+          "[engine][seq]") {
     Rig r;
     r.pattern(0, 16);
     r.e.seqPlay(0);
     r.render(6000 * 3 - 10);
-    r.e.midiStart(0);
     r.e.midiSongPosition(0, 40);
     r.render(6000 * 2);
-    const auto st = r.steps();
+    auto st = r.steps();
     REQUIRE(st.size() == 5);
     for (int k = 0; k < 5; ++k) CHECK(st[size_t(k)].stepAbs == k);
+    r.e.midiStart(0);
+    r.e.midiSongPosition(0, 40);
+    r.render(6000 * 2 - 10);
+    st = r.steps();
+    REQUIRE(st.size() == 7);
+    CHECK(st[5].stepAbs == 0);
+    CHECK(st[5].step == 0);
+    CHECK(st[6].stepAbs == 1);
 }
 
 TEST_CASE("Sequencer: swing and triplet resolutions", "[engine][seq]") {
@@ -627,7 +689,7 @@ TEST_CASE("Sequencer: a track switched off releases its held, slid, chord, retri
     auto held = std::make_shared<SeqLane>();  // track 1: note tied over the 4 steps, chord voice of 4 steps
     auto slid = std::make_shared<SeqLane>();  // track 2: SLD from step 0 to step 3
     auto rtg = std::make_shared<SeqLane>();   // track 3: 8 hits in step 0
-    auto arp = std::make_shared<SeqLane>();   // track 4 (16 channels): arpeggio of the track over a tie
+    auto arp = std::make_shared<SeqLane>();   // track 4 (32 channels): arpeggio of the track over a tie
     held->pat[0] = 0;
     held->vpat[0][0] = 4;
     held->vdur[0][0] = 4;
@@ -784,7 +846,7 @@ TEST_CASE("Sequencer: VOL, RTG, ARP and GAT of the steps of a held note act at e
             if (x.op == 'T' && x.track == 0 && x.sample >= from && x.sample < to) out.push_back(x.x);
         return out;
     };
-    SECTION("VOL: the 4-bit volume in Authentic 3ch, the level of the voice in Studio 16ch") {
+    SECTION("VOL: the 4-bit volume in Authentic 3ch, the level of the voice in 32 ch") {
         for (const VoiceMode mode : {VoiceMode::Authentic3, VoiceMode::Studio16}) {
             CAPTURE(int(mode));
             Rig r;
@@ -991,7 +1053,7 @@ TEST_CASE("Sequencer: ARP row, one ADSR per note of the sequencer, running on th
     }
 }
 
-TEST_CASE("Sequencer: the next note does not cut the release of a note on a polyphonic track in 16 channels",
+TEST_CASE("Sequencer: the next note does not cut the release of a note on a polyphonic track in 16 and 32 channels ",
           "[engine][seq]") {
     // Indus's case (24/10/2026 22:41): C#4 held over steps 4 to 12, B3 over steps 13 and 14, ADSR 1000 ms, 1000 ms,
     // 0 %, 2000 ms. Polyphonic: C#4 goes on to its release on a chord voice of the track while B3 starts; Monophonic
@@ -1055,8 +1117,8 @@ TEST_CASE("Sequencer: the next note does not cut the release of a note on a poly
             CHECK(after < held * 0.6);  // B3 alone
             continue;
         }
-        REQUIRE(cs4 >= 16);  // a chord voice of track 1 (kLaneVoices)
-        CHECK(cs4 < 21);
+        REQUIRE(cs4 >= Engine::kLaneVoices);  // a chord voice of track 1
+        CHECK(cs4 < Engine::kLaneVoices + ymengine::kSeqChordVoices);
         CHECK(r.e.voice(cs4).tag == VoiceTag::Chord);
         CHECK(r.e.voice(cs4).adsrStage == 4);
         CHECK(r.e.voice(cs4).adsrNow > 0.6);
@@ -1110,7 +1172,7 @@ TEST_CASE("Sequencer: a chord does not cut the release of the chord before while
     CHECK(notes(true) == std::vector<int>{48, 52, 55});
 }
 
-TEST_CASE("Sequencer: a note held live before Play goes on sounding in 16 channels, is cut and counted in 3",
+TEST_CASE("Sequencer: a note held live before Play goes on sounding in 16 and 32 channels, is cut and counted in 3 ",
           "[engine][seq]") {
     // Latch (Indus, 25/10/2026 19:41): a key held before Play sits on the voice of track 1, which the sequencer
     // reserves once it plays. Its first note took that voice and cut the held note, whose key stayed lit.
@@ -1156,4 +1218,60 @@ TEST_CASE("Sequencer: a note held live before Play goes on sounding in 16 channe
         for (int n = 0; n < 128; ++n)
             if (n != 72) CHECK(r.e.manualCuts()[size_t(n)] == 0);
     }
+}
+
+TEST_CASE("Sequencer: the notes released by Stop keep the panning of their PAN row to the end",
+          "[engine][seq]") {
+    // Indus (29/10/2026 14:38): a stereo song (the PAN rows of an imported MOD or XM) went to mono when it stopped,
+    // because its releases took the mixer's centre again.
+    Rig r;
+    r.g.mode = VoiceMode::Studio16;
+    r.global();
+    TrackParams t;
+    t.mix.enabled = true;
+    t.patch.releaseMs = 1000;
+    r.e.setTrack(0, t);
+    auto l = std::make_shared<SeqLane>();
+    l->pat[0] = 0;
+    l->oct[0] = 4;
+    for (size_t s = 0; s < 16; ++s) {
+        l->tie[s] = s > 0;
+        l->pnr[s] = 1;  // hard left
+    }
+    r.data.patterns[0].steps = 16;
+    r.data.patterns[0].lanes[0] = l;
+    r.e.setSequence(&r.data);
+    double eL = 0, eR = 0;
+    auto play = [&](uint64_t n) {
+        eL = eR = 0;
+        std::vector<float> a(512), b(512);
+        while (n > 0) {
+            const uint32_t k = uint32_t(std::min<uint64_t>(n, a.size()));
+            r.e.render(a.data(), b.data(), k);
+            for (uint32_t j = 0; j < k; ++j) {
+                eL += double(a[j]) * a[j];
+                eR += double(b[j]) * b[j];
+            }
+            r.at += k;
+            n -= k;
+        }
+    };
+    r.e.seqPlay(0);
+    play(12000);  // two steps of the held note, on the left
+    REQUIRE(eL > 1.0);
+    CHECK(eR < eL * 1e-6);
+    r.e.seqStop(0);
+    play(24000);  // the release, half of it
+    const auto v = r.e.voice(0);
+    REQUIRE(v.on);
+    REQUIRE(v.adsrStage == 4);
+    REQUIRE(eL > 0.01);
+    CHECK(eR < eL * 1e-6);  // still on the left
+    // Once released, the track has the mixer's panning again: a note played live there is in the centre.
+    play(48000);
+    REQUIRE_FALSE(r.e.voice(0).on);
+    r.e.noteOn(0, 60, 100, 0);
+    play(12000);
+    REQUIRE(eL > 0.01);
+    CHECK(std::abs(eR - eL) < eL * 1e-3);
 }

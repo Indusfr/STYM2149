@@ -18,7 +18,7 @@ constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 constexpr char kHex[] = "0123456789ABCDEF";
 
 // One slot as a JSON object; the 8-bit source is written as unsigned bytes in base64.
-json::Value slotJson(const DigidrumSlotState& s, const std::vector<uint8_t>& nibbles) {
+json::Value slotJson(const DigidrumSlotState& s, std::span<const uint8_t> nibbles) {
     json::Value o = json::Value::object();
     o.set("name", s.name);
     o.set("rate", s.play.rateHz);
@@ -39,7 +39,7 @@ json::Value slotJson(const DigidrumSlotState& s, const std::vector<uint8_t>& nib
 
 // Reads one slot over its default state: each value is brought back into its range, and the loop start never passes
 // the loop end.
-void readSlot(const json::Value& o, DigidrumSlotState& s, std::vector<uint8_t>& nibbles) {
+void readSlot(const json::Value& o, DigidrumSlotState& s, SharedSamples<uint8_t>& values) {
     using namespace ymengine;
     if (const json::Value* v = o.find("name"); v && v->isString()) s.name = cleanDigidrumName(v->string());
     auto num = [&](std::string_view k, double def) {
@@ -51,24 +51,23 @@ void readSlot(const json::Value& o, DigidrumSlotState& s, std::vector<uint8_t>& 
     s.play.root = uint8_t(std::clamp(std::lround(num("root", 60)), 0L, 127L));
     s.play.cents = std::clamp(num("cents", 0), -kDigidrumCentsMax, kDigidrumCentsMax);
     s.play.loop = num("loop", 0) != 0;
-    const double maxLen = double(Engine::kMaxUserSample);
-    s.play.end = uint32_t(std::clamp(std::floor(num("loopEnd", 0)), 0.0, maxLen));
+    s.play.end = uint32_t(std::clamp(std::floor(num("loopEnd", 0)), 0.0, double(UINT32_MAX)));
     s.play.start = uint32_t(std::clamp(std::floor(num("loopStart", 0)), 0.0, double(s.play.end)));
     if (const json::Value* v = o.find("convert"); v && v->isString())
         s.convert = v->string() == "ym" ? DigiConvert::YmLevels : DigiConvert::Linear;
     if (const json::Value* v = o.find("data"); v && v->isString()) {
         // One value per hexadecimal digit; any other character is skipped.
+        std::vector<uint8_t> nibbles;
         for (char c : v->string()) {
-            if (nibbles.size() >= Engine::kMaxUserSample) break;
             if (c >= '0' && c <= '9') nibbles.push_back(uint8_t(c - '0'));
             else if (c >= 'A' && c <= 'F') nibbles.push_back(uint8_t(c - 'A' + 10));
             else if (c >= 'a' && c <= 'f') nibbles.push_back(uint8_t(c - 'a' + 10));
         }
+        values = std::move(nibbles);
     }
     if (const json::Value* v = o.find("source"); v && v->isString()) {
-        std::vector<uint8_t> raw = base64Decode(v->string());
-        if (raw.size() > Engine::kMaxUserSample) raw.resize(Engine::kMaxUserSample);
-        s.source.assign(raw.begin(), raw.end());
+        const std::vector<uint8_t> raw = base64Decode(v->string());
+        s.source = std::vector<int8_t>(raw.begin(), raw.end());
     }
 }
 
@@ -77,14 +76,19 @@ void readSlot(const json::Value& o, DigidrumSlotState& s, std::vector<uint8_t>& 
 DigidrumBank captureBank(const std::string& name, const NonParamState& state) {
     DigidrumBank b;
     b.name = name;
-    b.slots = state.digiSlots;
-    b.nibbles = state.digidrums;
+    size_t n = 8;
+    for (size_t k = 0; k < state.digiSlots.size(); ++k)
+        if (!state.digidrums[k].empty() || !(state.digiSlots[k] == DigidrumSlotState{})) n = std::max(n, k + 1);
+    b.slots.assign(state.digiSlots.begin(), state.digiSlots.begin() + std::ptrdiff_t(n));
+    b.nibbles.assign(state.digidrums.begin(), state.digidrums.begin() + std::ptrdiff_t(n));
     return b;
 }
 
 void applyBank(const DigidrumBank& bank, NonParamState& state) {
-    state.digiSlots = bank.slots;
-    state.digidrums = bank.nibbles;
+    for (size_t k = 0; k < state.digiSlots.size(); ++k) {
+        state.digiSlots[k] = k < bank.slots.size() ? bank.slots[k] : DigidrumSlotState{};
+        state.digidrums[k] = k < bank.nibbles.size() ? bank.nibbles[k] : SharedSamples<uint8_t>{};
+    }
 }
 
 std::optional<std::vector<DigidrumBank>> parseDigidrumBanks(std::string_view text, std::string* error) {
@@ -103,10 +107,14 @@ std::optional<std::vector<DigidrumBank>> parseDigidrumBanks(std::string_view tex
         if (!name || !name->isString() || cleanDigidrumName(name->string()).empty()) continue;
         DigidrumBank bank;
         bank.name = cleanDigidrumName(name->string());
-        // Slots missing from the file stay empty; slots beyond the eighth are ignored.
-        if (const json::Value* slots = b.find("slots"); slots && slots->isArray())
-            for (size_t k = 0; k < slots->items().size() && k < bank.slots.size(); ++k)
-                if (slots->items()[k].isObject()) readSlot(slots->items()[k], bank.slots[k], bank.nibbles[k]);
+        // Eight slots at least; those past ymengine::kDigidrumSlotsMax are ignored.
+        const json::Value* slots = b.find("slots");
+        const size_t n =
+            slots && slots->isArray() ? std::min<size_t>(slots->items().size(), ymengine::kDigidrumSlotsMax) : 0;
+        bank.slots.resize(std::max<size_t>(n, 8));
+        bank.nibbles.resize(bank.slots.size());
+        for (size_t k = 0; k < n; ++k)
+            if (slots->items()[k].isObject()) readSlot(slots->items()[k], bank.slots[k], bank.nibbles[k]);
         out.push_back(std::move(bank));
     }
     return out;

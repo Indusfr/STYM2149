@@ -6,10 +6,12 @@ add_library(stym_pluginui STATIC
   src/BackgroundJob.cpp
   src/CmdBox.cpp
   src/CurveWindow.cpp
+  src/DemoData.cpp
   src/DeskIcons.cpp
   src/EchoWindow.cpp
   src/StepSoundWindow.cpp
   src/HelpWindow.cpp
+  src/InfoDemo.cpp
   src/IconData.cpp
   src/KbdWindow.cpp
   src/KitWindow.cpp

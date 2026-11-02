@@ -1,4 +1,4 @@
-// STYM2149 — virtual channel of the 16-channel mode against channel A of ymcore::Ym2149 (step by step)
+// STYM2149 — virtual channel of the 32-channel mode against channel A of ymcore::Ym2149 (step by step)
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>

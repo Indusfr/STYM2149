@@ -2,32 +2,50 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Usage: gemshot output_folder [--ref captures_folder] [scene...]
+// Usage: gemshot output_folder [--ref captures_folder] [--ui-texts file] [--pref key=value]... [scene...]
 // With --ref, also writes <scene>-diff.png (deviations in red) and prints the percentage of different pixels.
+// With --ui-texts, writes to `file` every text the scenes measure or draw in the interface language, one per line,
+// sorted, a line break written "\n" (catalogue of the interface, tools/tipcatalog/README.md). Each --pref sets a
+// preference after the scene's own: --pref uiLanguage=de renders the scenes with the interface in German.
 // Without a named scene, renders every scene; those of the windows specific to STYM2149 are compared with
 // <captures>/stym.
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Png.h"
 #include "Scenes.h"
+#include "gemui/Language.h"
 
 int main(int argc, char** argv) {
     using namespace stym;
-    std::string out, ref;
+    std::string out, ref, texts;
     std::vector<std::string> only;
+    std::vector<std::pair<std::string, std::string>> prefs;
     for (int i = 1; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--ref") && i + 1 < argc) ref = argv[++i];
+        else if (!std::strcmp(argv[i], "--ui-texts") && i + 1 < argc) texts = argv[++i];
+        else if (!std::strcmp(argv[i], "--pref") && i + 1 < argc) {
+            const std::string kv = argv[++i];
+            const size_t eq = kv.find('=');
+            prefs.emplace_back(kv.substr(0, eq), eq == std::string::npos ? "" : kv.substr(eq + 1));
+        }
         else if (out.empty()) out = argv[i];
         else only.push_back(argv[i]);
     }
     if (out.empty()) {
-        std::fprintf(stderr, "usage: gemshot output_folder [--ref captures_folder] [scene...]\n");
+        std::fprintf(stderr,
+                     "usage: gemshot output_folder [--ref captures_folder] [--ui-texts file] [--pref key=value]... "
+                     "[scene...]\n");
         return 2;
     }
+    std::set<std::string, std::less<>> uiTexts;
+    if (!texts.empty()) gemui::recordUiTexts([&uiTexts](std::string_view s) { uiTexts.emplace(s); });
     std::vector<std::string> names = only;
     if (names.empty()) {
         names = gemshot::sceneNames();
@@ -36,7 +54,7 @@ int main(int argc, char** argv) {
     const auto& stym = gemshot::stymSceneNames();
     int failed = 0;
     for (const std::string& name : names) {
-        const gemshot::Shot shot = gemshot::renderScene(name);
+        const gemshot::Shot shot = gemshot::renderScene(name, prefs);
         const tools::Image& img = shot.image;
         if (!img.width) {
             std::fprintf(stderr, "unknown scene: %s\n", name.c_str());
@@ -82,6 +100,18 @@ int main(int argc, char** argv) {
                         shot.masks.front().decision.c_str());
         }
         std::printf("\n");
+    }
+    if (!texts.empty()) {
+        gemui::recordUiTexts(nullptr);
+        std::ofstream file(texts);
+        for (const std::string& s : uiTexts) {
+            for (const char c : s) {
+                if (c == '\n') file << "\\n";
+                else if (c == '\\') file << "\\\\";
+                else file << c;
+            }
+            file << '\n';
+        }
     }
     return failed ? 1 : 0;
 }

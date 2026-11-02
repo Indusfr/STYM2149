@@ -1,4 +1,4 @@
-// STYM2149 — ymengine: virtual YM channel of the 16-channel mode
+// STYM2149 — ymengine: virtual YM channel of the 32-channel mode
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //

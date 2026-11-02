@@ -1,4 +1,4 @@
-// STYM2149 — pluginui: tooltip languages
+// STYM2149 — pluginui: languages of the tooltips and of the interface
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include "pluginui/TipLanguage.h"
@@ -16,6 +16,9 @@ struct Pattern {
     size_t entry;
     std::vector<std::string_view> lits;
     std::vector<int> slots;
+    // Per placeholder: between quotes ("{1}") or brackets ([{1}]), a name (of a bank, a sample, a control) kept as it
+    // is in the interface.
+    std::vector<bool> names;
     size_t literalSize = 0;  // the most specific pattern wins when several match
 };
 
@@ -85,7 +88,7 @@ struct TipBook::Table {
     void index() {
         for (size_t e = 0; e < lines.size(); ++e) {
             const std::string_view en = lines[e].first;
-            Pattern p{e, {}, {}};
+            Pattern p{e, {}, {}, {}};
             size_t from = 0;
             for (size_t i = 0; i < en.size(); ++i)
                 if (placeholderAt(en, i)) {
@@ -95,6 +98,13 @@ struct TipBook::Table {
                     i += 2;
                 }
             p.lits.push_back(en.substr(from));
+            for (size_t k = 0; k < p.slots.size(); ++k) {
+                const std::string_view before = p.lits[k], after = p.lits[k + 1];
+                const bool quoted = !before.empty() && !after.empty() &&
+                                    ((before.back() == '"' && after.front() == '"') ||
+                                     (before.back() == '[' && after.front() == ']'));
+                p.names.push_back(quoted);
+            }
             if (p.slots.empty()) {
                 exact.emplace(en, e);  // the first entry of a line wins
                 continue;
@@ -105,59 +115,84 @@ struct TipBook::Table {
     }
 
     // Line with placeholders that matches `english` with the most fixed text, and what its placeholders captured.
-    // Linear in the number of patterns; on equal fixed text, the first entry wins.
+    // Linear in the number of patterns; on equal fixed text, the one with fewer placeholders wins ("• {1}" before
+    // "{1} to {2}" for a bullet line that holds " to "), then the first entry.
     const Pattern* bestPattern(std::string_view english, std::vector<std::string_view>& bestParts) const {
         const Pattern* best = nullptr;
         std::vector<std::string_view> parts;
         for (const Pattern& p : patterns)
-            if ((!best || p.literalSize > best->literalSize) && match(p, english, parts)) {
+            if ((!best || p.literalSize > best->literalSize ||
+                 (p.literalSize == best->literalSize && p.slots.size() < best->slots.size())) &&
+                match(p, english, parts)) {
                 best = &p;
                 bestParts = parts;
             }
         return best;
     }
 
-    std::optional<std::string> line(std::string_view english) const {
-        if (const auto it = exact.find(english); it != exact.end()) return std::string(lines[it->second].second);
-        std::vector<std::string_view> parts;
-        const Pattern* best = bestPattern(english, parts);
-        if (!best) return std::nullopt;
-        return fill(lines[best->entry].second, *best, parts);
+    // The translation of `english` (nullopt: none); the pattern that matched and what it captured, if one did.
+    std::optional<std::string_view> find(std::string_view english, const Pattern*& pattern,
+                                         std::vector<std::string_view>& parts) const {
+        pattern = nullptr;
+        if (const auto it = exact.find(english); it != exact.end()) return lines[it->second].second;
+        pattern = bestPattern(english, parts);
+        if (!pattern) return std::nullopt;
+        return lines[pattern->entry].second;
     }
 };
 
 namespace {
 
-// The catalogue, each line translated by itself (placeholders of the tests), built once.
-const TipBook::Table& catalogue() {
-    static const TipBook::Table table = [] {
+// The catalogue of the tooltips or of the interface, each line translated by itself (placeholders of the tests), built
+// once.
+const TipBook::Table& catalogue(bool interface) {
+    auto build = [](const char* const* lines, size_t count) {
         TipBook::Table t;
-        t.lines.reserve(tipcatalog::kLineCount);
-        for (size_t e = 0; e < tipcatalog::kLineCount; ++e)
-            t.lines.emplace_back(tipcatalog::kLines[e], tipcatalog::kLines[e]);
+        t.lines.reserve(count);
+        for (size_t e = 0; e < count; ++e) t.lines.emplace_back(lines[e], lines[e]);
         t.index();
         return t;
-    }();
-    return table;
+    };
+    static const TipBook::Table tips = build(tipcatalog::kLines, tipcatalog::kLineCount);
+    static const TipBook::Table ui = build(tipcatalog::kUiLines, tipcatalog::kUiLineCount);
+    return interface ? ui : tips;
+}
+
+std::optional<std::vector<std::string>> placeholderParts(bool interface, std::string_view english) {
+    const TipBook::Table& c = catalogue(interface);
+    if (c.exact.count(english)) return std::vector<std::string>{};
+    std::vector<std::string_view> parts;
+    const Pattern* p = c.bestPattern(english, parts);
+    if (!p) return std::nullopt;
+    std::vector<std::string> out;
+    for (size_t k = 0; k < parts.size(); ++k)
+        if (!p->names[k]) out.emplace_back(parts[k]);
+    return out;
+}
+
+bool hasLetter(std::string_view s) noexcept {
+    for (const char c : s)
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) return true;
+    return false;
 }
 
 }  // namespace
 
 std::optional<std::vector<std::string>> tipPlaceholderParts(std::string_view english) {
-    const TipBook::Table& c = catalogue();
-    if (c.exact.count(english)) return std::vector<std::string>{};
-    std::vector<std::string_view> parts;
-    if (!c.bestPattern(english, parts)) return std::nullopt;
-    return std::vector<std::string>(parts.begin(), parts.end());
+    return placeholderParts(false, english);
+}
+
+std::optional<std::vector<std::string>> uiPlaceholderParts(std::string_view english) {
+    return placeholderParts(true, english);
 }
 
 // ------------------------------------------------------------------------------------------- books
 
-// Each table copies its file's lines into `owned`, then indexes views of them.
-TipBook::TipBook(const std::vector<const TipFile*>& files) {
+// Each table copies its file's lines (or interface lines) into `owned`, then indexes views of them.
+TipBook::TipBook(const std::vector<const TipFile*>& files, bool interface) : nested_(interface) {
     for (const TipFile* file : files) {
         auto t = std::make_shared<Table>();
-        t->owned = file->lines;
+        t->owned = interface ? file->uiLines : file->lines;
         t->lines.reserve(t->owned.size());
         for (const auto& [en, tr] : t->owned) t->lines.emplace_back(en, tr);
         t->index();
@@ -165,9 +200,40 @@ TipBook::TipBook(const std::vector<const TipFile*>& files) {
     }
 }
 
+TipBook::TipBook(const std::vector<const TipFile*>& files) : TipBook(files, false) {}
+
+TipBook TipBook::interfaceBook(const std::vector<const TipFile*>& files) { return TipBook(files, true); }
+
+// The spaces around the part stay, as uiText keeps those around a line; a part without a letter (a number) is not
+// looked up.
+std::string TipBook::part(std::string_view english) const {
+    const size_t a = english.find_first_not_of(' '), b = english.find_last_not_of(' ');
+    if (a == std::string_view::npos || !hasLetter(english)) return std::string(english);
+    const std::string_view core = english.substr(a, b + 1 - a);
+    std::vector<std::string_view> parts;
+    for (const auto& t : tables_) {
+        const Pattern* p = nullptr;
+        if (const std::optional<std::string_view> tr = t->find(core, p, parts))
+            return std::string(english.substr(0, a)) + (p ? fill(*tr, *p, parts) : std::string(*tr)) +
+                   std::string(english.substr(b + 1));
+    }
+    return std::string(english);
+}
+
 std::optional<std::string> TipBook::line(std::string_view english) const {
-    for (const auto& t : tables_)
-        if (std::optional<std::string> tr = t->line(english)) return tr;
+    std::vector<std::string_view> parts;
+    for (const auto& t : tables_) {
+        const Pattern* p = nullptr;
+        const std::optional<std::string_view> tr = t->find(english, p, parts);
+        if (!tr) continue;
+        if (!p) return std::string(*tr);
+        if (!nested_) return fill(*tr, *p, parts);
+        std::vector<std::string> own;  // the parts translated, then views of them for fill
+        own.reserve(parts.size());
+        for (size_t k = 0; k < parts.size(); ++k)
+            own.push_back(p->names[k] ? std::string(parts[k]) : this->part(parts[k]));
+        return fill(*tr, *p, std::vector<std::string_view>(own.begin(), own.end()));
+    }
     return std::nullopt;
 }
 
@@ -266,23 +332,25 @@ std::string quoted(std::string_view s) {
 
 // Line by line: a keyword starts a field, a line that is only a quoted string continues the current one. An entry is
 // complete once its msgstr has started; the next comment, msgctxt or msgid closes it (flush). The msgstr of the first
-// empty msgid is the header. msgctxt, msgid_plural and msgstr[1] onwards are read into `ignored`.
+// empty msgid without a context is the header. An entry of context "ui" is an interface line, one without a
+// context a tooltip line; the other contexts are left out. msgid_plural and msgstr[1] onwards are read into `ignored`.
 std::optional<TipFile> parseTipFile(std::string_view text, std::string_view fileId) {
     if (text.substr(0, 3) == "\xEF\xBB\xBF") text.remove_prefix(3);  // UTF-8 byte order mark
     TipFile file;
     std::optional<std::string> header;
     // Entry being read: its msgid and msgstr (msgstr[0] for a plural entry), the field the next quoted lines continue.
-    std::string id, str;
+    std::string ctxt, id, str;
     bool hasId = false, hasStr = false, fuzzy = false;
     std::string* field = nullptr;
     auto flush = [&] {
         if (hasId && hasStr) {
-            if (id.empty()) {
+            if (id.empty() && ctxt.empty()) {
                 if (!header) header = str;
-            } else if (!str.empty() && !fuzzy) {
-                file.lines.emplace_back(std::move(id), std::move(str));
+            } else if (!id.empty() && !str.empty() && !fuzzy && (ctxt.empty() || ctxt == "ui")) {
+                (ctxt.empty() ? file.lines : file.uiLines).emplace_back(std::move(id), std::move(str));
             }
         }
+        ctxt.clear();
         id.clear();
         str.clear();
         hasId = hasStr = fuzzy = false;
@@ -307,9 +375,9 @@ std::optional<TipFile> parseTipFile(std::string_view text, std::string_view file
         };
         if (keyword("msgctxt")) {
             if (hasStr) flush();
-            ignored.clear();
-            field = &ignored;
-            unquote(line.substr(7), ignored);
+            ctxt.clear();
+            field = &ctxt;
+            unquote(line.substr(7), ctxt);
         } else if (keyword("msgid")) {
             if (hasStr) flush();
             hasId = true;
@@ -341,12 +409,14 @@ std::optional<TipFile> parseTipFile(std::string_view text, std::string_view file
 
 std::string tipTemplate(std::string_view version) {
     std::string out =
-        "# STYM2149 tooltips: template of a new language.\n"
+        "# STYM2149 tooltips and interface: template of a new language.\n"
         "# Save a copy in the Languages folder as <code>.po (nl.po for Dutch), give the code and the name\n"
         "# of the language below, then write each translation in the msgstr under its English line (a text\n"
         "# editor or Poedit will do). Lines left empty stay in English. {1} to {9} stand for parts of the\n"
         "# line that vary (a number, a name): keep each one, in any order. Only the characters of the GEM\n"
-        "# font (the Atari ST character set) can be drawn; the others appear as \"?\".\n";
+        "# font (the Atari ST character set) can be drawn; the others appear as \"?\".\n"
+        "# The tooltips come first; the entries with msgctxt \"ui\" are the texts of the interface (menus,\n"
+        "# buttons, labels, window titles), which are best kept about as long as the English.\n";
     out += "msgid \"\"\nmsgstr \"\"\n";
     out += "\"Project-Id-Version: STYM2149 " + std::string(version) + "\\n\"\n";
     out += "\"Language: \\n\"\n\"X-Language-Name: \\n\"\n";
@@ -354,17 +424,21 @@ std::string tipTemplate(std::string_view version) {
            "\"Content-Transfer-Encoding: 8bit\\n\"\n";
     for (size_t e = 0; e < tipcatalog::kLineCount; ++e)
         out += "\nmsgid " + quoted(tipcatalog::kLines[e]) + "\nmsgstr \"\"\n";
+    for (size_t e = 0; e < tipcatalog::kUiLineCount; ++e)
+        out += "\nmsgctxt \"ui\"\nmsgid " + quoted(tipcatalog::kUiLines[e]) + "\nmsgstr \"\"\n";
     return out;
 }
 
 std::vector<std::pair<std::string, std::string>> tipFolderFiles(std::string_view version,
                                                                 std::string_view installedFolder) {
     std::string readme =
-        "STYM2149 tooltip languages\n"
+        "STYM2149 languages of the tooltips and of the interface\n"
         "\n"
-        "Each .po file of this folder adds a language to the Language menu of Options > Settings,\n"
-        "or corrects one of those installed with STYM2149. English is built in. The menu reads\n"
-        "the folder each time it opens.\n"
+        "Each .po file of this folder adds a language to the Interface language and Tooltip\n"
+        "language menus of Options > Settings, or corrects one of those installed with STYM2149.\n"
+        "English is built in. The menus read the folder each time they open. The entries with\n"
+        "msgctxt \"ui\" translate the interface (menus, buttons, labels, window titles), the others\n"
+        "the tooltips.\n"
         "\n"
         "The languages installed with STYM2149 (French, German, Spanish, Portuguese, Italian) are\n"
         "PO files of the same kind, in a folder of the computer";

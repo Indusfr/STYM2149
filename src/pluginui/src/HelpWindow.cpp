@@ -5,8 +5,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "gemui/Font.h"
+#include "gemui/Language.h"
 #include "pluginui/MainWindow.h"
 
 namespace stym::pluginui {
@@ -25,9 +27,12 @@ constexpr Row kWindows[] = {
     {"^G", "Song"},           {"^R", "Modulation"},  {"^P", "Patches"},
     {"^K", "Drum kit"},       {"Esc", "close the topmost window, then panic (all notes off)"},
 };
+// Shift + ^, since ^C and ^V copy and paste in the grid.
 constexpr Row kGenerator[] = {
-    {"^V", "Chip Voice"}, {"^S", "SID Voice"}, {"^U", "Sync Buzzer"}, {"^C", "Chipdrum"}, {"^I", "Digidrum"},
-    {"^D", "DMA (STE)"},  // ^D no longer loads the demo pattern
+    {"Shift + ^V", "Chip Voice"}, {"Shift + ^S", "SID Voice"}, {"Shift + ^U", "Sync Buzzer"},
+    {"Shift + ^F", "FM Voice"},
+    {"Shift + ^C", "Chipdrum"},   {"Shift + ^I", "Digidrum"},
+    {"Shift + ^D", "DMA (STE)"},  // ^D no longer loads the demo pattern
 };
 constexpr Row kFile[] = {{"^Q", "quit"}, {"^?", "this window"}};
 constexpr Row kTransport[] = {
@@ -103,7 +108,8 @@ constexpr Row kMore[] = {
     {"] / [", "lengthen / shorten the note at the grid cursor"},
     {"\\", "split the note at the grid cursor"},
     {"J", "join the note at the grid cursor to the next one"},
-    {"^C / ^X / ^V", "copy, cut, paste the note at the grid cursor, or the selected block"},
+    {"^C / ^X / ^V", "copy, cut, paste the note at the grid cursor, or the selected box or block"},
+    {"^A", "select all the notes of the grid"},
     {"Arrows", "move the selected block (Shift + Up/Down: one octave)"},
     {"Delete", "clear the selected block"},
     {"Esc", "drop the block selection"},
@@ -182,6 +188,7 @@ std::vector<std::string_view> wrap(std::string_view text, double width) {
 
 std::span<const HelpWindow::Section> HelpWindow::sections() noexcept { return kSections; }
 
+// Every text is translated into the interface language first, then measured and cut as it is.
 HelpWindow::Layout HelpWindow::layOut(double width) {
     // buildHelp: per section an h4, then a table as wide as the content box.
     Layout l;
@@ -189,20 +196,32 @@ HelpWindow::Layout HelpWindow::layOut(double width) {
     double y = kPad;
     for (const Section& s : kSections) {
         if (&s != &kSections[0]) y += kHeadAbove;
-        l.lines.push_back({s.title, kPad, y, true});
+        l.lines.push_back({gemui::uiString(s.title), kPad, y, true});
         y += kLine;
         l.rules.push_back(y);
         y += kRule + kHeadBelow;
-        // First column: its width, or the longest key (white-space:nowrap) and its padding.
-        double keys = 0;
-        for (const Row& r : s.rows) keys = std::max(keys, gemui::Font::width(r.key, kPx));
-        const double col = std::max(kKeyCol, keys + kKeyPad);
+        std::vector<std::string> keys, texts;
         for (const Row& r : s.rows) {
+            keys.push_back(gemui::uiString(r.key));
+            texts.push_back(gemui::uiString(r.text));
+        }
+        const gemui::RawText raw;
+        // First column: its width, or the longest key (white-space:nowrap) and its padding. A translated key longer
+        // than the longest English key and than 40 % of the table wraps in its column, which leaves the second column
+        // room for its text.
+        double keysW = 0, englishW = 0;
+        for (const std::string& k : keys) keysW = std::max(keysW, gemui::Font::width(k, kPx));
+        for (const Row& r : s.rows) englishW = std::max(englishW, gemui::Font::width(r.key, kPx));
+        const double col = std::max(kKeyCol, std::min(keysW, std::max(englishW, 0.4 * width)) + kKeyPad);
+        for (size_t k = 0; k < keys.size(); ++k) {
             y += kCellPad;
-            l.lines.push_back({r.key, kPad, y});
-            const std::vector<std::string_view> text = wrap(r.text, width - col);
-            for (size_t i = 0; i < text.size(); ++i) l.lines.push_back({text[i], kPad + col, y + kLine * double(i)});
-            y += kLine * double(std::max<size_t>(1, text.size())) + kCellPad;
+            const std::vector<std::string_view> key = wrap(keys[k], col - kKeyPad);
+            for (size_t i = 0; i < key.size(); ++i)
+                l.lines.push_back({std::string(key[i]), kPad, y + kLine * double(i)});
+            const std::vector<std::string_view> text = wrap(texts[k], width - col);
+            for (size_t i = 0; i < text.size(); ++i)
+                l.lines.push_back({std::string(text[i]), kPad + col, y + kLine * double(i)});
+            y += kLine * double(std::max({size_t(1), key.size(), text.size()})) + kCellPad;
         }
     }
     l.height = y + kPad;
@@ -215,6 +234,10 @@ void HelpWindow::build() {
     setTitle("SHORTCUTS");
     add(pane_);
     pane_.add(text_);
+    relayout();
+}
+
+void HelpWindow::relayout() {
     // .mixbody (display:block; max-height:70vh; overflow:auto): as tall as its content, at most 70 % of the desktop;
     // the vertical scroll bar, when the content overflows, takes its width from the table.
     const double maxH = 0.7 * MainWindow::kHeight;
@@ -223,13 +246,16 @@ void HelpWindow::build() {
     Layout l = layOut(paneW - 2 * kPad);
     if (l.height > maxH) l = layOut(paneW - gemui::ScrollPane::kBar - 2 * kPad);
     const double paneH = std::min(l.height, maxH);
-    pane_.setBox({double(kX + kInset), double(kY + kInset + gemui::TitleBar::kHeight), paneW, paneH});
+    // At (kX, kY) the first time, then where the user left it.
+    const double x = laidOut_ ? box().x : double(kX), y = laidOut_ ? box().y : double(kY);
+    pane_.setBox({x + kInset, y + kInset + gemui::TitleBar::kHeight, paneW, paneH});
     pane_.setContentSize(int(l.width), int(l.height));
     const gemui::Point o = pane_.contentOrigin();
     text_.setBox({double(o.x), double(o.y), l.width, l.height});
     text_.setLayout(std::move(l));
     // Last: place() may move the window and its content to keep it on the desktop.
-    place({double(kX), double(kY), double(kW), kInset + gemui::TitleBar::kHeight + paneH + kInset});
+    place({x, y, double(kW), kInset + gemui::TitleBar::kHeight + paneH + kInset});
+    laidOut_ = true;
 }
 
 void HelpWindow::show() { open(); }
@@ -238,11 +264,39 @@ std::optional<Rect> HelpWindow::rectOf(std::string_view id) const {
     if (!isOpen()) return std::nullopt;
     if (id == "helpWin") return bounds();
     if (id == "helpBody") return pane_.bounds();
+    if (id == "helpFmRow") {  // the row of FM Voice (Shift + ^F), across the body, clipped to it
+        for (const Line& line : layout().lines)
+            if (!line.heading && line.text == gemui::uiString("Shift + ^F")) {
+                const gemui::Box b = text_.box();
+                const Rect body = pane_.bounds();
+                const Rect row{int(b.x), int(b.y + line.y - kCellPad), int(layout().width), int(kLine + 2 * kCellPad)};
+                if (row.y < body.y || row.bottom() > body.bottom()) return std::nullopt;
+                return row;
+            }
+        return std::nullopt;
+    }
+    if (id == "helpGenKeys") {  // keys of the Generator section, Shift + ^: their first column
+        double top = -1, bottom = -1, x = 0;
+        for (const Row& r : kGenerator)
+            for (const Line& line : layout().lines)
+                if (!line.heading && line.text == gemui::uiString(r.key)) {
+                    top = top < 0 ? line.y : std::min(top, line.y);
+                    bottom = std::max(bottom, line.y + kLine);
+                    x = line.x;
+                }
+        if (top < 0) return std::nullopt;
+        // As wide as the longest key (the FM Voice row, made the column of the whole cell too large a zone).
+        double wide = 0;
+        for (const Row& r : kGenerator) wide = std::max(wide, gemui::Font::width(gemui::uiString(r.key), kPx));
+        const gemui::Box b = text_.box();
+        return Rect{int(b.x + x), int(b.y + top), int(std::ceil(wide)) + 1, int(bottom - top)};
+    }
     return std::nullopt;
 }
 
 void HelpWindow::Text::paint(gemui::Painter& p) {
-    // Only the lines that cross the visible part of the body (the painter's clip).
+    // Only the lines that cross the visible part of the body (the painter's clip), already translated.
+    const gemui::RawText raw;
     const Rect clip = p.clip();
     const double ox = box().x, oy = box().y;
     for (const double r : layout_.rules)

@@ -52,7 +52,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }

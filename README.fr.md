@@ -6,11 +6,11 @@ Instrument logiciel (VST3, CLAP, LV2 et Standalone ; AU et AAX à venir) qui ém
 
 Programming: Pascal "Indus" Nowak (with Claude's help) — Copyright © 2026 Indus / PRISM. Licence : AGPLv3.
 
-- Jusqu'à 16 pistes : une puce à 3 voix, deux puces (2 × 3 voix) ou 16 pistes ; horloges de l'Atari ST, du ZX Spectrum et de l'Amstrad CPC ; chaînes de sortie Raw, ST et STE.
-- Effets de timer de l'Atari ST (SID, Sync Buzzer, Digidrums), buzzer accordé, son DMA du STE, ADSR, vibrato, un LFO par piste, arpèges synchronisés au tempo, glissés, un écho des notes dans tous les modes et un delay en 16 voies.
-- Séquenceur pas à pas de 16 pistes avec Song, mixeur, 32 instruments et séquences d'instrument, MIDI learn.
-- 483 paramètres d'hôte, à identifiants stables ; motifs, morceaux et réglages enregistrés avec le projet.
-- Fichiers : lecteur YM et SNDH, import et export MIDI, export WAV et stems, export VBL, YM3, YM6 et SNDH pour un vrai ST ou STE, import XM.
+- Jusqu'à 32 pistes : une puce à 3 voix, deux puces (2 × 3 voix), 16 ou 32 pistes ; horloges de l'Atari ST, du ZX Spectrum et de l'Amstrad CPC ; chaînes de sortie Raw, ST et STE.
+- Effets de timer de l'Atari ST (SID, Sync Buzzer, FM, Digidrums), buzzer accordé, son DMA du STE, ADSR, vibrato, un LFO par piste, arpèges synchronisés au tempo, glissés, un écho des notes dans tous les modes et un delay en 16 et 32 voies.
+- Séquenceur pas à pas de 32 pistes avec Song, mixeur, 127 instruments et séquences d'instrument, MIDI learn.
+- 1102 paramètres d'hôte, à identifiants stables ; motifs, morceaux et réglages enregistrés avec le projet.
+- Fichiers : lecteur YM et SNDH, import et export MIDI, export WAV et stems, export VBL, YM3, YM6 et SNDH pour un vrai ST ou STE, import XM, MOD, S3M et OKT, import YM et SNDH en motifs éditables.
 - Aucun accès réseau, aucune télémétrie : STYM2149 ne se connecte jamais à rien.
 
 Le [manuel d'utilisation](docs/MANUAL.fr.md) explique l'installation et chaque fenêtre.
@@ -83,6 +83,8 @@ Paquets : `packaging/linux/make_tarball.sh` construit l'archive Linux ; `packagi
 
 - `ym2wav` : fait le rendu d'un fichier YM (compressé LHA ou non) en WAV.
 - `ymbench` : charge CPU du moteur de voix (`--seq --notes 6 --noise` pour le pire cas, `--hash` pour une empreinte de la sortie).
+- `ymimport` : importe un morceau YM ou SNDH en motifs, comme File > Import, les rejoue et les compare trame par trame au morceau.
+- `mymimport` : joue un morceau maxYMiser (.MYS + .MYV) avec le modèle de sa routine qu'a STYM2149 et le compare tick par tick à la routine (dont vous fournissez le binaire) ; avec `--import` et `--export`, vérifie l'import et l'export trame par trame.
 - `gemshot` : fait le rendu de l'interface en PNG, sans hôte ni JUCE (tests visuels).
 - `tools/gemfont` : polices GEM tirées du prototype et d'EmuTOS.
 

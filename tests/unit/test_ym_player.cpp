@@ -1,10 +1,11 @@
 // STYM2149 — YM Player in the plugin: files read and refused, playback in place of the engine, stop
-// and resume, Rewind, subsong, close, loop, resume on a new chip, SNDH and crashed routine.
+// and resume, Rewind, subsong, close, loop, resume on a new chip, SNDH and crashed routine, a project played apart.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -289,4 +290,62 @@ TEST_CASE("YM Player: SNDH, subsong and crashed routine", "[ymplayer][sndh]") {
     for (int i = 0; i < 100 && g.d.ymPlaying(); ++i) g.blocks(1, true);
     CHECK_FALSE(g.d.ymPlaying());
     CHECK(g.d.ymStatus().failed);
+}
+
+// File > Play... of a STYM2149 file or of a converted song: a second driver plays a copy of a project in the
+// YM Player, in stereo; it stops at its end and Play starts it again from the beginning.
+TEST_CASE("YM Player: a project played apart, stopped at its end, played again from the start", "[ymplayer]") {
+    Rig g;
+    g.run(480, {noteOn(60)});
+    auto p = std::make_shared<Driver::PlayerProject>();
+    p->values[size_t(paramIndex(Global::FreeTempo))] = 240.0f;
+    p->extras.seq.cur().steps = 16;
+    ymseq::Lane& l = p->extras.seq.cur().edit(0);
+    for (int k = 0; k < 16; ++k) {  // C4 on every step
+        l.pat[size_t(k)] = 0;
+        l.oct[size_t(k)] = int8_t(ymseq::octaveCode(4, 3));
+    }
+    p->name = "tune.stym  -  STYM2149";
+    g.d.ymLoadProject(p);
+    CHECK(g.d.ymProject() == p);
+    CHECK_FALSE(g.d.ymTune());
+    CHECK_FALSE(g.d.ymPlaying());
+    g.blocks(2);
+    CHECK(g.manualHeld());  // loaded, stopped: the engine is still heard
+
+    g.d.ymPlay(true);
+    g.blocks(10);
+    CHECK_FALSE(g.silent());
+    CHECK_FALSE(g.manualHeld());
+    CHECK(g.d.ymStatus().frames == 5);  // 0.1 s at 50 Hz
+    CHECK(g.d.ymStatus().regs[7] != 0);
+    // A bar of 16 steps at 240 BPM: 1 s, then its release; playback stops by itself, in silence.
+    int blocks = 0;
+    while (g.d.ymPlaying() && blocks < 2000) {
+        g.run(480);
+        ++blocks;
+    }
+    CHECK_FALSE(g.d.ymPlaying());
+    CHECK(blocks > 80);
+    const uint64_t end = g.d.ymStatus().frames;
+    g.blocks(2);
+    CHECK(g.silent());
+    CHECK(g.d.ymStatus().frames == end);
+
+    // Play again: from the beginning.
+    g.d.ymPlay(true);
+    g.blocks(10);
+    CHECK(g.d.ymPlaying());
+    CHECK(g.d.ymStatus().frames == 5);
+    CHECK_FALSE(g.silent());
+
+    // A YM tune loaded next replaces the project; closing forgets both.
+    g.d.ymLoad(load(ym3(50), "s.ym"));
+    CHECK_FALSE(g.d.ymProject());
+    g.d.ymLoadProject(p);
+    CHECK_FALSE(g.d.ymTune());
+    g.d.ymClose();
+    CHECK_FALSE(g.d.ymProject());
+    g.blocks(2);
+    g.d.service(g.v);
 }

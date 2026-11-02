@@ -58,7 +58,10 @@ TEST_CASE("DMA: DMAS chunk of the state, absent by default, read back identicall
     st.extras.dma.slots[5] = {0, true, 48, true};
     st.extras.dma.slots[7].rate = 3;
     st.extras.dmaSamples[5] = {1, -2, 3, -4, 5, -6};
-    st.extras.dmaSamples[0] = bytes(ymengine::kDmaMaxBytes, -128);
+    st.extras.dmaSamples[0] = bytes(100000, -128);  // longer than the former 32 KB
+    st.extras.dmaSamples[126] = {9, -8};            // the last of the 127 (formerly eight)
+    st.extras.dma.slots[126] = {1, false, 72, false};
+    st.extras.dmaNames[126] = "Far";
     const std::vector<uint8_t> enc = encodeState(st);
     CHECK(hasChunk(enc, "DMAS"));
     const DecodeResult back = decodeState(enc);
@@ -94,8 +97,9 @@ TEST_CASE("DMA: DMAS chunk of the state, absent by default, read back identicall
         for (int i = 0; i < 4; ++i) b[at + 4 + size_t(i)] = uint8_t(len >> (8 * i));
         return b;
     };
-    const size_t cents = 8 * 8;                               // one f64 per slot
-    const size_t names = 8 + std::string("Pad loop").size();  // one length byte per slot, then the name
+    const size_t slots = 127;                                         // up to slot 126, the last used
+    const size_t cents = slots * 8;                                   // one f64 per slot
+    const size_t names = slots + std::string("Pad loopFar").size();  // one length byte per slot, then the names
     const DecodeResult noCents = decodeState(cut(cents));
     REQUIRE(noCents.ok);
     CHECK(noCents.state.extras.dma.slots[5].cents == 0);
@@ -105,14 +109,14 @@ TEST_CASE("DMA: DMAS chunk of the state, absent by default, read back identicall
     REQUIRE(noNames.ok);
     CHECK(noNames.state.extras.dma.slots[5].start == 1);
     CHECK(noNames.state.extras.dma.slots[5].end == 5);
-    CHECK(noNames.state.extras.dmaNames == std::array<std::string, ymengine::kDmaSlots>{});
-    const DecodeResult old = decodeState(cut(cents + names + 64));
+    CHECK(noNames.state.extras.dmaNames == std::array<std::string, ymengine::kDmaSlotsMax>{});
+    const DecodeResult old = decodeState(cut(cents + names + slots * 8));
     REQUIRE(old.ok);
     CHECK(old.state.extras.dma.slots[5].start == 0);
     CHECK(old.state.extras.dma.slots[5].end == 0);
     CHECK(old.state.extras.dma.slots[5].loop);
     CHECK(old.state.extras.dmaSamples == st.extras.dmaSamples);
-    CHECK(old.state.extras.dmaNames == std::array<std::string, ymengine::kDmaSlots>{});
+    CHECK(old.state.extras.dmaNames == std::array<std::string, ymengine::kDmaSlotsMax>{});
 
     // A name alone is enough to write the chunk.
     PluginState named;
@@ -149,20 +153,24 @@ TEST_CASE("DMA: sample of the track in TRKX (when not default) and in the Patche
     REQUIRE(lib);
     REQUIRE(lib->size() == 1);
     CHECK(patchChange((*lib)[0], NonParamState{}, 9).track.patch.dmaSlot == 6);
-    const auto bad = parsePatchLibrary(R"([{"name":"y","patch":{"dmaSlot":40}}])");
+    const auto far = parsePatchLibrary(R"([{"name":"y","patch":{"dmaSlot":40}}])");  // past the former eight
+    REQUIRE(far);
+    CHECK(patchChange((*far)[0], NonParamState{}, 0).track.patch.dmaSlot == 40);
+    const auto bad = parsePatchLibrary(R"([{"name":"y","patch":{"dmaSlot":300}}])");
     REQUIRE(bad);
-    CHECK(patchChange((*bad)[0], NonParamState{}, 0).track.patch.dmaSlot == 7);
+    CHECK(patchChange((*bad)[0], NonParamState{}, 0).track.patch.dmaSlot == 126);
 }
 
-TEST_CASE("DMA: out-of-range values brought back, sample truncated to 32 KB, name cleaned", "[dma][state]") {
+TEST_CASE("DMA: out-of-range values brought back, samples of any length, name cleaned", "[dma][state]") {
     NonParamState n;
     n.dma.slots[2].rate = 7;
     n.dma.slots[2].root = 200;
-    n.tracks[4].patch.dmaSlot = 12;
+    n.tracks[4].patch.dmaSlot = 300;
     n.tracks[5].patch.dmaSlot = -9;
-    n.dmaSamples[1] = bytes(ymengine::kDmaMaxBytes + 100, 3);
+    n.tracks[6].patch.dmaSlot = 120;
+    n.dmaSamples[1] = bytes(40000, 3);
     n.dma.slots[3] = {2, false, 60, false, 900, 400};  // Start past End
-    n.dma.slots[4].end = ymengine::kDmaMaxBytes + 5;
+    n.dma.slots[4].end = 40005;
     n.dma.slots[6].start = 300;                          // End 0: to the end of the sample, Start kept
     n.dma.slots[5].cents = 250;                          // fine tune: ±100 cents
     n.dma.slots[7].cents = std::numeric_limits<double>::quiet_NaN();
@@ -171,15 +179,16 @@ TEST_CASE("DMA: out-of-range values brought back, sample truncated to 32 KB, nam
     CHECK(n.dmaNames[0] == "A name far too l");
     CHECK(n.dma.slots[3].start == 400);
     CHECK(n.dma.slots[3].end == 400);
-    CHECK(n.dma.slots[4].end == ymengine::kDmaMaxBytes);
+    CHECK(n.dma.slots[4].end == 40005);  // the engine plays up to the end of the sample
     CHECK(n.dma.slots[6].start == 300);
     CHECK(n.dma.slots[2].rate == ymengine::kDmaRates - 1);
     CHECK(n.dma.slots[2].root == 127);
     CHECK(n.dma.slots[5].cents == 100);
     CHECK(n.dma.slots[7].cents == 0);
-    CHECK(n.tracks[4].patch.dmaSlot == ymengine::kDmaSlots - 1);
+    CHECK(n.tracks[4].patch.dmaSlot == ymengine::kDmaSlotsMax - 1);
     CHECK(n.tracks[5].patch.dmaSlot == -1);
-    CHECK(n.dmaSamples[1].size() == ymengine::kDmaMaxBytes);
+    CHECK(n.tracks[6].patch.dmaSlot == 120);
+    CHECK(n.dmaSamples[1].size() == 40000);  // whole: once 32 KB at most
 }
 
 TEST_CASE("DMA: Computer parameter (ST or STE machine), version 3, DMA type of the generator", "[dma][params]") {
@@ -193,7 +202,8 @@ TEST_CASE("DMA: Computer parameter (ST or STE machine), version 3, DMA type of t
     CHECK(s.choices[1] == "STE");
     const ParamSpec& gen = paramSpec(paramIndex(0, Track::Generator));
     REQUIRE(gen.choices.size() == size_t(ymengine::kGenerators));
-    CHECK(gen.choices.back() == "DMA");
+    CHECK(gen.choices[size_t(ymengine::Generator::Dma)] == "DMA");
+    CHECK(gen.choices.back() == "FM Voice");
 }
 
 TEST_CASE("DMA: notes of a DMA track through the driver, machine change, preview", "[dma][driver]") {
@@ -201,7 +211,6 @@ TEST_CASE("DMA: notes of a DMA track through the driver, machine change, preview
     snap.state.dmaSamples[0] = bytes(20000, 100);
     snap.state.dmaSamples[4] = bytes(20000, 50);
     for (auto& sl : snap.state.dma.slots) sl.loop = true;
-    snap.dmaVersion.fill(1);
     Driver d;
     ParamValues v = defaultValues();
     v[size_t(paramIndex(Global::Computer))] = 1;     // STE
@@ -265,7 +274,6 @@ TEST_CASE("DMA: the right side of a stereo sample through the driver, its LED (I
     snap.state.dmaSamples[0] = square;
     snap.state.dma.slots[0].stereo = true;
     snap.state.dma.slots[0].loop = true;
-    snap.dmaVersion.fill(1);
     Driver d;
     ParamValues v = defaultValues();
     v[size_t(paramIndex(Global::Computer))] = 1;     // STE
@@ -338,12 +346,12 @@ TEST_CASE("DMA: file converted to the slot rate, mono or stereo, 32 KB at most",
     CHECK(up[1] == 64);   // 0.5
     CHECK(up[3] == 64);   // the sample after the end counts as 0
 
-    // 32 KB at most (16 KB per channel in stereo); non-finite values: 0.
+    // The whole file (once 32 KB at most); non-finite values: 0.
     std::vector<float> longer(100000, 0.0f);
     longer[0] = NAN;
-    CHECK(toDmaSample(longer, {}, 25033, 25033).size() == ymengine::kDmaMaxBytes);
+    CHECK(toDmaSample(longer, {}, 25033, 25033).size() == 100000);
     CHECK(toDmaSample(longer, {}, 25033, 25033)[0] == 0);
-    CHECK(toDmaSample(longer, longer, 25033, 25033).size() == ymengine::kDmaMaxBytes);
+    CHECK(toDmaSample(longer, longer, 25033, 25033).size() == 200000);
     CHECK(toDmaSample({}, {}, 25033, 25033).empty());
     CHECK(toDmaSample(half, {}, 0, 25033).empty());
 }
@@ -352,7 +360,7 @@ TEST_CASE("DMA: raw bytes, Sign and Gain", "[dma][sample]") {
     const std::vector<uint8_t> raw = {0x00, 0x7F, 0x80, 0xFF, 0x10};
     CHECK(dmaRaw(raw, false) == std::vector<int8_t>{0, 127, -128, -1, 16});
     CHECK(dmaRaw(raw, true).size() == 4);  // stereo: even number of bytes
-    CHECK(dmaRaw(std::vector<uint8_t>(40000, 1), false).size() == ymengine::kDmaMaxBytes);
+    CHECK(dmaRaw(std::vector<uint8_t>(40000, 1), false).size() == 40000);  // whole
 
     std::vector<int8_t> b = {0, 127, -128, -1};
     dmaSign(b);
@@ -484,10 +492,11 @@ TEST_CASE("Resample: the sample keeps its length in time at the new rate, 32 KB 
     // Half the rate: every other frame, both channels of a stereo frame together.
     const std::vector<int8_t> st = {10, -10, 20, -20, 30, -30, 40, -40};
     CHECK(plugin::dmaResample(st, true, 50066, 25033) == std::vector<int8_t>{10, -10, 30, -30});
-    // Eight times the rate: cut to 32 KB (16 KB per channel in stereo).
+    // Eight times the rate: the whole sample (once cut to 32 KB).
     const std::vector<int8_t> big(8192, 1);
-    CHECK(plugin::dmaResample(big, false, 6258, 50066).size() == ymengine::kDmaMaxBytes);
-    CHECK(plugin::dmaResample(big, true, 6258, 50066).size() == ymengine::kDmaMaxBytes);
+    const auto eight = size_t(std::floor(8192.0 * 50066 / 6258));
+    CHECK(plugin::dmaResample(big, false, 6258, 50066).size() == eight);
+    CHECK(plugin::dmaResample(big, true, 6258, 50066).size() == 2 * size_t(std::floor(4096.0 * 50066 / 6258)));
     CHECK(plugin::dmaResample({}, false, 6258, 50066).empty());
 }
 
@@ -501,8 +510,10 @@ TEST_CASE("DMA: named banks, read back identically, tolerant reading (Indus, 26/
     const DmaBank b = captureDmaBank("Breaks", st);
     CHECK(b.name == "Breaks");
     CHECK(b.dma == st.dma);
-    CHECK(b.samples == st.dmaSamples);
-    CHECK(b.names == st.dmaNames);
+    REQUIRE(b.samples.size() == 8);  // eight slots at least, up to the last one used
+    REQUIRE(b.names.size() == 8);
+    CHECK(std::equal(b.samples.begin(), b.samples.end(), st.dmaSamples.begin()));
+    CHECK(std::equal(b.names.begin(), b.names.end(), st.dmaNames.begin()));
 
     const std::string text = dumpDmaBanks({b, captureDmaBank("Empty", NonParamState{})});
     const auto back = parseDmaBanks(text);

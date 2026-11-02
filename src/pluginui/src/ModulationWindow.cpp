@@ -286,10 +286,27 @@ void ModulationWindow::build() {
     loop_.setTip("Loop the table instead of playing it once");
     rate_.setTip("Table speed, in VBL ticks per step");
     clear_.setTip("Clear the modulation table and its sequence rows");
+    trackSel_.setId("ornTrack");
+    trackSel_.setRaw(true);  // a name the user gives, or the chip's
+    trackSel_.setMinWidth(40);
+    trackSel_.setTip("Track edited: the one the table shows and the main window's tabs choose");
     for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&on_, &labLen_, &len_, &lenv_, &loop_, &rate_,
                                                                   &clear_, &hint_, &hint2_, &hint3_, &sep_, &grid_})
         add(*w);
     seqx_.addTo(*this);  // the sequences: their rows over the table, their settings below it
+    add(labTrack_);
+    add(trackSel_);
+    insOpen_.setId("ornInsOpen");
+    insNum_.setId("ornInsNum");
+    insName_.setId("ornInsName");
+    insOpen_.setTip("Open the Instruments window (Ctrl+T)");
+    insNum_.setTip("Instrument of this track: the one last loaded into it or stored from it. Pick another to load it "
+                   "into the track; --: the track plays its own sound");
+    insName_.setPx(12);  // the 8x8 font
+    insName_.setLeftAligned(true);
+    insName_.setTip("Name of the track's instrument: type it and press Enter to rename the instrument. Without one, the "
+                    "track's sound is stored in the first free slot under this name");
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&insOpen_, &insNum_, &insName_}) add(*w);
     lfo_.addTo(*this);   // the LFO below them
 }
 
@@ -300,7 +317,12 @@ void ModulationWindow::wire() {
         editPatch([](ymengine::TrackPatch& p) { p.ornamentOn = !p.ornamentOn; });
     };
     loop_.onClick = [this] { editPatch([](ymengine::TrackPatch& p) { p.ornamentLoop = !p.ornamentLoop; }); };
+    trackSel_.setPopup(true);  // a GEM pop-up button, with its shadow
+    trackSel_.onClick = [this] { m_.popup(trackSel_, m_.trackItems(), m_.cur_); };  // as in the Step Sequencer
+    insOpen_.onClick = [this] { m_.ins_.show(); };
+    m_.wireInstrument(insNum_, insName_, insNameTrack_);
     // Rate: 1 to 4 VBL frames per step; item k - 1 is checked.
+    rate_.setPopup(true);  // a GEM pop-up button, with its shadow
     rate_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int k = 1; k <= 4; ++k) {
@@ -367,6 +389,9 @@ void ModulationWindow::wire() {
 // ------------------------------------------------------------------------------------------- state
 
 bool ModulationWindow::drum() const noexcept { return m_.drumTrack(); }
+bool ModulationWindow::instrumentNameStale() const noexcept {
+    return m_.desk_.keyFocus() == &insName_ && insNameTrack_ != m_.cur_;
+}
 bool ModulationWindow::dma() const noexcept { return m_.generator() == int(ymengine::Generator::Dma); }
 bool ModulationWindow::live() const noexcept { return patch().ornamentOn && !drum(); }
 const ymengine::TrackPatch& ModulationWindow::patch() const noexcept {
@@ -413,6 +438,8 @@ void ModulationWindow::refresh() {
     if (!lenv_.editing()) lenv_.setText(std::to_string(p.ornamentLength));
     loop_.setText(p.ornamentLoop ? "Loop" : "Hold");
     rate_.setText(std::to_string(std::max<int>(p.ornamentRate, 1)) + "/frame");
+    trackSel_.setText(m_.trackName(m_.cur_));
+    m_.showInstrument(insNum_, insName_, insNameTrack_);
     refreshGrid();
     seqx_.refresh();
     lfo_.refresh();
@@ -522,6 +549,23 @@ void ModulationWindow::layout() {
     seqx_.placeRows(x, grid_.box().y + OrnGrid::kSeqY, body);
     // Their settings always, then the LFO.
     bottom = seqx_.layout(x, bottom, contentW, kPad);
+    // Track: in the pitch matrix's column, on the line of Write PER.
+    {
+        const gemui::Box& wr = seqx_.button("seqxVibWrite")->box();
+        std::vector<FlexItem> tr = {{&labTrack_, labTrack_.naturalWidth(), 16}, btn(trackSel_)};
+        flexRow(x + SequencesPanel::kMatrixX, wr.y, contentW - SequencesPanel::kMatrixX, tr, kGap, false);
+        // Centred on Write PER's line.
+        for (FlexItem& it : tr) it.w->setBox({it.box.x, wr.y + (wr.h - it.height) / 2, it.box.w, it.height});
+        bottom = std::max(bottom, trackSel_.box().bottom());
+        // The instrument: its two buttons on the same line in the pitch column, its name under them (one
+        // underscore per character it takes, as in the GENERATOR frame).
+        insNum_.setMinWidth(Button{"$00"}.naturalWidth());
+        std::vector<FlexItem> ins = {btn(insOpen_), btn(insNum_)};
+        flexRow(x, wr.y, SequencesPanel::kMatrixX - kGap, ins, kGap, false);
+        const double nameW = std::round(gemui::Font::advance(insName_.px())) * plugin::kInstrumentNameMax;
+        insName_.setBox({x, wr.bottom() + 6, nameW, insName_.naturalHeight()});
+        bottom = std::max(bottom, insName_.box().bottom());
+    }
     bottom = lfo_.layout(x, bottom, contentW, kPad);
 
     // Window: content, padding of 8, border and margin of .gwin (6 on each side). Grown past the bottom of the
@@ -540,7 +584,8 @@ std::optional<Rect> ModulationWindow::rectOf(std::string_view id) const {
         const gemui::Widget* w;
     };
     const Named named[] = {{"ornOn", &on_},     {"ornLen", &len_},     {"ornLenv", &lenv_}, {"ornLoop", &loop_},
-                           {"ornRate", &rate_}, {"ornClear", &clear_}, {"orngrid", &grid_}};
+                           {"ornRate", &rate_}, {"ornClear", &clear_}, {"orngrid", &grid_}, {"ornTrack", &trackSel_},
+                           {"ornInsOpen", &insOpen_}, {"ornInsNum", &insNum_}, {"ornInsName", &insName_}};
     for (const Named& n : named)
         if (id == n.id) return n.w->visible() ? std::optional<Rect>(n.w->bounds()) : std::nullopt;
     if (id.substr(0, 3) == "lfo") return lfo_.rectOf(id);

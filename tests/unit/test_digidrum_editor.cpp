@@ -1,6 +1,6 @@
 // STYM2149 — Digidrum editor: rate, root note and fine tune per slot, held loop (released at the end
 // of the note), preview; DIGS chunk of the state, values brought back into their ranges; 4-bit Linear and YM levels
-// conversion, 8-bit source, tools; named banks (JSON, base64).
+// conversion, 8-bit source, tools; named banks (JSON, base64); the channel loaded from a stereo file.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_approx.hpp>
@@ -138,7 +138,7 @@ TEST_CASE("Digidrum: slot settings brought back into their ranges", "[digidrum][
     CHECK(g.rateHz == ymengine::kDigidrumRateMax);
     CHECK(g.root == 127);
     CHECK(g.cents == -ymengine::kDigidrumCentsMax);
-    CHECK(g.end == Engine::kMaxUserSample);
+    CHECK(g.end == 800000);  // any length: the engine plays up to the end of the sample
     CHECK(g.start == g.end);
     d.rateHz = NAN;
     e.setDigidrumSlot(1, d);
@@ -351,16 +351,16 @@ TEST_CASE("Digidrum: out-of-range settings brought back, name cleaned", "[digidr
     s.play.start = 70000;
     s.play.end = 90000;
     s.convert = DigiConvert(7);
-    s.source.assign(Engine::kMaxUserSample + 10, 1);
+    s.source = std::vector<int8_t>(70000, 1);
     sanitize(n);
     CHECK(s.name == "Avery long drum");  // first 16 characters, trailing space removed
     CHECK(s.play.rateHz == ymengine::kDigidrumRateMin);
     CHECK(s.play.root == 127);
     CHECK(s.play.cents == 0);
-    CHECK(s.play.end == Engine::kMaxUserSample);
-    CHECK(s.play.start == Engine::kMaxUserSample);
+    CHECK(s.play.end == 90000);  // any length
+    CHECK(s.play.start == 70000);
     CHECK(s.convert == DigiConvert::YmLevels);
-    CHECK(s.source.size() == Engine::kMaxUserSample);
+    CHECK(s.source.size() == 70000);
     CHECK(cleanDigidrumName("   ").empty());
 }
 
@@ -369,7 +369,6 @@ TEST_CASE("Digidrum: slot settings passed to the engine, preview from the screen
     snap.state.digidrums[2] = std::vector<uint8_t>(2000, 15);
     snap.state.digiSlots[2].play.rateHz = 11025;
     snap.state.digiSlots[2].play.root = 50;
-    snap.sampleVersion.fill(1);
     Driver d;
     ParamValues v = defaultValues();
     d.prepare({48000, 0}, v, snap);
@@ -400,12 +399,9 @@ TEST_CASE("Digidrum: slot settings passed to the engine, preview from the screen
 
 // -------------------------------------------------------------------------------------------- conversion, tools
 
-TEST_CASE("Digidrum: loading rate and maximum length", "[digidrum][sample]") {
-    CHECK(digidrumMaxSamples(7800) == kDigidrumMaxSamples);
-    CHECK(digidrumMaxSamples(20000) == 60000);
-    CHECK(digidrumMaxSamples(1e6) == 60000);
-    CHECK(digidrumMaxSamples(10) == 6000);
-    CHECK(digidrumMaxSamples(NAN) == kDigidrumMaxSamples);
+TEST_CASE("Digidrum: loading rate, the whole file", "[digidrum][sample]") {
+    // Ten seconds at 7800 Hz: whole (once 3 s at most).
+    CHECK(toDigidrum(std::vector<float>(480000, 0.25f), 48000, 7800).size() == 78000);
     // A one-second file at 48 kHz, loaded at 11025 Hz: 11025 values, the source at the same length.
     const std::vector<float> one(48000, 0.5f);
     CHECK(toDigidrum(one, 48000, 11025).size() == 11025);
@@ -495,8 +491,10 @@ TEST_CASE("Digidrum: named banks, read back identically, tolerant reading", "[di
     st.digidrums[5] = {7};
     const DigidrumBank b = captureBank("Kit one", st);
     CHECK(b.name == "Kit one");
-    CHECK(b.slots == st.digiSlots);
-    CHECK(b.nibbles == st.digidrums);
+    REQUIRE(b.slots.size() == 8);  // eight slots at least, up to the last one used
+    REQUIRE(b.nibbles.size() == 8);
+    CHECK(std::equal(b.slots.begin(), b.slots.end(), st.digiSlots.begin()));
+    CHECK(std::equal(b.nibbles.begin(), b.nibbles.end(), st.digidrums.begin()));
 
     const std::string text = dumpDigidrumBanks({b, captureBank("Empty", NonParamState{})});
     const auto back = parseDigidrumBanks(text);
@@ -534,4 +532,20 @@ TEST_CASE("Digidrum: named banks, read back identically, tolerant reading", "[di
     CHECK(o.nibbles[0] == std::vector<uint8_t>{0, 1, 15, 15});
     CHECK(o.slots[0].source == std::vector<int8_t>{-1});
     CHECK(o.slots[1] == DigidrumSlotState{});
+}
+
+TEST_CASE("Digidrum: the channel that a stereo file loads, left, right or both mixed", "[digidrum]") {
+    const std::vector<float> left = {1.0f, 0.5f, -1.0f, 0.25f}, right = {0.0f, -0.5f, 1.0f};
+    CHECK(digidrumChannel(left, right, DigiStereo::Left) == left);
+    CHECK(digidrumChannel(left, right, DigiStereo::Right) == right);
+    // The mean, as long as the shorter channel.
+    CHECK(digidrumChannel(left, right, DigiStereo::Mix) == std::vector<float>{0.5f, 0.0f, 0.0f});
+    // A mono file: its only channel, whatever the choice.
+    for (const DigiStereo s : {DigiStereo::Left, DigiStereo::Right, DigiStereo::Mix})
+        CHECK(digidrumChannel(left, {}, s) == left);
+    // The preference: its names, Mix for anything else (the default).
+    for (const DigiStereo s : {DigiStereo::Left, DigiStereo::Right, DigiStereo::Mix})
+        CHECK(digiStereoOf(digiStereoName(s)) == s);
+    CHECK(digiStereoOf("") == DigiStereo::Mix);
+    CHECK(digiStereoOf("LEFT") == DigiStereo::Mix);
 }

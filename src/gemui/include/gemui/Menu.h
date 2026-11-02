@@ -35,6 +35,14 @@ struct MenuItem {
     std::string why;                // reason for an unavailable entry (tooltip)
     const Bitmap* icon = nullptr;   // icon before the label (envelope shapes)
     std::function<void()> pick;
+    bool raw = false;  // label shown as it is, not translated (a name the user gave, a language's own name)
+    // Check mark of the entry in a menu opened without a checked index (a menu of the bar): when one entry of the
+    // menu is marked, every entry of it takes the mark's column, the marked ones "✓ " (the generators of the Edit
+    // menu).
+    bool marked = false;
+    // Entry switched on and off by a pick, marked while it is on (Options > Oscilloscope): the mark's column is
+    // kept even when no entry of the menu is marked, so that the labels do not move.
+    bool checkable = false;
     // Submenu: entries and checked entry (subMarks: check marks shown; -1: none checked).
     std::vector<MenuItem> sub;
     bool subMarks = false;
@@ -71,8 +79,10 @@ public:
     // than the desktop height (at least kColumnsMin px).
     // checked: index of the checked entry among the plain entries, or a negative value for no check marks. Any menu
     // already open is closed first.
+    // overAnchor: the menu of a GEM pop-up button: in the GEM look, the checked entry opens over the button,
+    // their left edges together, and the menu is at least as wide as the button.
     static MenuList& open(Desktop& d, std::vector<MenuItem> items, int checked, const Box& anchor, bool fromBar,
-                          bool columns = false);
+                          bool columns = false, bool overAnchor = false);
     static constexpr int kColumnsMargin = 120, kColumnsMin = 120;
     // Opens a menu below an anchor box over the popups already open, which stay open: picking an entry or leaving the
     // menu closes the menu alone (a menu of a box such as the Euclidean generator).
@@ -122,6 +132,8 @@ private:
     // Arranges the entries in columns of at most maxH px (a column always takes at least one entry); returns the size
     // of the menu, frame included. The rectangles of the entries are relative to the inside of the frame.
     Size arrange(int maxH);
+    void widen(Size& size, int minW) noexcept;
+    void paintGem(Painter& p);
     int rowAt(Point p) const noexcept;
     std::string shownLabel(const Row& row) const;
     void openSub(int row);
@@ -132,11 +144,12 @@ private:
     void activate(int row);
     void closeAll();
     static MenuList& place(Desktop& d, std::vector<MenuItem> items, int checked, const Box& anchor, bool fromBar,
-                           bool columns);
+                           bool columns, bool overAnchor);
 
     std::vector<MenuItem> items_;
     std::vector<Row> rows_;
     int checked_ = kNoMarks;
+    bool flagMarks_ = false;          // an entry is marked (MenuItem::marked): the mark's column for every entry
     int hover_ = -1, down_ = -1;     // rows hovered and pressed (a click: press and release on the same row)
     MenuList* parentMenu_ = nullptr;  // menu this submenu comes from; nullptr for the top-level menu
     MenuList* sub_ = nullptr;         // open submenu (owned by the desktop), its row shown in reverse video
@@ -144,13 +157,18 @@ private:
     Desktop::TimerId closeTimer_ = 0, subTimer_ = 0;  // closing of the cascade (top-level menu), of the submenu
     Desktop* desk_ = nullptr;
     bool over_ = false;  // opened over other popups (openOver)
+    bool shadow_ = false;  // GEM shadow of a pop-up
 };
 
 // .menubar: white background, 2 px bottom rule, 8 px padding; titles (4 px / 10 px padding) on the left, indicators
 // (CHIP:, MIDI:) on the right. A title opens its menu on hover or on click; an indicator is clicked.
 class MenuBar : public Widget {
 public:
-    static constexpr int kHeight = 26;
+    // The prototype's height (26 px, rule included), which places the windows; GEM's (19 px: a line of the 8×16 font,
+    // a pixel above and below, the 1 px rule).
+    static constexpr int kHeight = 26, kGemHeight = 19;
+    // Height of the bar in the current look.
+    static int height() noexcept;
 
     MenuBar() = default;
     ~MenuBar() override;

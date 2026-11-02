@@ -17,8 +17,13 @@
 #include "BuildId.h"
 #include "KeyboardLayout.h"
 #include "PluginProcessor.h"
+#include "StandaloneSlot.h"
+#include "gemui/Alert.h"
+#include "gemui/Language.h"
 #include "plugincore/Digidrum.h"
 #include "plugincore/DmaSample.h"
+#include "plugincore/State.h"
+#include "plugincore/SteMemory.h"
 #include "pluginui/IconData.h"
 
 namespace stym::plugin {
@@ -33,6 +38,19 @@ constexpr int kZoomMin = 50, kZoomMax = 200;
 // test, item 5) made 25 % larger (second DAW test, item 15); 160 % shows it at its logical size.
 constexpr int kZoomFull = 160;
 constexpr int zoomed(int logicalSize, int zoom) noexcept { return logicalSize * zoom / kZoomFull; }
+
+// Largest zoom: the window grows until it fills the user area of the largest display (an 8K screen, for
+// one), 200 % at least, as before.
+int maxZoom() {
+    int best = kZoomMax;
+    for (const auto& d : juce::Desktop::getInstance().getDisplays().displays) {
+        const auto a = d.userBounds;
+        const double z = std::min(a.getWidth() * kZoomFull / MainWindow::kWidth,
+                                  a.getHeight() * kZoomFull / MainWindow::kHeight);
+        best = std::max(best, int(std::floor(z)));
+    }
+    return best;
+}
 
 // Starting size when the window was never resized (the prototype's autoZoom, from the main display). The thresholds
 // are the prototype's, compared here with the display's user area in logical pixels instead of the browser window.
@@ -112,7 +130,7 @@ std::unique_ptr<juce::PropertiesFile> StymEditor::userPreferences() {
 #endif
     o.filenameSuffix = ".settings";
     o.osxLibrarySubFolder = "Application Support";
-    o.millisecondsBeforeSaving = 500;
+    o.millisecondsBeforeSaving = -1;  // written by the editor itself, merged with the file (writePreferences)
     return openPreferences(o.getDefaultFile(), o);
 }
 
@@ -135,45 +153,83 @@ std::unique_ptr<juce::PropertiesFile> StymEditor::openPreferences(const juce::Fi
     return prefs;
 }
 
+// Every copy of the standalone application and every instance of the plugin in hosts keep their preferences
+// in memory: the file is read again just before writing, so that only the keys changed here replace those in the
+// file. Two copies writing within the same instant could still lose one change; a person changes one copy at a time.
+void StymEditor::writePreferences(juce::PropertiesFile& file, const juce::StringPairArray& changed) {
+    file.reload();  // values read over the ones in memory (JUCE keeps keys missing from the file)
+    for (int i = 0; i < changed.size(); ++i) file.setValue(changed.getAllKeys()[i], changed.getAllValues()[i]);
+    file.saveIfNeeded();
+}
+
+void StymEditor::storePreference(const juce::String& key, const juce::String& value) {
+    if (!prefs_) return;
+    prefs_->setValue(key, value);
+    if (unsavedPrefs_.size() == 0) prefsDueAt_ = juce::Time::getMillisecondCounterHiRes() + 500.0;
+    unsavedPrefs_.set(key, value);
+}
+
+void StymEditor::savePreferences() {
+    if (!prefs_ || unsavedPrefs_.size() == 0) return;
+    writePreferences(*prefs_, unsavedPrefs_);
+    unsavedPrefs_.clear();
+}
+
 StymEditor::StymEditor(StymProcessor& owner) : StymEditor(owner, userPreferences()) {}
 
 StymEditor::StymEditor(StymProcessor& owner, std::unique_ptr<juce::PropertiesFile> preferences)
     : AudioProcessorEditor(owner), processor_(owner), prefs_(std::move(preferences)) {
     const int stored = prefs_->getIntValue("zoom", 0);
-    // Size the window was last given, otherwise one from the display, not remembered (prototype).
-    zoom_ = stored >= kZoomMin && stored <= kZoomMax ? stored : autoZoom();
+    zoomMax_ = maxZoom();
+    // Size the window was last given, otherwise one from the display, not remembered (prototype); no larger than
+    // the largest display now.
+    zoom_ = stored >= kZoomMin ? std::min(stored, zoomMax_) : autoZoom();
     // Smooth pixels by default (Settings > Pixels; default again since the eleventh DAW test, item 130).
     cache_.setSharp(prefs_->getValue("pixels", "smooth") == "sharp");
     processor_.dropHostNotes();  // notes received while the window was closed: stale
+    processor_.dropMonitorMidi();
     processor_.dropLearnMidi();  // likewise for learned messages (the window reads the map again and gives it back)
     window_ = std::make_unique<MainWindow>(static_cast<pluginui::Host&>(*this));
     setOpaque(true);
     setWantsKeyboardFocus(true);
-    // Resizable by the host (or the standalone application's window), in the desktop's proportions, from 50 to
-    // 200 %; without a handle drawn by JUCE in the GEM desktop.
+    // Resizable by the host (or the standalone application's window), in the desktop's proportions, from 50 % up to
+    // the largest display; without a handle drawn by JUCE in the GEM desktop.
     const juce::ScopedValueSetter<bool> applying(applyingZoom_, true);  // provisional sizes: nothing to remember
     setResizable(true, false);
     setResizeLimits(zoomed(MainWindow::kWidth, kZoomMin), zoomed(MainWindow::kHeight, kZoomMin),
-                    zoomed(MainWindow::kWidth, kZoomMax), zoomed(MainWindow::kHeight, kZoomMax));
+                    zoomed(MainWindow::kWidth, zoomMax_), zoomed(MainWindow::kHeight, zoomMax_));
     getConstrainer()->setFixedAspectRatio(double(MainWindow::kWidth) / double(MainWindow::kHeight));
     applyZoom(zoom_);
     window_->tick(juce::Time::getMillisecondCounterHiRes());
     flush();
-    startTimerHz(30);
+    startTimerHz(frameHz_);
+#if JucePlugin_Build_Standalone
+    // A MIDI input unplugged while a key is held, then plugged back: told by the device manager.
+    if (auto* holder = standalone() ? standaloneHolder() : nullptr) {
+        juce::StringArray available, enabled;
+        scanMidiInputs(available, enabled);
+        midiInputsSeen(available, enabled);
+        holder->deviceManager.addChangeListener(this);
+    }
+#endif
 }
 
 StymEditor::~StymEditor() {
     stopTimer();
+#if JucePlugin_Build_Standalone
+    if (auto* holder = standalone() ? standaloneHolder() : nullptr) holder->deviceManager.removeChangeListener(this);
+#endif
     // Notes held with the mouse must not stay stuck: on-screen playing is cut (CC 120).
     processor_.pushScreenMidi(0xB0, 120, 0);
     window_.reset();
     processor_.disarmMidiLearn();  // learn mode ends with the window
+    savePreferences();
     if (prefs_) prefs_->saveIfNeeded();
 }
 
 void StymEditor::applyZoom(int percent) {
     const juce::ScopedValueSetter<bool> applying(applyingZoom_, true);
-    zoom_ = std::clamp(percent, kZoomMin, kZoomMax);
+    zoom_ = std::clamp(percent, kZoomMin, zoomMax_);
     setSize(zoomed(MainWindow::kWidth, zoom_), zoomed(MainWindow::kHeight, zoom_));
     repaint();
 }
@@ -181,8 +237,8 @@ void StymEditor::applyZoom(int percent) {
 void StymEditor::resized() {
     if (applyingZoom_) return;
     // Size given by the host or by the user: the zoom follows the width and becomes the remembered choice.
-    zoom_ = std::clamp(int(std::lround(getWidth() * double(kZoomFull) / MainWindow::kWidth)), kZoomMin, kZoomMax);
-    if (prefs_) prefs_->setValue("zoom", zoom_);
+    zoom_ = std::clamp(int(std::lround(getWidth() * double(kZoomFull) / MainWindow::kWidth)), kZoomMin, zoomMax_);
+    storePreference("zoom", juce::String(zoom_));
     repaint();
 }
 
@@ -286,9 +342,17 @@ void StymEditor::flush() {
 
 void StymEditor::timerCallback() { frame(); }
 
-void StymEditor::frame() {
-    window_->tick(juce::Time::getMillisecondCounterHiRes());
+void StymEditor::frame() { frame(juce::Time::getMillisecondCounterHiRes()); }
+
+void StymEditor::frame(double now) {
+    window_->tick(now);
     flush();
+    if (unsavedPrefs_.size() > 0 && now >= prefsDueAt_) savePreferences();
+    // 60 frames a second while the demo of the Information box plays.
+    if (const int hz = window_->frameRate(); hz != frameHz_) {
+        frameHz_ = hz;
+        startTimerHz(hz);
+    }
 }
 
 gemui::Point StymEditor::logical(const juce::MouseEvent& e) const noexcept {
@@ -308,6 +372,29 @@ void StymEditor::mouseDown(const juce::MouseEvent& e) {
                                  : e.mods.isMiddleButtonDown() ? gemui::MouseButton::Middle
                                                                : gemui::MouseButton::Left;
     window_->desktop().mouseDown(logical(e), b, mods(e.mods));
+    flush();
+}
+
+bool StymEditor::isInterestedInFileDrag(const juce::StringArray& files) {
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    for (const juce::String& f : files) {
+        const juce::File file(f);
+        if (pluginui::MainWindow::isMidiFile(f.toStdString()) || file.hasFileExtension("raw;spl;sam") ||
+            formats.findFormatForFileExtension(file.getFileExtension()) != nullptr)
+            return true;
+    }
+    return false;
+}
+
+void StymEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    std::vector<std::string> paths;
+    for (const juce::String& f : files) paths.push_back(f.toStdString());
+    // The point of the drop in logical pixels, as for the mouse: the drawing of a sample under it takes the file.
+    const auto p = juce::Point<float>(float(x), float(y)).transformedBy(toScreen().inverted());
+    const gemui::Point at{std::clamp(int(std::floor(p.x)), 0, MainWindow::kWidth - 1),
+                          std::clamp(int(std::floor(p.y)), 0, MainWindow::kHeight - 1)};
+    window_->dropFiles(paths, at);
     flush();
 }
 
@@ -436,6 +523,8 @@ void StymEditor::screenMidi(uint8_t status, uint8_t data1, uint8_t data2) {
 
 bool StymEditor::hostNote(std::array<uint8_t, 3>& message) { return processor_.popHostNote(message); }
 
+bool StymEditor::monitorMidi(plugin::MonitorMessage& message) { return processor_.popMonitorMidi(message); }
+
 void StymEditor::setMidiCapture(const MidiKeys& keys, bool armed) { processor_.setMidiCapture(keys, armed); }
 
 bool StymEditor::learnMidi(std::array<uint8_t, 3>& message) { return processor_.popLearnMidi(message); }
@@ -467,6 +556,15 @@ bool StymEditor::standalone() const {
     return processor_.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
 }
 
+void StymEditor::showAlert(const std::vector<std::string>& lines) {
+    gemui::Alert::Spec spec;
+    for (const std::string& line : lines) spec.lines.push_back({line});
+    gemui::Alert::open(window_->desktop(), std::move(spec));
+    flush();
+}
+
+int StymEditor::copyNumber() const { return standalone() ? standaloneCopyNumber() : 1; }
+
 std::string StymEditor::midiStatus() const {
 #if JucePlugin_Build_Standalone
     if (auto* holder = standalone() ? standaloneHolder() : nullptr) {
@@ -486,6 +584,56 @@ std::string StymEditor::midiStatus() const {
     return "host";  // in a host, MIDI comes through the track
 }
 
+void StymEditor::scanMidiInputs(juce::StringArray& available, juce::StringArray& enabled) const {
+    available.clear();
+    enabled.clear();
+#if JucePlugin_Build_Standalone
+    if (auto* holder = standalone() ? standaloneHolder() : nullptr)
+        for (const auto& d : juce::MidiInput::getAvailableDevices()) {
+            available.add(d.identifier);
+            if (holder->deviceManager.isMidiInputDeviceEnabled(d.identifier)) enabled.add(d.identifier);
+        }
+#endif
+}
+
+void StymEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
+#if JucePlugin_Build_Standalone
+    auto* holder = standalone() ? standaloneHolder() : nullptr;
+    if (!holder) return;
+    juce::StringArray available, enabled;
+    scanMidiInputs(available, enabled);
+    // Closed, then opened on the device that came back; each change calls here again, and finds nothing more to do.
+    for (const juce::String& id : midiInputsSeen(available, enabled)) {
+        holder->deviceManager.setMidiInputDeviceEnabled(id, false);
+        holder->deviceManager.setMidiInputDeviceEnabled(id, true);
+    }
+#endif
+}
+
+juce::StringArray StymEditor::midiInputsSeen(const juce::StringArray& available, const juce::StringArray& enabled) {
+    juce::StringArray present, back;
+    for (const juce::String& id : available)
+        if (enabled.contains(id)) present.add(id);
+    // Inputs are merged: which keys came from the one gone (unplugged or switched off) is not known, so every key held
+    // is released.
+    for (const juce::String& id : midiInputs_)
+        if (!present.contains(id)) {
+            processor_.releaseMidiKeys();
+            break;
+        }
+    // Unplugged: JUCE keeps the input it had opened, closed by the system, and counts it as enabled; when the device
+    // comes back under the same identifier, it does not open it again.
+    for (const juce::String& id : midiInputs_)
+        if (!available.contains(id)) midiGone_.addIfNotAlreadyThere(id);
+    for (int i = midiGone_.size(); --i >= 0;)
+        if (available.contains(midiGone_[i])) {
+            if (enabled.contains(midiGone_[i])) back.add(midiGone_[i]);  // switched off meanwhile: stays off
+            midiGone_.remove(i);
+        }
+    midiInputs_ = present;
+    return back;
+}
+
 // Version and build: "0.9.0 build 412 (fe71c0d)" from the CI, "0.9.0 build dev" from a local build.
 std::string StymEditor::version() const {
     std::string v = std::string(JucePlugin_VersionString) + " build " + kBuildNumber;
@@ -495,10 +643,9 @@ std::string StymEditor::version() const {
 
 void StymEditor::quit() {
     if (!standalone()) return;
-#if JucePlugin_Build_Standalone
-    // Like the close box of the JUCE window: the state is kept and reopened at the next launch.
-    if (auto* holder = standaloneHolder()) holder->savePluginState();
-#endif
+    // The state is no longer kept at Quit, unlike JUCE's window and the prototype: the work not saved is lost,
+    // as the Quit box says, and the next start reopens the configuration last saved or loaded (Indus, 01/11/2026
+    // 18:25).
     juce::JUCEApplicationBase::quit();
 }
 
@@ -522,51 +669,59 @@ void StymEditor::openAudioSettings() {
 #endif
 }
 
-void StymEditor::loadDigidrum(int slot) {
+std::string StymEditor::audioFilePatterns() const {
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    return formats.getWildcardForAllFormats().toStdString();
+}
+
+void StymEditor::loadDigidrum(int slot, const std::string& path) {
     // The prototype's loading at the slot's rate (7800 Hz by default); 8-bit source kept for the Digidrums editor,
-    // name taken from the file, loop reset to the whole sample.
-    if (slot < 0 || slot >= ymengine::kDigidrumSlots) return;
-    auto formats = std::make_shared<juce::AudioFormatManager>();
-    formats->registerBasicFormats();
-    chooser_ = std::make_unique<juce::FileChooser>("Load a sample into slot " + juce::String(slot + 1), juce::File(),
-                                                   formats->getWildcardForAllFormats());
-    // The callback comes later, on the message thread: `self` is null if the editor was closed in the meantime, and
-    // the lambda keeps the format manager alive. Same pattern in loadDmaSample and launchChooser.
-    const juce::Component::SafePointer<StymEditor> self(this);
-    chooser_->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [self, formats, slot](const juce::FileChooser& fc) {
-            if (self == nullptr) return;
-            const juce::File file = fc.getResult();
-            if (file == juce::File()) return;
-            std::unique_ptr<juce::AudioFormatReader> reader(formats->createReaderFor(file));
-            if (reader == nullptr || reader->sampleRate <= 0 || reader->lengthInSamples <= 0) {
-                self->window_->showMessage("Could not decode this audio file.");
-                self->flush();
-                return;
-            }
-            const DigidrumSlotState settings = self->processor_.extras().digiSlots[size_t(slot)];
-            const double rate = settings.play.rateHz;
-            // Just what 3 s at the slot's rate need, plus the next sample for the interpolation.
-            const auto want = juce::int64(std::ceil(reader->sampleRate * double(digidrumMaxSamples(rate)) / rate)) + 1;
-            const int len = int(std::min(reader->lengthInSamples, want));
-            juce::AudioBuffer<float> buf(1, len);
-            reader->read(&buf, 0, len, 0, true, false);  // first channel (getChannelData(0))
-            const std::span<const float> channel{buf.getReadPointer(0), size_t(len)};
-            std::vector<int8_t> source = toDigidrumSource(channel, reader->sampleRate, rate);
-            std::vector<uint8_t> data = settings.convert == DigiConvert::Linear
-                                            ? toDigidrum(channel, reader->sampleRate, rate)
-                                            : digidrumNibbles(source, settings.convert);
-            const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
-            self->processor_.editExtras([&](NonParamState& s) {
-                DigidrumSlotState& d = s.digiSlots[size_t(slot)];
-                d.name = name;
-                d.play.start = 0;
-                d.play.end = uint32_t(data.size());
-                d.source = std::move(source);
-                s.digidrums[size_t(slot)] = std::move(data);
-            });
-        });
+    // name taken from the file, the whole sample played. The whole file (once 3 s at most), after an
+    // alert when the samples would then go past the memory of the Atari. The file chosen by Load or dropped on the
+    // drawing, after the alert that asks whether to replace the slot's sample.
+    if (slot < 0 || slot >= ymengine::kDigidrumSlotsMax || !juce::File::isAbsolutePath(str(path))) return;
+    const juce::File file(str(path));
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    if (reader == nullptr || reader->sampleRate <= 0 || reader->lengthInSamples <= 0) {
+        window_->showMessage("Could not decode this audio file.");
+        return;
+    }
+    const DigidrumSlotState settings = processor_.extras().digiSlots[size_t(slot)];
+    const double rate = settings.play.rateHz;
+    // Too long: more than kSampleLoadMax read or once converted.
+    if (reader->lengthInSamples > juce::int64(kSampleLoadMax) ||
+        double(reader->lengthInSamples) * rate / reader->sampleRate > double(kSampleLoadMax)) {
+        window_->showMessage("This file is too long for a sample.");
+        return;
+    }
+    const int len = int(reader->lengthInSamples);
+    // A stereo file: the channel that the Stereo menu of the Digidrums window chooses, or both mixed.
+    const int ch = reader->numChannels > 1 ? 2 : 1;
+    juce::AudioBuffer<float> buf(ch, len);
+    reader->read(&buf, 0, len, 0, true, ch > 1);
+    const DigiStereo stereo = digiStereoOf(preference(kDigiStereoPref, "mix"));
+    const std::vector<float> mono = digidrumChannel(
+        {buf.getReadPointer(0), size_t(len)},
+        ch > 1 ? std::span<const float>{buf.getReadPointer(1), size_t(len)} : std::span<const float>{}, stereo);
+    const std::span<const float> channel{mono};
+    std::vector<int8_t> source = toDigidrumSource(channel, reader->sampleRate, rate);
+    std::vector<uint8_t> data = settings.convert == DigiConvert::Linear ? toDigidrum(channel, reader->sampleRate, rate)
+                                                                        : digidrumNibbles(source, settings.convert);
+    const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
+    // Shared bytes: the alert and the edit copy the change without copying the sample.
+    const SharedSamples<int8_t> src = std::move(source);
+    const SharedSamples<uint8_t> values = std::move(data);
+    window_->applySampleLoad([slot, name, src, values](NonParamState& s) {
+        DigidrumSlotState& d = s.digiSlots[size_t(slot)];
+        d.name = name;
+        d.play.start = 0;
+        d.play.end = uint32_t(values.size());
+        d.source = src;
+        s.digidrums[size_t(slot)] = values;
+    });
 }
 
 pluginui::Host::Recorder StymEditor::recorder() const {
@@ -585,9 +740,24 @@ std::string StymEditor::loadYm(std::string_view bytes, const std::string& fileNa
     return processor_.loadYm({reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()}, fileName);
 }
 
+std::string StymEditor::playProject(const plugin::ParamValues& values, const plugin::NonParamState& extras, bool song,
+                                    const std::string& name) {
+    processor_.playProject(values, extras, song, name);
+    return {};
+}
+
 pluginui::Host::YmPlayer StymEditor::ymPlayer() const {
     YmPlayer y;
     const Driver& d = processor_.driver();
+    if (const std::shared_ptr<const Driver::PlayerProject> p = d.ymProject()) {  // a project played
+        const Driver::YmStatus st = d.ymStatus();
+        y.loaded = true;
+        y.playing = d.ymPlaying();
+        y.name = p->name;
+        y.position = st.position;
+        y.regs = st.regs;
+        return y;
+    }
     const std::shared_ptr<const YmTune> tune = d.ymTune();
     if (!tune) return y;
     const Driver::YmStatus st = d.ymStatus();
@@ -614,68 +784,76 @@ void StymEditor::disarmRecorder() { processor_.disarmRecorder(); }
 void StymEditor::clearRecording() { processor_.clearTake(); }
 RegisterTake StymEditor::recordedTake() const { return processor_.recordedTake(); }
 
-void StymEditor::loadDmaSample(int slot) {
+void StymEditor::loadDmaSample(int slot, const std::string& path) {
     // DMA track: audio file resampled at the slot's rate, mono or stereo depending on its format; .raw, .spl
-    // or .sam file: signed bytes taken as they are.
-    if (slot < 0 || slot >= ymengine::kDmaSlots) return;
-    auto formats = std::make_shared<juce::AudioFormatManager>();
-    formats->registerBasicFormats();
-    chooser_ = std::make_unique<juce::FileChooser>("Load a DMA sample into slot " + juce::String(slot + 1), juce::File(),
-                                                   formats->getWildcardForAllFormats() + ";*.raw;*.spl;*.sam");
-    const juce::Component::SafePointer<StymEditor> self(this);
-    chooser_->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [self, formats, slot](const juce::FileChooser& fc) {
-            if (self == nullptr) return;
-            const juce::File file = fc.getResult();
-            if (file == juce::File()) return;
-            const ymengine::DmaSlot settings = self->processor_.extras().dma.slots[size_t(slot)];
-            std::vector<int8_t> data;
-            if (file.hasFileExtension("raw;spl;sam")) {
-                juce::MemoryBlock block;
-                if (!file.loadFileAsData(block) || block.getSize() == 0) {
-                    self->window_->showMessage("Could not read this file.");
-                    self->flush();
-                    return;
-                }
-                data = dmaRaw({static_cast<const uint8_t*>(block.getData()), block.getSize()}, settings.stereo);
-            } else {
-                std::unique_ptr<juce::AudioFormatReader> reader(formats->createReaderFor(file));
-                if (reader == nullptr || reader->sampleRate <= 0 || reader->lengthInSamples <= 0) {
-                    self->window_->showMessage("Could not decode this audio file.");
-                    self->flush();
-                    return;
-                }
-                // Just what 32 KB at the slot's rate need, plus the next sample for the interpolation.
-                const double rate = ymengine::kDmaRateHz[settings.rate];
-                const double frames = double(ymengine::kDmaMaxBytes) / (settings.stereo ? 2 : 1);
-                const auto want = juce::int64(std::ceil(reader->sampleRate * frames / rate)) + 1;
-                const int len = int(std::min(reader->lengthInSamples, want));
-                const int ch = settings.stereo && reader->numChannels > 1 ? 2 : 1;
-                juce::AudioBuffer<float> buf(ch, len);
-                reader->read(&buf, 0, len, 0, true, ch > 1);
-                const std::span<const float> left{buf.getReadPointer(0), size_t(len)};
-                // Stereo from a mono file: the channel copied.
-                const std::span<const float> right =
-                    settings.stereo ? std::span<const float>{buf.getReadPointer(ch - 1), size_t(len)} : std::span<const float>{};
-                data = toDmaSample(left, right, reader->sampleRate, rate);
-            }
-            // Name taken from the file.
-            const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
-            self->processor_.editExtras([&](NonParamState& s) {
-                s.dmaSamples[size_t(slot)] = std::move(data);
-                s.dma.slots[size_t(slot)].start = s.dma.slots[size_t(slot)].end = 0;  // the whole sample
-                s.dmaNames[size_t(slot)] = name;
-            });
-        });
+    // or .sam file: signed bytes taken as they are. The whole file (once 32 KB at most), after an alert when
+    // the samples would then go past the memory of the Atari; chosen by Load or dropped on the drawing.
+    if (slot < 0 || slot >= ymengine::kDmaSlotsMax || !juce::File::isAbsolutePath(str(path))) return;
+    const juce::File file(str(path));
+    const ymengine::DmaSlot settings = processor_.extras().dma.slots[size_t(slot)];
+    std::vector<int8_t> data;
+    if (file.hasFileExtension("raw;spl;sam")) {
+        if (uint64_t(file.getSize()) > kSampleLoadMax) {
+            window_->showMessage("This file is too long for a sample.");
+            return;
+        }
+        juce::MemoryBlock block;
+        if (!file.loadFileAsData(block) || block.getSize() == 0) {
+            window_->showMessage("Could not read this file.");
+            return;
+        }
+        data = dmaRaw({static_cast<const uint8_t*>(block.getData()), block.getSize()}, settings.stereo);
+    } else {
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+        if (reader == nullptr || reader->sampleRate <= 0 || reader->lengthInSamples <= 0) {
+            window_->showMessage("Could not decode this audio file.");
+            return;
+        }
+        const double rate = ymengine::kDmaRateHz[settings.rate];
+        if (reader->lengthInSamples > juce::int64(kSampleLoadMax) ||
+            double(reader->lengthInSamples) * rate / reader->sampleRate * (settings.stereo ? 2 : 1) >
+                double(kSampleLoadMax)) {
+            window_->showMessage("This file is too long for a sample.");
+            return;
+        }
+        const int len = int(reader->lengthInSamples);
+        const int ch = settings.stereo && reader->numChannels > 1 ? 2 : 1;
+        juce::AudioBuffer<float> buf(ch, len);
+        reader->read(&buf, 0, len, 0, true, ch > 1);
+        const std::span<const float> left{buf.getReadPointer(0), size_t(len)};
+        // Stereo from a mono file: the channel copied.
+        const std::span<const float> right =
+            settings.stereo ? std::span<const float>{buf.getReadPointer(ch - 1), size_t(len)} : std::span<const float>{};
+        data = toDmaSample(left, right, reader->sampleRate, rate);
+    }
+    // Name taken from the file.
+    const std::string name = cleanDigidrumName(file.getFileNameWithoutExtension().toStdString());
+    const SharedSamples<int8_t> bytes = std::move(data);  // shared: the alert and the edit do not copy it
+    window_->applySampleLoad([slot, name, bytes](NonParamState& s) {
+        s.dmaSamples[size_t(slot)] = bytes;
+        s.dma.slots[size_t(slot)].start = s.dma.slots[size_t(slot)].end = 0;  // the whole sample
+        s.dmaNames[size_t(slot)] = name;
+    });
 }
 
+// The MIDI learn map of a copy of the standalone application is its own, in the copy's settings file (Indus,
+// 31/10/2026 11:03): each copy plays its own controller. In a host, it stays one of the shared preferences.
+juce::PropertySet* StymEditor::copySettings() const { return standalone() ? standaloneSettings() : nullptr; }
+
 std::string StymEditor::preference(std::string_view key, std::string_view fallback) const {
+    if (juce::PropertySet* copy = key == "midiMap" ? copySettings() : nullptr)
+        return copy->getValue(str(key), str(fallback)).toStdString();
     return prefs_->getValue(str(key), str(fallback)).toStdString();
 }
 
 void StymEditor::setPreference(std::string_view key, std::string_view value) {
-    prefs_->setValue(str(key), str(value));
+    if (juce::PropertySet* copy = key == "midiMap" ? copySettings() : nullptr) {
+        copy->setValue(str(key), str(value));
+        return;
+    }
+    storePreference(str(key), str(value));
     if (key == "pixels") {  // Settings > Pixels: the whole desktop drawn again
         cache_.setSharp(value == "sharp");
         image_ = {};
@@ -809,6 +987,34 @@ NonParamState StymEditor::newExtras() const {
     return s;
 }
 
+// The configuration of the standalone application (Indus, 01/11/2026 18:25): the state a host would save, so
+// that JUCE's holder reopens it at the next start as it did with the state it saved at each Quit.
+std::string StymEditor::configuration() const {
+    juce::MemoryBlock block;
+    processor_.getStateInformation(block);
+    return {static_cast<const char*>(block.getData()), block.getSize()};
+}
+
+std::string StymEditor::loadConfiguration(std::string_view bytes) {
+    const DecodeResult r = decodeState({reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()});
+    if (!r.ok) return r.error.empty() ? "unreadable" : r.error;
+    if (r.kind != StateKind::State) return "not a configuration";
+    processor_.setStateInformation(bytes.data(), int(bytes.size()));
+    return {};
+}
+
+void StymEditor::keepConfiguration(const std::string& path, std::string_view bytes) {
+    juce::PropertySet* copy = copySettings();
+    if (copy == nullptr) return;
+    copy->setValue("configFile", str(path));
+    copy->setValue("filterState", juce::MemoryBlock(bytes.data(), bytes.size()).toBase64Encoding());
+}
+
+std::string StymEditor::configurationFile() const {
+    const juce::PropertySet* copy = copySettings();
+    return copy != nullptr ? copy->getValue("configFile").toStdString() : std::string{};
+}
+
 void StymEditor::launchChooser(const FileDialog& d, bool save, std::function<void(const std::string& path)> done) {
     // Suggested file: the last one of this kind, otherwise the suggested name in the last chosen folder (at first,
     // the user's documents).
@@ -821,7 +1027,8 @@ void StymEditor::launchChooser(const FileDialog& d, bool save, std::function<voi
         if (!dir.isDirectory()) dir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
         initial = d.name.empty() ? dir : dir.getChildFile(str(d.name));
     }
-    chooser_ = std::make_unique<juce::FileChooser>(str(d.title), initial, str(d.patterns));
+    // The title in the interface language, as the GEM texts.
+    chooser_ = std::make_unique<juce::FileChooser>(str(gemui::uiString(d.title)), initial, str(d.patterns));
     using Browser = juce::FileBrowserComponent;
     const int chooserFlags = Browser::canSelectFiles |
                              (save ? Browser::saveMode | Browser::warnAboutOverwriting : Browser::openMode);
@@ -830,7 +1037,7 @@ void StymEditor::launchChooser(const FileDialog& d, bool save, std::function<voi
         if (self == nullptr) return;
         const juce::File file = fc.getResult();
         if (file == juce::File()) return;
-        self->prefs_->setValue("lastFolder", file.getParentDirectory().getFullPathName());
+        self->storePreference("lastFolder", file.getParentDirectory().getFullPathName());
         done(file.getFullPathName().toStdString());
         self->flush();
     });

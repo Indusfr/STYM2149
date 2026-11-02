@@ -19,13 +19,7 @@ using gemui::Rect;
 namespace {
 // Padding of the content, gap between the two columns, gap between the slot buttons of a column (px).
 constexpr double kPad = 8, kGap = 8, kRowGap = 4;
-constexpr int kRows = plugin::kInstruments / 2;  // two columns: $01-$10, $11-$20
-
-// Two upper-case hexadecimal digits: the slot numbers $01 to $20.
-std::string hex2(int v) {
-    static const char* const kHex = "0123456789ABCDEF";
-    return {kHex[(v >> 4) & 15], kHex[v & 15]};
-}
+constexpr int kRows = InstrumentsWindow::kPageSlots / 2;  // two columns: 1-16, 17-32 on the first page
 }  // namespace
 
 InstrumentsWindow::InstrumentsWindow(MainWindow& main) : m_(main) {
@@ -39,18 +33,35 @@ void InstrumentsWindow::build() {
     add(hint_);
     add(sep_);
     for (Button& b : slots_) add(b);
+    add(prev_);
+    add(pageLab_);
+    add(next_);
+    pageLab_.setRaw(true);  // slot numbers
+    prev_.setTip("The 32 instruments before");
+    next_.setTip("The 32 instruments after");
 }
 
 void InstrumentsWindow::wire() {
     onClose = [this] { m_.syncWindowButtons(); };
-    for (int k = 0; k < plugin::kInstruments; ++k) {
-        Button& b = slots_[size_t(k)];
-        b.onClick = [this, k] {
+    for (int i = 0; i < kPageSlots; ++i) {
+        Button& b = slots_[size_t(i)];
+        b.onClick = [this, i] {
+            const int k = page_ * kPageSlots + i;
+            if (k >= plugin::kInstruments) return;
             if (at(k).used) loadIntoChannel(k);
             else storeChannel(k);
         };
-        b.onContext = [this, k](gemui::Point) { slotMenu(k); };
+        b.onContext = [this, i](gemui::Point) {
+            if (const int k = page_ * kPageSlots + i; k < plugin::kInstruments) slotMenu(k);
+        };
     }
+    prev_.onClick = [this] { setPage(page_ - 1); };
+    next_.onClick = [this] { setPage(page_ + 1); };
+}
+
+void InstrumentsWindow::setPage(int page) {
+    page_ = std::clamp(page, 0, kPages - 1);
+    refresh();
 }
 
 const plugin::Instrument& InstrumentsWindow::at(int k) const { return m_.extras_.instruments[size_t(k)]; }
@@ -65,10 +76,16 @@ void InstrumentsWindow::put(int k, plugin::Instrument ins) {
 void InstrumentsWindow::storeChannel(int k) {
     // Name asked as for a patch; an empty name stores nothing. The slot keeps its proposed name.
     const std::string name = at(k).used ? at(k).name : "Instrument " + std::to_string(k + 1);
-    prompt("Instrument " + hex2(k + 1) + " name:", name, [this, k](const std::string& n) {
+    prompt("Instrument " + std::to_string(k + 1) + " name:", name, [this, k](const std::string& n) {
         const std::string clean = plugin::cleanInstrumentName(n);
         if (clean.empty()) return;
-        put(k, plugin::captureInstrument(clean, m_.values_, m_.extras_, m_.cur_));
+        // The slot becomes the track's instrument.
+        plugin::Instrument ins = plugin::captureInstrument(clean, m_.values_, m_.extras_, m_.cur_);
+        m_.host_.editExtras([k, t = m_.cur_, &ins](plugin::NonParamState& s) {
+            s.instruments[size_t(k)] = std::move(ins);
+            s.trackInstruments[size_t(t)] = uint8_t(k + 1);
+        });
+        m_.pullExtras();
     });
 }
 
@@ -87,14 +104,18 @@ void InstrumentsWindow::loadIntoChannel(int k) {
         m_.host_.endGesture(i);
         m_.values_[size_t(i)] = m_.host_.param(i);
     }
-    m_.host_.editExtras([&](plugin::NonParamState& s) { s.tracks[size_t(t)] = c.track; });
+    m_.host_.editExtras([&](plugin::NonParamState& s) {
+        s.tracks[size_t(t)] = c.track;
+        s.trackInstruments[size_t(t)] = uint8_t(k + 1);  // shown in the GENERATOR frame
+    });
     m_.pullExtras();
     m_.pushCur();
 }
 
 void InstrumentsWindow::rename(int k) {
     if (!at(k).used) return;
-    prompt("Rename instrument " + hex2(k + 1) + ":", plugin::instrumentLabel(at(k), k), [this, k](const std::string& n) {
+    const std::string title = "Rename instrument " + std::to_string(k + 1) + ":";
+    prompt(title, plugin::instrumentLabel(at(k), k), [this, k](const std::string& n) {
         const std::string clean = plugin::cleanInstrumentName(n);
         if (clean.empty() || !at(k).used) return;
         plugin::Instrument ins = at(k);
@@ -131,7 +152,7 @@ void InstrumentsWindow::loadFromPatches(int k) {
         m.why = "Patches: Save current stores the focused channel sound";
         items.push_back(std::move(m));
     }
-    m_.popup(slots_[size_t(k)], std::move(items), -1);
+    m_.popup(slots_[size_t(k % kPageSlots)], std::move(items), -1, true);
 }
 
 void InstrumentsWindow::slotMenu(int k) {
@@ -155,7 +176,7 @@ void InstrumentsWindow::slotMenu(int k) {
     item("Load from Patches", false, [this, k] { loadFromPatches(k); });
     items.push_back(MenuItem::separatorItem());
     item("Clear", true, [this, k] { clear(k); });
-    m_.trackPopup(slots_[size_t(k)], std::move(items), -1);
+    m_.trackPopup(slots_[size_t(k % kPageSlots)], std::move(items), -1);
 }
 
 void InstrumentsWindow::prompt(const std::string& message, const std::string& text,
@@ -173,6 +194,8 @@ void InstrumentsWindow::prompt(const std::string& message, const std::string& te
 // ------------------------------------------------------------------------------------------- display
 
 void InstrumentsWindow::show() {
+    // Opened on the page of the focused track's instrument, if it has one.
+    if (const int n = m_.trackInstrument(m_.cur_)) page_ = (n - 1) / kPageSlots;
     open();
     refresh();
     m_.syncWindowButtons();
@@ -180,12 +203,21 @@ void InstrumentsWindow::show() {
 
 void InstrumentsWindow::refresh() {
     if (!isOpen()) return;
-    for (int k = 0; k < plugin::kInstruments; ++k) {
+    const int first = page_ * kPageSlots;
+    for (int i = 0; i < kPageSlots; ++i) {
+        const int k = first + i;
+        Button& b = slots_[size_t(i)];
+        b.setVisible(k < plugin::kInstruments);  // the last page ends at 127
+        if (k >= plugin::kInstruments) continue;
         const plugin::Instrument& ins = at(k);
-        Button& b = slots_[size_t(k)];
-        b.setText(hex2(k + 1) + (ins.used ? " " + plugin::instrumentLabel(ins, k) : " —"));
+        b.setText(std::to_string(k + 1) + (ins.used ? " " + plugin::instrumentLabel(ins, k) : " —"));
+        b.setRaw(ins.used && !ins.name.empty());  // a name the user gave, not translated
         b.setTip(ins.used ? "Click: load into the focused channel" : "Click: store the focused channel here");
     }
+    const int last = std::min(first + kPageSlots, plugin::kInstruments);
+    pageLab_.setText(std::to_string(first + 1) + "-" + std::to_string(last));
+    prev_.setEnabled(page_ > 0);
+    next_.setEnabled(page_ < kPages - 1);
     layout();
 }
 
@@ -206,12 +238,22 @@ void InstrumentsWindow::layout() {
     // Slots column by column: k / kRows is the column, k % kRows the row; each button as wide as its column.
     const double colW = (contentW - kGap) / 2;
     const double h = slots_[0].naturalHeight();
-    for (int k = 0; k < plugin::kInstruments; ++k) {
-        Button& b = slots_[size_t(k)];
+    for (int i = 0; i < kPageSlots; ++i) {
+        Button& b = slots_[size_t(i)];
         b.setMinWidth(colW);
-        b.setBox({x + (k / kRows) * (colW + kGap), y + (k % kRows) * (h + kRowGap), colW, h});
+        b.setBox({x + (i / kRows) * (colW + kGap), y + (i % kRows) * (h + kRowGap), colW, h});
     }
     y += kRows * h + (kRows - 1) * kRowGap;
+
+    // The pages: < and > at the ends of the row, the numbers of the page between them.
+    y += kPad;
+    const double aw = std::max(prev_.naturalWidth(), next_.naturalWidth());
+    prev_.setBox({x, y, aw, h});
+    next_.setBox({x + contentW - aw, y, aw, h});
+    const double lw = pageLab_.naturalWidth();
+    pageLab_.setBox({x + (contentW - lw) / 2, y + (h - pageLab_.naturalHeight()) / 2, lw,
+                     double(pageLab_.naturalHeight())});
+    y += h;
 
     // Height: content, padding of 8, border and margin (6); the width stays kWidth.
     const double wh = y + kPad + 6 - oy;
@@ -223,10 +265,13 @@ std::optional<Rect> InstrumentsWindow::rectOf(std::string_view id) const {
     if (!isOpen()) return std::nullopt;
     if (id == "insWin") return bounds();
     if (id == "insHint") return hint_.bounds();
+    if (id == "insPrev") return prev_.bounds();
+    if (id == "insNext") return next_.bounds();
+    if (id == "insPage") return pageLab_.bounds();
     if (id.substr(0, 7) == "insSlot") {
         const std::string num(id.substr(7));
         const int k = num.empty() || num.size() > 2 ? -1 : std::atoi(num.c_str());
-        if (k >= 0 && k < plugin::kInstruments) return slots_[size_t(k)].bounds();
+        if (k >= 0 && k < kPageSlots && slots_[size_t(k)].visible()) return slots_[size_t(k)].bounds();
     }
     return std::nullopt;
 }

@@ -10,11 +10,11 @@
 // and Drop (steps of the 4-bit volume lost at each repeat). Off, only "Echo" and its button show, like the LFO.
 // A Sync Buzzer in the 3-channel modes has none: its level is the hardware envelope that the channels share,
 // which a repeat would restart at full level; the Echo is greyed out there and the engine plays no repeat.
-// Delay, in 16 channels only: the audio that each track sends to it (Send row of the Mixer) comes back as echoes,
-// from host parameters: On / Off and Ping-pong, Sync (a division of the tempo) or Time in ms, Feedback, Hi cut and
-// Level. In the 3-channel modes, its On / Off is greyed out and nothing else of it shows; Off, only On / Off shows
-// (Ping-pong hidden too, ninth DAW test, item 114).
-// Below a rule, as wide as the window, like the LFO in the Modulation window.
+// Delay, in 16 and 32 channels only: the audio that each track sends to it (Send row of the Mixer) comes back as
+// echoes, from host parameters: On / Off and Ping-pong, Sync (a division of the tempo) or Time in ms, Feedback, Hi cut
+// and Level. In the 3-channel modes, its On / Off is greyed out and nothing else of it shows; Off, only On / Off shows
+// (Ping-pong hidden too, ninth DAW test, item 114). Below a rule, as wide as the window, like the LFO in the
+// Modulation window.
 #pragma once
 #include <functional>
 #include <optional>
@@ -64,7 +64,7 @@ private:
     void build();
     void wire();
     void layout();
-    bool studio() const noexcept;  // 16 channels: the delay applies
+    bool studio() const noexcept;  // 16 and 32 channels: the delay applies
     bool buzzer3() const noexcept;  // Sync Buzzer in 3 channels: no echo
     const ymengine::TrackEcho& echo() const noexcept;
     // Changes the focused track's echo in the state, one undo step of the track.

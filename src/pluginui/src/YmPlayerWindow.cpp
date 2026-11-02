@@ -49,14 +49,15 @@ YmPlayerWindow::YmPlayerWindow(MainWindow& main) : m_(main) {
 }
 
 void YmPlayerWindow::build() {
-    setTitle("YM PLAYER");
+    setTitle("YM/MOD PLAYER");
     play_.setTip("Play the loaded YM tune");
     rew_.setTip("Back to the start of the tune");
+    load_.setTip("Play another file (as File > Play...)");
     subPrev_.setTip("Previous subsong (restarts the tune)");
     subNext_.setTip("Next subsong (restarts the tune)");
     hint_.setText(kHintYm);
-    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&name_, &play_, &rew_, &pos_, &labSub_, &subPrev_,
-                                                                  &subv_, &subNext_, &hint_})
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&name_, &play_, &rew_, &pos_, &load_, &labSub_,
+                                                                  &subPrev_, &subv_, &subNext_, &hint_})
         add(*w);
 }
 
@@ -79,6 +80,8 @@ void YmPlayerWindow::wire() {
         last_.position = 0;
         refresh();
     };
+    // Load: the dialogue of File > Play...; the file chosen replaces the tune, the window staying open.
+    load_.onClick = [this] { m_.playFile(); };
     auto step = [this](int d) {
         const int s = std::clamp(last_.subsong + d, 1, std::max(1, last_.subsongs));
         if (s == last_.subsong) return;
@@ -117,6 +120,7 @@ void YmPlayerWindow::poll() {
 void YmPlayerWindow::refresh() {
     if (!isOpen()) return;
     name_.setText(collapsed(last_.name));
+    name_.setRaw(true);  // the tune's title, not translated
     hint_.setText(last_.sndh ? kHintSndh : kHintYm);
     // toggleBtn(#ymPlay): button lit and "Stop" during playback.
     play_.setOn(last_.playing);
@@ -146,10 +150,12 @@ void YmPlayerWindow::layout() {
     const double nameH = 12.0 * name_.lineCount();
     name_.setBox({x, y, contentW, nameH});
     y += nameH;
-    // .row (margin-top 8, margin-bottom 6, gap 8): Play, Rewind, #ymPos.
+    // .row (margin-top 8, margin-bottom 6, gap 8): Play, Rewind, #ymPos; Load flush right.
     y += 8;
-    std::vector<FlexItem> row = {btn(play_), btn(rew_), lab(pos_)};
-    y += flexRow(x, y, contentW, row, kGap);
+    FlexItem load = btn(load_);
+    load.autoMargin = true;
+    std::vector<FlexItem> row = {btn(play_), btn(rew_), lab(pos_), load};
+    y += flexRow(x, y, contentW, row, kGap, false);
     // Sub-tune of an SNDH (STYM2149): same kind of row.
     if (labSub_.visible()) {
         y += 6;
@@ -175,6 +181,7 @@ std::optional<Rect> YmPlayerWindow::rectOf(std::string_view id) const {
     if (id == "ymPlay") return play_.bounds();
     if (id == "ymRew") return rew_.bounds();
     if (id == "ymPos") return pos_.bounds();
+    if (id == "ymLoad") return load_.bounds();
     if (id == "ymName") return name_.bounds();
     if (labSub_.visible()) {
         if (id == "ymSubPrev") return subPrev_.bounds();

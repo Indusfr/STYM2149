@@ -123,7 +123,7 @@ TEST_CASE("Chipdrum kit: bounds", "[kit]") {
 }
 
 TEST_CASE("Chipdrum kit: audition of an instrument (Audition, drumprev)", "[kit]") {
-    // Muted engine, linear output: the difference with the same engine without audition is the 16-channel sample of
+    // Muted engine, linear output: the difference with the same engine without audition is the 32-channel sample of
     // the instrument, read without interpolation at 7800 Hz, (s - 7.5) / 7.5 × 0.55, multiplied by the output law.
     for (const VoiceMode mode : {VoiceMode::Studio16, VoiceMode::Authentic3}) {
         CAPTURE(int(mode));

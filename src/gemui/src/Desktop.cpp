@@ -7,6 +7,7 @@
 
 #include "gemui/Controls.h"
 #include "gemui/Font.h"
+#include "gemui/Language.h"
 
 namespace stym::gemui {
 namespace {
@@ -448,7 +449,9 @@ void Desktop::hideTip() {
     tipText_.clear();
 }
 
+// The tooltip has its own language (translateTip): its text is measured and drawn as it is.
 std::vector<std::string> Desktop::tipLines() const {
+    const RawText raw;
     return wrapTip(tipText_, width() / 2 - 2 * (kTipPadX + 2));
 }
 
@@ -456,6 +459,7 @@ std::vector<std::string> Desktop::tipLines() const {
 // 12 px right of and 20 px below the pointer, pushed left to stay 4 px inside the desktop, or put above the pointer
 // (8 px gap) when it would run past the bottom.
 Rect Desktop::tipRect() const {
+    const RawText raw;
     int w = 0, n = 0;
     for (const std::string& l : tipLines()) {
         w = std::max(w, int(Font::width(l, kTipPx)));
@@ -468,6 +472,7 @@ Rect Desktop::tipRect() const {
 }
 
 void Desktop::paintTooltip(Painter& p) {
+    const RawText raw;
     const Rect r = tipRect();
     p.fill(r, colors::kWhite);
     p.frame(r, 2, colors::kBlack);
@@ -512,13 +517,13 @@ void Desktop::paintTree(Painter& p, Widget& w) {
     const Rect area = a < 1 ? w.extent().intersect(p.clip()) : Rect{};
     const bool group = !area.empty();
     if (group) p.beginOpacity(area, a);
-    if (!w.bounds_.intersect(p.clip()).empty()) w.paint(p);
+    if (!w.drawnBounds().intersect(p.clip()).empty()) w.paint(p);
     const Rect clip = p.clip();
     if (w.clipsChildren()) p.setClip(clip.intersect(w.childArea()));
     if (!p.clip().empty())
         for (Widget* c : w.children_) paintTree(p, *c);
     p.setClip(clip);
-    if (!w.bounds_.intersect(p.clip()).empty()) w.paintOver(p);
+    if (!w.drawnBounds().intersect(p.clip()).empty()) w.paintOver(p);
     if (group) p.endOpacity();
 }
 
@@ -540,14 +545,21 @@ const std::vector<Rect>& Desktop::takePending() noexcept {
 }
 
 // Layers from the bottom: the root and its windows, the menus, then each modal box over its own veil with the menus
-// opened over it, and the tooltip on top of everything.
+// opened over it, and the tooltip on top of everything. The highest box that covers r hides the layers below it.
 void Desktop::draw(Painter& p, const Rect& r) {
     p.setClip(r);
-    if (root_) paintTree(p, *root_);
-    else p.fill(r, colors::kBlack);
-    for (size_t level = 0, i = 0; level <= modals_.size(); ++level) {
+    size_t first = modals_.size();  // level painted first (0: the root)
+    while (first > 0 && !(modals_[first - 1]->visible_ && modals_[first - 1]->covers(r))) --first;
+    size_t i = 0;
+    if (first == 0) {
+        if (root_) paintTree(p, *root_);
+        else p.fill(r, colors::kBlack);
+    } else {
+        while (i < popups_.size() && popupLevel_[i] < first) ++i;
+    }
+    for (size_t level = first; level <= modals_.size(); ++level) {
         if (level > 0) {
-            p.shade(r, colors::kBlack, 0.25);  // veil rgba(0, 0, 0, 0.25) below each box
+            if (level > first) p.shade(r, colors::kBlack, 0.25);  // veil rgba(0, 0, 0, 0.25) below each box
             paintTree(p, *modals_[level - 1]);
         }
         for (; i < popups_.size() && popupLevel_[i] <= level; ++i) paintTree(p, *popups_[i]);

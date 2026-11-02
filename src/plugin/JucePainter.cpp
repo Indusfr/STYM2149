@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "gemui/Font.h"
+#include "gemui/Look.h"
 
 namespace stym::plugin {
 
@@ -360,18 +361,38 @@ void JucePainter::beginOpacity(const Rect& r, double alpha) {
     groups_.push_back(std::move(g));
 }
 
+// In the GEM look, the GEM grey of the framebuffer: the screen pixels of one desktop pixel in two keep what
+// was painted, the others get back what lay below.
 void JucePainter::endOpacity() {
     if (groups_.empty()) return;
     const Group g = std::move(groups_.back());
     groups_.pop_back();
     if (g.r.isEmpty()) return;
+    const bool dither = !gemui::prototypeLook();
+    // Desktop pixel of each screen column and row of the group: the v whose screen pixels at(v) to at(v + 1) - 1
+    // hold it.
+    const auto desk = [this](int s) {
+        int v = int(std::floor((s + 0.5) / d_));
+        while (v > 0 && at(v) > s) --v;
+        while (at(v + 1) <= s) ++v;
+        return v;
+    };
+    std::vector<int> cols;
+    if (dither) {
+        cols.resize(size_t(g.r.getWidth()));
+        for (int x = 0; x < g.r.getWidth(); ++x) cols[size_t(x)] = desk(g.r.getX() + x);
+    }
     const juce::Image::BitmapData bd(image_, g.r.getX(), g.r.getY(), g.r.getWidth(), g.r.getHeight(),
                                      juce::Image::BitmapData::readWrite);
     for (int y = 0; y < g.r.getHeight(); ++y) {
         auto* p = reinterpret_cast<uint32_t*>(bd.getLinePointer(y));
         const Color* u = g.under.data() + size_t(y) * size_t(g.r.getWidth());
-        for (int x = 0; x < g.r.getWidth(); ++x)
-            if (p[x] != u[x]) p[x] = gemui::mix(p[x], u[x], g.alpha);
+        const int row = dither ? desk(g.r.getY() + y) : 0;
+        for (int x = 0; x < g.r.getWidth(); ++x) {
+            if (p[x] == u[x]) continue;
+            if (!dither) p[x] = gemui::mix(p[x], u[x], g.alpha);
+            else if (!gemui::ditherKeeps(cols[size_t(x)], row)) p[x] = u[x];
+        }
     }
 }
 

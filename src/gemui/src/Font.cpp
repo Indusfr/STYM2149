@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "gemui/Language.h"
+
 namespace stym::gemui {
 
 GlyphPos glyphPos(double x) noexcept {
@@ -87,6 +89,7 @@ Font::Raster Font::raster(int px, int index, int quarter, Face face) noexcept {
 }
 
 Font::LineBox Font::lineBox(std::string_view utf8, int px, Face face) noexcept {
+    utf8 = uiText(utf8);  // the text drawn, in the interface language
     const fontdata::Size& f = size(px);
     LineBox box{int(std::floor(f.asc64 / 64.0 + 0.5)), int(std::floor(f.desc64 / 64.0 + 0.5))};
     if (cell(px, face)) return box;
@@ -125,6 +128,7 @@ int Font::glyph(char32_t c) noexcept {
 }
 
 int Font::length(std::string_view utf8) noexcept {
+    utf8 = uiText(utf8);
     int n = 0;
     for (size_t pos = 0; pos < utf8.size(); ++n) nextCodepoint(utf8, pos);
     return n;
@@ -136,6 +140,7 @@ double Font::advance(char32_t c, int px, Face face) noexcept {
 }
 
 double Font::width(std::string_view utf8, int px, double letterSpacing, Face face) noexcept {
+    utf8 = uiText(utf8);
     double w = 0;
     for (size_t pos = 0; pos < utf8.size();) w += advance(nextCodepoint(utf8, pos), px, face) + letterSpacing;
     return w;

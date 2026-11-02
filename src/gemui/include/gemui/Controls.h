@@ -51,6 +51,8 @@ public:
     void setOpacity(double a);
     // Solid background behind the line (window title, monitor headers); transparent by default.
     void setBackground(Color c);
+    // The text is a name the user gave (a sample, a file): measured and drawn as it is, never translated.
+    void setRaw(bool raw);
 
     // Width of the text (letter spacing included), in layout pixels; height: the font size.
     double naturalWidth() const noexcept;
@@ -68,12 +70,16 @@ private:
     double spacing_ = 0;
     Align align_ = Align::Left;
     bool dim_ = false;
+    bool raw_ = false;
     double opacity_ = 1;
 };
 
 // .btn: white background, 2 px border, 14 px text, 3 px / 10 px padding; .on and :active in reverse video;
 // .dflt (default button): 4 px border, 1 px / 8 px padding; track tab (.chtabs .btn): 2 px / 7 px padding,
-// .sel: 4 px green bottom rule. An icon can follow the text (#shapeSel: 8 px gap).
+// .sel: 4 px green bottom rule. An icon can follow the text (#shapeSel: 8 px gap). In the GEM look, the
+// prototype's sizes with the borders of GEM, drawn inside the box: 1 px, 2 px for a button that closes its box (EXIT),
+// 3 px for the default one; a pop-up button has the 2 px shadow of GEM; a disabled button keeps its border, its
+// text dotted.
 class Button : public Widget {
 public:
     enum class Style : uint8_t { Normal, Default, Tab };
@@ -101,17 +107,36 @@ public:
         offOpacity_ = a;
         classOff_ = true;
     }
+    // Button that closes its box (GEM's EXIT: the buttons of an alert, OK of a dialog): 2 px border in the GEM look,
+    // like every button (the default one: 3 px).
+    void setExit(bool e);
+    // Button that opens a pop-up of choices: 2 px border and a 2 px shadow below and to the right in the GEM
+    // look.
+    void setPopup(bool p);
+    bool popup() const noexcept { return popup_; }
     // Green dotted border (.btn.pend): setting pending.
     void setPending(bool p);
+    // Crossed by an X from corner to corner of its inner box: a sample past the memory of the Atari, silent.
+    void setCrossed(bool c);
+    bool crossed() const noexcept { return crossed_; }
+    // Greyed like a disabled button while it keeps its tooltip and its right click: an empty sample slot, which the
+    // left click does not choose but whose number a menu can still change.
+    void setGreyed(bool g);
+    bool greyed() const noexcept { return greyed_; }
     // Padding and minimum width (border included) of a prototype class: .tools .btn (5 px / 8 px, 30 px),
     // .tbar .btn (2 px / 6 px, 26 px), .tbar.big .btn (7 px / 14 px, 46 px), bank buttons (6 px / 11 px).
     void setPadding(int padY, int padX);
     void setMinWidth(double w);
+    // The text is a name the user gave (a patch, a track): measured and drawn as it is, never translated.
+    void setRaw(bool raw);
 
     // Content, padding and borders (at least the minimum width); the height counts the 4 px green rule of a selected
     // tab instead of its bottom border.
     double naturalWidth() const noexcept;
     int naturalHeight() const noexcept;
+    // naturalWidth() the button would have with `text` instead of its own (a layout that keeps the width of the
+    // longest of several texts the button shows in turn).
+    double widthFor(std::string_view text) const noexcept;
 
     // Press and release over the button (the release outside it cancels the click).
     std::function<void()> onClick;
@@ -120,30 +145,35 @@ public:
     void click();
 
     void paint(Painter& p) override;
-    double opacity() const noexcept override { return enabled() ? 1.0 : offOpacity_; }
+    // The GEM look dots the text alone (paint): the border stays.
+    double opacity() const noexcept override;
     bool acceptsMouse() const noexcept override { return true; }
     void mouseDown(const MouseEvent& e) override;
     void mouseUp(const MouseEvent& e) override;
     void mouseCancel() override;
-    Pointer pointer() const noexcept override { return Pointer::Hand; }
+    Pointer pointer() const noexcept override { return greyed_ ? Pointer::Arrow : Pointer::Hand; }
 
 private:
-    int border() const noexcept;
+    static constexpr int kGemShadow = 2;  // GEM shadow of a pop-up button
+    int border() const noexcept;       // the prototype's, which sets the size
+    int drawnBorder() const noexcept;  // the one drawn: GEM's in the GEM look
     int lineHeight() const noexcept;
     // How much taller the line box is than the plain GEM font's (a character outside the font, Font::lineBox).
     Font::LineBox fallbackGrowth() const noexcept;
     int padX() const noexcept;
     int padY() const noexcept;
-    double contentWidth() const noexcept;
+    double contentWidth(std::string_view text) const noexcept;
 
     std::string text_;
     Style style_ = Style::Normal;
     int px_ = 14;
     Face face_ = Face::kSystem;
-    bool on_ = false, sel_ = false, pressed_ = false, pending_ = false;
+    bool on_ = false, sel_ = false, pressed_ = false, pending_ = false, crossed_ = false, greyed_ = false;
+    bool exit_ = false, popup_ = false;
     const Bitmap* icon_ = nullptr;
     double offOpacity_ = kOpacityButtonOff;
     bool classOff_ = false;  // setDisabledOpacity called: the disabled text stays black
+    bool raw_ = false;
     int padY_ = -1, padX_ = -1;  // < 0: those of the style
     double minWidth_ = 0;
 };
@@ -338,6 +368,9 @@ public:
     const std::string& text() const noexcept { return text_; }
     void setPx(int px);
     int px() const noexcept { return px_; }
+    // Text from the left edge, over the first underscores, as a GEM name field draws it (instrument name);
+    // right-aligned by default, as the prototype's inputs.
+    void setLeftAligned(bool on);
     // Height of the line (the font's line-height: normal).
     double naturalHeight() const noexcept;
 
@@ -356,6 +389,7 @@ private:
     std::string text_;
     int px_ = 16;
     bool focused_ = false;
+    bool left_ = false;
 };
 
 // fieldset + legend: 2 px border, legend 12 px from the edge (border and padding of the frame; 10 px for
@@ -386,13 +420,16 @@ private:
     int inset_ = 12;
 };
 
-// .gemwin / .gwin / .alert: 2 px black border, 2 px white rule then 2 px black rule inside, white background.
+// .gemwin / .gwin / .alert: 2 px black border, 2 px white rule then 2 px black rule inside, white background. GEM look:
+// the OUTLINED box of GEM's dialogs, a 1 px outline, 2 px of white, a 2 px border.
 // A window stops the mouse: what it covers receives neither mouse nor tooltip.
 class WindowFrame : public Widget {
 public:
     static constexpr int kInset = 6;  // border + rules: the content starts 6 px from the edge
     void paint(Painter& p) override;
     bool blocksMouse() const noexcept override { return true; }
+    // Filled white: opaque over its whole box.
+    bool covers(const Rect& r) const noexcept override { return opacity() >= 1 && bounds().intersect(r) == r; }
 };
 
 // .titlebar: 26 px (2 px bottom rule included); 24 px close box on the left and full-screen box on the right (GEM
@@ -477,16 +514,20 @@ private:
 };
 
 // GEM desktop icon (ICONBLK of the AES): a 32 × 32 picture, its mask in white then its data in black, a character
-// in it (the drive letter), above its name in the 6×6 font on a white box 72 px wide. Decorative (ninth DAW test,
-// item 102): a click or a double click does nothing; a press held and moved drags its dotted outline, which the
-// root paints above the windows (paintDrag), and the release puts the icon there, inside limits().
+// in it (the drive letter), above its name in the 6×6 font on a white box 72 × 8 px. The whole icon is drawn twice as
+// big, each pixel a 2 × 2 square: the picture and its letter (Indus, 01/11/2026 22:08), the name and its box
+// (02/11/2026 04:31).
+// Decorative (ninth DAW test, item 102): a click or a double click does nothing; a press held and moved drags its
+// dotted outline, which the root paints above the windows (paintDrag), and the release puts the icon there, inside
+// limits().
 class DeskIcon : public Widget {
 public:
-    static constexpr int kW = 72, kPicture = 32, kNameH = 8, kH = kPicture + kNameH;
+    static constexpr int kZoom = 2, kPicture = 32 * kZoom, kW = 72 * kZoom, kNameH = 8 * kZoom, kH = kPicture + kNameH;
 
     void setPicture(const Bitmap* data, const Bitmap* mask) noexcept;
+    // `data` and `mask`: 32 × 32, drawn at kZoom.
     // Character drawn in the picture (0: none) in the AES's SMALL font (6×6), as gr_gicon draws ib_char, its cell's
-    // top-left corner at (x, y) of the picture.
+    // top-left corner at (x, y) of the 32 × 32 picture, at kZoom like the picture.
     void setLetter(char c, int x, int y) noexcept;
     void setName(std::string name);
     const std::string& name() const noexcept { return name_; }

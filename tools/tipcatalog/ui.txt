@@ -1,0 +1,1281 @@
+(Apache-2.0). Fonts and icons from EmuTOS (GPL).
+(Arnaud Carré) and ym2149-rs by slippyex (MIT).
+(per channel)
+(shared)
+({1} to {2}):
+16 and 32 ch have no YM registers: switch to 3ch or 2x3ch.
+3 ch: the eight DMA tracks follow the YM tracks. 16 and 32 ch: any track can use the DMA type.
+3CH AUTH (shared env+noise)
+3ch: the drum takes over this channel
+50 Hz = VBL rate
+68000 emulator by Karl Stenerud (MIT); ICE unpacking
+68000 replay routine played at its timer rate. The register strip and scope follow.
+70 Hz (Monochrome)
+Accent
+accent; left click draws, right click opens a slider
+Accents
+Add
+Add appends the current pattern (again = +1 repeat, Shift+Add = new entry).
+Add to song
+ADPCM samples (not read): {1}.
+ADSR ENVELOPE
+after Hans Wessels (public domain).
+Aftertouch
+Aka pygmies
+All
+All its notes and settings will be lost.
+All off
+All on
+Alt + click a note
+Always
+An export is already running.
+Analog
+Apply
+Arab
+Arpeggiator
+ARPEGGIATOR - {1}
+Arrows
+At once
+At tick
+audio gain
+Audio/MIDI settings
+Audition
+Aug {1}
+Augmented
+Authentic 3ch
+Auto (detect)
+Balance (-100 to 100):
+Bank
+Bank name, 16 chars (same name: replaced):
+Banks
+bar length; accents and metronome follow it
+Base
+Bend
+Bend range
+block and channel menu
+Block: Copy
+Block: Cut
+Blues major
+Body
+Bounce
+Bounce only
+Box (AtariAudio)
+BPM row tempos clamped to 32-255 BPM: {1}.
+Brazilian samba
+Built with JUCE (AGPLv3). Licences: see the
+Buzzer Slide
+Cancel
+Center
+Central African
+CH {1} / {2} / {3}
+Channel
+Channel (track mixer)
+Channel {1}
+Channel {1} [{2}]
+Channels beyond the {1} DMA tracks: {2} left out.
+Channels {1}-{2} already contain data.
+Chip
+Chip clock
+Chip conformity
+Chip Voice
+CHIP: OK
+CHIP: {1}
+Chipdrum
+Chipdrum only: do not retrigger while it still rings
+Chord
+Chord...
+Chromatic
+Clap
+Classical
+Clear
+Clear block (n/a)
+Clear MIDI map
+clear the selected block
+clear the step at the cursor
+clear the step at the Modulation cursor
+Clear track {1}?
+Click = load into focused channel. Right click for actions.
+Click a mixer scope
+Click a note
+Click an empty cell
+Click selects (Shift = multi). Right click for actions.
+Click: load into the focused channel, or store it in an empty slot. Right click for actions.
+Clock
+close the topmost window, then panic (all notes off)
+Closed Hat
+Color
+Commands - step {1}
+Computer
+COMPUTER KEYBOARD
+Computer keyboard
+COMPUTER KEYBOARD: {1}
+Computer: ST. The DMA sound needs the STE.
+Computer: STE, any track can use the DMA type.
+Computer: STE, DMA tracks {1} to {2}.
+Continue
+Copy
+Copy ({1} notes)
+Copy ({1})
+copy / cut / paste / transpose the pattern
+copy / paste that row to another track
+copy / paste the whole patch
+Copy block (n/a)
+Copy row
+Copy settings
+copy, cut, paste the note at the grid cursor, or the selected box or block
+Curve
+Custom
+Custom chip clock in MHz
+Custom {1} MHz
+Custom {1} MHz...
+Cut
+Cut ({1})
+Cut block (n/a)
+cut, copy, paste blocks
+Cycles
+Decay
+Delay
+Delete
+Delete bank
+Delete the recorded take?
+Demo pattern
+Depth
+Deselect
+Detune
+Digi
+Digidrum
+Digidrum samples
+Digidrum: on track {1}, the Digidrum track.
+DIGIDRUMS
+Digidrums
+Diminished
+Diminished (H-W)
+Diminished (W-H)
+Diminished {1}
+Discard the changes?
+Division
+DMA (STE)
+DMA - STE
+DMA samples
+Dominant {1}
+Dorian
+Double click a mixer pan
+Double harmonic
+Double octave
+Down
+Down {1}
+Drag a note
+Drag a song block
+Drag from an empty cell
+Drag past the first / last column
+Drag past the top / bottom row
+drag to draw — left = start of the slide, right = arrival
+draw the note and its length in one move
+Drop
+drop the block selection
+DRUM KIT
+Drum Kit
+Drum kit
+Drum pads
+drums: off
+Dual chip 2x3ch
+Duplicate
+Duplicate ({1})
+duplicate the block
+E({1}) {2}
+Echo
+Edit
+Effects
+EFFECTS - {1}
+EFFECTS - {1} [{2}]
+Effects left out: {1}
+empty
+empty - click to load a file
+Emulation after AtariAudio by Leonard/Oxygene
+End
+Ends at {1}% of the interval: the slide stops short of the target note.
+English (C D E)
+Enter
+Entries to play again before this loop (1-255):
+Entry
+Env
+Env freq
+Env period
+ENVELOPE
+Envelope
+ENVELOPE - {1}
+envelope only
+Envelope restart
+EP =
+erase it (no menu)
+Euclid
+Euclidean generator
+Everything in this pattern can be written to YM registers.
+Expected a standard MIDI file (format 0 or 1) with notes.
+Expected a YM register dump (YM2 / YM3 / YM5 / YM6) or an SNDH file.
+Exponential
+Export
+Export pattern
+Export song
+Export the patch library
+Export the pattern as MIDI
+Export the pattern as WAV
+Export the pattern stems
+Export the song as MIDI
+Export the song as WAV
+Export the song stems
+Exporting patterns
+Exporting songs
+Fade out
+Feedback
+Fifth
+File
+Fine
+Fine tune
+first / last block
+Fit
+Fit: each note keeps its time, on the steps of {1}/{2}.
+Fix
+FLOPPY DISK
+Follow
+Format
+Fourth
+Free
+Free software under the GNU Affero General Public
+Gate
+GEN: generator. FIX: fixed note. OUT: pitch of C4 (+-12). Right click: a slider on VOL, PER and NP; clears MIX, GEN, FIX.
+GENERATOR
+Generator
+GENERATOR - {1} [{2}]
+Ghost
+glissando shape used by the slide starting on that step
+Global
+grey out-of-scale rows, or force notes into the scale
+Groove: ticks added to each line, up to 16 values (0-15)
+Groove: {1} {2} {3} {4}...
+Groove: {1}...
+Half-dim {1}
+Hard sync
+Harmonic minor
+Hat
+Held notes
+Hi cut
+hit
+Hold
+Home / End
+Host
+Hungarian minor
+Import
+Import a MIDI file
+Import a patch library
+Importing files
+Information
+Information demo
+Ins or A
+Insert loop
+Insert note-off
+Insert rest
+insert the current pattern after the cursor
+Instrument {1} name:
+INSTRUMENTS
+Instruments
+Instruments without a DMA slot (8 at most): {1}, {2} note left out.
+Instruments without a DMA slot (8 at most): {1}, {2} notes left out.
+Instruments...
+INTERFACE
+Internal
+Invert
+It cannot be undone.
+It was left unchanged.
+Japanese (Hirajoshi)
+join the note at the grid cursor to the next one
+Join with next (n/a)
+Join with next J
+jump to that block and load its pattern
+Keep
+Keep: each note keeps its step, which lasts {1}/{2}.
+Keyboard layout
+keyboard octave (Computer keyboard open)
+keyboard octave down / up
+Keys: Left/Right move, Ins/A add, Del remove, D duplicate, +/- repeats, X/C/V cut/copy/paste, Home/End jump
+Kick
+Kit by note: C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = do not retrigger while it still rings. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+Kit: {1}
+Kits
+Languages folder...
+Latch
+Latin (Do Re Mi)
+Launch
+Layer
+Left / Right
+Len
+Len =
+Len {1}
+Length of this entry, in steps (1-256):
+length written when placing a note, from 1/1 to 1/64, dotted or triplet
+Length...
+Length: {1} steps
+lengthen / shorten the note at the grid cursor
+Level
+LHA decompression after pylzh by Hirofumi Ukawa
+Library is empty
+Library is empty. Save current stores the focused channel sound.
+License v3: you may share and modify it under its
+licenses folder and THIRD_PARTY.md.
+Linear
+Link
+Link: none
+Link: {1}
+Load
+Load bank
+Load from Patches
+Load into channel
+Load...
+Locrian
+Logarithmic
+Longer ]
+Loop
+Loop back...
+Loops unrolled to 32 KB (the STE loops whole samples): {1}.
+Lydian
+Macedonian
+Major
+Major (Ionian)
+Major 1st inv
+Major 2nd inv
+Major spread
+Major {1}
+Master
+Master (0 to 100):
+Max
+Melodic minor
+Menu
+Merge
+Metro
+metronome on / off
+MIDI exported
+MIDI ext
+MIDI imported
+MIDI learn
+MIDI learn: click a slider or button, then move a control...
+MIDI learn: map cleared
+MIDI monitor
+MIDI routing
+MIDI: -
+MIDI: access denied
+MIDI: host
+MIDI: none
+Min
+Minor
+Minor (Aeolian)
+Minor 1st inv
+Minor 2nd inv
+Minor add9
+Minor maj {1}
+Minor spread
+Minor {1}
+MIXER
+Mixer
+Mixolydian
+Mode
+Modulation
+MODULATION - {1}
+MODULATION - {1} [{2}]
+Mono
+Monophonic
+more / fewer repeats
+More keys
+Mouse
+Mouse wheel over the grid
+move it in pitch and time, keeping its length
+Move left
+Move right
+move the cursor along the arrangement
+move the cursor of the Arpeggiator or Modulation table
+move the edit cursor in the grid (Shift + Left/Right: change channel)
+move the selected block (Shift + Up/Down: one octave)
+MPE bend range
+MPE slide (CC74)
+Name
+Neapolitan minor
+New
+new project (File > New)
+New project?
+next / previous open window to the front
+No change
+No tracks with notes.
+Noise
+Noise period
+Noise Slide
+Noise+Env
+None
+none
+Normalize
+Not a valid drum kit file.
+Not a valid patch library file.
+Not an XM module.
+Not as heard:
+Not as in the module:
+Note
+note
+Note cut
+Note delay
+Note length
+Note monitor
+Note names
+Note's generator
+Notes played with their instrument's main sample: {1}.
+Notes without a sample: {1}.
+Nothing to import: no notes with a sample.
+Numpad 0 - 9
+Oct +
+Oct -
+OCT / GAT / PAN
+Oct {1}
+Oct {1}-{2}
+Oct+
+Oct-
+Octave
+octave
+octave, gate and pan, per step
+Octaves
+Off
+Omni
+On
+One frame of R0-R13 per replay tick while the host plays (standalone: the sequencer).
+Open Hat
+open the large oscilloscope
+Options
+Order
+Oscilloscope
+Other
+Out
+Out L
+Out R
+Output chain
+Overshoot
+Overview
+Overwrite
+Overwrite them?
+Pads 1 to 8: Digidrum slots 1 to 8
+Pads 1 to 8: Kick to Tom 2
+Pan
+Pan (-100 to 100):
+Pan {1}
+Panic
+Paste
+Paste (n/a)
+Paste block (n/a)
+Paste here
+Paste note here
+Paste row
+Paste row (n/a)
+Paste settings
+Patch name:
+Patch {1}
+PATCHES
+Patches
+Pattern
+Pattern breaks to a later row (played from row 0): {1}.
+Pattern read error.
+Patterns beyond 32: {1} left out.
+Pause
+Pentatonic major
+Pentatonic minor
+Per channel
+Per-VBL-frame tables (the tracker "ornament"): pitch in semitones, NSE row toggles noise, VOL row sets level. Click / drag to draw.
+Period
+Persian
+Phrygian
+Phrygian dominant
+Ping-pong
+Pitch
+Pitch matrix
+Pixels
+Play
+play / stop
+Play them with Chipdrum or Digidrum?
+Play/Stop
+Polyphonic
+Power
+Power + oct
+Preset
+Preset read error.
+Presets
+previous / next channel (grid closed)
+Programming: Pascal "Indus" Nowak (with Claude's help)
+Pulses
+put or remove a note at the cursor
+Quantize to VBL
+Quit
+quit
+Quit STYM2149?
+Ramp
+Random
+Random walk
+ratchet (hits inside the step) and trigger condition
+Rate
+Rate (kHz)
+Raw
+Read error.
+Ready.
+Rebuilds live while playing.
+Rec
+recentre it
+RECORDER
+Recorder
+Recording chip {1}: {2}, {3} frames.
+Redo
+redo
+Register monitor
+Register stream played at the VBL rate. The register strip and scope follow.
+Remove
+Remove ({1})
+remove the block or the selection
+Rename
+Rename channel...
+Rename instrument {1}:
+Rename patch:
+Rename...
+Renderer
+reorder the arrangement
+repeat / duplicate / cut / move / remove
+Repeat x1
+Repeat x16
+Repeat x2
+Repeat x4
+Repeat x8
+Repeats
+Replace
+Resample
+Resampling
+Reset
+resize it to the current Note value, or remove it if already that long
+Resolution
+Restart
+Restart from start
+Restart here
+Retrig
+Retro
+Reverse
+Rewind
+Rhythms
+Right click a channel tab
+Right click a note
+Right click a pattern slot
+Right click a row label
+Right click a song block
+Right click an empty cell
+Root
+Rotate
+Rows = sample slots. Drag a note to set how long the sample plays. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+RTG / CND
+S-curve
+Same track
+Sample
+Sample data cut by the end of the file.
+Sample offset
+Sample offsets above OFF brought down: {1}.
+Sample {1} is empty: load it in the DMA window.
+Samples
+Save
+Save as
+Save bank...
+Save current
+Save to Patches
+Saw
+Saw down
+Saw up
+Sawtooth
+Scale
+Scale + Snap
+Scale-locked
+SCOPE - TRACK {1}
+scroll the view one semitone
+select a block of steps
+select a pattern bank
+select a pattern slot
+Select all
+Select all ^A
+select all the notes of the grid
+Selection
+Semitone offsets, applied to the last played note.
+Send (0 to 100):
+Send {1}
+Sequence rows, played with the table tick by tick. PER: tone period offset (+ lower). NP: noise period. MIX: channel mode 0-7.
+Sequencer rows
+Sequencer view
+Set
+SETTINGS
+Settings this version does not know are not used.
+Settings...
+Seventh
+Shape
+Shape R13
+Shared
+Shared by every step of track {1}
+Sharp
+sharp
+Shift
+Shift + 1 - 4
+Shift + drag in the grid
+Short
+SHORTCUTS
+Shortcuts
+Shorter [
+show the notes of the other channels behind the grid
+SID min vol
+SID ratio
+SID Voice
+SID wave
+Sign
+Signature
+Sinc
+Sine
+Slide
+SLIDE CURVE
+slide to the next note
+Slides
+Slot
+Slot {1}
+slot {1}: empty
+slot {1}: {2} smp @ {3} Hz
+Smooth
+Snap
+Snare
+snare
+{1} exported
+SNDH played by AtariAudio's machine and the Musashi
+Soft clip
+Soft saw
+Software
+SONG
+Song
+Song is empty. Add entries first.
+Song read error.
+Song window
+SOUND ENGINE
+SOURCE
+Source
+SOURCE - {1}
+South African
+Space
+Speed changes without a free CMD cell: {1}.
+Speed: ticks per line (1-31)
+Speed: {1} ticks...
+Split here \
+split it at the clicked step
+split the note at the grid cursor
+Square
+SRC / GEN
+SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). ARP = arpeggio table. Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. PAN = per-step pan. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+ST channel
+Start
+Start to End is played; Loop repeats it while the note is held. The 8-bit source is kept.
+STE bass
+STE treble
+Stems (ZIP)
+Stems exported
+Step
+Step command rows
+Step Sequencer
+STEP SEQUENCER - {1} [{2}]
+Step {1} step
+Stepped
+Steps
+steps
+Stereo
+STOP
+Stop
+Stop MIDI learn
+Store channel
+Subsong
+Sweep
+Swing
+SYNC
+Sync
+Sync Buzzer
+Sync Buzzer steps
+Sync Mark
+SYSTEM
+Tab / Shift + Tab
+Table
+Tail
+Take
+Tempo
+Tempo for this block (blank = song tempo):
+Tempo {1} BPM, STE machine.
+Tempo...
+Tempos clamped to 20-300 BPM: {1}.
+Tenth
+terms (see LICENSE).
+The Digidrum bank file could not be read.
+The DMA bank file could not be read.
+The file could not be exported:
+The file could not be read.
+The file could not be written:
+The file reached its 4 GB limit and has been cut.
+The file was longer and has been truncated.
+The Languages folder cannot be opened
+The last take is saved with the project.
+The LFO of this track is off (Modulation window)
+The MIDI file fills pattern {1}.
+The MIDI file holds drums (channel {1}).
+The notes already written will be lost.
+The notes on its hits will be replaced.
+The other tracks and the tempo stay.
+The patch library file could not be read.
+The patterns hold notes. Fit them to {1}/{2}?
+The settings changed in this window will be lost.
+The song was longer than one hour and has been cut.
+the view scrolls one semitone at a time
+the view scrolls through the pattern
+The YM file is damaged.
+These may sound different in VBL, YM3, YM6 or SNDH exports:
+Third
+This file comes from a newer STYM2149.
+This track is not a Chipdrum. Switch its generator to Chipdrum (Ctrl+C) to edit the kit.
+this window
+Tick
+Ticks per line
+Ticks {1}
+ticks {1}
+Ticks {1}+
+Ticks: Speed ticks per line
+Ticks: speed {1} at {2} Hz, STE machine.
+Time
+Timer
+Timer ratio
+To
+toggle NSE at the Modulation cursor
+Tom {1}
+Tone
+Tone+Env
+Tone+Noise
+Tone+Noise+Env
+tone-noise source and generator, per step
+Tools
+Tooltips
+Track
+Track ({1})
+Track length
+Track name, 8 chars (blank = number):
+Track {1} holds notes. Replace them?
+Tracks {1} and {2} hold notes. Replace them?
+transport & edit
+Transport and edit
+TRASH
+Tri fifth
+Triangle
+Tritone
+Tune
+Tuning
+Tuning A4
+Tuning La4
+Turkish
+Type
+Ukrainian Dorian
+Undo
+undo / redo
+Unsaved work will be lost.
+Unsupported chip clock: {1} Hz.
+Unsupported file
+Unsupported MIDI file
+Up
+Up {1}
+Use STE
+Used by the Custom entry of the CRV row.
+value of one step, from 1/4 down to 1/64, plus triplets
+Value...
+VBL frequency
+VBL, YM3 and SNDH exports will match what you hear.
+VBL, YM3, YM6 and SNDH exports will match what you hear.
+Velocity
+Version: {1}
+VIBRATO
+Vibrato
+Vibrato table
+Voice {1}
+Voices
+Voicing
+Vol
+Vol 4-bit
+Volume
+Volume (0 to 100):
+Volume column effects left out: {1}.
+Volume R
+Volume Slide
+waiting for clock...
+WAV exported
+West African
+Wheel
+Wheel depth
+whole pattern at a glance; click or drag it to move the view
+Whole pattern: every step, every octave. Click or drag to move the view.
+Whole tone
+Width
+Windows
+Wobble
+write a note with the current Note value
+Write PER
+Write the figure into track {1}?
+write the step at the table cursor
+Writing notes
+XM imported
+XM not imported
+YM levels
+YM Pad
+YM/MOD PLAYER
+YM2149F emulator - GEM edition
+YM2149F REGISTER MONITOR
+{1} (empty)
+{1} [{2}]
+{1} DMA instrument
+{1} DMA instruments
+{1} Env
+{1} frame at {2} Hz, {3}.
+{1} frames at {2} Hz, {3}.
+{1} frames, {2} at {3} Hz, chip {4}
+{1} Noise
+{1} Noise+Env
+{1} octave
+{1} Off
+{1} pattern
+{1} patterns
+{1} semitone
+{1} Song entries
+{1} Song entry
+{1} Song position
+{1} Song positions
+{1} Tone
+{1} Tone+Env
+{1} Tone+Noise
+{1} Tone+Noise+Env
+{1} track, {2}
+{1} track, {2} pattern of {3} steps (the last of {4}), {5} BPM.
+{1} track, {2} pattern of {3} steps, {4} BPM.
+{1} track, {2} patterns of {3} steps (the last of {4}), {5} BPM.
+{1} track, {2} patterns of {3} steps, {4} BPM.
+{1} track, {2}, {3}, {4}.
+{1} track, {2}-bit, {3} kHz, {4}.
+{1} track, {2}.
+{1} tracks, {2}
+{1} tracks, {2} pattern of {3} steps, {4} BPM.
+{1} tracks, {2} pattern, {3} DMA instrument, {4} Song entry.
+{1} tracks, {2} patterns of {3} steps (the last of {4}), {5} BPM.
+{1} tracks, {2} patterns of {3} steps, {4} BPM.
+{1} tracks, {2}, {3}, {4}.
+{1} tracks, {2}-bit, {3} kHz, {4}.
+{1} triplet
+{1}-bit float
+{1}-bit float, {2} kHz, {3}.
+{1}-bit reg
+{1}-bit samples at the slot rate.
+{1}-bit samples played by the timer of a Digidrum track, at the rate below from the root note.
+{1}-bit, {2} kHz, {3}.
+{1}/{2} eighth
+{1}/{2} quarter
+{1}/{2} sixteenth
+{1}/{2} sixty-fourth
+{1}/{2} thirty-second
+{1}/{2} {3} step
+{1}/{2} {3} steps
+{1}/{2}. {3} step
+{1}/{2}. {3} steps
+{1}/{2}T triplet
+{1}/{2}T {3} step
+{1}/{2}T {3} steps
+• Chip clock {1} is not an Atari clock (an ST or STE runs its YM at {2} MHz)
+• Dual chip: VBL, YM and SNDH exports need Authentic 3ch (one chip)
+• Mixer levels are ignored (only the {1}-bit volume is written)
+• Timer effects frozen: {1} voice frames.
+• Timer Free: exact timer rates, which the MFP of an ST or STE rounds
+• {1}: ADSR in Smooth mode (audio gain, not in registers)
+• {1}: ADSR on a Sync Buzzer — the hardware envelope drives the level
+Interface language
+Tooltip language
+MIDI file
+SCOPE - {1}
+slot {1}:
+{1} bytes
+{1} values
+{1} s at {2} Hz
+{1} smp @ {2} Hz
+mono
+stereo
+loop
+4-bit
+{1}/frame
+pad
+{1} to {2}
+{1} to {2} (partly out of the chip range)
+Kit by note: C=kick C#=snare D=clap D#=hi-hat E=open-hat F=closed-hat F#=tom 1 G=tom 2 (mod 8). HLD = do not retrigger while it still rings. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+Rows = sample slots. Drag a note to set how long the sample plays. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). ARP = arpeggio table. Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape for that step. GAT = per-step gate. VOL = accent. RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other pass, 1:4 / 4:4 = one pass in four, 25 / 50 / 75 = chance in %.
+Selection: Copy
+Selection: Cut
+Note: Copy
+Note: Cut
+tuned x{1}/{2}
+{1}-bit
+Delete bank "{1}" from the library?
+MIDI learn: [{1}] armed - move a knob or press a pad
+MIDI learn: {1} -> [{2}] - click another control or exit via Options
+UpDn
+{1} ({2} to {3}):
+Send
+Balance
+Sample {1} "{2}": {3}Hz, {4}, root {5}, loop.
+Sample {1} "{2}": {3}Hz, {4}, root {5}, one shot.
+Sample {1}: {2}Hz, {3}, root {4}, loop.
+Sample {1}: {2}Hz, {3}, root {4}, one shot.
+CH {1} / {2}
+Chip Voice: no settings of its own
+Importing files:
+Exporting patterns:
+Exporting songs:
+not available in this version yet.
+Armed: the take starts when the sequencer plays.
+Armed: the take starts when the host plays.
+6th
+Length: {1} step
+Ch{1} Note on {2} {3}
+Ch{1} Note off {2} {3}
+Ch{1} Poly AT {2} {3}
+Ch{1} CC {2} {3}
+Ch{1} Program {2}
+Ch{1} Pressure {2}
+Ch{1} Pitch bend {2}
+MTC quarter frame
+Song position {1}
+Song select {1}
+Tune request
+System {1}
+SysEx {1} bytes
+repeated x{1}
+{1} lines
+{1} tracks hold notes. Replace them?
+The MIDI file fills patterns {1} to {2}.
+Load preset
+Load pattern
+Load song
+Load drum kit
+Save preset as
+Save pattern as
+Save song as
+Save drum kit as
+Export the take as {1}
+Export the song as {1}
+a VBL dump
+• {1} tracks with notes — a YM2149 has three voices (A, B, C)
+• {1}: {2} step with a chord — one YM voice plays one note at a time
+• {1}: {2} steps with a chord — one YM voice plays one note at a time
+• {1}: {2} note below the chip range (period would exceed 4095)
+• {1}: {2} notes below the chip range (period would exceed 4095)
+• {1}: {2} note above the chip range
+• {1}: {2} notes above the chip range
+• {1}: Digidrum replays its sample in YM6 and SNDH only (silent in VBL and YM3)
+• {1}: DMA sound of the STE, carried by SNDH only
+• {1}: Chipdrum uses sample tables here (Authentic 3ch synthesises it from registers)
+• {1}: SID ratio x{2} needs a timer faster than most ST replayers run
+• {1} DMA tracks with notes — the STE has one DMA channel, the SNDH plays the latest note
+• Tempo: {1} steps/s exceeds the {2} Hz VBL rate — steps would be dropped
+• {1}: arpeggio at {2} Hz is faster than the VBL rate
+• {1}: modulation table runs faster than one step per VBL
+• {1}: vibrato is smooth here; on hardware it steps at the VBL rate
+• {1}: slide curves other than Linear are interpolated, not written per VBL
+• Mixer pan is ignored (the ST is mono)
+• Per-step PAN row is ignored (the ST is mono)
+• Master level is a playback gain, not a register value
+• Master L / R and balance are ignored (the ST is mono)
+Custom...
+Custom {1} lines
+Custom {1} lines...
+Lines the MIDI monitor keeps
+Clear the MIDI monitor?
+The lines it keeps will be lost.
+MIDI learn: [{1}] disarmed - click another control or exit via Options
+Velocity curve
+Aftertouch curve
+Soft
+Hard
+YM not imported
+SNDH not imported
+Subsong to import
+The replay routine stopped before its first frame.
+Import the YM file as patterns
+Import the SNDH file as patterns
+Grid guessed from {1} notes: {2} % of them start on a step.
+A frame is a replay tick of the tune ({1} Hz).
+Frames per step
+Steps per pattern
+YM imported
+SNDH imported
+{1} instrument
+{1} instruments
+Ticks: speed {1} at {2} Hz, Authentic 3ch, A4 {3} Hz.
+Not as in the tune:
+The tune plays no note.
+The tune plays only through timer effects or samples, which the import leaves out.
+Replay rate {1} Hz played at {2} Hz.
+Timer effects (SID, digidrums, sync buzzers) left out: {1}.
+{1} frame
+{1} frames
+Digidrum hits left out: {1}.
+STE DAC sound left out.
+Beyond 10 minutes: {1} left out.
+Notes before the first step left out: {1}.
+Notes played with the closest of the 127 instruments: {1}.
+Notes whose pitch goes beyond their table (12 semitones up or down): {1}.
+Notes beyond B0-C9 brought within: {1}.
+Notes whose envelope period changes (one per instrument): {1}.
+Notes longer than their table (64 frames): {1}.
+Envelope restarts left out (one per step): {1}.
+Timer effects that STYM2149 does not play (pulse width, buzzer FM, sync square) left out: {1}.
+Digidrum hits of channels other than {1} left out (one Digidrum track): {2}.
+Digidrum hits beyond 3 octaves of their slot's rate: {1}.
+Digidrum samples cut to their 3 seconds: {1}.
+SID notes below volume 15 (their waveform scaled down, not lowered): {1}.
+Sync buzzers of more than 2 shapes whose square plays lower: {1}.
+Sync buzzers whose envelope period does not follow the note: {1}.
+Choose the voiceset (.MYV) of the song
+Choose the song (.MYS) of the voiceset
+maxYMiser song imported
+maxYMiser song not imported
+Digidrum samples on track 4: {1}.
+Not a maxYMiser song (.MYS).
+Too many patterns in the song.
+Corrupt pattern in the song.
+The song file is cut.
+Corrupt song header.
+The song names a missing pattern.
+Not a maxYMiser voiceset (.MYV).
+The voiceset file is cut.
+Too many sequences in the voiceset.
+Corrupt digidrum in the voiceset.
+An instrument names a missing sequence.
+Left
+Right
+Mix
+Export the song for maxYMiser
+maxYMiser plays the three channels of one chip: switch to Authentic 3ch
+The song could not be exported:
+The Song is empty.
+maxYMiser song exported
+{1} digidrum
+{1} digidrums
+{1} song step, {2}, {3}.
+{1} song steps, {2}, {3}.
+{1} song step, {2}, {3}, {4}.
+{1} song steps, {2}, {3}, {4}.
+Speed {1} at {2} Hz, loops at step {3}.
+Speed {1} at {2} Hz, plays once.
+• {1}
+The song stops where maxYMiser runs out of song steps (256) or patterns (240).
+Frames played with the closest of the 32 instruments: {1}.
+Frames whose buzzer or timer pitch is approximate (a third generator): {1}.
+Envelope restarts within a row left out: {1}.
+Timer effect frames beyond the MFP's reach, played at its nearest rate: {1}.
+Frames whose timer effect differs from their row's: {1}.
+Rows longer than 63 frames, their notes held from the 63rd: {1}.
+Rows of one frame played as two: {1}.
+Rows longer than 255 frames cut to 255: {1}.
+STE DMA sound left out.
+Digidrum {1} played once, without its loop.
+YM-Tracker song imported
+YM-Tracker song not imported
+Not a YM-Tracker song.
+The song is cut.
+Unsupported number of channels.
+The song is damaged.
+Unsupported pattern length.
+A pattern of the song is damaged.
+An instrument of the song is damaged.
+Not a gzip stream.
+Unknown gzip compression method.
+Unknown gzip header flags.
+The gzip header is cut.
+The compressed data are damaged or too large.
+The gzip stream is cut.
+The gzip checksum does not match.
+The gzip length does not match.
+Nothing to import: the song has no pattern.
+Nothing to import: no notes on the first three channels.
+Tempo {1} BPM, replay at {2} Hz, Authentic 3ch.
+Ticks: speed {1} at {2} Hz, Authentic 3ch.
+Not as in the song:
+{1} row
+{1} rows
+Channels beyond the first three (one chip, Authentic 3ch): {1}.
+Notes beyond 127 instruments, played without their effects: {1}.
+Arpeggios and envelope periods that start after their note's attack, played from it: {1}.
+Note effects on rows without a note of this pattern: {1}.
+3xx without a note before it in the pattern: {1}.
+Pitch macros beyond an octave and 127 period steps, clamped: {1}.
+Macros that do not repeat within 64 ticks, held at the 64th: {1}.
+SID rates beyond 1/4 to 8 times the note, clamped: {1}.
+Sync-Buzzer (Uxx) rates following the note: {1}.
+Digidrum hits of other channels, played on channel {1}: {2}.
+Digidrum hits on the same row as another: {1}.
+Digidrum hits beyond 8 samples: {1}.
+Digidrum hits without a sample in the bank: {1}.
+Volumes below the one of VOL 1 ({1} of 15), played at it: {2}.
+Unknown effects left out: {1}.
+Export the song for YM-Tracker
+YM-Tracker plays the three channels of one chip: switch to Authentic 3ch
+YM-Tracker song exported
+{1} position
+{1} positions
+{1} position, {2}, {3}.
+{1} positions, {2}, {3}.
+{1} position, {2}, {3}, {4}.
+{1} positions, {2}, {3}, {4}.
+Speed {1} at {2} BPM, loops at position {3}.
+Speed {1} at {2} BPM, plays once.
+The Song stops after 256 positions.
+Notes played with the closest of the 16 instruments: {1}.
+Notes under the Digidrum hits, left out as the sequencer does: {1}.
+Notes beyond C-1 to B-8 moved by octaves: {1}.
+Note releases moved to the end of their row (the cell holds another effect): {1}.
+Effects without room in their cell: {1}.
+ADSR stages beyond 15 ticks, clamped: {1}.
+Buzzer ratios played at the nearest octave: {1}.
+Replay at {1} Hz written at {2} Hz (ticks of twice the length).
+Rows longer than 31 ticks, shortened: {1}.
+Tempos beyond 32-255 BPM once in ticks, clamped: {1}.
+Swing left out.
+Digidrum hits beyond 255 samples: {1}.
+Digidrum rates beyond 65535 Hz, clamped: {1}.
+Looped Digidrum slots played once: {1}.
+Tuning A4 left out (YM-Tracker plays A4 at 440 Hz).
+STE DMA tracks left out.
+Left out: {1} ({2}).
+GEN on held steps
+Chipdrum and DMA notes
+FM Voice steps (the note plays alone)
+GEN Chip Voice on a Sync Buzzer
+ARP (Jxx)
+chord notes
+Exx without the envelope
+buzzer fine tune
+volume tables under an ADSR
+noise steps of tables
+NP, MIX, GEN and FIX table rows
+Detune and Analog
+Digidrum hits on empty slots
+MOD imported
+MOD not imported
+Not a MOD module.
+Corrupt MOD module.
+Tracker song
+SNDH / YM file
+Import a tracker song
+Import an SNDH or YM file
+Tracker song not imported
+Expected an XM, MOD, S3M, OKT, maxYMiser,
+YM-Tracker or TTrak file.
+S3M imported
+S3M not imported
+OKT imported
+OKT not imported
+Not an S3M module.
+Corrupt S3M module.
+Not an OKT module.
+Corrupt OKT module.
+AdLib channels (no OPL chip): {1} left out.
+AdLib instruments (no OPL chip): {1} left out.
+Unsupported XM version (1.04 only).
+Corrupt XM header.
+Corrupt XM pattern.
+Corrupt XM instrument.
+Play...
+Play a file
+The file cannot be played.
+Nothing to play in this file.
+It comes from a newer STYM2149.
+Not a valid STYM2149 file.
+Expected a YM, SNDH, maxYMiser, YM-Tracker,
+TTrak, XM, MOD, S3M, OKT or STYM2149 file.
+This file holds a project.
+This file holds a pattern.
+This file holds a song.
+This file holds a drum kit.
+It cannot be read by this version.
+Main
+Instrument
+8-bit signed samples, within the memory of the Atari. A DMA track plays one of them, tuned from its root note.
+Replace the slots with bank "{1}"?
+Replace the samples with bank "{1}"?
+Memory
+{1} KB
+{1} MB
+{1} KB of {2} KB
+The samples take {1},
+more than the {1} the memory of the Atari leaves them.
+Those past it will be silent and crossed out,
+from the last, until the memory is enough again.
+Number...
+Digidrum of pad {1}
+This file is too long for a sample.
+Proceed
+The module plays {1} channels.
+32 ch plays up to 32 of them on DMA tracks;
+16 ch plays up to 16 of them on DMA tracks;
+16 ch plays 16 and leaves the others out.
+{1} plays 8 and leaves the others out.
+No instrument yet
+The 127 instruments are in use: clear one in the Instruments window first.
+Instruments beyond the 127 of a project: {1}, {2} note left out.
+Instruments beyond the 127 of a project: {1}, {2} notes left out.
+Channels on the track of one that never plays at the same time: {1}.
+RAM
+Load a sample into slot {1}
+Load a DMA sample into slot {1}
+Slot {1} already holds a sample.
+Slot {1} already holds "{2}".
+Replace it with "{1}"?
+Fade
+This copy plays through the ASIO driver of the first copy.
+Most ASIO drivers serve one application at a time: if a copy stays silent, choose another output for it in Options > Audio/MIDI settings.
+The ASIO driver of the first copy serves one application at a time.
+This copy plays through another output: choose it in Options > Audio/MIDI settings.
+This copy has no audio output: choose one in Options > Audio/MIDI settings.
+TTrak module imported
+TTrak module not imported
+TTrak module exported
+Not a TTrak module (.TPM).
+The TTrak module is cut.
+Corrupt TTrak module header.
+Corrupt TTrak sample table.
+Export the song for TTrak
+TTrak plays the three channels of one chip: switch to Authentic 3ch
+Frames that TTrak plays otherwise: {1} of {2}.
+Frames beyond TTrak's pitch tables (or a timer too slow): {1}.
+The song stops where TTrak runs out of positions (127) or patterns (128).
+Replayed at {1} Hz instead of {2} Hz (TTrak's rates: 50, 100, 150, 200 Hz).
+Notes played with the closest of the 32 instruments: {1}.
+Notes longer than an instrument's tables, played approximately: {1}.
+Notes played louder (their row has no room for the volume effect): {1}.
+Digidrums past the 32 samples of TTrak left out: {1}.
+FM Voice frames played as the note alone (TTrak's FM: four steps of x1, x1.5, x2 or x3, no envelope): {1}.
+FM Voice frames played as the note alone: {1}.
+{1} Hz, loops at position {2}.
+{1} Hz, plays once.
+{1} sample
+{1} samples
+The Song plays nothing.
+FM wave
+• {1}: FM Voice plays its wave in SNDH only (the note alone in VBL, YM3 and YM6)
+• {1}: FM Voice of {2} step at ratio x{3} needs a timer faster than most ST replayers run
+• {1}: FM Voice of {2} steps at ratio x{3} needs a timer faster than most ST replayers run
+Ratios
+Semitones
+Semitones above the note:
+7 fifth  12 octave  19 x3  24 x4
+FM Voice frames whose steps play approximately (x0.5, x5 or more than 8 steps): {1}.
+Configuration
+Load configuration
+Save configuration as
+Configuration read error.

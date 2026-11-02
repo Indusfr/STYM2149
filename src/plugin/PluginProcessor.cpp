@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "PluginEditor.h"
+#include "StandaloneSlot.h"
 
 namespace stym::plugin {
 namespace {
@@ -89,7 +90,7 @@ juce::AudioProcessor::BusesProperties StymProcessor::makeBuses() {
 }
 
 StymProcessor::StymProcessor() : AudioProcessor(makeBuses()) {
-    // Parameters in the table's order, grouped as "global" and "t01" to "t16"; params_ keeps a pointer to each one
+    // Parameters in the table's order, grouped as "global" and "t01" to "t32"; params_ keeps a pointer to each one
     // (JUCE owns them), indexed like the table.
     auto global = std::make_unique<juce::AudioProcessorParameterGroup>("global", "Global", "|");
     std::array<std::unique_ptr<juce::AudioProcessorParameterGroup>, kTracks> tracks;
@@ -137,10 +138,10 @@ bool StymProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
 }
 
 // Bit t set when the host has enabled the output of track t.
-uint16_t StymProcessor::enabledTrackOutputs() const {
-    uint16_t mask = 0;
+uint32_t StymProcessor::enabledTrackOutputs() const {
+    uint32_t mask = 0;
     for (int t = 0; t < kTracks; ++t)
-        if (const auto* bus = getBus(false, kTrackBusFirst + t); bus && bus->isEnabled()) mask = uint16_t(mask | 1u << t);
+        if (const auto* bus = getBus(false, kTrackBusFirst + t); bus && bus->isEnabled()) mask |= 1u << t;
     return mask;
 }
 
@@ -157,17 +158,15 @@ ymengine::SeqClock StymProcessor::defaultSeqClock() const noexcept {
     return wrapperType == wrapperType_Standalone ? ymengine::SeqClock::Internal : ymengine::SeqClock::Host;
 }
 
-Snapshot StymProcessor::makeSnapshot() const {
-    Snapshot s;
-    s.state = extras_;
-    s.kitVersion = kitVersion_;
-    s.sampleVersion = sampleVersion_;
-    s.dmaVersion = dmaVersion_;
+std::unique_ptr<Snapshot> StymProcessor::makeSnapshot() const {
+    auto s = std::make_unique<Snapshot>();
+    s->state = extras_;
+    s->kitVersion = kitVersion_;
     // Standalone: no host transport, a state set to Host sync plays in Free run.
-    if (wrapperType == wrapperType_Standalone && s.state.global.seqClock == ymengine::SeqClock::Host)
-        s.state.global.seqClock = ymengine::SeqClock::Internal;
-    fillSequence(s.state.seq, s.seq);
-    s.patternSerial = patternSerial_;
+    if (wrapperType == wrapperType_Standalone && s->state.global.seqClock == ymengine::SeqClock::Host)
+        s->state.global.seqClock = ymengine::SeqClock::Internal;
+    fillSequence(s->state.seq, s->seq);
+    s->patternSerial = patternSerial_;
     return s;
 }
 
@@ -179,7 +178,7 @@ void StymProcessor::prepareToPlay(double sampleRate, int maxBlock) {
         click_.assign(size_t(std::max(maxBlock, 0)), 0.0f);
         preparedOutputs_ = enabledTrackOutputs();
         values_ = currentValues();
-        driver_.prepare({uint32_t(std::lround(sampleRate)), preparedOutputs_}, values_, makeSnapshot());
+        driver_.prepare({uint32_t(std::lround(sampleRate)), preparedOutputs_}, values_, *makeSnapshot());
         engineStatus_.prepare(uint32_t(std::lround(sampleRate)));
     }
     // Outside the lock, as in serviceMessageThread: a VST3 host told of the new latency can call back into the plugin
@@ -217,8 +216,16 @@ void StymProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         e.data = {b[1], b[2], b[3]};
         e.screen = true;
         midi_.push_back(e);
+        // The keys of a MIDI input gone: the editor lets them go too (lit keys, notes being recorded).
+        if (e.command == UiCommand::KeysOff)
+            hostNoteFifo_.write(1).forEach([&](int k) { hostNoteBuffer_[size_t(k)] = {0xB0, 123, 0}; });
     });
     for (const auto m : midi) {
+        // MIDI monitor: every message, learned ones included, but the MIDI clock and active sensing, which
+        // come many times a second.
+        if (m.numBytes > 0 && m.data[0] != 0xF8 && m.data[0] != 0xFE)
+            monitorFifo_.write(1).forEach(
+                [&](int slot) { monitorBuffer_[size_t(slot)] = monitorMessage(m.data, m.numBytes); });
         if (m.numBytes <= 0 || m.numBytes > 3) continue;  // SysEx: ignored
         // MIDI learn: a learned CC or note, or one caught for the armed control, goes to the editor. A note off
         // goes on to the engine too (not to the editor's host notes): a note that was sounding when its key was
@@ -237,8 +244,9 @@ void StymProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         std::copy(m.data, m.data + m.numBytes, e.data.begin());
         midi_.push_back(e);
         if (claimed) continue;
-        // Note on and off, CC 120 and 123 (all cut): also seen by the editor.
-        if (e.size == 3 && (st == 0x80 || st == 0x90 || (st == 0xB0 && (e.data[1] == 120 || e.data[1] == 123))))
+        // Note on and off, CC 120 and 123 (all cut), the Record button: also seen by the editor.
+        if (e.size == 3 && (st == 0x80 || st == 0x90 || (st == 0xB0 && (e.data[1] == 120 || e.data[1] == 123)) ||
+                            isRecordCc(e.data[0], e.data[1])))
             hostNoteFifo_.write(1).forEach([&](int slot) { hostNoteBuffer_[size_t(slot)] = e.data; });
     }
     midi.clear();
@@ -318,6 +326,17 @@ bool StymProcessor::popHostNote(std::array<uint8_t, 3>& message) noexcept {
 
 void StymProcessor::dropHostNotes() noexcept { hostNoteFifo_.read(hostNoteFifo_.getNumReady()).forEach([](int) {}); }
 
+bool StymProcessor::popMonitorMidi(MonitorMessage& message) noexcept {
+    bool got = false;
+    monitorFifo_.read(1).forEach([&](int slot) {
+        message = monitorBuffer_[size_t(slot)];
+        got = true;
+    });
+    return got;
+}
+
+void StymProcessor::dropMonitorMidi() noexcept { monitorFifo_.read(monitorFifo_.getNumReady()).forEach([](int) {}); }
+
 void StymProcessor::setMidiMap(std::string_view json) { capture_.set(midiKeys(parseMidiMap(json)), false); }
 
 bool StymProcessor::popLearnMidi(std::array<uint8_t, 3>& message) noexcept {
@@ -340,22 +359,21 @@ NonParamState StymProcessor::extras() const {
 void StymProcessor::editExtras(const std::function<void(NonParamState&)>& edit) {
     {
         const std::lock_guard<std::mutex> lock(controlLock_);
-        NonParamState next = extras_;
+        // On the heap, as the Snapshot (over 100 KB).
+        auto nextPtr = std::make_unique<NonParamState>(extras_);
+        NonParamState& next = *nextPtr;
         edit(next);
         sanitize(next);
-        // The kit and the samples are rebuilt by the audio thread only if they change (setKit is costly).
+        // The kit is rebuilt by the audio thread only if it changes (setKit is costly); the samples are given again
+        // when their buffer changes (SharedSamples).
         bool kitChanged = false;
         for (size_t i = 0; i < next.kit.inst.size(); ++i) {
             const auto &a = next.kit.inst[i], &b = extras_.kit.inst[i];
             kitChanged = kitChanged || a.a != b.a || a.b != b.b || a.dec != b.dec || a.noise != b.noise || a.vol != b.vol;
         }
         if (kitChanged) ++kitVersion_;
-        for (size_t i = 0; i < next.digidrums.size(); ++i)
-            if (next.digidrums[i] != extras_.digidrums[i]) ++sampleVersion_[i];
-        for (size_t i = 0; i < next.dmaSamples.size(); ++i)
-            if (next.dmaSamples[i] != extras_.dmaSamples[i]) ++dmaVersion_[i];
         extras_ = std::move(next);
-        driver_.publish(makeSnapshot());
+        driver_.publish(*makeSnapshot());
     }
     extrasVersion_.fetch_add(1, std::memory_order_acq_rel);
     // The host marks the project as modified (renaming, kit, Digidrum: none of this is a parameter).
@@ -432,6 +450,16 @@ std::string StymProcessor::loadYm(std::span<const uint8_t> bytes, std::string fi
     return {};
 }
 
+void StymProcessor::playProject(const ParamValues& values, const NonParamState& extras, bool song, std::string name) {
+    auto p = std::make_shared<Driver::PlayerProject>();
+    p->values = values;
+    p->extras = extras;
+    p->song = song;
+    p->name = std::move(name);
+    const std::lock_guard<std::mutex> lock(controlLock_);
+    driver_.ymLoadProject(std::move(p));
+}
+
 void StymProcessor::ymPlay(bool on) {
     const std::lock_guard<std::mutex> lock(controlLock_);
     driver_.ymPlay(on);
@@ -456,14 +484,15 @@ juce::AudioProcessorEditor* StymProcessor::createEditor() { return new StymEdito
 
 // Host state: the binary blob of plugincore/State.h (parameters by ID, non-automatable state, recorder take).
 void StymProcessor::getStateInformation(juce::MemoryBlock& dest) {
-    PluginState state;
-    state.values = currentValues();
+    // On the heap: over 100 KB, too much for the stack of a host thread.
+    auto state = std::make_unique<PluginState>();
+    state->values = currentValues();
     {
         const std::lock_guard<std::mutex> lock(controlLock_);
-        state.extras = extras_;
-        state.take = take_;
+        state->extras = extras_;
+        state->take = take_;
     }
-    const std::vector<uint8_t> bytes = encodeState(state);
+    const std::vector<uint8_t> bytes = encodeState(*state);
     dest.replaceAll(bytes.data(), bytes.size());
 }
 
@@ -475,12 +504,11 @@ void StymProcessor::applyExtras(const NonParamState& extras, const RegisterTake*
         if (take) take_ = *take;
         // State from before the sequencer: default sequencer settings for this format.
         if (!hasSequencer) extras_.global.seqClock = defaultSeqClock();
-        // Every version moves: the audio thread rebuilds the kit, the samples and the pattern from the new state.
+        // Every version moves: the audio thread rebuilds the kit and the pattern from the new state (its samples are
+        // new buffers, given again).
         ++kitVersion_;
-        for (auto& v : sampleVersion_) ++v;
-        for (auto& v : dmaVersion_) ++v;
         ++patternSerial_;  // the engine takes the state's current pattern again
-        driver_.publish(makeSnapshot());
+        driver_.publish(*makeSnapshot());
     }
     extrasVersion_.fetch_add(1, std::memory_order_acq_rel);
 }
@@ -502,7 +530,8 @@ void StymProcessor::loadProject(const ParamValues& values, const NonParamState& 
 void StymProcessor::setStateInformation(const void* data, int size) {
     if (data == nullptr || size <= 0) return;
     const DecodeResult r = decodeState({static_cast<const uint8_t*>(data), size_t(size)});
-    if (!r.ok) return;  // unreadable or newer state: the current state is kept
+    // Unreadable or newer state, or a pattern, Song or kit file: the current state is kept.
+    if (!r.ok || r.kind != StateKind::State) return;
     for (int i = 0; i < kParamCount; ++i) {
         auto* p = params_[size_t(i)];
         p->setValueNotifyingHost(p->convertTo0to1(r.state.values[size_t(i)]));
@@ -518,8 +547,11 @@ void StymProcessor::setStateInformation(const void* data, int size) {
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     auto* p = new stym::plugin::StymProcessor();
-    // MIDI learn map from the user's preferences: applied from creation, with the editor closed.
-    // The tests create the processor without it.
-    p->setMidiMap(stym::plugin::StymEditor::userPreferences()->getValue("midiMap").toStdString());
+    // MIDI learn map from the user's preferences, or from the settings of this copy of the standalone application:
+    // applied from creation, with the editor closed. The tests create the processor without it.
+    const juce::PropertySet* copy = stym::plugin::standaloneSettings();
+    const juce::String map = copy != nullptr ? copy->getValue("midiMap")
+                                             : stym::plugin::StymEditor::userPreferences()->getValue("midiMap");
+    p->setMidiMap(map.toStdString());
     return p;
 }

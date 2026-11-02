@@ -44,7 +44,7 @@ void StepSoundWindow::clear() {
         if (b->button.parent() == this) remove(b->button);
     for (auto& h : headings_)
         if (h->parent() == this) remove(*h);
-    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&wave_, &none_, &hint_})
+    for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&wave_, &none_, &fmLegend_, &hint_})
         if (w->parent() == this) remove(*w);
     rows_.clear();
     buttons_.clear();
@@ -109,6 +109,7 @@ StepSoundWindow::ButtonItem& StepSoundWindow::addButton(std::string id, gemui::B
     b.id = std::move(id);
     b.src = &src;
     b.button.setTip(src.tip());
+    b.button.setPopup(src.popup());  // the GEM shadow of a pop-up button
     if (click) b.button.onClick = [&b, click] { click(b.button); };
     else b.button.onClick = [s = &src] { if (s->onClick) s->onClick(); };
     b.button.onContext = [s = &src](gemui::Point p) { if (s->onContext) s->onContext(p); };
@@ -201,6 +202,8 @@ void StepSoundWindow::build() {
                 form.button.setBox({x + waveHead.naturalWidth() + kGap, y, form.button.naturalWidth(), h});
                 return h;
             });
+            wave_.setScale(15, 3, false);
+            wave_.tipFor = nullptr;
             wave_.onSet = m.sidWave_.onSet;
             wave_.onWheel = m.sidWave_.onWheel;
             wave_.onMenu = m.sidWave_.onMenu;
@@ -234,6 +237,46 @@ void StepSoundWindow::build() {
             lines_.push_back([&period, &width, placeSlider](double x, double y) {
                 placeSlider(period, x, y);
                 return placeSlider(width, x, y);
+            });
+        } else if (gen_ == int(Generator::Fm)) {
+            // Timer ratio, the FM wave and its steps, as in the GENERATOR frame (01/11/2026).
+            SliderRow& ratio =
+                addSlider("ratio", "Timer ratio", m.ratio_, m.ratiov_, &m.labRatio_, {4, 0, "9.99"}, true);
+            ratio.pre.setText("x");
+            sliderLine(ratio);
+            // The menu of its scales after its name, as in the main window.
+            gemui::Label& fmHead = addHeading("FM wave");
+            ButtonItem& scale = addButton("fmScale", m.fmScale_, [&m](gemui::Button& b) { m.fmScaleMenu(b); });
+            scale.button.setMinWidth(m.fmScale_.naturalWidth());  // as wide as the widest scale
+            lines_.push_back([&fmHead, &scale](double x, double y) {
+                const double h = scale.button.naturalHeight();
+                fmHead.setBox({x, y + (h - 16) / 2, fmHead.naturalWidth(), 16});
+                scale.button.setBox({x + fmHead.naturalWidth() + kGap, y, scale.button.naturalWidth(), h});
+                return h;
+            });
+            wave_.copyScale(m.fmWave_);
+            wave_.tipFor = m.fmWave_.tipFor;
+            wave_.onSet = m.fmWave_.onSet;
+            wave_.onWheel = m.fmWave_.onWheel;
+            wave_.onMenu = m.fmWave_.onMenu;
+            wave_.setTip(m.fmWave_.tip());
+            add(wave_);
+            lines_.push_back([this](double x, double y) {  // two rows of values in Semitones
+                wave_.setBox({x + std::round((rowW_ - SidWaveGrid::kWidth) / 2), y, double(SidWaveGrid::kWidth),
+                              double(wave_.height())});
+                return double(wave_.height()) + 2;
+            });
+            SliderRow& steps =
+                addSlider("fmSteps", "Steps", m.fmSteps_, m.fmStepsv_, &m.labFmSteps_, {2, 3, "99"}, false);
+            steps.alignTo = &ratio;
+            sliderLine(steps);
+            fmLegend_.setText(m.fmHint_.text());
+            add(fmLegend_);
+            lines_.push_back([this](double x, double y) {
+                fmLegend_.setBox({x, y, rowW_, 12});  // the width first: the line count follows it
+                const double h = 12.0 * fmLegend_.lineCount();
+                fmLegend_.setBox({x, y, rowW_, h});
+                return h;
             });
         } else if (gen_ == int(Generator::SyncBuzzer)) {
             gemui::Label& tune = addHeading("Tuning");
@@ -345,9 +388,9 @@ std::string StepSoundWindow::titleText() const {
     static constexpr const char* kKinds[] = {"GENERATOR", "SOURCE", "ENVELOPE"};
     std::string t = std::string(kKinds[int(kind_)]) + " - " + std::to_string(m_.cur_ + 1);
     if (kind_ == Kind::Generator) {
-        static constexpr const char* kGens[] = {"Chip Voice", "SID Voice", "Digidrum",
-                                                "Sync Buzzer", "Chipdrum", "DMA"};
-        t += std::string(" [") + kGens[std::clamp(gen_, 0, 5)] + "]";
+        static constexpr const char* kGens[] = {"Chip Voice", "SID Voice", "Digidrum", "Sync Buzzer",
+                                                "Chipdrum",   "DMA",       "FM Voice"};
+        t += std::string(" [") + kGens[std::clamp(gen_, 0, 6)] + "]";
     }
     return t;
 }
@@ -390,7 +433,10 @@ void StepSoundWindow::refresh() {
         b.button.setOn(b.src->on());
         b.button.setEnabled(b.src->enabled());
     }
-    if (wave_.parent() == this) {
+    if (wave_.parent() == this && gen_ == int(Generator::Fm)) {
+        wave_.copyScale(m_.fmWave_);  // its scale
+        wave_.setState(m_.fmWave_.state());
+    } else if (wave_.parent() == this) {
         wave_.setState(m_.sidWave_.state());
         wave_.setVisible(m_.waveForm() != MainWindow::WaveForm::Base);
     }

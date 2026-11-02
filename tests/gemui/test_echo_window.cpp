@@ -1,7 +1,7 @@
 // STYM2149 — Effects window (eighth DAW test, item 98; renamed by the ninth, items 110 to 112):
 // Edit > Effects, ^F or the Effects button; the echo of the focused track's sound in every mode (On / Off,
 // Division, To, Repeats, Drop, one undo step each, in the state), greyed out for a Sync Buzzer in 3 channels;
-// the delay of the 16 channels from host parameters (On / Off, Ping-pong, Sync and Division or Time, Feedback, Hi cut,
+// the delay of the 32 channels from host parameters (On / Off, Ping-pong, Sync and Division or Time, Feedback, Hi cut,
 // Level), greyed out in the 3-channel modes, Ping-pong hidden while it is off.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
@@ -134,7 +134,7 @@ TEST_CASE("Echo: Division and To menus, Repeats and Drop dragged and typed, in t
     CHECK(echo(h).division == 2);
     CHECK(w.echoWindow().button("echoDiv")->text() == divisionNames()[2]);
 
-    // To: the same track, or one of the sixteen tracks.
+    // To: the same track, or one of the tracks of the mode, 16 in 16 ch.
     click(w, "echoTo");
     const std::vector<std::string> to = menuLabels(w);
     REQUIRE(to.size() == 1 + 16);
@@ -194,7 +194,7 @@ TEST_CASE("Echo: in 3 channels too, To lists its tracks; a percussion track has 
     CHECK(echo(h).drop == 7);
 }
 
-TEST_CASE("Delay: 16 channels, host parameters; Sync and Division, or Time in ms", "[ui][echo][delay]") {
+TEST_CASE("Delay: 16 and 32 channels, host parameters; Sync and Division, or Time in ms", "[ui][echo][delay]") {
     CHECK(EchoWindow::timeOfPosition(0) == int(ymengine::kDelayMinMs));
     CHECK(EchoWindow::timeOfPosition(EchoWindow::kLogPositions) == int(ymengine::kDelayMaxMs));
     CHECK(EchoWindow::cutOfPosition(0) == int(ymengine::kDelayHiCutMin));
@@ -276,11 +276,11 @@ TEST_CASE("Delay: greyed out in the 3-channel modes, nothing else of it shows", 
         w.echoWindow().show();
         const gemui::Button* on = w.echoWindow().button("delayOn");
         CHECK_FALSE(on->enabled());
-        CHECK(on->tip() == "Delay: 16 ch only. In 3 ch, the Echo repeats the notes on the chip");
+        CHECK(on->tip() == "Delay: 16 and 32 ch only. In 3 ch, the Echo repeats the notes on the chip");
         CHECK_FALSE(w.rectOf("delayPing"));  // hidden
         CHECK_FALSE(w.rectOf("delaySync"));
         CHECK_FALSE(w.rectOf("delayFb"));
-        // Back to 16 channels: its settings.
+        // Back to 32 channels: its settings.
         h.p(Global::VoiceMode) = 0;
         w.tick(0);
         CHECK(on->enabled());
@@ -313,12 +313,12 @@ TEST_CASE("Effects: no echo for a Sync Buzzer in 3 channels, greyed out; nor a S
         CHECK_FALSE(on->enabled());
         CHECK(on->tip() ==
               "Echo: none for Sync Buzzer in 3 ch, a repeat would restart the shared hardware envelope at full level");
-        CHECK(on->text() == "On");  // the setting kept, for another sound or 16 channels
+        CHECK(on->text() == "On");  // the setting kept, for another sound or 32 channels
         CHECK_FALSE(w.echoWindow().slider("echoRep")->enabled());
         CHECK_FALSE(w.echoWindow().button("echoDiv")->enabled());
         click(w, "echoOn");
         CHECK(echo(h).on);
-        // The Mixer has no Send in the 3-channel modes: the delay is a 16-channel effect.
+        // The Mixer has no Send in the 3-channel modes: the delay is a 32-channel effect.
         w.mixer().show();
         CHECK_FALSE(w.rectOf("mixSend0"));
         // Chip Voice: its echo.
@@ -327,7 +327,7 @@ TEST_CASE("Effects: no echo for a Sync Buzzer in 3 channels, greyed out; nor a S
         CHECK(on->enabled());
         CHECK(w.echoWindow().slider("echoRep")->enabled());
     }
-    // 16 channels: a Sync Buzzer has its echo, and its Send.
+    // 32 channels: a Sync Buzzer has its echo, and its Send.
     UiHost h;
     h.p(0, plugin::Track::Generator) = float(ymengine::Generator::SyncBuzzer);
     MainWindow w(h);

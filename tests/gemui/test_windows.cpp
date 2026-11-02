@@ -262,6 +262,59 @@ TEST_CASE("Horizontal and vertical scrollbars: halftoned corner, left and right 
     CHECK(h.at(649, 750) == colors::kBlack);
 }
 
+TEST_CASE("Scrollbars of a pane half as thick: square arrows, the viewport taller", "[gemui]") {
+    HelpPane h(916, 1410);
+    ScrollPane& s = h.pane;
+    s.setBarSize(13);
+    CHECK(s.barSize() == 13);
+    CHECK(s.viewport() == Rect{126, 102, 535, 648});
+    using P = ScrollPane::Part;
+    CHECK(s.partRect(P::Left) == Rect{126, 750, 13, 13});
+    CHECK(s.partRect(P::Right) == Rect{648, 750, 13, 13});
+    CHECK(s.partRect(P::Corner) == Rect{661, 750, 13, 13});
+    CHECK(s.partRect(P::TrackH).y == 750);
+    CHECK(s.partRect(P::TrackH).h == 13);
+    CHECK(s.partRect(P::TrackH).x == 139);
+    // The arrow glyph stays whole inside the rules: black pixels in the cell, under its 2 px top rule.
+    h.d.invalidateAll();
+    h.d.paint();
+    bool ink = false;
+    for (int y = 752; y < 763; ++y)
+        for (int x = 128; x < 137; ++x) ink = ink || h.d.surface().at(x, y) == colors::kBlack;
+    CHECK(ink);
+    s.setBarSize(4);  // no room for the glyph: 12 px at least
+    CHECK(s.barSize() == 12);
+}
+
+TEST_CASE("Scrollbars of a closed pane: a rule on the outer side too, 14 px at least (Indus, 01/11/2026)", "[gemui]") {
+    HelpPane h(916, 1410);
+    ScrollPane& s = h.pane;
+    s.setBarSize(13);
+    s.setClosed(true);
+    CHECK(s.closed());
+    CHECK(s.barSize() == 14);  // the glyph's 10 px between two rules
+    using P = ScrollPane::Part;
+    const Rect left = s.partRect(P::Left), track = s.partRect(P::TrackH), right = s.partRect(P::Right);
+    CHECK(left.h == 14);
+    h.d.invalidateAll();
+    h.d.paint();
+    // The bottom rule along the arrows and the track, and the right rule along the vertical bar.
+    for (int x : {left.x + 4, track.x + 3, track.right() - 3, right.x + 4}) {
+        CAPTURE(x);
+        CHECK(h.d.surface().at(x, left.bottom() - 1) == colors::kBlack);
+    }
+    const Rect trackV = s.partRect(P::TrackV);
+    CHECK(h.d.surface().at(trackV.right() - 1, trackV.y + 3) == colors::kBlack);
+    // The glyph stays whole between the rules: ink above the bottom rule, white under the glyph.
+    bool ink = false;
+    for (int y = left.y + 2; y < left.bottom() - 2; ++y)
+        for (int x = left.x + 2; x < left.right(); ++x) ink = ink || h.d.surface().at(x, y) == colors::kBlack;
+    CHECK(ink);
+    s.setClosed(false);
+    s.setBarSize(13);
+    CHECK(s.barSize() == 13);
+}
+
 TEST_CASE("Scrollbar: repeated arrows, track by pages, dragged thumb, wheel", "[gemui]") {
     HelpPane h(522, 1746);
     ScrollPane& s = h.pane;

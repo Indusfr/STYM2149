@@ -186,7 +186,7 @@ TEST_CASE("Pitch: Digidrum and DMA transpose their sample from its root note", "
                 CHECK(std::fabs(off) < (timer == TimerMode::Mfp ? 0.15 : 0.08));
             }
 
-    // DMA (16 channels, STE): a sine of 96 bytes at 25 033 Hz, root C4; an octave read twice or half as fast.
+    // DMA (32 channels, STE): a sine of 96 bytes at 25 033 Hz, root C4; an octave read twice or half as fast.
     std::vector<int8_t> bytes(9600);
     for (size_t i = 0; i < bytes.size(); ++i)
         bytes[i] = int8_t(std::lround(100 * std::sin(2 * 3.141592653589793 * double(i) / 96)));

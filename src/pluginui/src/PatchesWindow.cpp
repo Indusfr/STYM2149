@@ -57,7 +57,7 @@ void PatchesWindow::wire() {
     // Library files: Import appends the patches of the file at the end (patchLib.push), Export writes the
     // library in the prototype's format.
     import_.onClick = [this] {
-        m_.openFile(plugin::FileKind::Patches, [this](const std::string& text) { importText(text); });
+        m_.openPatchLibrary([this](const std::string& text) { importText(text); });
     };
     export_.onClick = [this] {
         load();
@@ -66,7 +66,7 @@ void PatchesWindow::wire() {
             return;
         }
         refresh();  // the buttons follow the library read again: their indices are those of lib_
-        m_.saveFileAs(plugin::FileKind::Patches, plugin::dumpPatchLibrary(lib_));
+        m_.savePatchLibrary(plugin::dumpPatchLibrary(lib_));
     };
 }
 
@@ -224,6 +224,7 @@ void PatchesWindow::refresh() {
         buttons_.clear();
         for (size_t k = 0; k < lib_.size(); ++k) {
             auto b = std::make_unique<Button>();
+            b->setRaw(true);  // the patch's name, as the user gave it
             b->onClick = [this, k] { loadInto(int(k)); };
             b->onContext = [this, k](gemui::Point) { patchMenu(int(k)); };
             add(*b);

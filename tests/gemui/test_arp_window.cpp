@@ -12,6 +12,7 @@
 
 #include "plugincore/Parameters.h"
 #include "pluginui/MainWindow.h"
+#include "pluginui/SettingsWindow.h"
 #include "ymengine/Pitch.h"
 
 using namespace stym;
@@ -23,6 +24,15 @@ using plugin::Track;
 using ymengine::ArpMode;
 
 namespace {
+
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
 
 class TestHost : public pluginui::Host {
 public:
@@ -62,7 +72,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -92,13 +101,12 @@ void click(MainWindow& w, const std::string& id) {
 // Entry of a menu opened below a button (its frame on the button's bottom rule, or on its top rule above it when it
 // does not fit; 20 px entries inside a 2 px border).
 void pick(MainWindow& w, const std::string& anchor, int entries, int index) {
-    const auto r = w.rectOf(anchor);
-    REQUIRE(r);
+    REQUIRE(w.rectOf(anchor));
     REQUIRE(w.desktop().hasPopups());
-    const int h = 4 + 20 * entries;
-    int top = r->bottom() - 2;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h + 2);
-    press(w, {r->x + 20, top + 2 + 20 * index + 10});
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    CHECK(m->items().size() == size_t(entries));
+    press(w, entryAt(w, index));
     CHECK_FALSE(w.desktop().hasPopups());
 }
 
@@ -160,7 +168,7 @@ TEST_CASE("Arpeggiator: button, Ctrl+B and Edit menu open the window; not applic
     key(w, gemui::Key::Escape);
     w.openMenu(2);  // Edit > Arpeggiator (second entry, below the bar)
     const gemui::Rect edit = *w.rectOf("mEdit");
-    press(w, {edit.x + 20, edit.bottom() + 2 + 20 + 10});
+    press(w, entryAt(w, 1));
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(w.arpeggiator().isOpen());
 
@@ -427,8 +435,8 @@ TEST_CASE("Undo: settings of the main window, one step per gesture on the focuse
     pick(w, "srcSel", 7, 2);
     CHECK(h.track(0, Track::Noise) == 1.0f);
     CHECK(h.editor.undo.undoSize() == 1);
-    // Generator on the keyboard (Ctrl+S: SID).
-    CHECK(ctrl(w, U's'));
+    // Generator on the keyboard (Shift+Ctrl+S: SID).
+    CHECK(ctrl(w, U's', true));
     CHECK(h.track(0, Track::Generator) == float(ymengine::Generator::Sid));
     CHECK(h.editor.undo.undoSize() == 2);
     ctrl(w, U'z');
@@ -447,23 +455,35 @@ TEST_CASE("Undo: settings of the main window, one step per gesture on the focuse
     CHECK(h.track(0, Track::Generator) == float(ymengine::Generator::Sid));
 }
 
-TEST_CASE("MIDI clock: waiting, then SYNC or STOP at each publication", "[ui][clock]") {
+TEST_CASE("MIDI clock: waiting, then SYNC or STOP at each publication, under Clock in Settings",
+          "[ui][clock]") {
     TestHost h;
     MainWindow w(h);
-    CHECK(w.rectOf("clkStatus")->w == 0);
+    pluginui::SettingsWindow& s = w.settingsWindow();
+    s.show();
+    CHECK(w.clockState().empty());
+    CHECK_FALSE(s.rectOf("setClockState"));
     h.values[size_t(paramIndex(Global::ArpClock))] = 1;
     w.tick(0);
-    CHECK(w.rectOf("clkStatus")->w == 20 * 8);  // waiting for clock...
+    CHECK(s.clockState() == "waiting for clock...");
+    // On its own line under the Clock button, at its left, and above MIDI routing.
+    const gemui::Rect clock = *s.rectOf("setMidiClock"), state = *s.rectOf("setClockState");
+    CHECK(state.x == clock.x);
+    CHECK(state.y > clock.bottom());
+    CHECK(s.rectOf("setRouting")->y > state.bottom());
     publish(h, w, [](plugin::EngineStatus& t) { t.seq.clockRunning = true; });
-    CHECK(w.rectOf("clkStatus")->w == 4 * 8);   // SYNC
+    CHECK(s.clockState() == "SYNC");
     publish(h, w, [](plugin::EngineStatus& t) { t.seq.clockRunning = false; });
-    CHECK(w.rectOf("clkStatus")->w == 4 * 8);   // STOP
+    CHECK(s.clockState() == "STOP");
     // Back to the internal clock, then MIDI: the waiting comes back.
     h.values[size_t(paramIndex(Global::ArpClock))] = 0;
     w.tick(0);
+    CHECK(s.clockState().empty());
+    CHECK_FALSE(s.rectOf("setClockState"));
+    CHECK(s.rectOf("setRouting")->y < state.y + 1);  // MIDI routing back under Clock
     h.values[size_t(paramIndex(Global::ArpClock))] = 1;
     w.tick(0);
-    CHECK(w.rectOf("clkStatus")->w == 20 * 8);
+    CHECK(s.clockState() == "waiting for clock...");
 }
 
 TEST_CASE("Arpeggiator: the reopened window gets its place and the table cursor back", "[ui][arp]") {

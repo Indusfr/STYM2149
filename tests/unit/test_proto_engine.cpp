@@ -205,6 +205,7 @@ TEST_CASE("Prototype: VBL frames (ornament, vibrato, Chip ADSR, SID, Sync Buzzer
         p.generator = Generator(int(num("effect")));
         p.sidRatio = num("sidRatio");
         p.volume = uint8_t(num("vol4"));
+        p.vibratoOn = true;  // the prototype's vibrato has no switch
         p.vibratoCents = num("vibDepth");
         p.vibratoHz = num("vibRate");
         p.ornamentOn = num("ornOn") != 0;

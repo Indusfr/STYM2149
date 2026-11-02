@@ -172,17 +172,19 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
     const std::vector<std::string> proto = {"Windows",        "Generator",      "File",
                                             "Transport and edit", "Writing notes", "Sequencer rows",
                                             "Sequencer view", "Song window",    "Mouse"};
-    // Rows of the prototype's HELP; STYM2149 adds one row at the end of Writing notes, and ^D leaves File (the demo
-    // pattern) for the end of Generator (the DMA generator).
-    const std::vector<size_t> rows = {8, 6, 2, 8, 9, 7, 6, 8, 9};
+    // Rows of the prototype's HELP; STYM2149 adds one row at the end of Writing notes, ^D leaves File (the demo
+    // pattern) for the end of Generator (the DMA generator), and Shift + ^F picks FM Voice.
+    const std::vector<size_t> rows = {8, 7, 2, 8, 9, 7, 6, 8, 9};
     for (size_t i = 0; i < proto.size(); ++i) {
         CAPTURE(i);
         CHECK(sections[i].title == proto[i]);
         CHECK(sections[i].rows.size() == rows[i]);
     }
     CHECK(sections[4].rows.back().key == "Alt + click a note");
-    CHECK(sections[1].rows.back().key == "^D");
+    CHECK(sections[1].rows.back().key == "Shift + ^D");  // with Shift
     CHECK(sections[1].rows.back().text == "DMA (STE)");
+    CHECK(sections[1].rows[3].key == "Shift + ^F");  // FM Voice after Sync Buzzer, as in the Edit menu
+    CHECK(sections[1].rows[3].text == "FM Voice");
     CHECK(sections[9].title == "More keys");
     CHECK(sections[9].rows.front().key == "^T");
     CHECK(sections[9].rows[1].key == "^F");  // Effects
@@ -200,18 +202,19 @@ TEST_CASE("Help window: the prototype's nine sections, then STYM2149's keys", "[
     // heading tops, first column 160 px or the longest key plus 10 px, second column wrapped at spaces. The row of
     // File > New, added since at the end of More keys, adds one 18 px row; ^L Sequences, gone with its window,
     // takes one away; ^D, moved from File to Generator, moves the heading of File down one row; ^F
-    // Effects adds one, Tab one more.
+    // Effects adds one, Tab one more, ^A one more, Shift + ^F FM Voice one in
+    // Generator.
     CHECK(l.width == 522);
-    CHECK(l.height == 2182 + 18 - 18 + 18 + 18);
+    CHECK(l.height == 2182 + 18 - 18 + 18 + 18 + 18 + 18);
     std::vector<double> tops;
     for (const HelpWindow::Line& line : l.lines)
         if (line.heading) tops.push_back(line.y);
-    CHECK(tops == std::vector<double>{8, 200, 322 + 18, 408, 600, 906, 1128, 1348, 1524, 1766});
+    CHECK(tops == std::vector<double>{8, 200, 322 + 36, 426, 618, 924, 1146, 1366, 1542, 1784});
     CHECK(l.rules.front() == 24);
     CHECK(rowAt(l, 157) == std::vector<std::string>{"Esc", "close the topmost window, then panic (all"});
     CHECK(rowAt(l, 173) == std::vector<std::string>{"notes off)"});
-    CHECK(rowAt(l, 573) == std::vector<std::string>{"M", "metronome on / off"});
-    CHECK(rowAt(l, 657) == std::vector<std::string>{"Click a note", "resize it to the current Note"});
+    CHECK(rowAt(l, 591) == std::vector<std::string>{"M", "metronome on / off"});
+    CHECK(rowAt(l, 675) == std::vector<std::string>{"Click a note", "resize it to the current Note"});
     for (const HelpWindow::Line& line : l.lines) {
         if (line.text == "Step Sequencer") CHECK(line.x == 168);           // 8 + 160
         if (line.text == "erase it (no menu)") CHECK(line.x == 282);       // 8 + 264 + 10
@@ -226,7 +229,7 @@ TEST_CASE("Help window: scrolled by its bar, reopened where it was left with its
         HelpWindow& help = w.help();
         help.show();
         gemui::ScrollPane& body = help.body();
-        CHECK(body.maxScroll() == gemui::Point{0, 2182 + 18 - 18 + 18 + 18 - 689});
+        CHECK(body.maxScroll() == gemui::Point{0, 2182 + 18 - 18 + 18 + 18 + 18 + 18 - 689});
         // Down arrow at the bottom of the bar: 40 px.
         const Rect down = body.partRect(gemui::ScrollPane::Part::Down);
         press(w, {down.x + 13, down.y + 13});

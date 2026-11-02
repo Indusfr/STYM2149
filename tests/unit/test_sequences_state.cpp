@@ -72,18 +72,18 @@ TEST_CASE("Sequences: TSEQ chunk of the state, written only for the tracks that 
     p.fixedNote = 200;
     p.detuneCents = 500;
     p.analogCents = -3;
-    p.link = 33;
+    p.link = 200;
     p.pitchMatrix = 0xFFFF;
     sanitize(n);
     CHECK(p.rows.period[0] == -127);
     CHECK(p.rows.noise[0] == 31);
     CHECK(p.rows.mix[0] == 8);
-    CHECK(p.rows.gen[0] == 3);
+    CHECK(p.rows.gen[0] == ymengine::kSeqGens - 1);  // FM Voice, the last one
     CHECK(p.rows.fix[0] == 1);
     CHECK(p.fixedNote == 127);
     CHECK(p.detuneCents == 100);
     CHECK(p.analogCents == 0);
-    CHECK(p.link == 32);
+    CHECK(p.link == 127);  // the last instrument
     CHECK(p.pitchMatrix == ymengine::kPitchMatrixAll);
     p.detuneCents = std::numeric_limits<double>::quiet_NaN();
     sanitize(n);

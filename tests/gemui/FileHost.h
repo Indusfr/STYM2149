@@ -15,6 +15,7 @@
 
 #include "gemui/Alert.h"
 #include "plugincore/Parameters.h"
+#include "plugincore/ProjectFiles.h"
 #include "pluginui/MainWindow.h"
 #include "ymio/ByteSink.h"
 
@@ -37,6 +38,16 @@ public:
     uint32_t rate = 0;  // host sample rate (0: unknown)
     Recorder rec;              // register recorder: state given by the test
     plugin::RegisterTake take;  // kept take
+    // YM Player: a tune is a file that starts with "YM3!"; the projects played (File > Play) are kept.
+    struct Played {
+        plugin::ParamValues values{};
+        plugin::NonParamState extras;
+        bool song = false;
+        std::string name;
+    };
+    std::vector<Played> played;
+    std::vector<std::string> ymLoads;
+    YmPlayer ym;
 
     float param(int i) const override { return values[size_t(i)]; }
     void beginGesture(int) override {}
@@ -65,7 +76,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view key, std::string_view fallback) const override {
         const auto it = prefs.find(std::string(key));
         return it == prefs.end() ? std::string(fallback) : it->second;
@@ -76,6 +86,43 @@ public:
     std::string patchLibrary() const override { return patches; }
     void setPatchLibrary(const std::string& json) override { patches = json; }
     uint32_t hostSampleRate() const override { return rate; }
+    std::string loadYm(std::string_view bytes, const std::string& fileName) override {
+        if (bytes.substr(0, 4) != "YM3!") return "Unsupported file";
+        ymLoads.push_back(fileName);
+        ym = {};
+        ym.loaded = true;
+        ym.name = fileName + "  -  YM3!";
+        return {};
+    }
+    std::string playProject(const plugin::ParamValues& v, const plugin::NonParamState& x, bool song,
+                            const std::string& name) override {
+        played.push_back({v, x, song, name});
+        ym = {};
+        ym.loaded = true;
+        ym.name = name;
+        return {};
+    }
+    YmPlayer ymPlayer() const override { return ym; }
+    void ymClose() override { ym = {}; }
+    // Configuration of the standalone application: the project's bytes; the file and the bytes kept.
+    std::string configFile, keptConfig;
+    std::string configuration() const override {
+        const std::vector<uint8_t> b = plugin::encodeNativeFile(plugin::FileKind::Preset, values, state);
+        return {b.begin(), b.end()};
+    }
+    std::string loadConfiguration(std::string_view bytes) override {
+        const plugin::NativeRead r = plugin::readNativeFile(bytes);
+        if (!r.ok || r.kind != plugin::FileKind::Preset) return "refused";
+        values = r.values;
+        state = r.extras;
+        ++serial;
+        return {};
+    }
+    void keepConfiguration(const std::string& path, std::string_view bytes) override {
+        configFile = path;
+        keptConfig = std::string(bytes);
+    }
+    std::string configurationFile() const override { return configFile; }
     Recorder recorder() const override { return rec; }
     plugin::RegisterTake recordedTake() const override { return take; }
 
@@ -161,19 +208,53 @@ inline bool undoKey(pluginui::MainWindow& w, bool redo = false) {
     return w.desktop().keyDown(e);
 }
 
-// Entry of a submenu of the File menu ("Save" > "Preset"), if it is enabled.
+// Entry of a submenu of the File menu ("Save" > "Preset"), if it and its parent are enabled.
 inline void fileMenu(pluginui::MainWindow& w, const std::string& entry, const std::string& sub) {
     w.openMenu(1);
     const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
     REQUIRE(list);
     std::function<void()> pick;
     for (const gemui::MenuItem& m : list->items())
-        if (m.label == entry)
+        if (m.label == entry && !m.disabled)
             for (const gemui::MenuItem& s : m.sub)
                 if (s.label == sub && !s.disabled) pick = s.pick;
     w.desktop().closePopups();
     REQUIRE(pick);
     pick();
+}
+
+// Entry at the end of a path of File menu entries ({"Export song", "WAV"}, {"Play..."}), if it and
+// its parents are enabled.
+inline void fileMenuPath(pluginui::MainWindow& w, const std::vector<std::string>& path) {
+    w.openMenu(1);
+    const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(list);
+    const std::vector<gemui::MenuItem>* items = &list->items();
+    std::function<void()> pick;
+    for (size_t k = 0; k < path.size(); ++k) {
+        const gemui::MenuItem* found = nullptr;
+        for (const gemui::MenuItem& m : *items)
+            if (m.label == path[k] && !m.disabled) found = &m;
+        if (!found) break;
+        if (k + 1 == path.size()) pick = found->pick;
+        items = &found->sub;
+    }
+    w.desktop().closePopups();
+    REQUIRE(pick);
+    pick();
+}
+
+// Entry of the File menu, as built when the menu opens ("Export song"); the menu is closed again.
+inline gemui::MenuItem fileEntry(pluginui::MainWindow& w, const std::string& entry) {
+    w.openMenu(1);
+    const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(list);
+    gemui::MenuItem out;
+    for (const gemui::MenuItem& m : list->items())
+        if (m.label == entry) out = m;
+    w.desktop().closePopups();
+    REQUIRE(out.label == entry);
+    return out;
 }
 
 inline gemui::Alert* topAlert(pluginui::MainWindow& w) {
@@ -192,6 +273,17 @@ inline void pressKey(pluginui::MainWindow& w, gemui::Key k) {
 }
 
 inline void dismiss(pluginui::MainWindow& w) { pressKey(w, gemui::Key::Enter); }
+
+// Clicks button `index` of the open GEM box.
+inline void alertButton(pluginui::MainWindow& w, size_t index) {
+    const gemui::Alert* a = topAlert(w);
+    REQUIRE(a);
+    REQUIRE(index < a->buttonCount());
+    const gemui::Point at = centre(a->button(index).bounds());
+    w.desktop().mouseMove(at, {});
+    w.desktop().mouseDown(at, gemui::MouseButton::Left, {});
+    w.desktop().mouseUp(at, {});
+}
 
 // Lets the worker thread of an export finish, editor ticks included.
 inline void waitExport(pluginui::MainWindow& w, double& now) {

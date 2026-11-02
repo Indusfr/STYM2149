@@ -5,18 +5,21 @@
 //
 // A STYM2149 addition (the prototype has none), opened by Options > Settings. It gathers what the Options menu held in
 // submenus: Sound engine (Computer, Chip clock, Output chain, Resampling, STE bass and treble, Soft clip, Timer,
-// Quantize to VBL), with the Tuning of A4 after the clock, its MIDI entries (MIDI routing, Velocity, Bend
-// range, Wheel depth), with the MIDI expression (the targets of the bend, the wheel and the aftertouch, MPE,
-// its bend range and the target of its CC74), and Pixels, Renderer, Note names, Keyboard layout and Tooltips (On /
-// Off, Language and the Languages folder). Three frames side by side: SOUND ENGINE, MIDI and INTERFACE. Each setting
-// is a label and a menu button that shows its value; the menu lists the values with the current one checked, and
-// greys out those that do not apply, as the submenus did. Tuning A4 is a value typed in Hz.
-// Under the frames, Cancel, the default button with its bold border, and OK (Indus, 25/10/2026 21:50): a
-// setting applies as soon as it is picked, so that it is heard; OK keeps the changes and closes the window, Cancel
-// puts back the settings changed in the window since it opened, then closes it, as the close box and Escape do.
-// When a setting then differs from its value at the opening, Cancel first asks in a GEM box whether the changes may
-// be lost (Indus, 26/10/2026 03:51). The VBL frequency left the Options menu for SOUND ENGINE, before Quantize
-// to VBL (Indus, 26/10/2026 04:03).
+// Quantize to VBL), with the Tuning of A4 after the clock and the RAM of the Atari after Computer (from the
+// Digidrums and DMA windows, Indus, 30/10/2026 02:49), its MIDI entries (MIDI routing, Velocity, Bend
+// range, Wheel depth), with the MIDI expression (the targets of the bend, the wheel and the aftertouch, MPE, its
+// bend range and the target of its CC74), and Pixels, Renderer, Note names, Keyboard layout, the Interface language
+// (Indus, 28/10/2026 03:06) and Tooltips (On / Off, Tooltip language and the Languages folder). The Clock of the
+// SYSTEM frame, Internal or MIDI ext, opens the MIDI frame, with the state of the MIDI clock under it while it follows
+// one (Indus, 29/10/2026 19:46). Three frames side by side: SOUND ENGINE, MIDI and INTERFACE. Each setting is a
+// label and a menu button that shows its value; the menu lists the values with the current one checked, and greys out
+// those that do not apply, as the submenus did. Tuning A4 is a value typed in Hz. Under the
+// frames, Cancel, the default button with its bold border, and OK (Indus, 25/10/2026 21:50): a setting applies
+// as soon as it is picked, so that it is heard; OK keeps the changes and closes the window, Cancel puts back the
+// settings changed in the window since it opened, then closes it, as the close box and Escape do. When a setting then
+// differs from its value at the opening, Cancel first asks in a GEM box whether the changes may be lost (Indus,
+// 26/10/2026 03:51). The VBL frequency left the Options menu for SOUND ENGINE, before Quantize to VBL (Indus,
+// 26/10/2026 04:03).
 #pragma once
 #include <array>
 #include <optional>
@@ -55,21 +58,33 @@ public:
     bool dialogKey(const gemui::KeyEvent& e);
     // Shows the values again (called by MainWindow::refresh, and after a preference is picked).
     void refresh();
+    // The state of the MIDI clock under Clock (MainWindow::clockState): "waiting for clock...", SYNC or STOP with
+    // MIDI ext, nothing with Internal. Called when the engine status changes it.
+    void refreshClock();
 
-    // Ids of the settings with a menu button, in the window's order: "setComputer", "setClock", "setChain",
-    // "setResampling", "setBass", "setTreble", "setSoftClip", "setTimer", "setQuantize", "setRouting", "setVelocity",
-    // "setBendTarget", "setBend", "setWheelTarget", "setWheel", "setAftertouch", "setMpe", "setMpeBend", "setMpeSlide",
-    // "setPixels", "setRenderer", "setNoteNames", "setLayout", "setTips", "setLanguage".
+    // Ids of the settings with a menu button, in the window's order: "setComputer", "setRam", "setClock",
+    // "setChain",
+    // "setResampling", "setBass", "setTreble", "setSoftClip", "setTimer", "setQuantize", "setMidiClock",
+    // "setRouting", "setVelocity",
+    // "setVelocityCurve", "setBendTarget", "setBend", "setWheelTarget", "setWheel", "setAftertouch",
+    // "setAftertouchCurve", "setMpe", "setMpeBend", "setMpeSlide",
+    // "setDrumPads", "setPixels", "setRenderer", "setNoteNames", "setLayout", "setMidiLines", "setInfoDemo",
+    // "setUiLanguage", "setTips",
+    // "setLanguage" (the tooltip language).
     static std::vector<std::string_view> menuIds();
     // Label of a setting by its id ("Chip clock"); "setA4" is the Tuning A4 field.
     static std::string_view labelOf(std::string_view id) noexcept;
-    // Rectangle of a control (captures, tests): "settingsWin", the ids above, "setA4", "setFolder", the frames
-    // "setEngine", "setMidi", "setInterface", and the buttons "setCancel" and "setOk".
+    // Rectangle of a control (captures, tests): "settingsWin", the ids above, "setA4", "setFolder", "setClockState"
+    // (the state of the MIDI clock, while shown), the frames "setEngine", "setMidi", "setInterface", and the buttons
+    // "setCancel" and "setOk".
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     // Menu button of a setting (tests): its click opens the menu of the values, under it; also "setFolder",
     // "setCancel" and "setOk".
     const gemui::Button* button(std::string_view id) const noexcept;
     const gemui::ValueField& tuningField() const noexcept { return a4v_; }
+    std::string clockState() const { return clockState_.visible() ? clockState_.text() : std::string(); }
+    // Label shown in front of a setting ("Tuning La4" with the Latin note names); empty for an unknown id.
+    const std::string& shownLabel(std::string_view id) const noexcept;
     // The entries of a setting's menu and the checked one (-1: none), as its button opens them.
     std::vector<gemui::MenuItem> items(std::string_view id, int& checked);
 
@@ -79,10 +94,11 @@ public:
 
 private:
     enum Row : int {
-        kComputer, kClock, kA4, kChain, kResampling, kBass, kTreble, kSoftClip, kTimer, kVbl, kQuantize,  // ENGINE
-        kRouting, kVelocity, kBendTarget, kBend, kWheelTarget, kWheel, kAftertouch, kMpe, kMpeBend,  // MIDI
-        kMpeSlide,
-        kPixels, kRenderer, kNoteNames, kLayout, kTips, kLanguage,                                   // INTERFACE
+        kComputer, kRam, kClock, kA4, kChain, kResampling, kBass, kTreble, kSoftClip, kTimer, kVbl,  // ENGINE
+        kQuantize,
+        kMidiClock, kRouting, kVelocity, kVelocityCurve, kBendTarget, kBend, kWheelTarget, kWheel, kAftertouch,  // MIDI
+        kAftertouchCurve, kMpe, kMpeBend, kMpeSlide, kDrumPads,
+        kPixels, kRenderer, kNoteNames, kLayout, kMidiLines, kInfoDemo, kUiLanguage, kTips, kLanguage,  // INTERFACE
         kRows
     };
 
@@ -99,7 +115,8 @@ private:
     // The entries of a row's menu, each pick noting first the value the row had.
     std::vector<gemui::MenuItem> notedItems(int row, int& checked);
     // Value of a row before the window first changed it since it opened: its host parameters (index and
-    // plain value), or the text of its preference (the tooltip language included), or Quantize to VBL / Tooltips.
+    // plain value), or the text of its preference (the languages included) or of the RAM, or Quantize to VBL /
+    // Tooltips.
     struct Saved {
         std::vector<std::pair<int, float>> params;
         std::string text;
@@ -114,6 +131,7 @@ private:
     std::array<gemui::Label, kRows> labs_;
     std::array<gemui::Button, kRows> btns_;  // kA4 has the field a4v_ instead; its button stays out of the window
     gemui::ValueField a4v_;
+    gemui::Label clockState_;  // under Clock with MIDI ext
     gemui::Button folder_{"Languages folder..."};
     gemui::Button cancel_{"Cancel", gemui::Button::Style::Default}, ok_{"OK"};
     std::array<std::optional<Saved>, kRows> saved_;

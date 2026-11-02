@@ -8,6 +8,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Png.h"
@@ -83,7 +84,8 @@ struct Shot {
     std::string alt;
     double altVeil = 0;
 };
-Shot renderScene(const std::string& name);
+// `prefs`: preferences set after the scene's own (gemshot --pref uiLanguage=fr renders the scenes in French).
+Shot renderScene(const std::string& name, const std::vector<std::pair<std::string, std::string>>& prefs = {});
 
 // Capture of Shot::alt as the scene shows that window: under the veil of its alert.
 tools::Image altCapture(const Shot& shot, const tools::Image& capture);

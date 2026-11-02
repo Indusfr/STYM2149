@@ -12,7 +12,7 @@ namespace stym::gemui {
 // The children are owned elsewhere: they stay alive, without a parent, until their owner destroys them.
 Widget::~Widget() {
     if (Desktop* d = desktop()) {
-        d->invalidate(bounds_);
+        d->invalidate(drawnBounds());
         d->forget(this);
     }
     for (Widget* c : children_) c->parent_ = nullptr;
@@ -56,7 +56,7 @@ void Widget::setVisible(bool v) {
     if (v == visible_) return;
     visible_ = v;
     if (Desktop* d = desktop()) {
-        d->invalidate(bounds_);
+        d->invalidate(drawnBounds());
         // A hidden widget keeps neither the hover, the press nor the focus (nor do its descendants: forget goes up).
         if (!v) {
             d->release(this);
@@ -126,10 +126,17 @@ Desktop* Widget::desktop() const noexcept {
     return w->owner_;
 }
 
-void Widget::repaint() noexcept { repaint(bounds_); }
+void Widget::repaint() noexcept { repaint(drawnBounds()); }
+
+void Widget::setOverhang(int px) {
+    if (px == overhang_) return;
+    repaint();
+    overhang_ = px;
+    repaint();
+}
 
 Rect Widget::extent() const noexcept {
-    Rect r = bounds_;
+    Rect r = drawnBounds();
     if (clipsChildren()) return r;
     for (const Widget* c : children_)
         if (c->visible_) r = r.unite(c->extent());

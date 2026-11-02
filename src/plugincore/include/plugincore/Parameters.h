@@ -30,8 +30,8 @@ enum class ParamScale : uint8_t { Linear, Log };
 // Global settings.
 enum class Global : uint8_t {
     Master,       // main level, 0-100 % (GLOB.master × 100)
-    VoiceMode,    // 16 ch / Authentic 3ch / Dual chip 2x3ch
-    ChipClock,    // chip clock: Custom (ChipClockHz, 16 ch only) or a preset of ChipConfig.h
+    VoiceMode,    // 16 ch / Authentic 3ch / Dual chip 2x3ch / 32 ch
+    ChipClock,    // chip clock: Custom (ChipClockHz, 16 and 32 ch only) or a preset of ChipConfig.h
     OutputChain,  // output chain Raw / ST / STE
     Resampling,   // conversion to the host rate: sinc, AtariAudio averaging, Retro
     SteBass,      // bass of the LMC1992, -12 to +12 dB in steps of 2
@@ -51,12 +51,12 @@ enum class Global : uint8_t {
     Gate,         // global gate, 5-95 % of the step (Indus's request)
     GateAll,      // global gate played by all tracks instead of their own
     Computer,     // ST / STE machine: STE DMA sound
-    ChipClockHz,  // frequency of the Custom chip clock, played in 16 ch only (fourth DAW test)
+    ChipClockHz,  // frequency of the Custom chip clock, played in 16 and 32 ch only (fourth DAW test)
     ArpSync,      // arpeggio cadence: Rate in Hz, or a division of the tempo (sixth DAW test)
     Master2,      // with MasterLink off, 0-100 %: the right output, or chip 2 in 2x3 ch (seventh DAW test)
     MasterPan,    // balance of the outputs, -100 (left only) to +100 (right only)
     MasterLink,   // Master sets both; off: Master the left output (chip 1), Master2 the right one (chip 2)
-    // Audio delay, fed by the Send of each track; 16 ch only (eighth DAW test).
+    // Audio delay, fed by the Send of each track; 16 and 32 ch only (eighth DAW test).
     DelayOn,
     DelaySync,      // time in ms, or a division of the tempo
     DelayDivision,  // kDelayDivisionBeats
@@ -66,14 +66,19 @@ enum class Global : uint8_t {
     DelayLevel,     // level of the echoes, 0-100 %
     DelayPingPong,  // echoes alternately left and right (stereo outputs)
     A4Hz,           // frequency of A4, from which every note is tuned (Tuning A4)
-    // MIDI expression: what the bend, the wheel and the aftertouch drive; MPE in 16 ch (lower zone: channel 1
-    // the master, 2 to 16 a note each), with the bend range of its notes and what their CC74 drives.
+    // MIDI expression: what the bend, the wheel and the aftertouch drive; MPE in 16 and 32 ch (lower zone:
+    // channel 1 the master, 2 to 16 a note each), with the bend range of its notes and what their CC74 drives.
     BendTarget,     // Pitch / Volume / Envelope
     WheelTarget,    // Off / Vibrato / Volume / Envelope / LFO
     Aftertouch,     // the targets of the wheel, for the channel and polyphonic pressure
     Mpe,
     MpeBendRange,   // semitones
     MpeSlide,       // Volume / Envelope / Vibrato
+    DrumPads,       // MIDI channel of the drum pads: Off or 1-16, 10 by default
+    // Curves of the velocity and of the aftertouch of a MIDI controller: Linear / Soft / Hard / S-curve.
+    VelocityCurve,
+    AftertouchCurve,
+    MasterMono,  // the stereo outputs mixed to mono, one Master fader (Indus, 30/10/2026 03:49-03:55)
     Count
 };
 
@@ -89,13 +94,15 @@ enum class Track : uint8_t {
     Gate,  // length of a one-step note, 5-95 % of the step (Gate slider of the prototype, CH[].gate)
     VibOn,  // vibrato On/Off (sixth DAW test)
     Send,   // send to the delay, 0-100 %, after the fader and the pan (eighth DAW test)
-    // Right side of a stereo DMA sample: its fader (without Link), mute and solo; Link: Level for both sides.
+    // Right side of a stereo DMA sample, then of every DMA track (the other generators are
+    // mono): its fader (without Link), mute and solo; Link: Level for both sides.
     LevelR, MuteR, SoloR, Link,
+    Mono,  // one fader, mute and solo for both sides, those of a stereo DMA sample mixed
     Count
 };
 
-// Settings of the Mixer alone (pan, mute, solo, send, the right side of a stereo DMA sample): neither in patches nor in
-// the undo step of a channel, not copied with a track. The Level is the track's (patches, Copy).
+// Settings of the Mixer alone (pan, mute, solo, send, the right side of a stereo track, Mono): neither in patches
+// nor in the undo step of a channel, not copied with a track. The Level is the track's (patches, Copy).
 constexpr bool mixerOnly(Track f) noexcept {
     switch (f) {
     case Track::Pan:
@@ -105,7 +112,8 @@ constexpr bool mixerOnly(Track f) noexcept {
     case Track::LevelR:
     case Track::MuteR:
     case Track::SoloR:
-    case Track::Link: return true;
+    case Track::Link:
+    case Track::Mono: return true;
     default: return false;
     }
 }

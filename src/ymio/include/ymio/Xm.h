@@ -31,6 +31,9 @@ struct XmCell {
     uint8_t volume = 0;      // volume column (0x10-0x50: volume 0-64; beyond, effects)
     uint8_t effect = 0;      // 0-35 (0-9, then A = 10 … Z = 35)
     uint8_t param = 0;
+    // An effect of the module's own format (an S3M or OKT module) that has no XM effect the import
+    // renders: 1 + its index into XmModule::foreignEffects, the effect column then empty; 0: none.
+    uint8_t foreign = 0;
     bool operator==(const XmCell&) const = default;
 };
 
@@ -72,10 +75,32 @@ struct XmModule {
     bool linear = true;  // linear frequency table (otherwise Amiga)
     int tempo = 6;       // ticks per row
     int bpm = 125;       // tick rate: a tick lasts 2.5 / bpm seconds
+    // Rate of the C-4 of a sample without relative note or fine tune: 8363 Hz in an XM; in a MOD (ymio/Mod.h), the
+    // Amiga PAL rate of period 428.
+    double c4Hz = 8363;
+    // Pan of each channel at the start, 0-255 (a MOD: the Amiga's L R R L); empty: 128 for all. In an XM an instrument
+    // sets the pan of its sample; a MOD has no sample pan (samplePanning false), the channel keeps its own.
+    std::vector<uint8_t> channelPan;
+    bool samplePanning = true;
     std::vector<uint8_t> order;  // order table (song length)
     std::vector<XmPattern> patterns;
     std::vector<XmInstrument> instruments;
     bool truncatedSamples = false;  // sample data cut by the end of the file
+    // Names of the effects of the module's own format kept out of the XM shape ("Exx", "S1x"…), counted by the import
+    // with that name where they are played (XmCell::foreign), and lines the reader adds to the import's alert (AdLib
+    // instruments of an S3M module…).
+    std::vector<std::string> foreignEffects;
+    std::vector<std::string> notes;
+
+    // The XmCell::foreign value of an effect of the module's format, its name added on first use (255 names at most;
+    // beyond, 0).
+    uint8_t foreignEffect(const std::string& effect) {
+        for (size_t i = 0; i < foreignEffects.size(); ++i)
+            if (foreignEffects[i] == effect) return uint8_t(i + 1);
+        if (foreignEffects.size() >= 255) return 0;
+        foreignEffects.push_back(effect);
+        return uint8_t(foreignEffects.size());
+    }
 
     const XmCell& cell(int pattern, int row, int channel) const {
         return patterns[size_t(pattern)].cells[size_t(row * channels + channel)];

@@ -36,18 +36,18 @@ public:
     };
     using Entries = std::array<Entry, ymengine::kSeqCmdKinds>;  // index: kind - 1
     // Rows on screen, in the order of the tenth DAW test (items 122 and 130): the kinds of the CMD row
-    // (ymengine::seqCmdInBox).
-    static constexpr std::array<ymengine::SeqCmd, 5> kOrder = {ymengine::SeqCmd::Speed, ymengine::SeqCmd::Sync,
-                                                               ymengine::SeqCmd::VolSlide, ymengine::SeqCmd::EnvSlide,
+    // (ymengine::seqCmdInBox; Sxx has the TIK row).
+    static constexpr std::array<ymengine::SeqCmd, 4> kOrder = {ymengine::SeqCmd::Sync, ymengine::SeqCmd::VolSlide,
+                                                               ymengine::SeqCmd::EnvSlide,
                                                                ymengine::SeqCmd::NoiseSlide};
     struct Spec {
         int step = 0;  // shown from 1
         Entries entries{};
         // Rows of kOrder in the box: a slide that cannot act from the step is left out; its entry stays as
         // the step has it.
-        std::array<bool, kOrder.size()> shown = {true, true, true, true, true};
-        // 16 channels: the Buzzer and Noise slides take a curve; OK then sets their EnvCurve and NoiseCurve
-        // entries (on with a shape other than Linear and the slide on).
+        std::array<bool, kOrder.size()> shown = {true, true, true, true};
+        // 16 and 32 channels: the Buzzer and Noise slides take a curve; OK then sets their EnvCurve and
+        // NoiseCurve entries (on with a shape other than Linear and the slide on).
         bool curves = false;
         std::function<void(const Entries&)> ok;
     };
@@ -90,7 +90,7 @@ private:
     void change(ymengine::SeqCmd k, int value);
     // A slide's speed (0-15) in its row's direction.
     void changeSpeed(ymengine::SeqCmd k, int speed);
-    // The Curve menu of a slide (16 channels), under its button.
+    // The Curve menu of a slide (16 and 32 channels), under its button.
     void curveMenu(ymengine::SeqCmd k);
     bool hasCurve(ymengine::SeqCmd k) const noexcept {
         return spec_.curves && ymengine::seqSlideCurve(k) != ymengine::SeqCmd::None;

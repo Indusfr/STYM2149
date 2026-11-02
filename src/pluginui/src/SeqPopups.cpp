@@ -97,12 +97,51 @@ public:
         int fallback = 0;  // value of the slider when the field cannot be read
         // Right button (Set, with the text entered) or left button (Channel, Center, Global: chan = true).
         std::function<void(bool chan, const std::string& text)> apply;
+        // A toggle on the left of the buttons' row, acting at once (Fade of the Note cut box); none if empty.
+        std::string toggle, toggleTip;
+        bool toggleOn = false, toggleEnabled = true;
+        std::function<void(bool on)> onToggle;
+        // A value after the toggle, acting at once and greyed while the toggle is off (length of the Fade);
+        // none if its mask is empty.
+        std::string toggleMask, toggleValueTip;
+        int toggleMin = 0, toggleMax = 0, toggleValue = 0;
+        std::function<void(int v)> onToggleValue;
     };
 
     ValuePopup(Spec spec, const Rect& anchor, int deskW) : spec_(std::move(spec)), title_(spec_.title, 16) {
         for (gemui::Widget* w : std::initializer_list<gemui::Widget*>{&title_, &range_, &field_, &chan_, &set_})
             add(*w);
         if (!spec_.suffix.empty()) add(suffix_);
+        const bool toggle = !spec_.toggle.empty();
+        if (toggle) {
+            add(toggle_);
+            toggle_.setText(spec_.toggle);
+            toggle_.setOn(spec_.toggleOn);
+            toggle_.setEnabled(spec_.toggleEnabled);
+            toggle_.setTip(spec_.toggleTip);
+            toggle_.onClick = [this] {
+                toggle_.setOn(!toggle_.on());
+                tvalue_.setDim(!toggle_.on());
+                if (spec_.onToggle) spec_.onToggle(toggle_.on());
+            };
+        }
+        const bool tvalue = toggle && !spec_.toggleMask.empty();
+        if (tvalue) {
+            add(tvalue_);
+            tvalue_.setMinChars(int(spec_.toggleMask.size()));
+            tvalue_.setMask(spec_.toggleMask);
+            tvalue_.setText(std::to_string(spec_.toggleValue) + unitOf(spec_.toggleMask));
+            tvalue_.setTip(spec_.toggleValueTip);
+            tvalue_.setDim(!spec_.toggleEnabled || !spec_.toggleOn);
+            tvalue_.onCommit = [this](const std::string& t) {
+                const auto v = gemui::typedNumber(t);
+                if (!v) return false;
+                const int n = std::clamp(int(std::lround(*v)), spec_.toggleMin, spec_.toggleMax);
+                tvalue_.setText(std::to_string(n) + unitOf(spec_.toggleMask));
+                if (spec_.onToggleValue) spec_.onToggleValue(n);
+                return true;
+            };
+        }
         title_.setTip(spec_.titleTip);
         range_.setRange(spec_.min, spec_.max, 1);
         range_.setValue(spec_.value);
@@ -129,7 +168,9 @@ public:
         const double sufW = spec_.suffix.empty() ? 0 : Font::width(spec_.suffix, 16);
         const double rowW = 150 + sp + spec_.textW + sufW;
         const double bw = chan_.naturalWidth() + sp + set_.naturalWidth();
-        const double content = std::max({rowW, title_.naturalWidth(), bw});
+        const double vw = tvalue ? tvalue_.naturalWidth() + sp : 0;
+        const double tw = toggle ? toggle_.naturalWidth() + vw + 2 * sp : 0;
+        const double content = std::max({rowW, title_.naturalWidth(), tw + bw});
         const double w = content + 16 + 4;
         const double x = std::max(4.0, std::min(double(anchor.x), double(deskW - 220)));
         const double y = anchor.bottom() + 2;
@@ -148,6 +189,9 @@ public:
         const double bh = set_.naturalHeight();
         set_.setBox({x0 + content - set_.naturalWidth(), y0, set_.naturalWidth(), bh});
         chan_.setBox({x0 + content - bw, y0, chan_.naturalWidth(), bh});
+        if (toggle) toggle_.setBox({x0, y0, toggle_.naturalWidth(), bh});
+        if (tvalue)
+            tvalue_.setBox({x0 + toggle_.naturalWidth() + sp, y0 + (bh - lh) / 2, tvalue_.naturalWidth(), lh});
         y0 += bh;
         setBox({x, y, w, y0 + 10 - y});
     }
@@ -161,12 +205,19 @@ private:
         if (apply) apply(chan, text);
     }
 
+    // The unit after the digits of a mask ("999 ms": " ms").
+    static std::string unitOf(const std::string& mask) {
+        const size_t e = mask.find_last_of("9.");
+        return e == std::string::npos ? std::string() : mask.substr(e + 1);
+    }
+
     Spec spec_;
     Text title_;
     Slider range_;
     gemui::TextField field_;
     Text suffix_{"", 16};
-    Button chan_, set_;
+    Button chan_, set_, toggle_;
+    gemui::ValueField tvalue_;
 };
 
 // Slider that a right click sets back (sixth DAW test, item 75).
@@ -322,11 +373,13 @@ bool SeqWindow::openStepSound(SeqLane row, int s) {
     const size_t k = size_t(s);
     using Kind = StepSoundWindow::Kind;
     switch (row) {
-    case SeqLane::Fx:
+    case SeqLane::Fx: {
         if (!l.fx[k]) return false;
         desk().closePopups();
-        m_.stepWin_.openFor(Kind::Generator, s, ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))]);
+        const int fx = std::min<int>(l.fx[k], ymengine::kSeqFxMax);
+        m_.stepWin_.openFor(Kind::Generator, s, ymengine::kSeqFxGen[size_t(fx)]);
         return true;
+    }
     case SeqLane::Mix:
         if (!l.mix[k]) return false;
         desk().closePopups();
@@ -394,9 +447,10 @@ void SeqWindow::openPan(const Rect& cell, int s) {
 void SeqWindow::openCmdValue(Rect cell, int s, ymengine::SeqCmd k) {
     // Rows of their own of the eleventh and twelfth DAW tests: DLY (Dxx, a tick of the line from 1, item 139),
     // CUT (Cxx, a tick of the line from 0, item 140), the restart tick of ENV (Rxx, from 0, item 146),
-    // SMP (Oxx, item 152) and TUN (Fxx in signed cents, item 153). The slider of the ticks spans the
-    // line at the current tempo; a tick typed beyond it is kept (the engine ignores it while the line is shorter).
-    // None takes the command out of the step.
+    // SMP (Oxx, item 152), TUN (Fxx in signed cents, item 153) and TIK (Sxx, the ticks of a line, out of
+    // the CMD row). The slider of the ticks spans the line at the current tempo, and a tick typed beyond it is
+    // brought back to the last one, as the slider (Indus, 30/10/2026 03:37). None takes the command out of the
+    // step. The Note cut box has Fade, the 5 ms fade of every CUT in 16 and 32 channels.
     using ymengine::SeqCmd;
     desk().closePopups();
     const uint16_t cur0 = lane().cmdAt(k, s);
@@ -409,6 +463,14 @@ void SeqWindow::openCmdValue(Rect cell, int s, ymengine::SeqCmd k) {
         spec.titleTip = "The DMA sample of this step starts this far in, in steps of 256 frames";
         spec.min = 0;
         spec.max = 255;
+        break;
+    case SeqCmd::Speed:
+        spec.title = "Ticks per line";
+        spec.titleTip = "Replay ticks of each line from this step on, for every track (Ticks timing)";
+        spec.min = 1;
+        spec.max = ymengine::kSpeedMax;
+        start = std::clamp(int(st().global.speed), 1, ymengine::kSpeedMax);
+        hi = ymengine::kSpeedMax;
         break;
     case SeqCmd::Fine:
         spec.title = "Fine tune";
@@ -426,6 +488,26 @@ void SeqWindow::openCmdValue(Rect cell, int s, ymengine::SeqCmd k) {
         spec.min = k == SeqCmd::Delay ? 1 : 0;
         spec.max = std::clamp(lineTicks() - 1, spec.min, 255);
         start = lineTicks() / 2;
+        hi = spec.max;
+        if (k == SeqCmd::Cut) {
+            spec.toggle = "Fade";
+            spec.toggleOn = st().global.cutFade;
+            spec.toggleEnabled = !m_.mode3();
+            spec.toggleTip = !m_.mode3() ? "Fade: every CUT of the project fades out, without a click"
+                                         : "Fade: 16 and 32 ch only (3ch and 2x3ch cut as an Atari does)";
+            spec.onToggle = [this](bool on) {
+                edit([on](plugin::NonParamState& g) { g.global.cutFade = on; });
+            };
+            // Length of the fade, 5 ms by default (Indus, 01/11/2026 11:26).
+            spec.toggleMask = "999 ms";
+            spec.toggleMin = 1;
+            spec.toggleMax = ymengine::kCutFadeMsMax;
+            spec.toggleValue = st().global.cutFadeMs;
+            spec.toggleValueTip = "Length of the fade of every CUT, in milliseconds (1 to 100, 5 by default)";
+            spec.onToggleValue = [this](int ms) {
+                edit([ms](plugin::NonParamState& g) { g.global.cutFadeMs = uint8_t(ms); });
+            };
+        }
         break;
     }
     }

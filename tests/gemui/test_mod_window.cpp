@@ -20,6 +20,15 @@ using plugin::Track;
 
 namespace {
 
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
+
 class TestHost : public pluginui::Host {
 public:
     plugin::ParamValues values = plugin::defaultValues();
@@ -50,7 +59,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -117,13 +125,12 @@ void type(MainWindow& w, const std::string& id, const std::string& text) {
 }
 
 void pick(MainWindow& w, const std::string& anchor, int entries, int index) {
-    const auto r = w.rectOf(anchor);
-    REQUIRE(r);
+    REQUIRE(w.rectOf(anchor));
     REQUIRE(w.desktop().hasPopups());
-    const int h = 4 + 20 * entries;
-    int top = r->bottom() - 2;
-    if (top + h > MainWindow::kHeight - 4) top = std::max(4, r->y - h + 2);
-    press(w, {r->x + 20, top + 2 + 20 * index + 10});
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    CHECK(m->items().size() == size_t(entries));
+    press(w, entryAt(w, index));
     CHECK_FALSE(w.desktop().hasPopups());
 }
 
@@ -140,11 +147,12 @@ TEST_CASE("Modulation: button, Ctrl+R and Edit menu open the window; not applica
     CHECK_FALSE(w.desktop().hasModal());  // no more "not available yet" alert
     CHECK(w.modulation().titleBar().title() == "MODULATION - 1");
     // Off: the row, controls disabled, at (140, 140); the place of the On button (boxes of the prototype). Below it,
-    // the settings of the sequences, 152 px high, 724 px wide: the slider of the row takes that width; then
-    // the LFO, off: 42 px high, its label and button only.
+    // the settings of the sequences, 152 px high, 724 px wide: the slider of the row takes that width, and
+    // the line of the instrument's name under them (18 px); then the LFO, off: 42 px high, its label
+    // and button only.
     CHECK(w.rectOf("ornWin")->x == 140);
     CHECK(w.rectOf("ornWin")->y == 140);
-    CHECK(w.rectOf("ornWin")->h == 78 + 152 + 42);
+    CHECK(w.rectOf("ornWin")->h == 78 + 152 + 18 + 42);
     CHECK(w.rectOf("ornOn")->x == 154);
     CHECK(w.rectOf("ornOn")->y == 180);
     CHECK(w.rectOf("ornLen")->w > 110);
@@ -160,7 +168,7 @@ TEST_CASE("Modulation: button, Ctrl+R and Edit menu open the window; not applica
     key(w, gemui::Key::Escape);
     w.openMenu(2);  // Edit > Modulation (fifth entry, below the bar)
     const gemui::Rect edit = *w.rectOf("mEdit");
-    press(w, {edit.x + 20, edit.bottom() + 2 + 4 * 20 + 10});
+    press(w, entryAt(w, 4));
     CHECK_FALSE(w.desktop().hasPopups());
     CHECK(w.modulation().isOpen());
 
@@ -182,9 +190,10 @@ TEST_CASE("Modulation: on/off, length, Loop / Hold, rate, Clear", "[ui][orn]") {
     CHECK(h.patch().ornamentOn);
     // On: the notes and the grid; window as wide as the notes (131 characters of 6 px). The notes of the sequence
     // rows join the table's, three lines; the rows are inside the table, between the pitch rows and NSE / VOL
-    // (438 px). Below, the settings (152 px) and the LFO, off (42 px).
+    // (438 px). Below, the settings (152 px), the instrument's name (18 px) and the LFO, off
+    // (42 px).
     CHECK(OrnGrid::kHeight == 438);
-    CHECK(w.rectOf("ornWin") == gemui::Rect{140, 140, 814, 124 + 438 + 14 + 152 + 42});
+    CHECK(w.rectOf("ornWin") == gemui::Rect{140, 140, 814, 124 + 438 + 14 + 152 + 18 + 42});
     CHECK(w.rectOf("orngrid") == gemui::Rect{154, 264, OrnGrid::kWidth, OrnGrid::kHeight});
     CHECK(w.rectOf("ornLen")->w > 110);  // flex:1: the track takes the space
 
@@ -211,6 +220,36 @@ TEST_CASE("Modulation: on/off, length, Loop / Hold, rate, Clear", "[ui][orn]") {
     click(w, "ornOn");
     CHECK_FALSE(h.patch().ornamentOn);
     CHECK_FALSE(w.rectOf("orngrid"));
+}
+
+TEST_CASE("Modulation: the Track button under the pitch matrix chooses the track edited", "[ui][orn]") {
+    // Indus, 29/10/2026 10:54: in the middle zone, a Track button like the Step Sequencer's.
+    TestHost h;
+    MainWindow w(h);
+    w.modulation().show();
+    const auto track = w.rectOf("ornTrack"), write = w.rectOf("seqxVibWrite"), mx = w.rectOf("seqxMx6");
+    REQUIRE(track);
+    REQUIRE(write);
+    REQUIRE(mx);
+    CHECK(track->y + track->h / 2 == write->y + write->h / 2);  // on the line of Write PER
+    CHECK(track->y > mx->bottom());                              // under the pitch matrix
+    CHECK(track->right() < write->x);
+    CHECK(w.rectOf("ornWin")->h == 78 + 152 + 18 + 42);  // Track takes no line of its own (the 18 px)
+    const auto* b = dynamic_cast<const gemui::Button*>(w.widgetOf("ornTrack"));
+    REQUIRE(b);
+    CHECK(b->text() == "1");
+    click(w, "ornTrack");
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    std::vector<gemui::MenuItem> items = m->items();
+    REQUIRE(items.size() == 16);  // the tracks of 16 ch
+    CHECK(items[1].label == "2 [Chip Voice]");
+    items[4].pick();
+    w.desktop().closePopups();
+    w.tick(0);
+    CHECK(h.values[size_t(plugin::paramIndex(plugin::Global::FocusTrack))] == 5.0f);
+    CHECK(b->text() == "5");
+    CHECK(w.modulation().titleBar().title() == "MODULATION - 5");
 }
 
 TEST_CASE("Modulation: drawing pitch, noise and volume, one undo step per stroke", "[ui][orn][undo]") {

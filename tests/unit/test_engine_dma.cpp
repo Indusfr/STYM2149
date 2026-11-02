@@ -39,7 +39,7 @@ struct Rig {
         g.ste = ste;
         e.setGlobal(g);
     }
-    // Track of DMA type (16-channel), active, at level 1, centred; slot -1: according to the rank.
+    // Track of DMA type (32-channel), active, at level 1, centred; slot -1: according to the rank.
     void dmaTrack(int t, int slot = 0, double pan = 0) {
         ymengine::TrackParams p = e.track(t);
         p.patch.generator = Generator::Dma;
@@ -289,8 +289,8 @@ TEST_CASE("DMA: slot of the track, or the one of its rank", "[engine][dma]") {
     DmaParams p;
     for (auto& s : p.slots) s.loop = true;
     g.e.setDma(p);
-    for (int k = 0; k < ymengine::kDmaSlots; ++k) g.e.setDmaSample(k, sine(2000, 20 + k));
-    g.dmaTrack(10, -1);  // 16-channel: track of index 10, slot 10 & 7 = 2
+    for (int k = 0; k < ymengine::kDmaTracks; ++k) g.e.setDmaSample(k, sine(2000, 20 + k));
+    g.dmaTrack(10, -1);  // 32-channel: track of index 10, slot 10 & 7 = 2
     g.e.noteOn(0, 60, 127, 10);
     g.run(480);
     REQUIRE(g.playing().size() == 1);
@@ -329,7 +329,7 @@ TEST_CASE("DMA: a new sample stops the voices that play the old one", "[engine][
     CHECK(silent(g.outL));  // the bus keeps nothing of the stopped voice
 }
 
-TEST_CASE("DMA: chords of a DMA track in 16-channel mode", "[engine][dma]") {
+TEST_CASE("DMA: chords of a DMA track in 32-channel mode", "[engine][dma]") {
     Rig g;
     g.dmaTrack(0);
     g.e.setDma(params());
@@ -511,7 +511,7 @@ TEST_CASE("DMA: DMA tracks in Authentic 3ch with the STE machine (5 to 12)", "[e
     DmaParams p;
     for (auto& s : p.slots) s.loop = true;
     g.e.setDma(p);
-    for (int k = 0; k < ymengine::kDmaSlots; ++k) g.e.setDmaSample(k, sine(4096, 32));
+    for (int k = 0; k < ymengine::kDmaTracks; ++k) g.e.setDmaSample(k, sine(4096, 32));
     for (int t = 4; t < 12; ++t) {
         auto tp = g.e.track(t);
         tp.mix.enabled = true;
@@ -688,7 +688,7 @@ TEST_CASE("DMA: with Loop on, the preview repeats the part until stopped or Loop
 TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of each side (Indus, 26/10/2026)",
           "[engine][dma][mixer]") {
     // Left side silent, right side a sine: left = scope − side stays at zero, right = scope + side carries the sine.
-    // 16 channels (track 1) and Authentic 3ch with the STE (track 5, the first DMA track).
+    // 32 channels (track 1) and Authentic 3ch with the STE (track 5, the first DMA track).
     for (const auto& [mode, track] : {std::pair{VoiceMode::Studio16, 1}, std::pair{VoiceMode::Authentic3, 4}}) {
         CAPTURE(int(mode));
         for (const bool stereo : {true, false}) {
@@ -742,7 +742,7 @@ TEST_CASE("DMA: a stereo sample gives the Mixer the peaks and oscilloscope of ea
 
 TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and solo (Indus, 26/10/2026)",
           "[engine][dma][mixer]") {
-    // Track A plays a stereo sample (both sides the same sine), centred; track B a mono sample, hard left. 16 channels
+    // Track A plays a stereo sample (both sides the same sine), centred; track B a mono sample, hard left. 32 channels
     // (tracks 1 and 2) and Authentic 3ch with the STE (tracks 5 and 6, DMA tracks).
     for (const auto& [mode, a] : {std::pair{VoiceMode::Studio16, 0}, std::pair{VoiceMode::Authentic3, 4}}) {
         CAPTURE(int(mode));
@@ -781,25 +781,49 @@ TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and so
         CHECK(std::fabs(ul / l - 1) < 0.01);
         CHECK(std::fabs(ur / r - 0.5) < 0.02);
         CHECK(std::fabs(upr / upl - 0.5) < 0.02);
-        // Mute of either side.
-        const auto [ml, mr, mpl, mpr] = play(true, [](ymengine::TrackMix& m) { m.muteR = true; }, false);
+        // Mute of either side, unlinked (linked, M and S act on both sides).
+        const auto [ml, mr, mpl, mpr] = play(true,
+                                             [](ymengine::TrackMix& m) {
+                                                 m.link = false;
+                                                 m.levelR = m.level;
+                                                 m.muteR = true;
+                                             },
+                                             false);
         CHECK(ml > 0.01);
         CHECK(mr == 0);
         CHECK(mpl > 0.1f);
         CHECK(mpr == 0.0f);
-        const auto [nl, nr, npl, npr] = play(true, [](ymengine::TrackMix& m) { m.mute = true; }, false);
+        const auto [nl, nr, npl, npr] = play(true,
+                                             [](ymengine::TrackMix& m) {
+                                                 m.link = false;
+                                                 m.levelR = m.level;
+                                                 m.mute = true;
+                                             },
+                                             false);
         CHECK(nl == 0);
         CHECK(nr > 0.01);
         CHECK(npl == 0.0f);
         CHECK(npr > 0.1f);
+        const auto [kl, kr, kpl, kpr] = play(true, [](ymengine::TrackMix& m) { m.mute = true; }, false);
+        CHECK(kl == 0);
+        CHECK(kr == 0);
+        const auto [il, ir, ipl, ipr] = play(true, [](ymengine::TrackMix& m) { m.muteR = true; }, false);
+        CHECK(std::fabs(ir / r - 1) < 1e-6);  // linked: the right side's M does nothing
+        (void)kpl, (void)kpr, (void)il, (void)ipl, (void)ipr;
         // Solo of the right side: the left side and track B (hard left) fall silent.
         const auto [bl, br, bpl, bpr] = play(true, [](ymengine::TrackMix&) {}, true);
         CHECK(bl > l * 1.2);
-        const auto [sl, sr, spl, spr] = play(true, [](ymengine::TrackMix& m) { m.soloR = true; }, true);
+        const auto [sl, sr, spl, spr] = play(true,
+                                             [](ymengine::TrackMix& m) {
+                                                 m.link = false;
+                                                 m.levelR = m.level;
+                                                 m.soloR = true;
+                                             },
+                                             true);
         CHECK(sl == 0);
         CHECK(std::fabs(sr / r - 1) < 0.01);
         (void)bpl, (void)bpr, (void)spl, (void)spr;
-        // A mono sample: the right side's settings do nothing, its solo either.
+        // A mono sample: its right side too has its own level, mute and solo; Mono takes them away.
         auto right = [](ymengine::TrackMix& m) {
             m.link = false;
             m.levelR = 0;
@@ -808,15 +832,24 @@ TEST_CASE("DMA: the right side of a stereo sample has its own fader, mute and so
         };
         const auto [ol, orr, opl, opr] = play(false, right, true);
         const auto [rl, rr, rpl, rpr] = play(false, [](ymengine::TrackMix&) {}, true);
-        CHECK(ol > 0.01);
-        CHECK(std::fabs(ol / rl - 1) < 1e-6);
-        CHECK(std::fabs(orr / rr - 1) < 1e-6);
-        CHECK(opr == opl);
+        CHECK(ol < rl * 1e-3);  // B is out of the solo, A's left side too
+        CHECK(orr < rr * 1e-3);
+        CHECK(opr == 0.0f);
+        const auto [xl, xr, xpl, xpr] = play(false,
+                                             [right](ymengine::TrackMix& m) {
+                                                 right(m);
+                                                 m.mono = true;
+                                             },
+                                             true);
+        CHECK(xl > 0.01);
+        CHECK(std::fabs(xl / rl - 1) < 1e-6);
+        CHECK(std::fabs(xr / rr - 1) < 1e-6);
+        CHECK(xpr == xpl);
         (void)rpl, (void)rpr;
     }
 }
 
-TEST_CASE("DMA: the right side's mixer applies live, and when the sample becomes stereo",
+TEST_CASE("DMA: the right side's mixer applies live, whatever the sample, and Mono takes it away",
           "[engine][dma][mixer]") {
     Rig g;
     g.dmaTrack(0, 0);
@@ -833,14 +866,48 @@ TEST_CASE("DMA: the right side's mixer applies live, and when the sample becomes
     CHECK(rms(g.outL) > 0.01);
     CHECK(rms(g.outR) < rms(g.outL) * 1e-4);
     CHECK(g.e.trackStereo(0));
-    // The same settings with a mono slot: the right side follows the left one.
+    // The same settings with a mono slot: the right side keeps them, until Mono.
     g.e.setDma(params(2, false));
-    CHECK_FALSE(g.e.trackStereo(0));
+    CHECK(g.e.trackStereo(0));
     g.e.setDmaSample(0, sine(4096, 32));
     g.e.noteOn(0, 60, 127, 0);
     g.clear();
     g.run(480);
     g.run(4800, true);
+    CHECK(rms(g.outL) > 0.01);
+    CHECK(rms(g.outR) < rms(g.outL) * 1e-4);
+    m.mono = true;
+    g.e.setTrackMix(0, 0, m);
+    g.clear();
+    g.run(4800);
+    CHECK_FALSE(g.e.trackStereo(0));
+    g.run(4800, true);
     CHECK(rms(g.outR) > 0.01);
     CHECK(std::fabs(rms(g.outR) / rms(g.outL) - 1) < 0.01);
+}
+
+TEST_CASE("Mixer: a mono generator has one fader, mute and solo for both sides of its pan",
+          "[engine][dma][mixer]") {
+    // 16 channels: a Chip Voice track with the right side's settings apart (left from an older state) plays both sides
+    // at its Level (Indus, 31/10/2026 16:56: only DMA is stereo).
+    Rig g;
+    ymengine::TrackParams p = g.e.track(0);
+    p.patch.generator = Generator::Chip;
+    p.mix.enabled = true;
+    p.mix.level = 1;
+    p.mix.pan = 0;
+    p.mix.link = false;
+    p.mix.levelR = 0;
+    p.mix.muteR = true;
+    g.e.setTrack(0, p);
+    CHECK_FALSE(g.e.trackStereo(0));
+    g.e.noteOn(0, 60, 127, 0);
+    g.run(4800);
+    g.run(4800, true);
+    CHECK(rms(g.outL) > 0.01);
+    CHECK(std::fabs(rms(g.outR) / rms(g.outL) - 1) < 0.01);
+    // The same settings on a DMA track: its right side apart.
+    g.dmaTrack(0, 0);
+    CHECK(g.e.trackStereo(0));
+    CHECK_FALSE(g.e.track(0).mix.link);
 }

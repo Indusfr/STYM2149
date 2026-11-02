@@ -7,12 +7,15 @@
 #include <cmath>
 #include <cstdio>
 #include <initializer_list>
+#include <tuple>
 
 #include "gemui/Alert.h"
 #include "plugincore/Mapping.h"
 #include "plugincore/Parameters.h"
+#include "plugincore/SteMemory.h"
 #include "pluginui/MainWindow.h"
 #include "ymengine/Pitch.h"
+#include "ymseq/Tables.h"
 
 namespace stym::pluginui {
 
@@ -43,10 +46,13 @@ struct RowSpec {
     const char* tip;
 };
 // One per row of SettingsWindow::Row, in its order.
-constexpr std::array<RowSpec, 27> kSpecs = {{
+constexpr std::array<RowSpec, 35> kSpecs = {{
     {"setComputer", "Computer", nullptr},  // the tooltip of the Computer button of the SYSTEM frame
+    {"setRam", "RAM",
+     "RAM of the Atari: the Digidrum and DMA samples share it in 3 ch, twice it in 2x3ch (two Ataris)\n"
+     "Those past it are silent and crossed out. 16 and 32 ch have no limit"},
     {"setClock", "Chip clock",
-     "Chip clock: the frequency that drives the YM, and so its pitch. Custom, typed in MHz, plays in 16 ch only"},
+     "Chip clock: the frequency that drives the YM, and so its pitch. Custom, typed in MHz, plays in 16 and 32 ch only"},
     {"setA4", "Tuning A4",
      "Tuning: the frequency of A4, from which every note is tuned (350 to 480 Hz, 440 by default)\n"
      "The chip plays the nearest period it can: at 2 MHz, an A4 at 440 Hz plays 440.14 Hz"},
@@ -64,9 +70,14 @@ constexpr std::array<RowSpec, 27> kSpecs = {{
      "register exports"},
     {"setQuantize", "Quantize to VBL",
      "Quantize to VBL: notes and steps start on the replay frames, as an Atari replay routine plays them"},
+    // The Clock of the SYSTEM frame (Indus, 29/10/2026 19:46), its tooltip with it.
+    {"setMidiClock", "Clock", "Clock source: internal tempo, or follow an incoming MIDI clock"},
     {"setRouting", "MIDI routing",
      "MIDI routing: Omni, the focused track; Layer, every enabled track; Per channel, channel n plays track n"},
-    {"setVelocity", "Velocity", "Velocity: Accent (a gain in 16 ch, the 4-bit volume in 3 ch), Vol 4-bit or Off"},
+    {"setVelocity", "Velocity", "Velocity: Accent (a gain in 16 and 32 ch, the 4-bit volume in 3 ch), Vol 4-bit or Off"},
+    {"setVelocityCurve", "Velocity curve",
+     "Velocity curve: how the force of a key becomes its velocity. Linear, as played; Soft, the light touches louder\n"
+     "Hard, more force for the loud notes; S-curve, the middle steeper and both ends flatter"},
     {"setBendTarget", "Bend",
      "Pitch bend: what it drives. Pitch, the note; Volume, the 4-bit volume (up towards 15, down towards 0)\n"
      "Envelope, the envelope frequency by the bend's semitones, the note unchanged (Sync Buzzer, Env sources)"},
@@ -77,26 +88,42 @@ constexpr std::array<RowSpec, 27> kSpecs = {{
     {"setWheel", "Wheel depth", "Vibrato of the wheel, the aftertouch and the MPE slide at their top, in cents"},
     {"setAftertouch", "Aftertouch",
      "Aftertouch: what the pressure of the keys drives (of the channel or of each note), with the wheel's choices"},
+    {"setAftertouchCurve", "Aftertouch curve",
+     "Aftertouch curve: how key pressure becomes its amount. Linear, as pressed; Soft, light pressure counts more\n"
+     "Hard, more pressure for the top; S-curve, the middle steeper and both ends flatter"},
     {"setMpe", "MPE",
      "MPE: channel 1 plays as usual, channels 2 to 16 one note each, with its own bend, pressure and slide\n"
-     "The notes go to the focused track (or Layer); 16 ch only"},
+     "The notes go to the focused track (or Layer); 16 and 32 ch only"},
     {"setMpeBend", "MPE bend range", "MPE: pitch bend range of each note, in semitones (48 is the MPE default)"},
     {"setMpeSlide", "MPE slide (CC74)",
      "MPE slide (CC74) of each note: Volume, from 0 at the bottom to 15 at the top (64 leaves it)\n"
      "Envelope, an octave either way (Sync Buzzer, Env sources); Vibrato, from the middle up to the Wheel depth"},
+    {"setDrumPads", "Drum pads",
+     "Drum pads: the MIDI channel of the pads (10 by default, as pads send in drum mode). Notes 36 to 43 play the\n"
+     "Chipdrum sounds 1 to 8, notes 44 to 51 the Digidrum samples 1 to 8; Off: the channel plays as the others"},
     {"setPixels", "Pixels",
      "Pixels: Sharp puts each pixel on whole screen pixels; Smooth draws the letters and icons with anti-aliasing"},
     {"setRenderer", "Renderer", "Renderer: how the window reaches the screen on Windows, Software or Direct2D"},
     {"setNoteNames", "Note names", "Note names: English (C D E) or Latin (Do Re Mi)"},
     {"setLayout", "Keyboard layout", "Layout of the computer keyboard; Auto follows the system's"},
+    {"setMidiLines", "MIDI monitor",
+     "MIDI monitor: how many of the last messages received it keeps, to scroll back\n"
+     "Custom: a number of lines typed, from 1 to 100000"},
+    {"setInfoDemo", "Information demo",
+     "Information demo: the animation of the Fuji > Information box; Off shows its icon instead"},
+    {"setUiLanguage", "Interface language", "Language of the menus, buttons, labels and window titles"},
     {"setTips", "Tooltips", "Tooltips: show these help boxes, or not"},
-    {"setLanguage", "Language", "Language of the tooltips"},
+    {"setLanguage", "Tooltip language", "Language of the tooltips"},
 }};
 
 constexpr const char* kSteWhy = "STE only: set Computer to STE";
+constexpr const char* kRamWhy = "RAM: 3ch and 2x3ch only (no limit in 16 and 32 ch)";
 constexpr const char* kRendererWhy = "Renderer: Windows only";
-constexpr const char* kMpeModeWhy = "MPE: 16 ch only";
+constexpr const char* kMpeModeWhy = "MPE: 16 and 32 ch only";
 constexpr const char* kMpeOffWhy = "MPE: set MPE to On";
+constexpr const char* kDrumPadsWhy = "Drum pads: off with MPE, whose notes use every channel";
+constexpr const char* kVelocityOffWhy = "Velocity curve: set Velocity to Accent or Vol 4-bit";
+constexpr const char* kAftertouchOffWhy = "Aftertouch curve: set Aftertouch to one of its targets";
 // Bend ranges of the MPE notes offered: small ones, then the octaves up to the 96 semitones of the
 // parameter; 48 is the MPE default.
 constexpr std::array kMpeBends = {1, 2, 3, 4, 5, 7, 12, 24, 36, 48, 60, 72, 84, 96};
@@ -137,10 +164,12 @@ void SettingsWindow::build() {
     a4v_.setMask("999.99 Hz");
     a4v_.setTip(kSpecs[kA4].tip);
     add(a4v_);
+    add(clockState_);
     folder_.setTip(kFolderTip);
     add(folder_);
     cancel_.setTip(kCancelTip);
     ok_.setTip(kOkTip);
+    ok_.setExit(true);  // closes the box: GEM's EXIT border
     add(cancel_);
     add(ok_);
 }
@@ -155,9 +184,10 @@ void SettingsWindow::wire() {
     };
     for (int r = 0; r < kRows; ++r) {
         if (r == kA4) continue;
+        btns_[size_t(r)].setPopup(true);  // a GEM pop-up button, with its shadow
         btns_[size_t(r)].onClick = [this, r] {
             // The languages of the files read again at each opening, as the Options menu did.
-            if (r == kLanguage) {
+            if (r == kLanguage || r == kUiLanguage) {
                 m_.scanTipLanguages();
                 m_.applyTipLanguage();
             }
@@ -214,11 +244,15 @@ bool SettingsWindow::differs(int row) const {
         if (m_.values_[size_t(index)] != value) return true;
     switch (row) {
     case kQuantize: return m_.extras_.global.quantizeVbl != s.flag;
+    case kRam: return std::to_string(m_.extras_.steRam) != s.text;
     case kPixels: return m_.host_.preference("pixels", "smooth") != s.text;
     case kRenderer: return m_.host_.preference("renderer", "software") != s.text;
     case kNoteNames: return m_.host_.preference("noteNames", "0") != s.text;
     case kLayout: return m_.host_.preference("kbdLayout", "auto") != s.text;
+    case kMidiLines: return std::to_string(m_.midiLines()) != s.text;
+    case kInfoDemo: return m_.host_.preference("infoDemo", "1") != s.text;
     case kTips: return m_.desk_.tooltips() != s.flag;
+    case kUiLanguage: return m_.uiLang_ != s.text;
     case kLanguage: return m_.tipLang_ != s.text;
     default: return false;
     }
@@ -252,6 +286,7 @@ void SettingsWindow::remember(int row) {
     };
     switch (row) {
     case kComputer: param(Global::Computer); break;
+    case kRam: s.text = std::to_string(m_.extras_.steRam); break;
     case kClock:  // the frequency of the Custom clock first, so that putting it back plays it at once
         param(Global::ChipClockHz);
         param(Global::ChipClock);
@@ -265,21 +300,28 @@ void SettingsWindow::remember(int row) {
     case kTimer: param(Global::Timer); break;
     case kVbl: param(Global::VblRate); break;
     case kQuantize: s.flag = m_.extras_.global.quantizeVbl; break;
+    case kMidiClock: param(Global::ArpClock); break;
     case kRouting: param(Global::MidiRouting); break;
     case kVelocity: param(Global::Velocity); break;
+    case kVelocityCurve: param(Global::VelocityCurve); break;
     case kBendTarget: param(Global::BendTarget); break;
     case kBend: param(Global::BendRange); break;
     case kWheelTarget: param(Global::WheelTarget); break;
     case kWheel: param(Global::WheelDepth); break;
     case kAftertouch: param(Global::Aftertouch); break;
+    case kAftertouchCurve: param(Global::AftertouchCurve); break;
     case kMpe: param(Global::Mpe); break;
     case kMpeBend: param(Global::MpeBendRange); break;
     case kMpeSlide: param(Global::MpeSlide); break;
+    case kDrumPads: param(Global::DrumPads); break;
     case kPixels: s.text = m_.host_.preference("pixels", "smooth"); break;
     case kRenderer: s.text = m_.host_.preference("renderer", "software"); break;
     case kNoteNames: s.text = m_.host_.preference("noteNames", "0"); break;
     case kLayout: s.text = m_.host_.preference("kbdLayout", "auto"); break;
+    case kMidiLines: s.text = std::to_string(m_.midiLines()); break;
+    case kInfoDemo: s.text = m_.host_.preference("infoDemo", "1"); break;
     case kTips: s.flag = m_.desk_.tooltips(); break;
+    case kUiLanguage: s.text = m_.uiLang_; break;
     case kLanguage: s.text = m_.tipLang_; break;
     default: return;
     }
@@ -287,8 +329,12 @@ void SettingsWindow::remember(int row) {
 }
 
 void SettingsWindow::putBack() {
-    static constexpr std::array<std::pair<int, const char*>, 4> kPrefs = {
-        {{kPixels, "pixels"}, {kRenderer, "renderer"}, {kNoteNames, "noteNames"}, {kLayout, "kbdLayout"}}};
+    static constexpr std::array<std::pair<int, const char*>, 6> kPrefs = {{{kPixels, "pixels"},
+                                                                          {kRenderer, "renderer"},
+                                                                          {kNoteNames, "noteNames"},
+                                                                          {kLayout, "kbdLayout"},
+                                                                          {kMidiLines, "midiLines"},
+                                                                          {kInfoDemo, "infoDemo"}}};
     for (int r = 0; r < kRows; ++r) {
         if (!saved_[size_t(r)]) continue;
         const Saved& s = *saved_[size_t(r)];
@@ -302,6 +348,10 @@ void SettingsWindow::putBack() {
             m_.host_.editExtras([on = s.flag](plugin::NonParamState& st) { st.global.quantizeVbl = on; });
             m_.pullExtras();
         }
+        if (r == kRam && std::to_string(m_.extras_.steRam) != s.text) {
+            m_.host_.editExtras([ram = uint8_t(std::stoi(s.text))](plugin::NonParamState& st) { st.steRam = ram; });
+            m_.pullExtras();
+        }
         for (const auto& [row, key] : kPrefs)
             if (r == row) m_.host_.setPreference(key, s.text);
         if (r == kTips) {
@@ -309,6 +359,7 @@ void SettingsWindow::putBack() {
             m_.host_.setPreference("tooltips", s.flag ? "1" : "0");
         }
         if (r == kLanguage && m_.tipLang_ != s.text) m_.setTipLanguage(s.text);
+        if (r == kUiLanguage && m_.uiLang_ != s.text) m_.setUiLanguage(s.text);
     }
     m_.refresh();  // the note names, the keyboard layout
 }
@@ -381,6 +432,25 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         for (int i = 0; i < int(out.size()); ++i) out[size_t(i)].pick = [this, i] { m_.setComputer(i); };
         return out;
     }
+    // The memory of the Atari for the samples, from the Digidrums and DMA windows (Indus, 30/10/2026 02:49):
+    // kept in the project (STEM chunk), one value for 3ch and 2x3ch (which counts two Ataris, twice it).
+    // Changing it cannot be undone, like loading a sample; a GEM box asks first when it would silence samples.
+    case kRam: {
+        std::vector<MenuItem> out;
+        for (size_t k = 0; k < plugin::kSteRamKb.size(); ++k) {
+            const uint32_t ram = plugin::kSteRamKb[k];
+            MenuItem e = entry(ram < 1024 ? std::to_string(ram) + " KB" : std::to_string(ram / 1024) + " MB");
+            e.pick = [this, idx = uint8_t(k)] {
+                m_.confirmMemory([idx](plugin::NonParamState& st) { st.steRam = idx; }, [this, idx] {
+                    m_.host_.editExtras([idx](plugin::NonParamState& st) { st.steRam = idx; });
+                    m_.pullExtras();
+                });
+            };
+            out.push_back(std::move(e));
+        }
+        checked = std::min<int>(m.extras_.steRam, int(plugin::kSteRamKb.size()) - 1);
+        return out;
+    }
     case kClock: {
         std::vector<MenuItem> out = m.paramItems(Global::ChipClock, 1, checked);
         for (size_t i = MainWindow::kFirstAyClock; i < out.size(); ++i)
@@ -393,7 +463,7 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         custom.pick = [this] { m_.customClock(); };
         if (m.mode3()) {
             custom.disabled = true;
-            custom.why = "Custom clock: 16 ch only (2 MHz in the other modes)";
+            custom.why = "Custom clock: 16 and 32 ch only (2 MHz in the other modes)";
         }
         return out;
     }
@@ -430,13 +500,17 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         checked = m.extras_.global.quantizeVbl ? 1 : 0;
         return out;
     }
+    // Internal or MIDI ext, from the SYSTEM frame.
+    case kMidiClock: return m.paramItems(Global::ArpClock, 1, checked);
     case kRouting: return m.paramItems(Global::MidiRouting, 1, checked);
     case kVelocity: return m.paramItems(Global::Velocity, 1, checked);
+    case kVelocityCurve: return m.paramItems(Global::VelocityCurve, 1, checked);
     case kBendTarget: return m.paramItems(Global::BendTarget, 1, checked);
     case kBend: return m.paramItems(Global::BendRange, 1, checked);
     case kWheelTarget: return m.paramItems(Global::WheelTarget, 1, checked);
     case kWheel: return m.paramItems(Global::WheelDepth, 25, checked);
     case kAftertouch: return m.paramItems(Global::Aftertouch, 1, checked);
+    case kAftertouchCurve: return m.paramItems(Global::AftertouchCurve, 1, checked);
     case kMpe: return m.paramItems(Global::Mpe, 1, checked);
     case kMpeBend: {  // the bend ranges of kMpeBends, and the one chosen if it is not among them
         std::vector<int> vals(kMpeBends.begin(), kMpeBends.end());
@@ -453,6 +527,7 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         return out;
     }
     case kMpeSlide: return m.paramItems(Global::MpeSlide, 1, checked);
+    case kDrumPads: return m.paramItems(Global::DrumPads, 1, checked);
     // Pixels of the plugin's window at a size that is not a whole multiple of the desktop (tenth DAW test, item 123):
     // Sharp puts each pixel on whole screen pixels, Smooth (default again, eleventh DAW test, item 130)
     // draws the letters and icons with anti-aliasing, as a browser shows the prototype.
@@ -462,10 +537,30 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
     // right of the Windows desktop for a few seconds (Indus, 24/10/2026 22:27). Greyed out elsewhere (its button).
     case kRenderer: return preference("renderer", "software", {{"Software", "software"}, {"Direct2D", "direct2d"}});
     case kNoteNames: return preference("noteNames", "0", {{kNoteLangs[0], "0"}, {kNoteLangs[1], "1"}});
+    // The demo of the Information box, from the Options menu into this window, On by default (Indus,
+    // 29/10/2026 10:54).
+    case kInfoDemo: return preference("infoDemo", "1", {{"On", "1"}, {"Off", "0"}});
     case kLayout:
         return preference("kbdLayout", "auto",
                           {{kLayoutNames[0], kLayoutIds[0]}, {kLayoutNames[1], kLayoutIds[1]},
                            {kLayoutNames[2], kLayoutIds[2]}, {kLayoutNames[3], kLayoutIds[3]}});
+    // Lines the MIDI monitor keeps, to scroll back through (Indus, 28/10/2026 08:19).
+    // Custom after them (Indus, 28/10/2026 10:02): any number from 1 to 100 000, typed in a prompt box; the
+    // entry shows it while it is the one kept.
+    case kMidiLines: {
+        static_assert(MidiLog::kKeptChoices == std::array{100, 500, 1000, 5000} && MidiLog::kKeptDefault == 500);
+        std::vector<MenuItem> out = preference(
+            "midiLines", "500",
+            {{"100 lines", "100"}, {"500 lines", "500"}, {"1000 lines", "1000"}, {"5000 lines", "5000"}});
+        const int n = m.midiLines();
+        const auto it = std::find(MidiLog::kKeptChoices.begin(), MidiLog::kKeptChoices.end(), n);
+        const bool custom = it == MidiLog::kKeptChoices.end();
+        checked = custom ? int(out.size()) : int(it - MidiLog::kKeptChoices.begin());
+        MenuItem e = entry(custom ? "Custom " + std::to_string(n) + " lines..." : std::string("Custom..."));
+        e.pick = [this] { m_.customMidiLines(); };
+        out.push_back(std::move(e));
+        return out;
+    }
     case kTips: {
         std::vector<MenuItem> out;
         for (int i = 0; i < 2; ++i) {
@@ -480,15 +575,20 @@ std::vector<MenuItem> SettingsWindow::rowItems(int row, int& checked) {
         checked = m.desk_.tooltips() ? 0 : 1;
         return out;
     }
-    // Tooltip language: English, built in, then the languages of the files, installed or the user's.
+    // Interface language and tooltip language: English, built in, then the languages of the files,
+    // installed or the user's, each named in its own language.
+    case kUiLanguage:
     case kLanguage: {
+        const bool ui = row == kUiLanguage;
         std::vector<MenuItem> out;
         for (size_t i = 0; i < m.tipChoices_.size(); ++i) {
             const MainWindow::TipChoice& c = m.tipChoices_[i];
-            if (c.id == m.tipLang_) checked = int(i);
+            if (c.id == (ui ? m.uiLang_ : m.tipLang_)) checked = int(i);
             MenuItem e = entry(c.name);
-            e.pick = [this, id = c.id] {
-                m_.setTipLanguage(id);
+            e.raw = true;
+            e.pick = [this, ui, id = c.id] {
+                if (ui) m_.setUiLanguage(id);
+                else m_.setTipLanguage(id);
                 refresh();
             };
             out.push_back(std::move(e));
@@ -509,7 +609,7 @@ void SettingsWindow::preferenceSet() {
 std::string SettingsWindow::valueText(int row) {
     int checked = -1;
     std::vector<MenuItem> list = rowItems(row, checked);
-    if (checked < 0 || checked >= int(list.size())) return row == kLanguage ? "English" : "";
+    if (checked < 0 || checked >= int(list.size())) return row == kLanguage || row == kUiLanguage ? "English" : "";
     std::string t = list[size_t(checked)].label;
     if (t.size() > 3 && t.compare(t.size() - 3, 3, "...") == 0) t.resize(t.size() - 3);
     return t;
@@ -521,7 +621,9 @@ double SettingsWindow::buttonWidth(int row) {
     for (const MenuItem& e : rowItems(row, checked)) {
         std::string t = e.label;
         if (t.size() > 3 && t.compare(t.size() - 3, 3, "...") == 0) t.resize(t.size() - 3);
-        w = std::max(w, Button(t).naturalWidth());
+        Button b(t);
+        b.setRaw(e.raw);  // a language named in its own language
+        w = std::max(w, b.naturalWidth());
     }
     return w;
 }
@@ -540,6 +642,8 @@ void SettingsWindow::refresh() {
     if (!isOpen()) return;
     for (int r = 0; r < kRows; ++r)
         if (r != kA4) btns_[size_t(r)].setText(valueText(r));
+    btns_[kLanguage].setRaw(true);  // the language's own name, as in its menu
+    btns_[kUiLanguage].setRaw(true);
     // STE bass and treble with Computer ST: greyed out, the value chosen before kept and shown.
     const bool ste = m_.ste();
     for (int r : {kBass, kTreble}) {
@@ -547,8 +651,12 @@ void SettingsWindow::refresh() {
         btns_[size_t(r)].setTip(ste ? kSpecs[size_t(r)].tip : kSteWhy);
         labs_[size_t(r)].setDim(!ste);
     }
-    // MPE: 16 ch only; its bend range and slide with MPE on.
+    // MPE: 16 and 32 ch only; its bend range and slide with MPE on. The change to a 3-voice mode turns it Off.
+    // The RAM, the other way round: 3ch and 2x3ch only, the value chosen kept.
     const bool studio = !m_.mode3();
+    btns_[kRam].setEnabled(!studio);
+    btns_[kRam].setTip(studio ? kRamWhy : kSpecs[kRam].tip);
+    labs_[kRam].setDim(studio);
     const bool mpe = studio && m_.pv(Global::Mpe) >= 0.5f;
     btns_[kMpe].setEnabled(studio);
     btns_[kMpe].setTip(studio ? kSpecs[kMpe].tip : kMpeModeWhy);
@@ -558,11 +666,39 @@ void SettingsWindow::refresh() {
         btns_[size_t(r)].setTip(mpe ? kSpecs[size_t(r)].tip : studio ? kMpeOffWhy : kMpeModeWhy);
         labs_[size_t(r)].setDim(!mpe);
     }
+    // Drum pads: off with MPE on, the value chosen kept.
+    btns_[kDrumPads].setEnabled(!mpe);
+    btns_[kDrumPads].setTip(mpe ? kDrumPadsWhy : kSpecs[kDrumPads].tip);
+    labs_[kDrumPads].setDim(mpe);
+    // The curves greyed out while their setting is Off (Indus, 01/11/2026 12:56), the curve chosen kept.
+    const bool velocity = m_.iv(Global::Velocity) != 2;    // Accent, Vol 4-bit, Off
+    const bool aftertouch = m_.iv(Global::Aftertouch) != 0;  // Off, then the targets
+    for (const auto& [r, on, why] : {std::tuple{int(kVelocityCurve), velocity, kVelocityOffWhy},
+                                     std::tuple{int(kAftertouchCurve), aftertouch, kAftertouchOffWhy}}) {
+        btns_[size_t(r)].setEnabled(on);
+        btns_[size_t(r)].setTip(on ? kSpecs[size_t(r)].tip : why);
+        labs_[size_t(r)].setDim(!on);
+    }
     const bool renderer = m_.host_.rendererChoice();
     btns_[kRenderer].setEnabled(renderer);
     btns_[kRenderer].setTip(renderer ? kSpecs[kRenderer].tip : kRendererWhy);
     labs_[kRenderer].setDim(!renderer);
     if (!a4v_.editing()) a4v_.setText(gemui::formatDecimal("%.2f", double(m_.pv(Global::A4Hz))) + " Hz");
+    // The note of Tuning A4 in the Note names chosen (Indus, 27/10/2026 21:09): Tuning La4 in Latin.
+    const bool latin = m_.host_.preference("noteNames", "0") == "1";
+    labs_[kA4].setText("Tuning " + ymseq::absNoteName(69, latin ? ymseq::NoteNames::Latin : ymseq::NoteNames::English));
+    const std::string clock = m_.clockState();
+    clockState_.setText(clock);
+    clockState_.setVisible(!clock.empty());
+    layout();
+}
+
+void SettingsWindow::refreshClock() {
+    if (!isOpen()) return;
+    const std::string clock = m_.clockState();
+    if (clock == clockState() && clockState_.visible() == !clock.empty()) return;
+    clockState_.setText(clock);
+    clockState_.setVisible(!clock.empty());
     layout();
 }
 
@@ -586,6 +722,9 @@ void SettingsWindow::layout() {
             for (int r : f.rows) {
                 labW = std::max(labW, labs_[size_t(r)].naturalWidth());
                 btnW = std::max(btnW, r == kA4 ? a4v_.naturalWidth() : buttonWidth(r));
+                // The widest state of the MIDI clock under its button, so that the column keeps its width.
+                if (r == kMidiClock)
+                    for (const char* t : MainWindow::kClockStates) btnW = std::max(btnW, gemui::Label(t).naturalWidth());
             }
         btnW = std::max(btnW, folder_.naturalWidth());
         double w = 0;
@@ -601,6 +740,11 @@ void SettingsWindow::layout() {
                 if (r == kA4) a4v_.setBox({bx, ry + (rowH - 16) / 2, a4v_.naturalWidth(), 16});
                 else btns_[size_t(r)].setBox({bx, ry, btnW, rowH});
                 ry += rowH + kRowGap;
+                // The state of the MIDI clock under its button, on a line of its own while shown.
+                if (r == kMidiClock && clockState_.visible()) {
+                    clockState_.setBox({bx, ry + (rowH - 16) / 2, clockState_.naturalWidth(), 16});
+                    ry += rowH + kRowGap;
+                }
             }
             if (f.folder) {
                 folder_.setBox({x + kFrameInset + labW + kGap, ry, btnW, double(folder_.naturalHeight())});
@@ -612,17 +756,19 @@ void SettingsWindow::layout() {
         }
         return std::pair<double, double>{w, y - kFrameGap};
     };
-    // Three columns, one frame each (the MIDI expression made the MIDI frame as tall as SOUND ENGINE).
+    // Three columns, one frame each (the MIDI frame, with its curves, is the tallest).
     const auto [leftW, leftBottom] = column(x0, y0, {{&engineFs_,
-                                                       {kComputer, kClock, kA4, kChain, kResampling, kBass, kTreble,
-                                                        kSoftClip, kTimer, kVbl, kQuantize}}});
+                                                       {kComputer, kRam, kClock, kA4, kChain, kResampling, kBass,
+                                                        kTreble, kSoftClip, kTimer, kVbl, kQuantize}}});
     const double midX = x0 + leftW + kColGap;
     const auto [midW, midBottom] =
-        column(midX, y0, {{&midiFs_, {kRouting, kVelocity, kBendTarget, kBend, kWheelTarget, kWheel, kAftertouch, kMpe,
-                                      kMpeBend, kMpeSlide}}});
+        column(midX, y0, {{&midiFs_, {kMidiClock, kRouting, kVelocity, kVelocityCurve, kBendTarget, kBend, kWheelTarget,
+                                      kWheel, kAftertouch, kAftertouchCurve, kMpe, kMpeBend, kMpeSlide, kDrumPads}}});
     const auto [rightW, rightBottom] =
         column(midX + midW + kColGap, y0,
-               {{&uiFs_, {kPixels, kRenderer, kNoteNames, kLayout, kTips, kLanguage}, true}});
+               {{&uiFs_,
+                 {kPixels, kRenderer, kNoteNames, kLayout, kMidiLines, kInfoDemo, kUiLanguage, kTips, kLanguage},
+                 true}});
     // The columns end together: the shorter ones' frames grow down to the tallest one's bottom.
     const double bottom = std::max({leftBottom, midBottom, rightBottom});
     for (gemui::GroupBox* f : {&engineFs_, &midiFs_, &uiFs_}) {
@@ -650,6 +796,7 @@ std::optional<Rect> SettingsWindow::rectOf(std::string_view id) const {
     if (id == "settingsWin") return bounds();
     if (id == "setA4") return a4v_.bounds();
     if (id == "setFolder") return folder_.bounds();
+    if (id == "setClockState") return clockState_.visible() ? std::optional<Rect>(clockState_.bounds()) : std::nullopt;
     if (id == "setEngine") return engineFs_.bounds();
     if (id == "setMidi") return midiFs_.bounds();
     if (id == "setInterface") return uiFs_.bounds();
@@ -666,6 +813,12 @@ const Button* SettingsWindow::button(std::string_view id) const noexcept {
     if (id == "setOk") return &ok_;
     const int r = rowOf(id);
     return r < 0 || r == kA4 ? nullptr : &btns_[size_t(r)];
+}
+
+const std::string& SettingsWindow::shownLabel(std::string_view id) const noexcept {
+    static const std::string none;
+    const int r = rowOf(id);
+    return r < 0 ? none : labs_[size_t(r)].text();
 }
 
 }  // namespace stym::pluginui

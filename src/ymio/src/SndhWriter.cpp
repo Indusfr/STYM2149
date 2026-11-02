@@ -19,6 +19,7 @@
 #include <tuple>
 
 #include "Asm68k.h"
+#include "ymengine/Params.h"
 #include "ymio/Sndh.h"
 
 namespace stym::ymio {
@@ -35,13 +36,17 @@ constexpr double kAtariClockHz = 2'000'000;
 // Variables of the routine, offsets from VARS. Longs: kPos = stream address of the next frame, kCount = frames left
 // before the loop, kBase = address of the first frame, kTotal = frames of the subsong.
 constexpr int kPos = 0, kCount = 4, kBase = 8, kTotal = 12;
-constexpr int kVoiceVars = 16, kVoiceSize = 16;
-constexpr int kPtr = 0, kEnd = 4, kVal = 8, kPhase = 9;  // per channel: digidrum (pointer, end), value, SID phase
-constexpr int kSaved = 64;    // vectors and MFP registers saved by the init
-constexpr int kSaveVec = 66;  // vectors of timers A, B and D
-constexpr int kSaveMfp = 78;  // IERA, IERB, IMRA, IMRB, TACR, TBCR, TCDCR
-constexpr int kSync = 86;     // demo sync byte: last Zxx command played, 0 at init
-constexpr int kVarsSize = 88;
+// Per channel: digidrum (pointer, end), value, SID phase; FM Voice: byte offset of its next step in its table
+// and the table's length in bytes, then its tone periods (words, high byte first).
+constexpr int kVoiceVars = 16, kVoiceSize = 48;
+constexpr int kPtr = 0, kEnd = 4, kVal = 8, kPhase = 9, kFmAt = 10, kFmLen = 11, kFmTab = 16;
+constexpr int kFmSteps = 16;
+constexpr int kSaved = kVoiceVars + 3 * kVoiceSize;  // vectors and MFP registers saved by the init
+constexpr int kSaveVec = kSaved + 2;                 // vectors of timers A, B and D
+constexpr int kSaveMfp = kSaveVec + 12;              // IERA, IERB, IMRA, IMRB, TACR, TBCR, TCDCR
+constexpr int kSync = kSaveMfp + 8;                  // demo sync byte: last Zxx command played, 0 at init
+constexpr int kVarsSize = kSync + 2;
+static_assert(kFmTab + 2 * kFmSteps <= kVoiceSize);
 constexpr int voiceVar(int v, int field) { return kVoiceVars + v * kVoiceSize + field; }
 
 // Timer of each channel: A, B, D (C stays with the system). MC68901: TACR $FFFA19, TBCR $FFFA1B, TCDCR $FFFA1D
@@ -66,16 +71,17 @@ constexpr uint8_t kAbBits = 0x21, kDBits = 0x10;
 constexpr uint16_t kYm = 0x8800, kDma = 0x8900;
 
 // Stream commands: 0 end; per channel, SID, Sync Buzzer or Digidrum start (prescaler, data, value), stop, data,
-// prescaler, value; then DMA start (copy on two bytes) and DMA stop (STE; never written for an ST, whose table skips
-// them); then Zxx (value of the sync byte).
-// Command byte = 1 + channel × kVoiceOps + operation, so the three channels take 1 to 21.
-enum VoiceOp : int { kSidStart, kBuzStart, kDigStart, kStop, kData, kCtrl, kValue, kVoiceOps };
+// prescaler, value, FM Voice start (prescaler, data, steps n, n periods on two bytes each, high byte first) and its
+// periods (n, n periods); then DMA start (copy on two bytes) and DMA stop (STE; never written for an ST, whose table
+// skips them); then Zxx (value of the sync byte).
+// Command byte = 1 + channel × kVoiceOps + operation, so the three channels take 1 to 27.
+enum VoiceOp : int { kSidStart, kBuzStart, kDigStart, kStop, kData, kCtrl, kValue, kFmStart, kFmPeriods, kVoiceOps };
 constexpr uint8_t voiceOp(int v, VoiceOp k) { return uint8_t(1 + v * kVoiceOps + k); }
 constexpr uint8_t kOpDmaStart = 1 + 3 * kVoiceOps;
 constexpr uint8_t kOpDmaStop = kOpDmaStart + 1;
 constexpr uint8_t kOpSync = kOpDmaStop + 1;
 
-enum EffectType : int { kNone = -1, kSid = 0, kBuzzer = 1, kDrum = 2 };
+enum EffectType : int { kNone = -1, kSid = 0, kBuzzer = 1, kDrum = 2, kFm = 3 };
 
 constexpr int D0 = 0, D1 = 1, D2 = 2, D3 = 3, D4 = 4, D5 = 5, D6 = 6;
 // MOVEM register mask from a list of register numbers (0-7: D0-D7, 8-15: A0-A7).
@@ -105,7 +111,7 @@ void startTimer(Asm& a, int v, int d) {  // prescaler in Dd
 // Timer interrupts: chip writes by two MOVEs (no other MFP interrupt cuts them, the 68000 masks level 6 during the
 // handling). Each handler saves the registers it uses, ends its interrupt in the MFP's in-service register and
 // returns with RTE.
-void emitIrqHandlers(Asm& a, const Labels& L, int v, int sid, int buz, int dig) {
+void emitIrqHandlers(Asm& a, const Labels& L, int v, int sid, int buz, int dig, int fm) {
     const TimerRegs& t = kTimers[v];
     // SID: toggles between the note level (value) and 0; phase 1: high level written last.
     a.bind(sid);
@@ -162,6 +168,31 @@ void emitIrqHandlers(Asm& a, const Labels& L, int v, int sid, int buz, int dig) 
         a.move(Size::B, imm(0), absW(kYm + 2));
         a.braS(out);
     }
+    // FM Voice: the next tone period of the table written to the channel's R(2v) and R(2v+1), the offset of
+    // the step after it kept (back to 0 at the end of the table). A0 = this channel's variables.
+    a.bind(fm);
+    {
+        const int keep = a.label();
+        a.movemPush(regs({D0, D1, 8}));
+        a.lea(pcRel(L.vars, voiceVar(v, 0)), 0);
+        a.moveq(0, D0);
+        a.move(Size::B, disp(0, kFmAt), dn(D0));
+        a.move(Size::W, idx(0, D0, kFmTab), dn(D1));
+        a.addq(Size::B, 2, dn(D0));
+        a.cmp(Size::B, disp(0, kFmLen), D0);
+        a.bccS(CS, keep);
+        a.moveq(0, D0);
+        a.bind(keep);
+        a.move(Size::B, dn(D0), disp(0, kFmAt));
+        a.move(Size::B, imm(uint32_t(2 * v)), absW(kYm));
+        a.move(Size::B, dn(D1), absW(kYm + 2));
+        a.lsr(Size::W, 8, D1);
+        a.move(Size::B, imm(uint32_t(2 * v + 1)), absW(kYm));
+        a.move(Size::B, dn(D1), absW(kYm + 2));
+        a.move(Size::B, imm(t.isrClear), absW(t.isr));
+        a.movemPop(regs({D0, D1, 8}));
+        a.rte();
+    }
 }
 
 // Complete routine (init, exit, play, interrupts); the tables and the streams follow, placed by the caller.
@@ -169,11 +200,12 @@ void emitIrqHandlers(Asm& a, const Labels& L, int v, int sid, int buz, int dig) 
 // (playRegs), except A0, which the init returns.
 void emitRoutine(Asm& a, const Labels& L, bool ste, int subsongs) {
     const uint16_t playRegs = regs({D0, D1, D2, D3, D4, D5, D6, 8, 9, 10, 11, 12});
-    std::array<int, 3> sid{}, buz{}, dig{};
+    std::array<int, 3> sid{}, buz{}, dig{}, fm{};
     for (int v = 0; v < 3; ++v) {
         sid[size_t(v)] = a.label();
         buz[size_t(v)] = a.label();
         dig[size_t(v)] = a.label();
+        fm[size_t(v)] = a.label();
     }
 
     // ------------------------------------------------------------------------------------- init (d0 = subsong)
@@ -400,6 +432,42 @@ void emitRoutine(Asm& a, const Labels& L, bool ste, int subsongs) {
             h(kValue);
             a.move(Size::B, postInc(0), disp(2, voiceVar(v, kVal)));
             a.bra(opLoop);
+            // FM Voice: its periods, byte by byte, into the channel's table (D2 = its length in bytes, A3 = the
+            // table); a start also points the table at its first step.
+            const auto periods = [&] {
+                const int copy = a.label();
+                a.moveq(0, D2);
+                a.move(Size::B, postInc(0), dn(D2));
+                a.add(Size::W, dn(D2), D2);
+                a.move(Size::B, dn(D2), disp(2, voiceVar(v, kFmLen)));
+                a.lea(disp(2, voiceVar(v, kFmTab)), 3);
+                a.subq(Size::W, 1, dn(D2));
+                a.bind(copy);
+                a.move(Size::B, postInc(0), postInc(3));
+                a.dbf(D2, copy);
+            };
+            h(kFmStart);
+            startWith(fm[size_t(v)]);
+            periods();
+            a.move(Size::B, imm(0), disp(2, voiceVar(v, kFmAt)));
+            startTimer(a, v, D1);
+            a.bra(opLoop);
+            h(kFmPeriods);
+            {
+                // Interrupts masked while the table changes, so that none writes half of a period.
+                const int in = a.label();
+                a.moveFromSr(D5);
+                a.oriSr(0x0700);
+                periods();
+                a.moveToSr(D5);
+                // A shorter table: from its first step.
+                a.move(Size::B, disp(2, voiceVar(v, kFmAt)), dn(D2));
+                a.cmp(Size::B, disp(2, voiceVar(v, kFmLen)), D2);
+                a.bccS(CS, in);
+                a.move(Size::B, imm(0), disp(2, voiceVar(v, kFmAt)));
+                a.bind(in);
+            }
+            a.bra(opLoop);
         }
         if (ste) {
             // DMA start: sound stopped, copy number (two bytes) → DMA table entry of 16 bytes (offset of the copy
@@ -441,7 +509,8 @@ void emitRoutine(Asm& a, const Labels& L, bool ste, int subsongs) {
         a.bra(opLoop);
     }
 
-    for (int v = 0; v < 3; ++v) emitIrqHandlers(a, L, v, sid[size_t(v)], buz[size_t(v)], dig[size_t(v)]);
+    for (int v = 0; v < 3; ++v)
+        emitIrqHandlers(a, L, v, sid[size_t(v)], buz[size_t(v)], dig[size_t(v)], fm[size_t(v)]);
 }
 
 // ----------------------------------------------------------------------------------------------------- Frames
@@ -507,8 +576,9 @@ public:
             const RegisterFrame& f = sub.frames[k];
             const std::array<uint8_t, 14> r = atariRegisters(f, ratio_, report_.clampedPeriods);
             std::vector<uint8_t> ops;
-            // owned: the channel's volume belongs to its interrupt (SID, Digidrum); started: effect (re)started here.
-            std::array<bool, 3> owned{}, started{};
+            // owned: the channel's volume belongs to its interrupt (SID, Digidrum); toned: its tone period (FM
+            // Voice); started: effect (re)started here.
+            std::array<bool, 3> owned{}, toned{}, started{};
             std::array<uint8_t, 3> startLevel{};
             int buzzStart = -1;
             bool buzzOn = false;
@@ -518,8 +588,9 @@ public:
                 int type = kNone;
                 if (e.on) {
                     type = e.gen == Generator::Sid ? kSid : e.gen == Generator::SyncBuzzer ? kBuzzer
-                                                    : e.gen == Generator::Digidrum ? kDrum : kNone;
-                    if (type == kDrum && info_.digidrums[e.value & 7].empty()) type = kNone;
+                                                    : e.gen == Generator::Digidrum ? kDrum
+                                                    : e.gen == Generator::Fm ? kFm : kNone;
+                    if (type == kDrum && drum(e.value).empty()) type = kNone;
                     if (!e.timer.running()) type = kNone;
                     if (type == kNone) ++report_.droppedEffects;
                 }
@@ -530,15 +601,39 @@ public:
                 }
                 // value: Digidrum slot, otherwise SID level or buzzer shape. A start (re)loads the timer; otherwise
                 // only what changed is sent.
-                const uint8_t value = uint8_t(type == kDrum ? (e.value & 7) : (e.value & 15));
+                const uint8_t value = uint8_t(type == kDrum ? e.value : (e.value & 15));
                 const uint8_t ctrl = uint8_t(e.timer.prescaler & 7), data = uint8_t(e.timer.data & 0xFF);
                 const bool start = e.restart || s.type != type || (type == kDrum && value != s.value);
+                if (type == kFm) {
+                    // The periods of its steps: the note's divided by their multiples, as the engine does.
+                    const FmTable t = fmTable(e, r, v);
+                    if (start) {
+                        ops.insert(ops.end(), {voiceOp(v, kFmStart), ctrl, data});
+                        s = Voice{type, e.timer, 0, 0.0};
+                        started[size_t(v)] = true;
+                    } else {
+                        if (e.timer.data != s.timer.data) ops.insert(ops.end(), {voiceOp(v, kData), data});
+                        if (e.timer.prescaler != s.timer.prescaler) ops.insert(ops.end(), {voiceOp(v, kCtrl), ctrl});
+                        s.timer = e.timer;
+                        if (t == s.fm) {
+                            toned[size_t(v)] = true;
+                            continue;
+                        }
+                        ops.push_back(voiceOp(v, kFmPeriods));
+                    }
+                    ops.push_back(t.steps);
+                    for (int i = 0; i < t.steps; ++i)
+                        ops.insert(ops.end(), {uint8_t(t.period[size_t(i)] >> 8), uint8_t(t.period[size_t(i)])});
+                    s.fm = t;
+                    toned[size_t(v)] = true;
+                    continue;
+                }
                 if (start) {
                     ops.insert(ops.end(), {voiceOp(v, type == kSid ? kSidStart : type == kBuzzer ? kBuzStart : kDigStart), ctrl, data, value});
                     s = Voice{type, e.timer, value, 0.0};
                     started[size_t(v)] = true;
                     if (type == kSid) startLevel[size_t(v)] = value;
-                    if (type == kDrum) startLevel[size_t(v)] = uint8_t(info_.digidrums[value][0] & 15);
+                    if (type == kDrum) startLevel[size_t(v)] = uint8_t(drum(value)[0] & 15);
                     if (type == kBuzzer) buzzStart = v;
                 } else {
                     if (e.timer.data != s.timer.data) ops.insert(ops.end(), {voiceOp(v, kData), data});
@@ -550,7 +645,7 @@ public:
                 owned[size_t(v)] = type != kBuzzer;
                 buzzOn = buzzOn || type == kBuzzer;
                 if (type == kDrum) {  // the engine still loops the sample: the SNDH has finished it
-                    if (s.irqs > double(info_.digidrums[value].size()) + 1) ++report_.heldDrums;
+                    if (s.irqs > double(drum(value).size()) + 1) ++report_.heldDrums;
                     s.irqs += e.timer.hz() / std::max(1u, info_.frameHz);
                 }
             }
@@ -561,6 +656,10 @@ public:
             uint16_t mask = 0;
             std::vector<uint8_t> values;
             for (int reg = 0; reg < 13; ++reg) {
+                if (reg < 6 && toned[size_t(reg / 2)]) {  // the FM Voice's interrupt writes the tone period
+                    shadow[size_t(reg)] = -1;
+                    continue;
+                }
                 const int v = reg - 8;
                 if (v >= 0 && v < 3 && owned[size_t(v)]) {  // register of the interrupt: written at the attack only
                     if (started[size_t(v)]) {
@@ -597,11 +696,39 @@ public:
     const std::vector<DmaCopy>& copies() const noexcept { return copies_; }
 
 private:
+    static inline const SndhDmaSample kNoDma{};
+    // The 4-bit values of a Digidrum slot (empty past those given).
+    std::span<const uint8_t> drum(size_t slot) const noexcept {
+        return slot < info_.digidrums.size() ? info_.digidrums[slot] : std::span<const uint8_t>{};
+    }
+
+    // Tone periods of the steps of an FM Voice.
+    struct FmTable {
+        uint8_t steps = 0;
+        std::array<uint16_t, kFmSteps> period{};
+        bool operator==(const FmTable&) const = default;
+    };
+    static FmTable fmTable(const RegisterFrame::Effect& e, const std::array<uint8_t, 14>& r, int v) {
+        FmTable t;
+        t.steps = uint8_t(std::clamp<int>(e.value, 1, kFmSteps));
+        const double tp = double(r[size_t(2 * v)] | (r[size_t(2 * v + 1)] & 15) << 8);
+        for (int i = 0; i < t.steps; ++i) {
+            if (e.semis) {  // semitones above the note, as maxYMiser computes them
+                t.period[size_t(i)] = ymengine::fmSemitonePeriod(uint16_t(tp), e.wave[size_t(i)]);
+                continue;
+            }
+            const size_t m = std::min<size_t>(e.wave[size_t(i)], ymengine::kFmMultiples.size() - 1);
+            t.period[size_t(i)] = uint16_t(std::clamp(std::lround(tp / ymengine::kFmMultiples[m]), 1L, 4095L));
+        }
+        return t;
+    }
+
     struct Voice {
         int type = kNone;
         MfpSetting timer{};
         uint8_t value = 0;
         double irqs = 0;  // interrupts since the attack (digidrum)
+        FmTable fm{};     // FM Voice: the periods its interrupt plays
     };
 
     // DMA commands of one frame: start at the attack of a note (copy at its pitch and volume), stop at its end.
@@ -609,7 +736,7 @@ private:
     void dmaFrame(const ymengine::DmaFrame& d, std::vector<uint8_t>& ops, bool& on, ymengine::DmaFrame& cur) {
         if (d.voices > 1) ++report_.dmaOverlap;
         if (d.on && d.restart) {
-            const SndhDmaSample& s = info_.dma[d.slot & 7];
+            const SndhDmaSample& s = d.slot < info_.dma.size() ? info_.dma[d.slot] : kNoDma;
             const size_t ch = s.stereo ? 2 : 1;
             if (!info_.ste || s.data.size() < ch) {
                 ++report_.dmaDropped;
@@ -622,7 +749,7 @@ private:
                 on = false;
                 return;
             }
-            const uint16_t copy = copyFor(d.slot & 7, d.step, d.gain, d.start);
+            const uint16_t copy = copyFor(d.slot, d.step, d.gain, d.start);
             ops.insert(ops.end(), {kOpDmaStart, uint8_t(copy >> 8), uint8_t(copy)});
             on = true;
             cur = d;
@@ -745,7 +872,7 @@ SndhWriteResult sndhFile(std::span<const SndhSubsong> subsongs, const SndhWriteI
         a.b(0);
     }
     a.align();
-    std::vector<int> streamLabels, drumLabels(8, -1), copyLabels;
+    std::vector<int> streamLabels, drumLabels(info.digidrums.size(), -1), copyLabels;
     a.bind(L.subtab);
     for (size_t k = 0; k < subsongs.size(); ++k) {
         streamLabels.push_back(a.label());
@@ -753,7 +880,7 @@ SndhWriteResult sndhFile(std::span<const SndhSubsong> subsongs, const SndhWriteI
         a.l(uint32_t(subsongs[k].frames.size()));
     }
     a.bind(L.drumtab);
-    for (size_t k = 0; k < 8; ++k) {
+    for (size_t k = 0; k < drumLabels.size(); ++k) {
         // Empty slot: zero offset and length (the encoder never starts it).
         if (info.digidrums[k].empty()) {
             a.l(0);
@@ -779,7 +906,7 @@ SndhWriteResult sndhFile(std::span<const SndhSubsong> subsongs, const SndhWriteI
         a.bind(streamLabels[k]);
         a.out.insert(a.out.end(), streams[k].begin(), streams[k].end());
     }
-    for (size_t k = 0; k < 8; ++k) {
+    for (size_t k = 0; k < drumLabels.size(); ++k) {
         if (drumLabels[k] < 0) continue;
         a.bind(drumLabels[k]);
         for (const uint8_t v : info.digidrums[k]) a.b(uint8_t(v & 15));

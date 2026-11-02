@@ -2,8 +2,9 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// A bank keeps the eight DMA samples (settings, signed bytes and names) under a name, as the Digidrum banks keep the
-// eight Digidrum slots. The library is shared by all projects: a JSON file next to the preferences file:
+// A bank keeps the DMA samples of a project (settings, signed bytes and names) under a name, as the Digidrum banks keep
+// the Digidrum slots: eight at least, up to the last one used (127 at most). The library is shared by
+// all projects: a JSON file next to the preferences file:
 //   {"kind": "dmalib", "version": 1, "banks": [{"name": ..., "slots": [{"name", "rate" (Hz, one of kDmaRateHz),
 //    "stereo", "root", "cents", "loop", "start", "end", "data" (the signed bytes in base64)}, ...]}, ...]}
 // Tolerant reading: missing keys at their default, a rate brought to the nearest of the four, values brought back
@@ -20,18 +21,19 @@
 
 namespace stym::plugin {
 
-// A named bank: the settings of the eight slots, their bytes and their names.
+// A named bank: the settings of the slots, their bytes and their names (as many bytes as names; the settings past
+// them at their default).
 struct DmaBank {
     std::string name;
     ymengine::DmaParams dma{};
-    std::array<std::vector<int8_t>, ymengine::kDmaSlots> samples{};
-    std::array<std::string, ymengine::kDmaSlots> names{};
+    std::vector<SharedSamples<int8_t>> samples;
+    std::vector<std::string> names;
     bool operator==(const DmaBank&) const = default;
 };
 
-// The eight DMA slots of the state, named.
+// The DMA slots of the state, named: eight at least, up to the last one used.
 DmaBank captureDmaBank(const std::string& name, const NonParamState& state);
-// A bank into the state: the eight slots replaced.
+// A bank into the state: every slot replaced, those past the bank's emptied.
 void applyDmaBank(const DmaBank& bank, NonParamState& state);
 
 // The library file (format above). Reading fails only when the text is not JSON or not a DMA bank library; a bank

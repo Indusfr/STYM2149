@@ -15,8 +15,10 @@
 
 #include "gemui/Alert.h"
 #include "gemui/Menu.h"
+#include "gemui/Scroll.h"
 #include "plugincore/Parameters.h"
 #include "pluginui/MainWindow.h"
+#include "ymengine/Params.h"
 
 using namespace stym;
 using pluginui::MainWindow;
@@ -63,7 +65,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -164,6 +165,9 @@ void typeUnder(MainWindow& w, const std::string& id, std::string_view text, gemu
 void publish(TestHost& h, MainWindow& w, uint64_t serial, const std::function<void(plugin::EngineStatus&)>& fill) {
     plugin::EngineStatus t;
     t.serial = serial;
+    // Pan gains of 1: the meters of the two sides, taken after the pan, show the peaks as published.
+    t.panL.fill(1.0f);
+    t.panR.fill(1.0f);
     fill(t);
     h.pending = t;
     w.tick(0);
@@ -178,9 +182,12 @@ TEST_CASE("Mixer: Mixer button and Ctrl+M open the window, Escape closes it", "[
     click(w, "openMixBtn");
     CHECK(w.mixer().isOpen());
     CHECK_FALSE(w.desktop().hasModal());  // no more "not available yet" alert
-    // + the Master faders, the values, the Send.
+    // + the Master faders, the values, the Send; no row of Mono and Link without a DMA
+    // track. 16 ch: the 16 strips, no bar.
     CHECK(w.rectOf("mixWin") == gemui::Rect{110, 110, 1048 + 78, 325 + 24 + 32});
     CHECK(w.rectOf("mixFad15"));
+    CHECK_FALSE(w.rectOf("mixFad16"));
+    CHECK_FALSE(w.mixer().stripPane().hasHorizontal());
     CHECK(w.rectOf("vuhR"));
     gemui::KeyEvent esc;
     esc.key = gemui::Key::Escape;
@@ -188,6 +195,75 @@ TEST_CASE("Mixer: Mixer button and Ctrl+M open the window, Escape closes it", "[
     CHECK_FALSE(w.mixer().isOpen());
     CHECK(ctrl(w, U'm'));
     CHECK(w.mixer().isOpen());
+}
+
+TEST_CASE("Mixer: 32 strips in a pane as wide as 16, scrolled by its bar or to the focused track",
+          "[ui][mixer]") {
+    TestHost h;
+    h.values[size_t(paramIndex(Global::VoiceMode))] = 3;  // 32 ch
+    MainWindow w(h);
+    w.mixer().show();
+    gemui::ScrollPane& pane = w.mixer().stripPane();
+    const gemui::Rect view = *w.rectOf("mixStrips");
+    CHECK(view.w == 16 * 60 + 15 * 4);
+    CHECK(pane.hasHorizontal());
+    CHECK_FALSE(pane.hasVertical());
+    CHECK(pane.scroll().x == 0);
+    CHECK(w.rectOf("mixFad15")->right() <= view.right());
+    CHECK(w.rectOf("mixFad16")->x >= view.right());  // beyond the pane, hidden by its edge
+    CHECK(w.rectOf("mixSep")->x > view.right());
+    const gemui::Rect master = *w.rectOf("mixMaster");
+    // Half as thick as the other scroll bars, square arrows, along the bottom of the pane; closed by a rule
+    // along its bottom (Indus, 01/11/2026 12:03): 14 px, room for the arrows between the two rules.
+    CHECK(pane.closed());
+    CHECK(pane.barSize() == 14);
+    const gemui::Rect track = pane.partRect(gemui::ScrollPane::Part::TrackH);
+    CHECK(track.h == 14);
+    CHECK(track.bottom() == view.bottom());
+    CHECK(pane.partRect(gemui::ScrollPane::Part::Left) == gemui::Rect{view.x, view.bottom() - 14, 14, 14});
+    CHECK(pane.viewport().h == view.h - 14);
+    w.desktop().invalidateAll();
+    w.desktop().paint();
+    for (int x : {view.x + 1, track.x + 4, track.right() - 4, view.right() - 2}) {
+        CAPTURE(x);
+        CHECK(w.desktop().surface().at(x, view.bottom() - 1) == gemui::colors::kBlack);
+        CHECK(w.desktop().surface().at(x, view.bottom() - 2) == gemui::colors::kBlack);
+    }
+    // 8 px between the last buttons (S; Mono and Link on a DMA track only) and the bar (Indus, 30/10/2026
+    // 02:23).
+    CHECK(track.y - w.rectOf("mixSolo0")->bottom() == 8);
+    CHECK_FALSE(w.rectOf("mixLink0"));
+
+    // The bar's right arrow: 40 px further; the Master stays in place.
+    const gemui::Rect arrow = pane.partRect(gemui::ScrollPane::Part::Right);
+    const gemui::Point at{arrow.x + arrow.w / 2, arrow.y + arrow.h / 2};
+    w.desktop().mouseMove(at, {});
+    w.desktop().mouseDown(at, gemui::MouseButton::Left, {});
+    w.desktop().mouseUp(at, {});
+    CHECK(pane.scroll().x == 40);
+    CHECK(*w.rectOf("mixMaster") == master);
+
+    // Focus on track 32: its strip whole in view, at the end of the pane.
+    h.values[size_t(paramIndex(Global::FocusTrack))] = float(plugin::kTracks);
+    w.tick(0);
+    CHECK(pane.scroll().x == pane.maxScroll().x);
+    CHECK(w.rectOf("mixFad31")->x >= view.x);
+    CHECK(w.rectOf("mixFad31")->right() <= view.right());
+    // Its mute button, now in view, takes the click.
+    click(w, "mixMute31");
+    CHECK(h.track(plugin::kTracks - 1, Track::Mute) == 1.0f);
+    // Back to track 1: the first strip in view.
+    h.values[size_t(paramIndex(Global::FocusTrack))] = 1;
+    w.tick(0);
+    CHECK(pane.scroll().x == 0);
+
+    // Authentic 3ch: four strips, no bar, the window shorter by the bar's height.
+    const int tall = w.rectOf("mixWin")->h;
+    h.values[size_t(paramIndex(Global::VoiceMode))] = 1;
+    w.tick(0);
+    CHECK_FALSE(pane.hasHorizontal());
+    CHECK(w.rectOf("mixStrips")->w < view.w);
+    CHECK(w.rectOf("mixWin")->h < tall);
 }
 
 TEST_CASE("Mixer: fader and panning linked to the track's level and pan, one step per drag", "[ui][mixer]") {
@@ -246,7 +322,8 @@ TEST_CASE("Mixer: values under the faders and the pans, the pans named; right cl
     CHECK(w.rectOf("mixMasterVal")->y == fv.y);
     CHECK(w.rectOf("mixMaster2Val")->y == fv.y);
     CHECK(w.rectOf("mixMasterPanVal")->y == pv.y);
-    CHECK(w.rectOf("mixLink")->y == w.rectOf("mixMute2")->y);
+    CHECK(w.rectOf("mixMasterMono")->y == w.rectOf("mixMute2")->y);  // Mono, then Link under it
+    CHECK(w.rectOf("mixLink")->y == w.rectOf("mixSolo2")->y);
     CHECK(mix.valueText("mixMasterVal") == "70");
     CHECK(mix.valueText("mixMaster2Val") == "70");
     CHECK(mix.valueText("mixMasterPanVal") == "0");
@@ -320,7 +397,7 @@ TEST_CASE("Mixer: a click on a value under its slider types it in place, Enter c
     w.mixer().show();
     pluginui::MixerWindow& mix = w.mixer();
     // Each field as wide as the widest value of its slider (3 characters for a level, 4 for a pan) or as its text,
-    // plus a pixel on each side, centred on the strip.
+    // plus a pixel on each side, centred on the strip of a mono generator.
     const gemui::Rect lab = *w.rectOf("mixLab2"), fv = *w.rectOf("mixFadVal2");
     CHECK(fv.w == 3 * 6 + 2);
     CHECK(std::abs((2 * fv.x + fv.w) - (2 * lab.x + lab.w)) <= 1);
@@ -395,7 +472,7 @@ TEST_CASE("Mixer: a click on a value under its slider types it in place, Enter c
     CHECK_FALSE(mix.field("mixFadVal1")->editing());
 }
 
-TEST_CASE("Mixer: Send of each track to the delay, under the pan, 16 channels only", "[ui][mixer]") {
+TEST_CASE("Mixer: Send of each track to the delay, under the pan, 16 and 32 channels only", "[ui][mixer]") {
     TestHost h;
     MainWindow w(h);
     w.mixer().show();
@@ -407,7 +484,8 @@ TEST_CASE("Mixer: Send of each track to the delay, under the pan, 16 channels on
     CHECK(sv.y == send.bottom() + 4);
     CHECK(sv.h == 8);
     CHECK(w.rectOf("mixMute2")->y == sv.bottom() + 4);
-    CHECK(w.rectOf("mixLink")->y == w.rectOf("mixMute2")->y);
+    CHECK(w.rectOf("mixMasterMono")->y == w.rectOf("mixMute2")->y);  // Mono, then Link under it
+    CHECK(w.rectOf("mixLink")->y == w.rectOf("mixSolo2")->y);
     CHECK(mix.valueText("mixSendVal2") == "Send 0");
 
     // Dragged to its right end: one undo step of the track.
@@ -568,7 +646,7 @@ TEST_CASE("Mixer: 3 ch, strips A B C Digi without panning, faders on the 4-bit v
     h.values[size_t(paramIndex(Global::VoiceMode))] = 0;
     w.tick(0);
     CHECK(w.rectOf("mixPan15"));
-    // + the Master faders, the values, the Send.
+    // + the Master faders, the values, the Send; Mono and Link only on a DMA track.
     CHECK(w.rectOf("mixWin") == gemui::Rect{110, 110, 1048 + 78, 325 + 24 + 32});
 }
 
@@ -606,7 +684,7 @@ TEST_CASE("Mixer: Master fader after a rule, the main level of the SYSTEM frame"
 TEST_CASE("Mixer: two Masters with Link, left and right with a balance for stereo outputs, chips 1 and 2 in 2x3 "
           "channels, one Master in 3-channel mono",
           "[ui][mixer]") {
-    // 16 channels and 3 channels with the STE (DMA tracks): stereo, left and right; two chips (ST or STE): a Master per
+    // 32 channels and 3 channels with the STE (DMA tracks): stereo, left and right; two chips (ST or STE): a Master per
     // chip, no balance; 3 channels with the ST: mono, one Master.
     struct Mode {
         int voices, computer;
@@ -642,7 +720,11 @@ TEST_CASE("Mixer: two Masters with Link, left and right with a balance for stere
         CHECK(r.y == l.y);
         CHECK(r.h == l.h);
         CHECK(r.x == l.right() + 4);
-        CHECK(link.y == w.rectOf("mixMute0")->y);
+        // Stereo outputs: the Master's Mono on the row of M, Link under it; otherwise Link on the row of M.
+        const bool stereoOut = m.voices == 0 || m.computer == 1;
+        CHECK(bool(w.rectOf("mixMasterMono")) == stereoOut);
+        CHECK(link.y == w.rectOf(stereoOut ? "mixSolo0" : "mixMute0")->y);
+        if (stereoOut) CHECK(w.rectOf("mixMasterMono")->y == w.rectOf("mixMute0")->y);
         const std::optional<gemui::Rect> pan = w.rectOf("mixMasterPan");
         if (pan) {
             const std::string lastPan = "mixPan" + std::to_string(m.voices == 1 ? 11 : 15);  // a DMA track in 3 ch
@@ -751,20 +833,19 @@ TEST_CASE("Mixer: place and state kept when the plugin window reopens", "[ui][mi
     CHECK(gemui::FloatWindow::topmost(w) == &w.mixer());
 }
 
-TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and two meters (Indus, 26/10/2026)",
-          "[ui][mixer][dma]") {
+TEST_CASE("Mixer: a DMA track has two oscilloscopes and two meters, after the pan; the other generators one",
+          "[ui][mixer]") {
     using pluginui::MixerWindow;
     TestHost h;
-    // 16 channels on the STE: track 3 plays slot 2, stereo; track 4 slot 3, mono.
+    // 16 channels with the STE: tracks 4 and 5 play DMA, track 5 in Mono; the other generators are mono
+    // (Indus, 31/10/2026 16:56).
     h.values[size_t(paramIndex(Global::Computer))] = 1;
     for (int t : {3, 4}) h.values[size_t(paramIndex(t, Track::Generator))] = float(ymengine::Generator::Dma);
-    h.state.tracks[3].patch.dmaSlot = 2;
-    h.state.tracks[4].patch.dmaSlot = 3;
-    h.state.dma.slots[2].stereo = true;
+    h.values[size_t(paramIndex(4, Track::Mono))] = 1;
     MainWindow w(h);
     w.mixer().show();
-    // Stereo: the left and right oscilloscopes side by side, sharing their frame's line, centred on the strip; each
-    // side its fader and its meter, the right side's 4 px after the left meter.
+    // The left and right oscilloscopes side by side, sharing their frame's line, centred on the strip; each side its
+    // fader and its meter, the right side's 4 px after the left meter.
     const auto l = w.rectOf("mixScope3"), r = w.rectOf("mixScopeR3"), vl = w.rectOf("mixVu3"),
                vr = w.rectOf("mixVuR3"), fad = w.rectOf("mixFad3"), pan = w.rectOf("mixPan3");
     REQUIRE(l);
@@ -777,7 +858,17 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
     CHECK(w.rectOf("mixFadR3")->x == vl->right() + 4);
     CHECK(vr->x == w.rectOf("mixFadR3")->right() + 3);
     CHECK(vl->x == fad->right() + 3);
-    // Mono: one oscilloscope and one meter, as before.
+    // A Chip Voice track: one oscilloscope, fader and meter, its pan and send, one M and one S, neither Mono nor Link.
+    for (const char* id : {"mixScope2", "mixFad2", "mixVu2", "mixPan2", "mixSend2", "mixMute2", "mixSolo2"})
+        CHECK(w.rectOf(id));
+    for (const char* id : {"mixScopeR2", "mixFadR2", "mixVuR2", "mixMuteR2", "mixSoloR2", "mixMono2", "mixLink2"})
+        CHECK_FALSE(w.rectOf(id));
+    // M and S of every strip on the same rows.
+    CHECK(w.rectOf("mixMute2")->y == w.rectOf("mixMute3")->y);
+    CHECK(w.rectOf("mixSolo2")->y == w.rectOf("mixSolo3")->y);
+    // Mono: one oscilloscope and one meter, Mono and Link kept.
+    CHECK(w.rectOf("mixMono4"));
+    CHECK(w.rectOf("mixLink4"));
     CHECK(w.rectOf("mixScope4"));
     CHECK_FALSE(w.rectOf("mixScopeR4"));
     CHECK_FALSE(w.rectOf("mixVuR4"));
@@ -797,14 +888,20 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
         w.desktop().translateTip = keep;
         return seen;
     };
-    CHECK(tipAt({l->x + 10, l->y + 10}) == "Left side of the stereo sample");
-    CHECK(tipAt({r->x + 20, r->y + 10}) == "Right side of the stereo sample");
+    CHECK(tipAt({l->x + 10, l->y + 10}) == "Left side, after the pan");
+    CHECK(tipAt({r->x + 20, r->y + 10}) == "Right side, after the pan");
+    CHECK(tipAt({w.rectOf("mixScope4")->x + 12, w.rectOf("mixScope4")->y + 8}).empty());
 
-    // Peaks: the left side's on the left meter, the right side's on the right one; mono, the larger of the two.
+    // Peaks: the left side's on the left meter, the right side's on the right one, each × the gain of the pan on its
+    // side; Mono and a mono generator, the larger of the two, before the pan.
     publish(h, w, 10, [](plugin::EngineStatus& t) {
         t.peak[3] = 0.25f;
         t.peakR[3] = 1.0f;
         t.peak[4] = t.peakR[4] = 0.5f;
+        t.panL[4] = t.panR[4] = 0.5f;
+        t.peak[2] = t.peakR[2] = 0.4f;
+        t.panL[2] = 1.0f;
+        t.panR[2] = 0.0f;
         for (size_t j = 0; j < t.trackScope[3].size(); ++j) {
             t.trackScope[3][j] = 0.5f;  // mean of 0 on the left and 1 on the right
             t.trackSide[3][j] = 0.5f;
@@ -815,6 +912,20 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
     CHECK(w.mixer().meter(3, true).clip());
     CHECK_FALSE(w.mixer().meter(3).clip());
     CHECK(w.mixer().meter(4).fill() == Catch::Approx(MixerWindow::vuPct(0.5)));
+    CHECK(w.mixer().meter(2).fill() == Catch::Approx(MixerWindow::vuPct(0.4)));
+    // A track back to Chip Voice: one side again, the window as tall (the other DMA track keeps the rows).
+    const int tall = w.rectOf("mixWin")->h;
+    h.values[size_t(paramIndex(3, Track::Generator))] = float(ymengine::Generator::Chip);
+    w.tick(0);
+    CHECK_FALSE(w.rectOf("mixScopeR3"));
+    CHECK_FALSE(w.rectOf("mixMono3"));
+    CHECK(w.rectOf("mixWin")->h == tall);
+    // No DMA track left: the rows of Mono and Link go.
+    h.values[size_t(paramIndex(4, Track::Generator))] = float(ymengine::Generator::Chip);
+    w.tick(0);
+    CHECK(w.rectOf("mixWin")->h == tall - 42);
+    for (int t : {3, 4}) h.values[size_t(paramIndex(t, Track::Generator))] = float(ymengine::Generator::Dma);
+    w.tick(0);
     // The left oscilloscope draws its trace at the zero line, the right one high (y = H/2 − v × H × 0.85).
     w.desktop().paint();
     auto darkRow = [&](const gemui::Rect& s) {
@@ -824,85 +935,124 @@ TEST_CASE("Mixer: a DMA track playing a stereo sample has two oscilloscopes and 
         return -1;
     };
     CHECK(darkRow(*r) < darkRow(*l));
+    // Panned hard left (cos 0 = 1, sin 0 = 0): the right side's meter falls to nothing.
+    publish(h, w, 11, [](plugin::EngineStatus& t) {
+        t.peak[3] = t.peakR[3] = 0.5f;
+        t.panL[3] = 1.0f;
+        t.panR[3] = 0.0f;
+    });
+    CHECK(w.mixer().meter(3).fill() == Catch::Approx(MixerWindow::vuPct(0.5)));
+    CHECK(w.mixer().meter(3, true).fill() == 0);
 
-    // The slot turns mono: one oscilloscope, one meter.
-    h.editExtras([](plugin::NonParamState& s) { s.dma.slots[2].stereo = false; });
+    // 3 channels with the STE: the YM channels A, B, C and Digi stay mono (Indus, 03:52), the DMA tracks have two
+    // sides.
+    h.values[size_t(paramIndex(Global::VoiceMode))] = 1;
+    h.values[size_t(paramIndex(Global::Computer))] = 1;
     w.tick(0);
-    CHECK_FALSE(w.rectOf("mixScopeR3"));
-    CHECK_FALSE(w.rectOf("mixVuR3"));
-    CHECK(w.rectOf("mixScope3")->w == 30);
-    CHECK(tipAt({w.rectOf("mixScope3")->x + 12, w.rectOf("mixScope3")->y + 8}).empty());
+    for (const char* id : {"mixScopeR0", "mixScopeR3", "mixMono0", "mixLink3"}) CHECK_FALSE(w.rectOf(id));
+    CHECK(w.rectOf("mixScopeR5"));
+    CHECK(w.rectOf("mixMono5"));
 }
 
-TEST_CASE("Mixer: a stereo sample's right side has its fader, M and S, and Link (Indus, 26/10/2026)",
-          "[ui][mixer][dma]") {
+TEST_CASE("Mixer: the right side's fader, M and S, Link, and Mono above it", "[ui][mixer]") {
     TestHost h;
-    // 16 channels on the STE: track 3 plays slot 2, stereo; track 4 slot 3, mono.
+    // 16 channels with the STE: track 4 plays DMA.
     h.values[size_t(paramIndex(Global::Computer))] = 1;
-    for (int t : {3, 4}) h.values[size_t(paramIndex(t, Track::Generator))] = float(ymengine::Generator::Dma);
-    h.state.tracks[3].patch.dmaSlot = 2;
-    h.state.tracks[4].patch.dmaSlot = 3;
-    h.state.dma.slots[2].stereo = true;
+    h.values[size_t(paramIndex(3, Track::Generator))] = float(ymengine::Generator::Dma);
     MainWindow w(h);
     pluginui::MixerWindow& mix = w.mixer();
     mix.show();
-    // Each side its fader and value, M and S under them; Link on a row of its own, under the S.
+    // Each side its fader and value, M and S under them; Mono and Link on rows of their own, under the S.
     const gemui::Rect fl = *w.rectOf("mixFad3"), fr = *w.rectOf("mixFadR3");
     CHECK(fr.y == fl.y);
     CHECK(fr.h == fl.h);
     CHECK(w.rectOf("mixFadRVal3")->y == w.rectOf("mixFadVal3")->y);
     const gemui::Rect ml = *w.rectOf("mixMute3"), mr = *w.rectOf("mixMuteR3");
     const gemui::Rect sl = *w.rectOf("mixSolo3"), sr = *w.rectOf("mixSoloR3"), link = *w.rectOf("mixLink3");
+    const gemui::Rect mono = *w.rectOf("mixMono3");
     CHECK(mr.y == ml.y);
     CHECK(sr.y == sl.y);
     CHECK(ml.x < fl.right());
     CHECK(mr.x > fl.right());
-    CHECK(link.y == sl.bottom() + 4);
+    CHECK(mono.y == sl.bottom() + 4);
+    CHECK(link.y == mono.bottom() + 4);
     CHECK(link.x + link.w / 2 == (ml.x + mr.right()) / 2);
-    // The mono strip: none of them; its M aligned with the stereo strip's.
-    for (const char* id : {"mixFadR4", "mixFadRVal4", "mixMuteR4", "mixSoloR4", "mixLink4"}) CHECK_FALSE(w.rectOf(id));
-    CHECK(w.rectOf("mixMute4")->y == ml.y);
-    // The Masters' Link stays on the row of M.
-    CHECK(w.rectOf("mixLink")->y == ml.y);
+    CHECK(mono.x + mono.w / 2 == (ml.x + mr.right()) / 2);
+    // The Masters: Mono on the row of M, Link on the row of S.
+    CHECK(w.rectOf("mixMasterMono")->y == ml.y);
+    CHECK(w.rectOf("mixLink")->y == sl.y);
     CHECK(mix.valueText("mixFadRVal3") == "75");
 
-    // Linked (the default): the right fader moves the Volume, the left fader with it.
+    // Linked (the default): the right fader moves the Volume, the left fader with it; the right side's M and S are the
+    // track's.
     drag(w, {fr.x + 8, fr.y + 2}, {{fr.x + 8, fr.y + 10}, {fr.x + 8, fr.y + 48}});
     CHECK(h.track(3, Track::Level) == 50.0f);
     CHECK(h.track(3, Track::LevelR) == 75.0f);
     CHECK(mix.valueText("mixFadVal3") == "50");
     CHECK(mix.valueText("mixFadRVal3") == "50");
     CHECK(h.editor.undo.undoSize() == 1);
-    // Link off: the right side keeps the level, then moves alone. One undo step each.
+    click(w, "mixMuteR3");
+    CHECK(h.track(3, Track::Mute) == 1.0f);
+    CHECK(h.track(3, Track::MuteR) == 0.0f);
+    CHECK(h.editor.undo.undoSize() == 2);
+    // Link off: the right side keeps the level, M and S, then moves alone. One undo step each.
     click(w, "mixLink3");
     CHECK(h.track(3, Track::Link) == 0.0f);
     CHECK(h.track(3, Track::LevelR) == 50.0f);
-    CHECK(h.editor.undo.undoSize() == 2);
+    CHECK(h.track(3, Track::MuteR) == 1.0f);
+    CHECK(h.editor.undo.undoSize() == 3);
     drag(w, {fr.x + 8, fr.y + 26}, {{fr.x + 8, fr.y + 40}, {fr.x + 8, fr.y + 70}});
     CHECK(h.track(3, Track::Level) == 50.0f);
     CHECK(h.track(3, Track::LevelR) < 50.0f);
-    CHECK(h.editor.undo.undoSize() == 3);
+    CHECK(h.editor.undo.undoSize() == 4);
     CHECK(mix.field("mixFadRVal3"));  // typed in place like the others
     // M and S of each side.
     click(w, "mixMuteR3");
-    CHECK(h.track(3, Track::MuteR) == 1.0f);
-    CHECK(h.track(3, Track::Mute) == 0.0f);
+    CHECK(h.track(3, Track::MuteR) == 0.0f);
+    CHECK(h.track(3, Track::Mute) == 1.0f);
     click(w, "mixSoloR3");
     CHECK(h.track(3, Track::SoloR) == 1.0f);
     CHECK(h.track(3, Track::Solo) == 0.0f);
-    CHECK(h.editor.undo.undoSize() == 5);
+    CHECK(h.editor.undo.undoSize() == 6);
     // Undo: Solo R, Mute R, the right fader, then Link back on.
     for (int k = 0; k < 3; ++k) CHECK(ctrl(w, U'z'));
     CHECK(h.track(3, Track::SoloR) == 0.0f);
-    CHECK(h.track(3, Track::MuteR) == 0.0f);
+    CHECK(h.track(3, Track::MuteR) == 1.0f);
     CHECK(h.track(3, Track::LevelR) == 50.0f);
     CHECK(ctrl(w, U'z'));
     CHECK(h.track(3, Track::Link) == 1.0f);
 
-    // The slot turns mono: the strip loses them, and the Link row goes.
+    // Mono: one fader, M and S, Link greyed (a click does nothing); the window keeps its height. One undo step.
     const int tall = w.rectOf("mixWin")->h;
-    h.editExtras([](plugin::NonParamState& s) { s.dma.slots[2].stereo = false; });
+    click(w, "mixMono3");
+    CHECK(h.track(3, Track::Mono) == 1.0f);
+    for (const char* id : {"mixFadR3", "mixMuteR3", "mixSoloR3", "mixScopeR3"}) CHECK_FALSE(w.rectOf(id));
+    CHECK(w.rectOf("mixLink3"));
+    click(w, "mixLink3");
+    CHECK(h.track(3, Track::Link) == 1.0f);
+    CHECK(w.rectOf("mixWin")->h == tall);
+    CHECK(ctrl(w, U'z'));
+    CHECK(h.track(3, Track::Mono) == 0.0f);
+    CHECK(w.rectOf("mixFadR3"));
+
+    // The Master's Mono: one fader, its Link greyed, no undo step; off, the two faders again.
+    const size_t steps = h.editor.undo.undoSize();
+    click(w, "mixMasterMono");
+    CHECK(h.values[size_t(paramIndex(Global::MasterMono))] == 1.0f);
+    CHECK_FALSE(w.rectOf("mixMaster2"));
+    CHECK(w.rectOf("mixMaster")->x + 8 == w.rectOf("mixMasterMono")->x + w.rectOf("mixMasterMono")->w / 2);
+    click(w, "mixLink");
+    CHECK(h.values[size_t(paramIndex(Global::MasterLink))] == 1.0f);
+    CHECK(h.editor.undo.undoSize() == steps);
+    click(w, "mixMasterMono");
+    CHECK(h.values[size_t(paramIndex(Global::MasterMono))] == 0.0f);
+    CHECK(w.rectOf("mixMaster2"));
+
+    // 3 channels with the ST: mono strips and output, neither Mono nor Link, the rows gone (Indus, 03:55).
+    h.values[size_t(paramIndex(Global::VoiceMode))] = 1;
+    h.values[size_t(paramIndex(Global::Computer))] = 0;
     w.tick(0);
-    for (const char* id : {"mixFadR3", "mixMuteR3", "mixSoloR3", "mixLink3"}) CHECK_FALSE(w.rectOf(id));
-    CHECK(w.rectOf("mixWin")->h == tall - 21);
+    for (const char* id : {"mixMono0", "mixLink0", "mixMasterMono", "mixLink"}) CHECK_FALSE(w.rectOf(id));
+    // Without the rows of Mono and Link (42), of the pan and of the send (32 each), and the Out R meter (22).
+    CHECK(w.rectOf("mixWin")->h == tall - 42 - 32 - 32 - 22);
 }

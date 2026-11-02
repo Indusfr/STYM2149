@@ -140,14 +140,14 @@ void RecorderWindow::refresh() {
         text = "Recording chip " + std::to_string(r.chip + 1) + ": " + duration(r.frames, uint32_t(vbl)) + ", " +
                std::to_string(r.frames) + " frames.";
     else if (!regs)
-        text = "16 ch has no YM registers: switch to 3ch or 2x3ch.";
+        text = "16 and 32 ch have no YM registers: switch to 3ch or 2x3ch.";
     else if (r.state == State::Armed)
         text = std::string("Armed: the take starts when ") + who + ".";
     else
         text = "Ready.";
     status_.setText(text);
     rec_.setOn(r.state != State::Idle);
-    rec_.setEnabled(regs || r.state != State::Idle);  // in 16 ch, still able to stop a take armed before
+    rec_.setEnabled(regs || r.state != State::Idle);  // in 16 and 32 ch, still able to stop a take armed before
     takev_.setText(r.takeFrames ? std::to_string(r.takeFrames) + " frames, " + duration(r.takeFrames, r.takeHz) +
                                       " at " + std::to_string(r.takeHz) + " Hz, chip " + std::to_string(r.takeChip + 1)
                                 : std::string("none"));

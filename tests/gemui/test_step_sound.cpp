@@ -56,7 +56,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::map<std::string, std::string, std::less<>> prefs;
     std::string preference(std::string_view k, std::string_view fallback) const override {
         const auto it = prefs.find(k);

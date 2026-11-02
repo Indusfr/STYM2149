@@ -50,7 +50,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }
@@ -114,7 +113,7 @@ TEST_CASE("Recorder: File menu, chip, Rec that arms and stops, states shown", "[
     REQUIRE(r.isOpen());
 
     // 16 voices: no registers, Rec greyed out.
-    CHECK(r.status() == "16 ch has no YM registers: switch to 3ch or 2x3ch.");
+    CHECK(r.status() == "16 and 32 ch have no YM registers: switch to 3ch or 2x3ch.");
     CHECK(r.takeText() == "none");
     click(w, "recRec");
     CHECK(h.arms.empty());

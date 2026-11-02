@@ -165,6 +165,13 @@ Rec parseRec(const std::string& line) {
     std::string op;
     ls >> r.sample >> op >> r.voice >> r.a >> r.b >> r.x >> r.y >> r.z;
     r.op = op.empty() ? 0 : op[0];
+    // Voice indices of the prototype's 16 tracks (16 track voices, 80 chord voices, then the free ones) in the engine's
+    // 32: the chord voices and the free voices come after more track voices. P names a track, not a voice.
+    constexpr int kProtoLane = 16, kProtoChord = 16 * ymengine::kSeqChordVoices;
+    if (r.op != 'P' && r.voice >= kProtoLane)
+        r.voice += r.voice < kProtoLane + kProtoChord
+                       ? Engine::kLaneVoices - kProtoLane
+                       : Engine::kLaneVoices + Engine::kChordVoices - kProtoLane - kProtoChord;
     return r;
 }
 
@@ -208,8 +215,8 @@ TEST_CASE("Prototype: sequencer playback (voice log, 16-channel, 3-channel, MIDI
         REQUIRE(c.table.size() == g.slideTable.size());
         for (size_t i = 0; i < c.table.size(); ++i) g.slideTable[i] = float(c.table[i]);
         e.setGlobal(g);
-        REQUIRE(c.smp.size() == size_t(kDigidrumSlots));
-        for (int k = 0; k < kDigidrumSlots; ++k) {
+        REQUIRE(c.smp.size() == size_t(kDigidrumPads));  // the eight samples of the prototype
+        for (int k = 0; k < kDigidrumPads; ++k) {
             std::vector<uint8_t> d(size_t(c.smp[size_t(k)]));
             for (size_t i = 0; i < d.size(); ++i) d[i] = uint8_t((i * size_t(k + 3)) & 15);
             e.setUserSample(k, d);

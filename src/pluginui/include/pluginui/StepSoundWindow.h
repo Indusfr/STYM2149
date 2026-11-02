@@ -101,6 +101,7 @@ private:
     std::vector<std::unique_ptr<gemui::Label>> headings_;
     SidWaveGrid wave_;
     gemui::Label none_{"Chip Voice: no settings of its own"};
+    Paragraph fmLegend_;  // the multiples of the FM wave's steps
     gemui::Label hint_{"", 12};
     std::vector<std::function<double(double x, double y)>> lines_;  // layout, top to bottom
 };

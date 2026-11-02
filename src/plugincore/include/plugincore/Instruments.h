@@ -2,7 +2,7 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// An instrument is the sound of a track stored in the project under a name, up to 32 ($01 to $20). The melodic steps
+// An instrument is the sound of a track stored in the project under a name, up to 127. The melodic steps
 // whose INS row designates it play it (sound and arpeggio; level, pan and gate stay those of the track).
 // The patch of the prototype (plugincore/Patches.h) is its exchange format: an instrument carries what a patch
 // carries, loading it into a track is a patch load (libApply), and the Patches library stores instruments.

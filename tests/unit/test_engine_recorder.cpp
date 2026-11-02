@@ -179,8 +179,8 @@ TEST_CASE("Recorder: muted channels at zero volume, timer effects described", "[
     }
 }
 
-TEST_CASE("Recorder: chosen chip, end of a take (room, mode), nothing in 16-channel mode", "[engine][recorder]") {
-    // 16-channel: no registers.
+TEST_CASE("Recorder: chosen chip, end of a take (room, mode), nothing in 32-channel mode", "[engine][recorder]") {
+    // 32-channel: no registers.
     Rig s(ymengine::VoiceMode::Studio16);
     s.e.startCapture(0, s.frames);
     CHECK_FALSE(s.e.capturing());

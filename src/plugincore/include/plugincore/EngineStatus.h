@@ -4,13 +4,13 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Takes over the messages from the audio processor of the prototype to its page:
-// - "st" (20 times per second): one LED per track that has an audible voice (active track, non-zero level, neither
-//   muted nor excluded by a solo); envelope of the most recent voice of the focused track that is not fading (stage
-//   and level; without ADSR: sustain at full);
+// - "st" (20 times per second): one LED per track that has an audible voice (non-zero level, neither muted nor
+//   excluded by a solo; a switched-off track sounds only when played live); envelope of the most recent voice
+//   of the focused track that is not fading (stage and level; without ADSR: sustain at full);
 // - "tp": period of the last attacked note ("Note" readout and register monitor), and whether a voice still sounds
 //   (the readout goes back to "-" when none does);
 // - the Web Audio analyser (2048 samples): here the last samples of the main output, (left + right) / 2, like the
-//   mono mix of the analyser;
+//   mono mix of the analyser, and half their difference;
 // - the sequencer ("st" and "pa" messages: step played, pattern switched): playback, MIDI clock received,
 //   pattern played and pending, step, Song entry, tempo; step played in the arpeggio table ("st": astep);
 // - the meters and oscilloscopes of the Mixer ("st": pk, opk, scope): peak of each track (Engine::takeMeters)
@@ -19,6 +19,7 @@
 // The audio thread captures after each block and publishes at 30 Hz (the editor's rate) through a triple buffer.
 #pragma once
 #include <array>
+#include <bitset>
 #include <cstdint>
 
 #include "plugincore/Parameters.h"
@@ -51,6 +52,10 @@ struct EngineStatus {
     std::array<EnvPoint, kEnvPoints> env{};
     uint8_t envCount = 0;
     std::array<float, kScopeSamples> scope{};  // from oldest to most recent
+    // Half the difference of the right and left outputs around scope (their mean), in the same order: left =
+    // scope − scopeSide, right = scope + scopeSide; zero for a mono output (the oscilloscope's left and right halves,
+    // Indus, 29/10/2026 10:54).
+    std::array<float, kScopeSamples> scopeSide{};
     ymengine::Engine::SeqStatus seq;     // sequencer
     int8_t arpStep = -1;                 // step of the arpeggio table played (Arpeggiator window: astep), -1 otherwise
     std::array<float, kTracks> peak{};   // peak of each track (1 = a single channel at the highest level)
@@ -61,11 +66,14 @@ struct EngineStatus {
     // same order: left = trackScope − trackSide, right = trackScope + trackSide.
     std::array<float, kTracks> peakR{};
     std::array<std::array<float, kTrackScopePoints>, kTracks> trackSide{};
+    // Gains of each track's panning (left, right; constant power, cos and sin of (pan + 1) × π/4): the Mixer shows a
+    // panned track's left and right outputs, its peaks and oscilloscope multiplied by them.
+    std::array<float, kTracks> panL{}, panR{};
     // STE DMA sound: bank slots played by a voice or by the preview (bit k: slot k).
-    uint8_t dmaSlots = 0;
+    std::bitset<ymengine::kDmaSlotsMax> dmaSlots;
     // Slots previewed by the Play buttons of the Digidrums and DMA windows (-1: none); a looping preview lights
     // its Play button, whose click stops it.
-    int8_t digiPreview = -1, dmaPreview = -1;
+    int16_t digiPreview = -1, dmaPreview = -1;
     std::array<uint8_t, kTracks> program{};  // instrument chosen by Program Change (0: the track's sound)
     // Notes played live that the sequencer cut (Engine::manualCuts): a counter per MIDI note; when one moves,
     // the interface lets go of that key.
@@ -92,6 +100,7 @@ private:
 
     TripleBuffer<EngineStatus> buffer_;
     std::array<float, kScopeSamples> ring_{};  // last samples of the mono mix; ringPos_ is the oldest
+    std::array<float, kScopeSamples> sideRing_{};  // (right − left) / 2 of the same samples
     uint32_t ringPos_ = 0;
     uint32_t period_ = 1600, elapsed_ = 0;     // samples between publications, samples since the last one
     uint64_t serial_ = 0, noteSerial_ = 0, lastAge_ = 0;

@@ -8,6 +8,7 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -694,7 +695,7 @@ TEST_CASE("Commands: Fxx detunes the track by xx - 100 cents from its row on, he
 
 TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, frame after frame",
           "[engine][seq][commands]") {
-    // 16-channel: the accent goes down a straight line from VOL 15 to VOL 3 over the 6 ticks of row 0, then holds at
+    // 32-channel: the accent goes down a straight line from VOL 15 to VOL 3 over the 6 ticks of row 0, then holds at
     // the level of row 1, which has no Gxx.
     Rig r;
     SeqLane& l = r.lane(0);
@@ -743,7 +744,8 @@ TEST_CASE("Commands: Gxx glides the level of the step to that of the next step, 
     for (const double x : b) CHECK(x == 1);
 }
 
-TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to the next command, 16 channels only ",
+TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to the next command, 16 and 32 channels "
+          "only",
           "[engine][seq][commands]") {
     // Envelope slide up over rows 0 and 1 (B00 at row 2), noise slide down: straight, then Exponential (slow start).
     const auto run = [](VoiceMode mode, int curve) {
@@ -793,4 +795,65 @@ TEST_CASE("Commands: Kxx and Qxx give the Buzzer and Noise slides a curve up to 
     const auto [cur3, curN3] = run(VoiceMode::Authentic3, expo);
     CHECK(cur3 == lin3);
     CHECK(curN3 == linN3);
+}
+
+TEST_CASE("Commands: with Fade, a CUT fades out in 5 ms in 16 and 32 channels", "[engine][seq][commands]") {
+    // Largest step between two samples of the left output over [from, to) of a note cut by C03 (tick 3 = 2880
+    // samples): the edges of the square wave, not the slow return of the output to its rest level once silent.
+    auto run = [](bool fade, VoiceMode mode) {
+        Rig r(mode);
+        r.g.cutFade = fade;
+        SeqLane& l = r.lane(0);
+        l.pat[0] = 0;
+        l.tie[0] = 1;  // held through its row: the CUT ends it, not the gate
+        l.setCmd(0, seqCmd(SeqCmd::Cut, 3));
+        r.start();
+        std::vector<float> out(4000), right(4000);
+        r.e.render(out.data(), right.data(), uint32_t(out.size()));
+        auto peak = [&](size_t a, size_t b) {
+            float m = 0;
+            for (size_t k = a; k < b; ++k) m = std::max(m, std::fabs(out[k] - out[k - 1]));
+            return m;
+        };
+        return std::array<float, 3>{peak(1500, 2870), peak(2880 + 72, 2880 + 192), peak(2880 + 260, 4000)};
+    };
+    const auto off = run(false, VoiceMode::Studio16), on = run(true, VoiceMode::Studio16);
+    REQUIRE(off[0] > 0.01f);
+    CHECK(off[1] < off[0] * 0.05f);          // the prototype's cut: silent 1.5 ms later
+    CHECK(on[1] > on[0] * 0.2f);             // still fading 1.5 to 4 ms later
+    CHECK(on[2] < on[0] * 0.05f);            // silent after 5 ms
+    CHECK(run(true, VoiceMode::Studio32)[1] > on[0] * 0.2f);
+    // 3ch cuts as before, Fade or not.
+    const auto m3 = run(true, VoiceMode::Authentic3);
+    REQUIRE(m3[0] > 0.01f);
+    CHECK(m3[1] < m3[0] * 0.05f);
+}
+
+TEST_CASE("Commands: the fade of a CUT lasts the length set, 5 ms by default", "[engine][seq][commands]") {
+    CHECK(ymengine::GlobalParams{}.cutFadeMs == 5);
+    // Largest step between two samples of the left output over [from, to) samples after the CUT at tick 3 (2880
+    // samples at 48 kHz, 48 samples per ms), as above.
+    auto run = [](int ms) {
+        Rig r(VoiceMode::Studio16);
+        r.g.cutFade = true;
+        r.g.cutFadeMs = uint8_t(ms);
+        SeqLane& l = r.lane(0);
+        l.pat[0] = 0;
+        l.tie[0] = 1;
+        l.setCmd(0, seqCmd(SeqCmd::Cut, 3));
+        r.start();
+        std::vector<float> out(5000), right(5000);
+        r.e.render(out.data(), right.data(), uint32_t(out.size()));
+        return [out](int from, int to) {
+            float m = 0;
+            for (size_t k = size_t(from); k < size_t(to); ++k) m = std::max(m, std::fabs(out[k] - out[k - 1]));
+            return m;
+        };
+    };
+    const auto before = run(5)(1500, 2870);
+    REQUIRE(before > 0.01f);
+    const auto ms20 = run(20), ms1 = run(1);
+    CHECK(ms20(2880 + 10 * 48, 2880 + 15 * 48) > before * 0.2f);  // still fading 10 to 15 ms later
+    CHECK(ms20(2880 + 22 * 48, 5000) < before * 0.05f);           // silent after 20 ms
+    CHECK(ms1(2880 + 72, 2880 + 192) < before * 0.05f);           // 1 ms: silent 1.5 ms later
 }

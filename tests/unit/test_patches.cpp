@@ -151,7 +151,7 @@ TEST_CASE("Patches: missing keys, out-of-range values, short arrays", "[patches]
     CHECK(param(w, 0, Track::EnvPeriod) == 65535.0f);
     CHECK(param(w, 0, Track::Volume) == 15.0f);
     CHECK(param(w, 0, Track::NoisePeriod) == 1.0f);
-    CHECK(param(w, 0, Track::Generator) == 5.0f);  // last type (DMA)
+    CHECK(param(w, 0, Track::Generator) == 6.0f);  // last type (FM Voice)
     CHECK(param(w, 0, Track::SidRatio) == 8.0f);
     CHECK(param(w, 0, Track::VibRate) == 7.5f);
     CHECK(param(w, 0, Track::Level) == 100.0f);
@@ -232,9 +232,11 @@ TEST_CASE("Patches: stym key when a patch carries STYM2149 keys", "[patches]") {
     CHECK_FALSE(newer);
 }
 
-TEST_CASE("Patches: vibrato Off written as a STYM2149 key, On when absent (sixth DAW test)", "[patches]") {
+TEST_CASE("Patches: vibrato On/Off written as a STYM2149 key when its absence reads otherwise",
+          "[patches]") {
     ParamValues v = defaultValues();
     param(v, 0, Track::VibOn) = 0;
+    param(v, 0, Track::VibDepth) = 30;
     const std::vector<PatchEntry> lib = {snapPatch("No vib", v, NonParamState{}, 0)};
     const std::string text = dumpPatchLibrary(lib);
     CHECK(text.find("\"vibOn\": 0") != std::string::npos);
@@ -244,9 +246,22 @@ TEST_CASE("Patches: vibrato Off written as a STYM2149 key, On when absent (sixth
     ParamValues w = defaultValues();
     for (const auto& [i, x] : patchChange((*read)[0], NonParamState{}, 1).params) w[size_t(i)] = x;
     CHECK(param(w, 1, Track::VibOn) == 0.0f);
-    // A patch of the prototype has no vibOn: vibrato On.
+    // A patch of the prototype has no vibOn: vibrato On with a depth, which it played; Off without, the default.
     param(w, 1, Track::VibOn) = 0;
+    const auto read2 = parsePatchLibrary(R"([{"name":"P","patch":{"vibDepth":40}}])");
+    REQUIRE(read2);
+    for (const auto& [i, x] : patchChange((*read2)[0], {}, 1).params) w[size_t(i)] = x;
+    CHECK(param(w, 1, Track::VibOn) == 1.0f);
     for (const auto& [i, x] : patchChange(snapPatch("P", defaultValues(), NonParamState{}, 0), {}, 1).params)
         w[size_t(i)] = x;
+    CHECK(param(w, 1, Track::VibOn) == 0.0f);
+    // On without a depth: written, read back On.
+    ParamValues u = defaultValues();
+    param(u, 0, Track::VibOn) = 1;
+    const std::string on = dumpPatchLibrary({snapPatch("On", u, NonParamState{}, 0)});
+    CHECK(on.find("\"vibOn\": 1") != std::string::npos);
+    const auto read3 = parsePatchLibrary(on);
+    REQUIRE(read3);
+    for (const auto& [i, x] : patchChange((*read3)[0], {}, 1).params) w[size_t(i)] = x;
     CHECK(param(w, 1, Track::VibOn) == 1.0f);
 }

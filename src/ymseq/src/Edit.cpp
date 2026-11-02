@@ -615,6 +615,8 @@ void LaneEditor::moveNoteTo(Moving& m, int c2, int row2) noexcept {
 // ---------------------------------------------------------------- rectangular selection
 
 std::vector<RectNote> LaneEditor::rectNotes(const RectBounds& r) const {
+    // A note is taken when the box covers it entirely, its last step included (Indus, 28/10/2026 10:09); the
+    // prototype took every note starting in the box.
     std::vector<RectNote> out;
     for (int s = std::max(0, r.a); s <= std::min(r.b, kSteps - 1); ++s) {
         if (l_.pat[u(s)] >= 0) {
@@ -622,11 +624,12 @@ std::vector<RectNote> LaneEditor::rectNotes(const RectBounds& r) const {
             if (row >= r.r1 && row <= r.r2) {
                 int d = 1;
                 while (s + d < kSteps && l_.tie[u(s + d)] && l_.pat[u(s + d)] < 0) ++d;
-                out.push_back({s, row, l_.tie[u(s)] ? d : 1, l_.vol[u(s)], l_.slide[u(s)], l_.slc[u(s)], 1});
+                const int len = l_.tie[u(s)] ? d : 1;
+                if (s + len - 1 <= r.b) out.push_back({s, row, len, l_.vol[u(s)], l_.slide[u(s)], l_.slc[u(s)], 1});
             }
         }
-        // Deviation: the chord voices that start in the box are part of it, as the grid shows them (the
-        // prototype took the roots only: Delete, Cut, Copy and the moves left the voices behind).
+        // Deviation: the chord voices in the box are part of it, as the grid shows them (the prototype took the
+        // roots only: Delete, Cut, Copy and the moves left the voices behind).
         for (int v = 2; v <= kPolyMax; ++v) {
             const auto row = voiceRow(s, v);
             if (!row || *row < r.r1 || *row > r.r2) continue;
@@ -635,7 +638,7 @@ std::vector<RectNote> LaneEditor::rectNotes(const RectBounds& r) const {
             n.row = *row;
             n.len = voiceDur(s, v);
             n.v = v;
-            out.push_back(n);
+            if (s + n.len - 1 <= r.b) out.push_back(n);
         }
     }
     return out;
@@ -996,6 +999,20 @@ void LaneEditor::recordAt(int s, int note, int velocity) noexcept {
     l_.vol[u(s)] = uint8_t(std::max(1, int(std::floor(double(velocity) / 127.0 * 15.0 + 0.5))));  // velocity → accent
 }
 
+int LaneEditor::recordVoiceAt(int s, int note) noexcept {
+    if (!inLane(s)) return 0;
+    // Row of the note as recordAt writes it: percussion row, or the pitch under Snap relative to the track's octave.
+    const int row = c_.drum ? mod12(note) % 8
+                            : std::clamp(snapToScale(note, c_.scale, c_.scaleRoot, c_.snap), 0, 127) -
+                                  (c_.trackOctave + 1) * 12;
+    if (const int v = voiceAt(s, row)) return v;
+    const int v = freeVoice(s);
+    if (!v) return 0;
+    writeVoiceAt(s, row, v);
+    l_.vdur[u(v - 2)][u(s)] = 1;
+    return v;
+}
+
 // ---------------------------------------------------------------- resolution change
 
 Lane fitLane(const Lane& src, int num, int den) {
@@ -1022,10 +1039,11 @@ Lane fitLane(const Lane& src, int num, int den) {
     };
     // Roots first, each with the rows of its step; their lengths once they are all placed.
     std::vector<std::pair<int, int>> ends;  // new start, new end (excluded)
+    std::vector<bool> landed(N, false);     // a step of the source lands there
     for (int s = 0; s < N; ++s) {
-        if (src.pat[u(s)] < 0) continue;
         const int ns = at(s);
-        if (ns >= N || out.pat[u(ns)] >= 0) continue;
+        if (ns < N) landed[u(ns)] = true;
+        if (src.pat[u(s)] < 0 || ns >= N || out.pat[u(ns)] >= 0) continue;
         for (int r = 0; r < kRowCount; ++r)
             if (Row(r) != Row::Tie) out.set(Row(r), ns, src.get(Row(r), s));
         copyVoices(s, ns, false);
@@ -1051,6 +1069,13 @@ Lane fitLane(const Lane& src, int num, int den) {
         const int len = std::min(ends[k].second, next) - ns;
         if (len > 1)
             for (int j = 0; j < len; ++j) out.tie[u(ns + j)] = 1;
+    }
+    // A finer grid leaves held steps that no step of the source reaches: they take the VOL, SRC, GEN and PAN of the
+    // step before, which a held step otherwise sets back to the note's defaults (VOL 15: an imported module, with its
+    // volume on every held step, pulsed from one step to the next).
+    for (int ns = 1; ns < N; ++ns) {
+        if (landed[u(ns)] || out.pat[u(ns)] >= 0 || !out.tie[u(ns)] || !out.tie[u(ns - 1)]) continue;
+        for (const Row r : {Row::Vol, Row::Mix, Row::Fx, Row::Pnr}) out.set(r, ns, out.get(r, ns - 1));
     }
     return out;
 }

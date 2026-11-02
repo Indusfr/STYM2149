@@ -13,6 +13,7 @@
 #include <cstdio>
 
 #include "gemui/Font.h"
+#include "gemui/Language.h"
 
 namespace stym::pluginui {
 
@@ -110,23 +111,79 @@ void Canvas::blit(Painter& p, const Rect& r) const { p.image(r, px_.data(), w_, 
 
 Scope::Scope() { canvas_.fill(0, 44, 920, 2, colors::kBlack); }  // flat trace on the centre line until samples come
 
-void Scope::setSamples(std::span<const float> buf) {
+void Scope::place(const Box& b) {
+    setBox(b);
+    const int w = std::max(16, int(std::lround(b.w)) - 24);
+    if (w == canvas_.width()) return;
+    canvas_ = Canvas(w, 90);
+    if (mid_.empty())
+        canvas_.fill(0, 44, w, 2, colors::kBlack);
+    else
+        redraw();
+}
+
+void Scope::setSamples(std::span<const float> mid, std::span<const float> side, double gain, bool trigger) {
+    mid_.assign(mid.begin(), mid.end());
+    side_.assign(side.begin(), side.end());
+    gain_ = gain;
+    trigger_ = trigger;
+    redraw();
+}
+
+void Scope::setMerge(bool merge) {
+    if (merge == merge_) return;
+    merge_ = merge;
+    redraw();
+}
+
+void Scope::setStereo(bool stereo) {
+    if (stereo == stereo_) return;
+    stereo_ = stereo;
+    redraw();
+}
+
+void Scope::redraw() {
     canvas_.clear(colors::kWhite);
+    const int w = canvas_.width();
+    split_ = stereo_ && !merge_;
+    if (!split_) {
+        trace(mid_, 0, w);
+    } else {
+        // Left = mid − side, right = mid + side, in two halves apart; paint frames each one. Without side
+        // samples, the same trace on both sides.
+        const bool side = side_.size() == mid_.size();
+        std::vector<float> ch(mid_.size());
+        const int half = splitHalf(w);
+        for (size_t i = 0; i < ch.size(); ++i) ch[i] = mid_[i] - (side ? side_[i] : 0.f);
+        trace(ch, 0, half);
+        for (size_t i = 0; i < ch.size(); ++i) ch[i] = mid_[i] + (side ? side_[i] : 0.f);
+        trace(ch, w - half, half);
+    }
+    repaint();
+}
+
+void Scope::trace(std::span<const float> buf, int x0, int w) {
     const int n = int(buf.size());
+    if (n == 0) {
+        canvas_.fill(x0, 44, w, 2, colors::kBlack);
+        return;
+    }
     // Trigger: the first rising zero crossing in the first half, so that a steady wave stands still from one
     // update to the next; none found, the trace starts at sample 0.
     int start = 0;
-    for (int i = 1; i < n / 2; ++i)
-        if (buf[size_t(i - 1)] <= 0 && buf[size_t(i)] > 0) {
-            start = i;
-            break;
-        }
-    const int count = std::min(1024, n - start);
+    if (trigger_)
+        for (int i = 1; i < n / 2; ++i)
+            if (buf[size_t(i - 1)] <= 0 && buf[size_t(i)] > 0) {
+                start = i;
+                break;
+            }
+    const int count = trigger_ ? std::min(1024, n - start) : n;
     int px0 = 0, py0 = 0;
     for (int i = 0; i < count; ++i) {
-        // Full scale (±1) spans ±40.5 px around the centre (y = 45); larger peaks are clamped just off the canvas.
-        const double x = double(i) / count * 920;
-        const double y = 45 - double(buf[size_t(start + i)]) * 90 * 0.45;
+        // Full scale (±1 / gain) spans ±40.5 px around the centre (y = 45); larger peaks are clamped just off the
+        // canvas. Without a trigger the last point ends at the right edge.
+        const double x = x0 + double(i) / std::max(1, trigger_ ? count : count - 1) * (trigger_ ? w : w - 1);
+        const double y = 45 - double(buf[size_t(start + i)]) * gain_ * 90 * 0.45;
         const int px1 = int(std::floor(x)), py1 = int(std::floor(std::clamp(y, -4.0, 94.0)));
         if (i == 0) {
             px0 = px1;
@@ -136,13 +193,42 @@ void Scope::setSamples(std::span<const float> buf) {
         px0 = px1;
         py0 = py1;
     }
-    repaint();
+}
+
+std::pair<Rect, Rect> Scope::splitFrames() const noexcept {
+    const Rect r = bounds(), in = r.inset(2);
+    const int w = canvas_.width(), half = splitHalf(w);
+    const auto sx = [&](int cx) { return in.x + int(std::lround(double(cx) * in.w / w)); };
+    const int leftEnd = sx(half), rightStart = sx(w - half);
+    return {Rect{r.x, r.y, leftEnd + 2 - r.x, r.h}, Rect{rightStart - 2, r.y, r.right() - rightStart + 2, r.h}};
 }
 
 void Scope::paint(Painter& p) {
     const Rect r = bounds();
-    p.frame(r, 2, colors::kBlack);
-    canvas_.blit(p, r.inset(2));
+    const Rect in = r.inset(2);
+    canvas_.blit(p, in);
+    if (!split_) {
+        p.frame(r, 2, colors::kBlack);
+        return;
+    }
+    // Two frames with white between them, as two oscilloscopes side by side.
+    const auto [left, right] = splitFrames();
+    p.fill(Rect{left.right(), r.y, right.x - left.right(), r.h}, colors::kWhite);
+    p.frame(left, 2, colors::kBlack);
+    p.frame(right, 2, colors::kBlack);
+    // L and R at the top left of their halves, on white, as on a stereo DMA sample.
+    {
+        const int half = splitHalf(canvas_.width());
+        for (int c = 0; c < 2; ++c) {
+            const std::string mark = c == 0 ? "L" : "R";
+            const double w = Font::width(mark, 10, 0, gemui::Face::kSmall);
+            const int cx = c == 0 ? 0 : canvas_.width() - half;
+            const double x = in.x + 3 + std::floor(double(cx) * in.w / canvas_.width());
+            const int y = in.y + 9;
+            p.fill(Rect{int(std::floor(x)) - 2, y - 7, int(std::ceil(w)) + 4, 9}, colors::kWhite);
+            p.textAt(mark, x, y, 10, colors::kBlack, 0, gemui::Face::kSmall);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------- RegisterMonitor
@@ -204,25 +290,134 @@ void RegisterMonitor::paint(Painter& p) {
 
 // -------------------------------------------------------------------------------------------- VoiceLeds
 
-void VoiceLeds::setState(const std::array<bool, 16>& on, int available) {
-    if (on == on_ && available == available_) return;
+void VoiceLeds::setState(const std::array<bool, kCount>& on, int available, int shown) {
+    shown = shown > 16 ? kCount : 16;
+    if (on == on_ && available == available_ && shown == shown_) return;
     on_ = on;
     available_ = available;
+    shown_ = shown;
     repaint();
 }
 
 void VoiceLeds::paint(Painter& p) {
-    // Two rows of eight, voices 1-8 then 9-16, every 16 px (12 px LED, 4 px gap).
-    for (int i = 0; i < 16; ++i) {
-        const double x = box().x + (i % 8) * 16, y = box().y + (i / 8) * 16;
-        const Rect c = Box{x, y, 12, 12}.snapped();
+    // 32 ch: two rows of sixteen, voices 1-16 then 17-32, every 8 px (6 px LED, 1 px frame, 2 px gap). The other
+    // modes: two rows of eight, voices 1-8 then 9-16, every 16 px (12 px LED, 2 px frame, 4 px gap). The rows 16 px
+    // apart.
+    const bool narrow = shown_ > 16;
+    const int perRow = narrow ? 16 : 8, pitch = narrow ? 8 : 16;
+    for (int i = 0; i < shown_; ++i) {
+        const double x = box().x + (i % perRow) * pitch, y = box().y + (i / perRow) * 16;
+        const Rect c = Box{x, y, narrow ? 6.0 : 12.0, 12}.snapped();
         const bool off = i >= available_;
         if (off) p.beginOpacity(c, 0.25);
         p.fill(c, on_[size_t(i)] ? colors::kLed : colors::kLedOff);
-        p.frame(c, 2, colors::kBlack);
+        p.frame(c, narrow ? 1 : 2, colors::kBlack);
         if (off) p.endOpacity();
     }
 }
+
+// ---------------------------------------------------------------------------------------------- MidiLog
+
+MidiLog::MidiLog() {
+    add(bar_);
+    bar_.setRange(0, 0, 1);
+    bar_.onChange = [this](double v) {
+        back_ = int(std::lround(v));
+        repaint();
+    };
+}
+
+void MidiLog::setKept(int lines) {
+    kept_ = std::max(1, lines);
+    if (lines_.size() <= size_t(kept_)) return;
+    lines_.erase(lines_.begin(), lines_.end() - kept_);
+    last_.clear();  // its lines may have left
+    back_ = std::min(back_, maxBack());
+    syncBar();
+    repaint();
+}
+
+void MidiLog::addLine(std::string line) {
+    lines_.push_back(std::move(line));
+    if (lines_.size() > size_t(kept_)) lines_.pop_front();
+    // Scrolled back: the lines shown stay put, until they leave the buffer (back_ clamped by push).
+    if (back_ > 0) ++back_;
+}
+
+void MidiLog::push(const std::string& message) {
+    // The same message again: its count, on a line of its own under it.
+    if (!last_.empty() && message == last_) {
+        const std::string count = "  repeated x" + std::to_string(++repeats_);
+        if (repeats_ == 2) addLine(count);
+        else lines_.back() = count;
+    } else {
+        size_t lines = 0;
+        for (size_t from = 0; from <= message.size(); ++lines) {
+            const size_t nl = message.find('\n', from);
+            addLine(message.substr(from, nl == std::string::npos ? std::string::npos : nl - from));
+            if (nl == std::string::npos) break;
+            from = nl + 1;
+        }
+        last_ = lines <= size_t(kept_) ? message : std::string();  // all its lines kept
+        repeats_ = 1;
+    }
+    back_ = std::min(back_, maxBack());
+    syncBar();
+    repaint();
+}
+
+void MidiLog::clear() {
+    lines_.clear();
+    last_.clear();
+    repeats_ = 0;
+    back_ = 0;
+    syncBar();
+    repaint();
+}
+
+int MidiLog::rows() const noexcept { return std::max(0, int((box().h - 8) / kLine)); }
+
+void MidiLog::scrollBack(int lines) {
+    back_ = std::clamp(lines, 0, maxBack());
+    syncBar();
+    repaint();
+}
+
+void MidiLog::place(const gemui::Box& b) {
+    setBox(b);
+    const Rect r = bounds();
+    bar_.setBox({double(r.right() - gemui::ScrollPane::kBar), double(r.y), double(gemui::ScrollPane::kBar),
+                 double(r.h)});
+    back_ = std::min(back_, maxBack());
+    syncBar();
+}
+
+void MidiLog::syncBar() {
+    bar_.setRange(0, maxBack(), 1);
+    bar_.setPage(rows(), std::max(1, rows()));
+    bar_.setValue(back_);
+}
+
+bool MidiLog::mouseWheel(const gemui::WheelEvent& e) {
+    if (e.dy == 0) return false;
+    // Three lines a notch, back through the older ones upwards.
+    scrollBack(back_ + (e.dy < 0 ? 3 : -3));
+    return true;
+}
+
+void MidiLog::paint(Painter& p) {
+    const Rect r = bounds();
+    p.fill(r, colors::kWhite);
+    const Rect saved = p.clip();
+    p.setClip(saved.intersect({r.x + 2, r.y + 2, r.w - 2 - gemui::ScrollPane::kBar, r.h - 4}));
+    const size_t n = std::min(size_t(rows()), lines_.size());
+    const size_t first = lines_.size() - n - size_t(back_);
+    for (size_t i = 0; i < n; ++i)
+        p.text(lines_[first + i], box().x + 6, box().y + 2 + double(i) * kLine, 12, colors::kBlack);
+    p.setClip(saved);
+}
+
+void MidiLog::paintOver(Painter& p) { p.frame(bounds(), 2, colors::kBlack); }
 
 // --------------------------------------------------------------------------------------------- Keyboard
 
@@ -611,7 +806,32 @@ namespace {
 // the place and on the baseline it has in the design (kW × kH, stretched to the inside of the box), on a white band so
 // that the drawing under it does not bite into the letters. While it is too wide, the clause after its last ", " or
 // " / " goes, then the characters that do not fit.
-void drawCaption(Painter& p, const Rect& r, int designW, int designH, std::string text, int baseline) {
+// The line of text in the interface language, clause by clause (the parts between ", " and " / "), the sample's name
+// as it is: "sample 1: kick, 40 bytes, ..." is "sample 1:", the name, then "40 bytes" and so on.
+std::string captionText(std::string_view text, std::string_view name) {
+    std::string out;
+    size_t from = 0;
+    if (const size_t at = name.empty() ? std::string_view::npos : text.find(name); at != std::string_view::npos) {
+        out += gemui::uiText(text.substr(0, at));
+        out += name;
+        from = at + name.size();
+    }
+    for (;;) {
+        size_t at = std::string_view::npos, len = 0;
+        for (const std::string_view sep : {", ", " / "})
+            if (const size_t a = text.find(sep, from); a < at) at = a, len = sep.size();
+        if (at != from) out += gemui::uiText(text.substr(from, at == std::string_view::npos ? at : at - from));
+        if (at == std::string_view::npos) break;
+        out += text.substr(at, len);
+        from = at + len;
+    }
+    return out;
+}
+
+void drawCaption(Painter& p, const Rect& r, int designW, int designH, std::string_view caption, int baseline,
+                 std::string_view name) {
+    std::string text = captionText(caption, name);
+    const gemui::RawText raw;  // translated: measured and drawn as it is
     const Rect in = r.inset(2);
     const double x = in.x + 8.0 * in.w / designW;
     const double advance = Font::advance(10, gemui::Face::kSmall);
@@ -708,6 +928,7 @@ DrumWave::DrumWave() { setSample(0, {}); }
 
 void DrumWave::setSample(int slot, std::span<const uint8_t> data, double rateHz, std::string_view name) {
     nibbles_.assign(data.begin(), data.end());
+    name_ = name;
     const std::string head = "slot " + std::to_string(slot + 1) + ": ";
     // The name first: the clauses after it go first when the line is too wide (drawCaption).
     const std::string named = head + (name.empty() ? "" : std::string(name) + ", ");
@@ -735,7 +956,7 @@ void DrumWave::paint(Painter& p) {
         drawWave(p, bandIn(in, kH, 13, 47), nibbles_.size(), [this](size_t i) { return nibbles_[i] / 15.0; },
                  [](size_t, size_t) { return true; });
     }
-    drawCaption(p, r, kW, kH, caption_, baseline_);
+    drawCaption(p, r, kW, kH, caption_, baseline_, name_);
 }
 
 // ------------------------------------------------------------------------------------------- DmaWave
@@ -761,11 +982,11 @@ void DmaWave::setSample(int slot, std::span<const int8_t> data, double rateHz, b
     name_ = name;
     bytes_.assign(data.begin(), data.end());
     repaint();
-    const std::string head = "sample " + std::to_string(slot + 1) + ": ";
-    // The name first: the clauses after it go first when the line is too wide (drawCaption).
-    const std::string named = head + (name.empty() ? "" : name_ + ", ");
+    // No "sample n:" in front: the slot buttons show the number (Indus, 29/10/2026 20:47). The name first:
+    // the clauses after it go first when the line is too wide (drawCaption).
+    const std::string named = name.empty() ? "" : name_ + ", ";
     if (data.empty()) {
-        caption_ = head + (loads_ ? "empty - click to load a file" : "empty");
+        caption_ = loads_ ? "empty - click to load a file" : "empty";
         baseline_ = 16;
         return;
     }
@@ -813,7 +1034,7 @@ void DmaWave::paint(Painter& p) {
             }
         }
     }
-    drawCaption(p, r, kW, kH, caption_, baseline_);
+    drawCaption(p, r, kW, kH, caption_, baseline_, name_);
 }
 
 void DmaWave::mouseUp(const gemui::MouseEvent& e) {
@@ -840,11 +1061,11 @@ void DigiWave::setSample(int slot, std::span<const uint8_t> data, double rateHz,
     name_ = name;
     nibbles_.assign(data.begin(), data.end());
     repaint();
-    const std::string head = "sample " + std::to_string(slot + 1) + ": ";
-    // The name first: the clauses after it go first when the line is too wide (drawCaption).
-    const std::string named = head + (name.empty() ? "" : name_ + ", ");
+    // No "sample n:" in front: the slot buttons show the number. The name first: the clauses after it
+    // go first when the line is too wide (drawCaption).
+    const std::string named = name.empty() ? "" : name_ + ", ";
     if (data.empty()) {
-        caption_ = head + "empty - click to load a file";
+        caption_ = "empty - click to load a file";
         baseline_ = 24;
         return;
     }
@@ -872,7 +1093,7 @@ void DigiWave::paint(Painter& p) {
         drawWave(p, area, n, [this](size_t i) { return nibbles_[i] / 15.0; },
                  [&](size_t a, size_t b) { return !part || (b > start_ && a < end_); });
     }
-    drawCaption(p, r, kW, kH, caption_, baseline_);
+    drawCaption(p, r, kW, kH, caption_, baseline_, name_);
 }
 
 void DigiWave::mouseUp(const gemui::MouseEvent& e) {
@@ -902,22 +1123,34 @@ Rect SidWaveGrid::cellRect(int step) const noexcept {
 
 void SidWaveGrid::paint(Painter& p) {
     const Rect r = bounds();
-    // Baseline of the digits: centred in the kDigitH strip under the bars.
+    // Baseline of the digits: centred in each kDigitH strip under the bars.
     const Font::LineBox lb = Font::lineBox("0", 9);
     const int baseline = snap(r.y + kBarH + kGap + std::floor((kDigitH - lb.height()) / 2) + lb.ascent);
+    const bool twoDigits = digitRows() > 1;
     for (int c = 0; c < kSteps; ++c) {
         const bool dead = c >= st_.length;  // beyond Steps (Base: its two steps)
         auto shade = [dead](Color k) { return dead ? gemui::mix(k, colors::kWhite, kWaveDeadAlpha) : k; };
         const Rect cr = cellRect(c);
         p.fill(cr, colors::kWhite);
         p.frame(cr, 1, shade(kWaveBorder));
-        const int v = std::min<int>(st_.wave[size_t(c)], 15);
+        const int v = std::min<int>(st_.wave[size_t(c)], max_);
         const Rect in{cr.x + 1, cr.y + 1, cr.w - 2, cr.h - 2};
-        if (v > 0) p.fill({in.x, in.bottom() - 3 * v, in.w, 3 * v}, shade(colors::kBlack));
-        // Volume in hexadecimal under the column (centred 6×6 text).
-        const std::string t(1, kWaveHex[v]);
+        const int h = std::min(in.h, notch_ * (v + (floor_ ? 1 : 0)));
+        if (h > 0) p.fill({in.x, in.bottom() - h, in.w, h}, shade(colors::kBlack));
+        if (!twoDigits) {
+            if (v > 15) continue;
+            // Volume in hexadecimal under the column (centred 6×6 text).
+            const std::string t(1, kWaveHex[v]);
+            const double dw = Font::width(t, 9, 0, gemui::Face::kSmall);
+            p.textAt(t, cr.x + (cr.w - dw) / 2, baseline, 9, shade(colors::kBlack), 0, gemui::Face::kSmall);
+            continue;
+        }
+        // Semitones: two hexadecimal digits, as wide as the column, so the odd steps on a second row lest
+        // neighbouring values run together; centred under the column and kept inside the grid at both ends.
+        const std::string t{kWaveHex[(v >> 4) & 15], kWaveHex[v & 15]};
         const double dw = Font::width(t, 9, 0, gemui::Face::kSmall);
-        p.textAt(t, cr.x + (cr.w - dw) / 2, baseline, 9, shade(colors::kBlack), 0, gemui::Face::kSmall);
+        const double x = std::clamp(cr.x + (cr.w - dw) / 2, double(r.x), r.x + kWidth - dw);
+        p.textAt(t, x, baseline + (c % 2) * kDigitH, 9, shade(colors::kBlack), 0, gemui::Face::kSmall);
     }
 }
 
@@ -926,17 +1159,18 @@ int SidWaveGrid::stepAt(Point p) const noexcept {
     const Rect r = bounds();
     const int rx = int(std::floor(p.x)) - r.x;
     const int ry = int(std::floor(p.y)) - r.y;
-    if (rx < 0 || ry < 0 || ry >= kHeight) return -1;
+    if (rx < 0 || ry < 0 || ry >= height()) return -1;
     const int c = rx / (kCellW + kGap);
     if (c >= kSteps || rx % (kCellW + kGap) >= kCellW) return -1;
     return c;
 }
 
 int SidWaveGrid::valueAt(double y) const noexcept {
-    // 3 px per notch from the bottom of the bar: the top of the column is 15.
+    // 3 px per notch from the bottom of the bar (the FM wave's scale: 5 px over a floor): the top of the
+    // column is the highest value.
     const Rect r = bounds();
     const double fromBottom = (r.y + kBarH - 1) - y;
-    return std::clamp(int(std::ceil(fromBottom / 3)), 0, 15);
+    return std::clamp(int(std::ceil(fromBottom / notch_)) - (floor_ ? 1 : 0), 0, max_);
 }
 
 void SidWaveGrid::mouseDown(const gemui::MouseEvent& e) {
@@ -966,7 +1200,7 @@ bool SidWaveGrid::mouseWheel(const gemui::WheelEvent& e) {
     const int c = stepAt(e.pos);
     if (c < 0 || e.dy == 0) return false;
     if (st_.square) return true;
-    const int v = std::clamp(st_.wave[size_t(c)] + (e.dy < 0 ? 1 : -1), 0, 15);
+    const int v = std::clamp(st_.wave[size_t(c)] + (e.dy < 0 ? 1 : -1), 0, max_);
     if (v == st_.wave[size_t(c)]) return true;
     if (onWheel) onWheel(c, v);
     else if (onSet) onSet(c, v);
@@ -980,6 +1214,7 @@ gemui::Pointer SidWaveGrid::pointerAt(Point p) const noexcept {
 std::string SidWaveGrid::tipAt(Point p) const {
     const int c = stepAt(p);
     if (c < 0) return {};
+    if (tipFor) return tipFor(c, st_.wave[size_t(c)]);
     const std::string head = "Step " + std::to_string(c + 1) + ": volume " + std::to_string(st_.wave[size_t(c)]);
     if (st_.square)
         return head + ". Square wave: the note's volume, then SID min vol. Choose Custom in the menu to draw a wave.";
@@ -988,6 +1223,28 @@ std::string SidWaveGrid::tipAt(Point p) const {
 }
 
 void Rule::paint(Painter& p) { p.fill(bounds(), colors::kBlack); }
+
+void MemoryGauge::set(uint64_t used, uint64_t total, uint64_t budget, bool limited) {
+    budget = std::max<uint64_t>(budget, 1);
+    if (used == used_ && total == total_ && budget == budget_ && limited == limited_) return;
+    used_ = used;
+    total_ = total;
+    budget_ = budget;
+    limited_ = limited;
+    repaint();
+}
+
+void MemoryGauge::paint(Painter& p) {
+    const Rect r = bounds();
+    p.fill(r, colors::kWhite);
+    p.frame(r, 2, colors::kBlack);
+    const Rect in{r.x + 2, r.y + 2, r.w - 4, r.h - 4};
+    const bool over = limited_ && total_ > budget_;
+    const uint64_t shown = over ? budget_ : std::min(limited_ ? used_ : total_, budget_);
+    const int w = int(double(in.w) * double(shown) / double(budget_) + 0.5);
+    p.fill({in.x, in.y, std::clamp(w, 0, in.w), in.h},
+           over ? colors::kClip : limited_ ? colors::kBlack : colors::kGrey);
+}
 
 LearnBadge::LearnBadge() {
     setOnTop(true);
@@ -1036,13 +1293,16 @@ std::vector<std::string> Paragraph::lines() const {
     // and at line breaks (<br>).
     // The font is monospaced: the width is counted in characters. Each paragraph between two "\n" is cut into
     // segments (up to a space, or up to and including such a hyphen), added to the line while they fit.
+    // The text is translated whole, then cut: the lines are drawn as they are.
     const int maxChars = std::max(1, int(box().w / Font::advance(12, gemui::Face::kSmall)));
     auto letter = [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; };
+    const std::string text = raw_ ? text_ : gemui::uiString(text_);
+    const gemui::RawText raw;
     std::vector<std::string> out;
     size_t from = 0;
-    while (from <= text_.size()) {
-        const size_t nl = std::min(text_.find('\n', from), text_.size());
-        const std::string_view para = std::string_view(text_).substr(from, nl - from);
+    while (from <= text.size()) {
+        const size_t nl = std::min(text.find('\n', from), text.size());
+        const std::string_view para = std::string_view(text).substr(from, nl - from);
         std::string line, sep;
         const size_t n = para.size();
         size_t pos = 0;
@@ -1076,8 +1336,15 @@ std::vector<std::string> Paragraph::lines() const {
     return out;
 }
 
+void Paragraph::setRaw(bool raw) {
+    if (raw == raw_) return;
+    raw_ = raw;
+    repaint();
+}
+
 double Paragraph::naturalWidth() const {
     // Width without wrapping (max-content): the longest line between two breaks.
+    const gemui::RawText raw(raw_);
     double w = 0;
     size_t from = 0;
     while (from <= text_.size()) {
@@ -1093,6 +1360,7 @@ int Paragraph::lineCount() const { return int(lines().size()); }
 void Paragraph::paint(Painter& p) {
     // 12 px text centred in each line (half-leading of the browser).
     const auto ls = lines();
+    const gemui::RawText raw;
     const double lead = (lineHeight_ - 12) / 2;
     for (size_t i = 0; i < ls.size(); ++i)
         p.text(ls[i], box().x, box().y + lead + lineHeight_ * double(i), 12, colors::kHint, 0, gemui::Face::kSmall);

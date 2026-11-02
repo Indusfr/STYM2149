@@ -18,7 +18,7 @@
 namespace stym::ymengine::detail {
 
 // Held by the engine (Engine::Impl::delay): prepare() allocates outside the audio thread, set() and process() run on
-// it once per render slice of the 16-channel mode.
+// it once per render slice of the 32-channel mode.
 class StereoDelay {
 public:
     // Allocates the lines (kDelayMaxMs and a margin), outside the audio thread.

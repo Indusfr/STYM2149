@@ -12,7 +12,8 @@
 // a Tab (:focus-visible). Confirmation: Enter and Escape cancel, whatever has the focus; prompt box: Enter activates
 // the button that has the focus, OK from the field.
 // Picture (STYM2149, Information box): an image centred above the text, each pixel drawn as a square of
-// `pictureScale` pixels (transparent pixels, alpha 0, left out), followed by the 16 px of a paragraph.
+// `pictureScale` pixels (transparent pixels, alpha 0, left out), followed by the 16 px of a paragraph. An animated
+// picture (the demo of the Information box) is opaque, drawn whole as an image and repainted alone at each frame.
 // Choice rows (STYM2149, WAV dialogue of the File menu): below the text, one row per setting, its label
 // followed by radio buttons (.btn, the chosen option in reverse video, .on), one space apart; 10 px between the rows;
 // the labels form a column, the block is centred.
@@ -61,6 +62,9 @@ public:
         // Picture above the text (0xAARRGGBB, pictureW × pictureH, row by row; nullptr: none).
         const Color* picture = nullptr;
         int pictureW = 0, pictureH = 0, pictureScale = 1;
+        // Animated picture: called at each tick of the desktop with its time (milliseconds), returns true when
+        // `picture` holds a new image.
+        std::function<bool(double nowMs)> animate;
         // Button that has the keyboard focus on opening (-1: none, or the input field).
         int focusButton = -1;
         // Enter activates the button that has the focus (browser button, #promptWin), otherwise always defaultButton.
@@ -134,6 +138,8 @@ private:
     void finish(int button);
     void pick(size_t row, int index);
     void moveFocus(int dir);  // Tab (+1) or Shift+Tab (-1)
+    Rect pictureRect() const noexcept;  // where the picture is drawn, empty without one
+    void nextFrame();                   // asks the animated picture for a new image, then waits for the next tick
 
     Spec spec_;
     Done done_;
@@ -149,6 +155,7 @@ private:
     double pictureTop_ = 0, textTop_ = 0, inputTop_ = 0;  // top of each block, from the top of the desktop
     int focus_ = -1;
     bool ring_ = false;  // focus ring shown: set by the first Tab
+    Desktop::TimerId frame_ = 0;  // next frame of the animated picture
 };
 
 }  // namespace stym::gemui

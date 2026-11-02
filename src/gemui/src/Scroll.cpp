@@ -26,17 +26,32 @@ ScrollPane::~ScrollPane() {
     if (Desktop* d = desktop()) d->cancel(repeat_);
 }
 
+void ScrollPane::setBarSize(int px) {
+    px = std::max(px, closed_ ? 14 : 12);
+    if (px == bar_) return;
+    bar_ = px;
+    repaint();
+    scrollTo(scroll_);
+}
+
+void ScrollPane::setClosed(bool on) {
+    if (on == closed_) return;
+    closed_ = on;
+    setBarSize(bar_);
+    repaint();
+}
+
 bool ScrollPane::hasVertical() const noexcept {
     const Rect r = bounds();
     if (contentH_ > r.h) return true;
-    return contentW_ > r.w && contentH_ > r.h - kBar;  // the horizontal scrollbar takes 26 px of height
+    return contentW_ > r.w && contentH_ > r.h - bar_;  // the horizontal scrollbar takes bar_ px of height
 }
 
-bool ScrollPane::hasHorizontal() const noexcept { return contentW_ > bounds().w - (hasVertical() ? kBar : 0); }
+bool ScrollPane::hasHorizontal() const noexcept { return contentW_ > bounds().w - (hasVertical() ? bar_ : 0); }
 
 Rect ScrollPane::viewport() const noexcept {
     const Rect r = bounds();
-    return {r.x, r.y, std::max(0, r.w - (hasVertical() ? kBar : 0)), std::max(0, r.h - (hasHorizontal() ? kBar : 0))};
+    return {r.x, r.y, std::max(0, r.w - (hasVertical() ? bar_ : 0)), std::max(0, r.h - (hasHorizontal() ? bar_ : 0))};
 }
 
 Point ScrollPane::maxScroll() const noexcept {
@@ -68,7 +83,7 @@ void ScrollPane::scrollTo(Point p) {
 
 int ScrollPane::trackLength(bool v) const noexcept {
     const Rect vp = viewport();
-    return std::max(0, (v ? vp.h : vp.w) - 2 * kBar);
+    return std::max(0, (v ? vp.h : vp.w) - 2 * bar_);
 }
 
 // Chromium's rule: the visible fraction of the content times the track, rounded, at least kMinThumb, at most the
@@ -95,17 +110,17 @@ int ScrollPane::thumbOffset(bool v) const noexcept {
 Rect ScrollPane::partRect(Part p) const noexcept {
     const Rect r = bounds(), vp = viewport();
     const bool v = hasVertical(), h = hasHorizontal();
-    const int bx = r.right() - kBar, by = r.bottom() - kBar;
+    const int bx = r.right() - bar_, by = r.bottom() - bar_;
     switch (p) {
-    case Part::Up: return v ? Rect{bx, r.y, kBar, kBar} : Rect{};
-    case Part::Down: return v ? Rect{bx, vp.bottom() - kBar, kBar, kBar} : Rect{};
-    case Part::TrackV: return v ? Rect{bx, r.y + kBar, kBar, trackLength(true)} : Rect{};
-    case Part::ThumbV: return v ? Rect{bx, r.y + kBar + thumbOffset(true), kBar, thumbLength(true)} : Rect{};
-    case Part::Left: return h ? Rect{r.x, by, kBar, kBar} : Rect{};
-    case Part::Right: return h ? Rect{vp.right() - kBar, by, kBar, kBar} : Rect{};
-    case Part::TrackH: return h ? Rect{r.x + kBar, by, trackLength(false), kBar} : Rect{};
-    case Part::ThumbH: return h ? Rect{r.x + kBar + thumbOffset(false), by, thumbLength(false), kBar} : Rect{};
-    case Part::Corner: return v && h ? Rect{bx, by, kBar, kBar} : Rect{};
+    case Part::Up: return v ? Rect{bx, r.y, bar_, bar_} : Rect{};
+    case Part::Down: return v ? Rect{bx, vp.bottom() - bar_, bar_, bar_} : Rect{};
+    case Part::TrackV: return v ? Rect{bx, r.y + bar_, bar_, trackLength(true)} : Rect{};
+    case Part::ThumbV: return v ? Rect{bx, r.y + bar_ + thumbOffset(true), bar_, thumbLength(true)} : Rect{};
+    case Part::Left: return h ? Rect{r.x, by, bar_, bar_} : Rect{};
+    case Part::Right: return h ? Rect{vp.right() - bar_, by, bar_, bar_} : Rect{};
+    case Part::TrackH: return h ? Rect{r.x + bar_, by, trackLength(false), bar_} : Rect{};
+    case Part::ThumbH: return h ? Rect{r.x + bar_ + thumbOffset(false), by, thumbLength(false), bar_} : Rect{};
+    case Part::Corner: return v && h ? Rect{bx, by, bar_, bar_} : Rect{};
     case Part::None: break;
     }
     return {};
@@ -122,14 +137,14 @@ ScrollPane::Part ScrollPane::partAt(Point pt) const noexcept {
 // -------------------------------------------------------------------------------------------------- Painting
 
 void ScrollPane::paintButton(Painter& p, Part part) const {
-    // Rules: all except the one on the side of the frame (right of a vertical scrollbar, bottom of a horizontal one).
-    // The prototype's horizontal buttons point inwards (read in Chromium).
+    // Rules: all except the one on the side of the frame (right of a vertical scrollbar, bottom of a horizontal one),
+    // that one too in a closed pane. The prototype's horizontal buttons point inwards (read in Chromium).
     const bool v = vertical(part);
     const Arrow a = part == Part::Up     ? Arrow::Up
                     : part == Part::Down ? Arrow::Down
                     : part == Part::Left ? Arrow::Right
                                          : Arrow::Left;
-    paintArrowCell(p, partRect(part), a, {true, true, v, !v});
+    paintArrowCell(p, partRect(part), a, {true, true, v || closed_, !v || closed_});
 }
 
 void ScrollPane::paintTrack(Painter& p, bool v) const {
@@ -138,6 +153,12 @@ void ScrollPane::paintTrack(Painter& p, bool v) const {
     p.tile(t, tiles::sliderDots(), {t.x, t.y});
     if (v) p.fill({t.x, t.y, kRule, t.h}, colors::kBlack);
     else p.fill({t.x, t.y, t.w, kRule}, colors::kBlack);
+    // The outer rule of a closed pane, along the track and the thumb.
+    const auto outer = [&p, v](const Rect& r) {
+        if (v) p.fill({r.right() - kRule, r.y, kRule, r.h}, colors::kBlack);
+        else p.fill({r.x, r.bottom() - kRule, r.w, kRule}, colors::kBlack);
+    };
+    if (closed_) outer(t);
     const Rect th = partRect(v ? Part::ThumbV : Part::ThumbH);
     if (th.empty()) return;
     p.fill(th, colors::kWhite);
@@ -145,6 +166,7 @@ void ScrollPane::paintTrack(Painter& p, bool v) const {
     p.fill({th.x, th.y, kRule, th.h}, colors::kBlack);
     if (v) p.fill({th.x, th.bottom() - kRule, th.w, kRule}, colors::kBlack);
     else p.fill({th.right() - kRule, th.y, kRule, th.h}, colors::kBlack);
+    if (closed_) outer(th);
 }
 
 void ScrollPane::paintOver(Painter& p) {
@@ -163,6 +185,10 @@ void ScrollPane::paintOver(Painter& p) {
         p.tile(c, tiles::sliderDots(), {c.x, c.y});
         p.fill({c.x, c.y, c.w, kRule}, colors::kBlack);
         p.fill({c.x, c.y, kRule, c.h}, colors::kBlack);
+        if (closed_) {
+            p.fill({c.x, c.bottom() - kRule, c.w, kRule}, colors::kBlack);
+            p.fill({c.right() - kRule, c.y, kRule, c.h}, colors::kBlack);
+        }
     }
 }
 

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <numeric>
 #include <set>
 
@@ -56,7 +57,8 @@ constexpr std::array<const char*, 3> kClipTips = {
     "Cut the note under the cursor, or the selection (Ctrl+X)",
     "Paste at the cursor (Ctrl+V)",
 };
-constexpr std::array<const char*, 6> kFxNames = {"Chip Voice", "SID Voice", "Digidrum", "Sync Buzzer", "Chipdrum", "DMA"};
+constexpr std::array<const char*, 7> kFxNames = {"Chip Voice", "SID Voice", "Digidrum", "Sync Buzzer",
+                                                "Chipdrum",   "DMA",       "FM Voice"};
 constexpr int kPolyMax = ymseq::kPolyMax;
 constexpr const char* kRtgHint =
     "RTG = ratchet: number of hits inside the step (1 = normal). CND = trigger condition: 1:2 / 2:2 = every other "
@@ -127,6 +129,7 @@ ymseq::Row laneRow(SeqLane l) noexcept {
     case SeqLane::Mod: return Row::CmdMod;
     case SeqLane::Smp: return Row::CmdOffset;
     case SeqLane::Tun: return Row::CmdFine;
+    case SeqLane::Tik: return Row::CmdSpeed;
     }
     return Row::Vol;
 }
@@ -149,8 +152,11 @@ void SeqWindow::build() {
             {&scaleSel_, "scaleSel"}, {&scaleSnap_, "scaleSnap"}, {&sig_, "seqSig"}, {&reso_, "seqReso"},
             {&fig_, "seqFig"}, {&chord_, "seqChord"}, {&poly_, "seqPolySel"}, {&ghost_, "seqGhost"},
             {&over_, "seqOver"}, {&play_, "trPlay"}, {&rec_, "trRec"}, {&loop_, "trLoop"}, {&metro_, "seqMetro"},
-            {&scroll_, "seqScroll"}})
+            {&launch_, "seqLaunch"}, {&trackSel_, "seqTrack"}, {&scroll_, "seqScroll"}})
         w->setId(id);
+    // Banks and Patterns: learnt keys replace the default ones of Launch (C2 to B2).
+    for (int i = 0; i < ymseq::kBanks; ++i) banks_[size_t(i)].setId(std::string("seqBank") + char('A' + i));
+    for (int i = 0; i < ymseq::kBankSize; ++i) pats_[size_t(i)].setId("seqPat" + std::to_string(i + 1));
     static const std::array<const gemui::Bitmap*, 6> toolIcons = {&icons::kToolMove,  &icons::kToolDraw,
                                                                   &icons::kToolErase, &icons::kToolSplit,
                                                                   &icons::kToolJoin,  &icons::kToolSelect};
@@ -249,6 +255,24 @@ void SeqWindow::build() {
     add(metro_);
     bigButton(metro_, icons::kBigMetro);
     metro_.setTip("Metronome: click on every beat, bell on the first beat of the bar; right click: its volume");
+    add(launch_);
+    launch_.setTip("Launch: the MIDI keys and pads C2 to G2 pick the patterns 1 to 8, G#2 to B2 the banks A to D, "
+                   "instead of playing\nMIDI learn can switch it from a button of the controller");
+    add(labTrack_);
+    add(trackSel_);
+    trackSel_.setRaw(true);  // a name the user gives, or the chip's
+    trackSel_.setMinWidth(40);
+    trackSel_.setTip("Track edited: the one the grid shows and the main window's tabs choose");
+    // The track's instrument between Track and Bank (Indus, 01/11/2026 20:21 and 20:43), as at the bottom of
+    // the GENERATOR frame: the Instruments window, and the number, whose menu loads an instrument into the
+    // track or opens the window. The name is in the menu: the row has no room for its 16 characters.
+    insOpen_.setId("seqInsOpen");
+    insNum_.setId("seqInsNum");
+    add(insOpen_);
+    add(insNum_);
+    insOpen_.setTip("Open the Instruments window (Ctrl+T)");
+    insNum_.setTip("Instrument of this track: the one last loaded into it or stored from it. Pick another to load it "
+                   "into the track; --: the track plays its own sound");
     add(labBank_);
     add(labPattern_);
     for (int i = 0; i < 4; ++i) {
@@ -350,6 +374,8 @@ void SeqWindow::wire() {
         return true;
     };
     gateAll_.onClick = [this] { m_.set(Global::GateAll, m_.iv(Global::GateAll) ? 0.0f : 1.0f); };
+    insOpen_.onClick = [this] { m_.ins_.show(); };
+    insNum_.onClick = [this] { m_.instrumentMenu(insNum_); };
     m_.bindSlider(swing_, [this](double v) { m_.set(Global::Swing, float(v)); });
     swingv_.onCommit = [this](const std::string& t) {
         const auto v = sliderValue(swing_, t, 1);
@@ -358,6 +384,7 @@ void SeqWindow::wire() {
         return true;
     };
 
+    scaleRoot_.setPopup(true);  // a GEM pop-up button, with its shadow
     scaleRoot_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = 0; i < 12; ++i) {
@@ -368,6 +395,7 @@ void SeqWindow::wire() {
         }
         popup(scaleRoot_, std::move(items), scaleRoot());
     };
+    scaleSel_.setPopup(true);  // a GEM pop-up button, with its shadow
     scaleSel_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = 0; i < ymseq::kScaleCount; ++i) {
@@ -385,6 +413,7 @@ void SeqWindow::wire() {
         ses().snap = !ses().snap;
         refresh();
     };
+    sig_.setPopup(true);  // a GEM pop-up button, with its shadow
     sig_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = 0; i < ymseq::kSignatureCount; ++i) {
@@ -400,9 +429,12 @@ void SeqWindow::wire() {
         }
         popup(sig_, std::move(items), signature());
     };
+    reso_.setPopup(true);  // a GEM pop-up button, with its shadow
     reso_.onClick = [this] { resolutionMenu(); };
+    fig_.setPopup(true);  // a GEM pop-up button, with its shadow
     fig_.onClick = [this] { popup(fig_, figItems(), inputFigure()); };
     fig_.setPadding(2, 6);  // the 16 px figure in the height of a 14 px text
+    chord_.setPopup(true);  // a GEM pop-up button, with its shadow
     chord_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = -1; i < int(ymengine::kChords.size()); ++i) {
@@ -416,6 +448,7 @@ void SeqWindow::wire() {
         }
         popup(chord_, std::move(items), ses().chord + 1);
     };
+    poly_.setPopup(true);  // a GEM pop-up button, with its shadow
     poly_.onClick = [this] {
         // pickVoicing: mono, the voices stay but muted and the entry chord goes back to Off.
         std::vector<MenuItem> items;
@@ -449,6 +482,14 @@ void SeqWindow::wire() {
     prev_.onClick = [this] { m_.songStep(-1); };
     next_.onClick = [this] { m_.songStep(1); };
     metro_.onClick = [this] { toggleMetro(); };
+    // The tracks of the mode, each with its generator; the one picked is edited, as a click on its tab does.
+    trackSel_.setPopup(true);  // a GEM pop-up button, with its shadow
+    trackSel_.onClick = [this] { popup(trackSel_, m_.trackItems(), cur()); };
+    launch_.onClick = [this] {
+        ses().launch = !ses().launch;
+        m_.pushCapture();  // the keys go to the editor rather than to the engine
+        refreshTransport();
+    };
     metro_.onContext = [this](gemui::Point) {
         // Volume of the metronome (seventh DAW test, item 87): the slider of the Modulation window's cells,
         // 0 to 100 %, back to 100 on a right click on it; each move applies.
@@ -589,7 +630,7 @@ SeqWindow::StepSound SeqWindow::stepSound(int s) const {
         return l.ins[k] > 0 && size_t(l.ins[k]) <= bank.size() && bank[size_t(l.ins[k] - 1)].used ? int(l.ins[k]) : 0;
     };
     const auto attackGen = [&](size_t k) {
-        int g = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))] : -1;
+        int g = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], ymengine::kSeqFxMax))] : -1;
         if (g < 0 && insAt(k)) {
             const Generator x = bank[size_t(l.ins[k] - 1)].patch.generator;
             if (!(mode3() && x == Generator::Digidrum)) g = int(x);
@@ -602,7 +643,7 @@ SeqWindow::StepSound SeqWindow::stepSound(int s) const {
     };
     const auto isDrum = [](int g) { return g == int(Generator::Digidrum) || g == int(Generator::Chipdrum); };
     const auto liveFx = [&](int g, size_t k) {
-        const int eff = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], 4))] : -1;
+        const int eff = l.fx[k] ? ymengine::kSeqFxGen[size_t(std::min<int>(l.fx[k], ymengine::kSeqFxMax))] : -1;
         return eff < 0 || eff == int(Generator::Chipdrum) || isDrum(g) || g == int(Generator::Dma) ? g : eff;
     };
     const auto chordAt = [&](size_t k) {
@@ -799,6 +840,10 @@ std::string SeqWindow::cantAct(SeqLane row, int s) const {
             (l.pat[S] >= 0 && l.slide[S]) || (l.pat[S] < 0 && (l.slide[S] || l.tie[S]) && ed.slideRunsAt(s));
         return act ? "" : "No slide runs on this step (SLD row)";
     }
+    case SeqLane::Tik:  // the ticks of a line act in Ticks timing only
+        return onTrack(SeqCmd::Speed) && st().global.timing != ymengine::SeqTiming::Ticks
+                   ? "BPM timing: a line lasts by the tempo"
+                   : "";
     case SeqLane::Bpm: {
         if (!proj().cur().bpm[S]) return {};
         const ymengine::GlobalParams& g = st().global;
@@ -1009,20 +1054,16 @@ void SeqWindow::askGroove() {
 
 void SeqWindow::askCmd(int s) {
     // Box of the commands of the step (tenth DAW test, items 121, 122 and 130). An absent command
-    // shows a value to start from: restart at tick 0, the song's ticks per line, sync mark 1; volume slide down a
-    // quarter step per tick, buzzer and noise slides up one unit, offset 0, fine tune 0 cents. OK writes the kinds of
-    // the box only (eleventh DAW test: the VIB, BPM, ENV, DLY and CUT rows have the others;
-    // Xyz and Pxy are retired).
+    // shows a value to start from: sync mark 1; volume slide down a quarter step per tick, buzzer and noise slides up
+    // one unit. OK writes the kinds of the box only (eleventh DAW test: the VIB, BPM, ENV, DLY and CUT rows have the
+    // others, and TIK the ticks per line; Xyz and Pxy are retired).
     using ymengine::SeqCmd;
-    const ymengine::GlobalParams& g = st().global;
-    const auto start = [&g](SeqCmd k) {
+    const auto start = [](SeqCmd k) {
         switch (k) {
-        case SeqCmd::Speed: return int(g.speed);
         case SeqCmd::Sync:
         case SeqCmd::VolSlide: return 1;
         case SeqCmd::EnvSlide:
         case SeqCmd::NoiseSlide: return 0x10;
-        case SeqCmd::Fine: return ymengine::kFineCmdCenter;
         default: return 0;
         }
     };
@@ -1041,8 +1082,8 @@ void SeqWindow::askCmd(int s) {
         else if (k == SeqCmd::EnvSlide || k == SeqCmd::NoiseSlide)
             spec.shown[i] = lane().cmdAt(k, s) != 0 || slideActs(k, s);
     }
-    // 16 channels: the Buzzer and Noise slides take a curve, Kxx and Qxx; the 3-channel modes leave them as
-    // they are (straight slides of the replay).
+    // 16 and 32 channels: the Buzzer and Noise slides take a curve, Kxx and Qxx; the 3-channel modes leave them
+    // as they are (straight slides of the replay).
     spec.curves = !mode3();
     spec.ok = [this, s, at = stepTarget(), curves = spec.curves](const CmdBox::Entries& entries) {
         if (!stillOn(at)) return;  // the box was for that step of another track or pattern
@@ -1295,15 +1336,50 @@ void SeqWindow::layout() {
     sep_.setBox({x - 8, y + 8, w + 16, 2});
     y += 8 + 2 + 8;
     // The Song arrows (start, previous, next) only in Song mode with entries. Transport: 52 px buttons 6 px apart,
-    // and before the arrows a 2 px rule with 8 px margins.
+    // and before the arrows a 2 px rule with 8 px margins. The arrows are 34 px wide, so that the track's
+    // instrument keeps its number on the row and the longest track name ("Digi1") its characters.
     const bool nav = st().global.songMode && !proj().song.empty();
     for (Button* b : {&start_, &prev_, &next_}) b->setVisible(nav);
     tbarSep_.setVisible(nav);
-    const double tbarW = nav ? 6 * 52 + 6 * 6 + 2 + 16 : 3 * 52 + 2 * 6;
+    constexpr double kArrowW = 34;
+    const double tbarW = nav ? 3 * 52 + 3 * kArrowW + 6 * 6 + 2 + 16 : 3 * 52 + 2 * 6;
     const double banksW = 4 * banks_[0].naturalWidth() + 3 * 6, patsW = 8 * pats_[0].naturalWidth() + 7 * 6;
-    std::vector<FlexItem> rt = {{nullptr, tbarW, 38}, btn(metro_, 14), lab(labBank_), {nullptr, banksW, 31},
-                                lab(labPattern_, 8), {nullptr, patsW, 31}};
-    rt[2].autoMargin = true;
+    // The track button right after its label, the 8 px gap of the other label + button pairs (Indus, 29/10/2026
+    // 10:54, an extra 8 px margin before). Then the track's instrument (Indus, 01/11/2026 20:43): the
+    // Instrument button and the number, as wide as "127"; with the Song arrows, the number alone, its menu opening
+    // the Instruments window too.
+    insOpen_.setVisible(!nav);
+    insNum_.setMinWidth(std::max(40.0, insNum_.widthFor("127")));
+    std::vector<FlexItem> rt = {{nullptr, tbarW, 38}, btn(metro_, 14), btn(launch_, 14), lab(labTrack_, 14),
+                                btn(trackSel_)};
+    if (!nav) rt.push_back(btn(insOpen_, 14));
+    rt.push_back(btn(insNum_, nav ? 14 : 0));
+    const size_t bankAt = rt.size();  // Bank's label, its buttons, Pattern's label, its buttons
+    rt.insert(rt.end(), {lab(labBank_), {nullptr, banksW, 31}, lab(labPattern_, 8), {nullptr, patsW, 31}});
+    rt[bankAt].autoMargin = true;
+    // The track button keeps the width of the mode's longest track name, so that Bank and Pattern stay put whatever
+    // the track ("Digi", "DMA1" are wider than "A"). Where the row lacks room (the Song arrows), the margins before
+    // Metronome, Launch, Track and the instrument shrink to 8 px, then the name is shortened: Bank and Pattern never
+    // wrap under the transport (Indus, 29/10/2026 15:43).
+    double trackW = 0;
+    for (int i = 0; i < ymseq::kTracks; ++i) trackW = std::max(trackW, trackSel_.widthFor(m_.trackName(i)));
+    rt[4].width = trackW;
+    const auto rowWidth = [&rt] {
+        double sum = 8.0 * double(rt.size() - 1);
+        for (const FlexItem& it : rt) sum += it.width + (it.autoMargin ? 0 : it.marginLeft);
+        return sum;
+    };
+    if (rowWidth() > w)
+        for (size_t i : {size_t(1), size_t(2), size_t(3), size_t(5)}) rt[i].marginLeft = 8;
+    rt[4].width = std::max(trackSel_.widthFor(""), trackW - std::max(0.0, rowWidth() - w));
+    {
+        std::string name = m_.trackName(cur());
+        while (!name.empty() && trackSel_.widthFor(name) > rt[4].width) {
+            while ((static_cast<unsigned char>(name.back()) & 0xC0) == 0x80 && name.size() > 1) name.pop_back();
+            name.pop_back();  // the last character, its continuation bytes removed just before
+        }
+        trackSel_.setText(name);
+    }
     const double th = flexRow(x, y, w, rt);
     {
         double bx = rt[0].box.x;
@@ -1316,18 +1392,18 @@ void SeqWindow::layout() {
             tbarSep_.setBox({bx + 8, by, 2, 38});
             bx += 8 + 2 + 8 + 6;
             for (Button* b : {&start_, &prev_, &next_}) {
-                b->setBox({bx, by, 52, 38});
-                bx += 52 + 6;
+                b->setBox({bx, by, kArrowW, 38});
+                bx += kArrowW + 6;
             }
         }
-        bx = rt[3].box.x;
+        bx = rt[bankAt + 1].box.x;
         for (Button& b : banks_) {
-            b.setBox({bx, rt[3].box.y, b.naturalWidth(), 31});
+            b.setBox({bx, rt[bankAt + 1].box.y, b.naturalWidth(), 31});
             bx += b.naturalWidth() + 6;
         }
-        bx = rt[5].box.x;
+        bx = rt[bankAt + 3].box.x;
         for (Button& b : pats_) {
-            b.setBox({bx, rt[5].box.y, b.naturalWidth(), 31});
+            b.setBox({bx, rt[bankAt + 3].box.y, b.naturalWidth(), 31});
             bx += b.naturalWidth() + 6;
         }
     }
@@ -1412,13 +1488,14 @@ std::vector<MenuItem> SeqWindow::figItems() {
 }
 
 void SeqWindow::popup(gemui::Widget& anchor, std::vector<MenuItem> items, int checked) {
-    gemui::MenuList::open(desk(), std::move(items), checked, anchor.box(), false);
+    const auto* button = dynamic_cast<const gemui::Button*>(&anchor);  // a GEM pop-up button
+    gemui::MenuList::open(desk(), std::move(items), checked, anchor.box(), false, false, button && button->popup());
 }
 
 // Menu of a grid cell: its entries act only while the track and the pattern it was opened on are the current ones.
-void SeqWindow::popupAt(const Rect& anchor, std::vector<MenuItem> items, int checked) {
+void SeqWindow::popupAt(const Rect& anchor, std::vector<MenuItem> items, int checked, bool columns) {
     gemui::pickOnlyWhile(items, [this, at = stepTarget()] { return stillOn(at); });
-    gemui::MenuList::open(desk(), std::move(items), checked, gemui::boxOf(anchor), false);
+    gemui::MenuList::open(desk(), std::move(items), checked, gemui::boxOf(anchor), false, columns);
 }
 
 // ------------------------------------------------------------------------------------------- refresh
@@ -1433,6 +1510,8 @@ void SeqWindow::refresh() {
     s.curRow = std::clamp(s.curRow, drum() ? SeqGrid::kRows - 8 : 0, SeqGrid::kRows - 1);
     if (!isOpen()) return;
     setTitle("STEP SEQUENCER - " + m_.trackName(cur()) + " [" + fxName(cur()) + "]");
+    trackSel_.setText(m_.trackName(cur()));
+    m_.showInstrumentNumber(insNum_);
     refreshControls();
     refreshTransport();
     refreshPatterns();
@@ -1590,6 +1669,8 @@ void SeqWindow::refreshTransport() {
     const bool nav = g.songMode && !proj().song.empty();
     for (Button* b : {&start_, &prev_, &next_}) b->setEnabled(nav && !host);
     metro_.setOn(g.metronome);
+    launch_.setOn(ses().launch);
+    song_.setOn(g.songMode);  // in reverse video while Song mode is on (Indus, 29/10/2026 20:11)
     m_.song_.refreshTransport();
 }
 
@@ -1621,7 +1702,7 @@ void SeqWindow::refreshHint() {
                         "8). HLD = do not retrigger while it still rings. PAN = per-step pan. VOL = accent. ") +
             kRtgHint;
     else
-        t = std::string("SRC = tone/noise source. GEN = generator per step (CV/SID/SB). ") +
+        t = std::string("SRC = tone/noise source. GEN = generator per step (CV/SID/SB/FM). ") +
             (arpOn() ? "ARP = arpeggio table. " : "") +
             "Note length is drawn in the grid: drag a note to stretch it. SLD = slide to next note. CRV = slide shape "
             "for that step. GAT = per-step gate. PAN = per-step pan. VOL = accent. " +
@@ -1645,6 +1726,8 @@ void SeqWindow::refreshEngineStatus(const plugin::EngineStatus& t) {
         edit([idx](plugin::NonParamState& st2) { st2.seq.applied(idx); });
     }
     if (was && !playing_) ses().record = false;  // stopping disarms Rec
+    recordClock(s);
+    recordHold();
     // Played step of the focused track (own length included): keys lit, window open or not. A track with its own length
     // (polymeter) loops on its own, so its step is the absolute step count modulo that length.
     const int plen = proj().tracks[size_t(cur())].length;
@@ -1873,6 +1956,7 @@ int SeqWindow::noteUnderCursor() const {
 }
 
 SeqWindow::CutState SeqWindow::cutState() const {
+    using Clip = EditorSession::GridClip;
     CutState c;
     if (grid_.hasRect()) {
         c.cut = true;
@@ -1880,27 +1964,94 @@ SeqWindow::CutState SeqWindow::cutState() const {
         c.paste = ses().rectClip.has_value();
         return c;
     }
+    if (grid_.hasBlock()) {
+        c.cut = true;
+        c.what = "Block";
+        c.paste = ses().blockClip.has_value();
+        return c;
+    }
     c.cut = noteUnderCursor() >= 0;
     c.what = "Note";
-    c.paste = !drum() && ses().noteClip.has_value();  // a note is not pasted on a drum track, as Ctrl+V
+    // At the cursor, the clipboard filled last; a note or a box is not pasted on a drum track.
+    switch (ses().lastGridClip) {
+    case Clip::Rect: c.paste = !drum() && ses().rectClip.has_value(); break;
+    case Clip::Block: c.paste = ses().blockClip.has_value(); break;
+    default: c.paste = !drum() && ses().noteClip.has_value(); break;
+    }
     return c;
 }
 
 void SeqWindow::editClip(int act) {
+    using Clip = EditorSession::GridClip;
     if (grid_.hasRect()) {  // rectangular selection
-        if (act == 2) rectPaste();
-        else rectCopy(act == 1);
-        refreshClips();
-        return;
+        if (act == 2) {
+            rectPaste();
+        } else {
+            rectCopy(act == 1);
+            ses().lastGridClip = Clip::Rect;
+        }
+    } else if (grid_.hasBlock()) {  // block of steps, as the menu of the block
+        if (act == 2) {
+            if (ses().blockClip) blockPaste(grid_.blockLo());
+        } else {
+            blockCopy(act == 1);
+            ses().lastGridClip = Clip::Block;
+        }
+    } else if (act == 2) {
+        // Without a selection: the clipboard filled last, at the cursor.
+        const int at = ses().curStep;
+        if (ses().lastGridClip == Clip::Rect && ses().rectClip && !drum()) {
+            pushUndo();
+            const std::vector<ymseq::RectNote> clip = *ses().rectClip;
+            editLane([&](ymseq::LaneEditor& ed, ymseq::Lane&) {
+                ed.rectPaste({at, at, 0, 0}, clip);
+                return true;
+            });
+        } else if (ses().lastGridClip == Clip::Block && ses().blockClip) {
+            blockPaste(at);
+        } else {
+            pasteNote(at, viewSemi() + 12 - ses().curRow);
+        }
+    } else if (const int s = noteUnderCursor(); s >= 0) {
+        copyNote(s, act == 1);
+        ses().lastGridClip = Clip::Note;
     }
-    if (act == 2) {
-        pasteNote(ses().curStep, viewSemi() + 12 - ses().curRow);
-        refreshClips();
-        return;
-    }
-    const int s = noteUnderCursor();
-    if (s >= 0) copyNote(s, act == 1);
     refreshClips();
+}
+
+void SeqWindow::selectAll() {
+    const int n = std::max(1, length());
+    grid_.clearSelections();
+    grid_.selTrack_ = cur();  // the selection belongs to this track
+    if (drum()) {
+        grid_.setBlock(0, n - 1);
+        return;
+    }
+    // The box spans the steps of the track and the rows of its lowest and highest notes, chord voices included, and
+    // goes on to the end of a note held beyond the last step: the box takes only the notes it covers whole.
+    ymseq::Lane copy = lane();
+    const ymseq::LaneEditor ed(copy, context());
+    int lo = std::numeric_limits<int>::max(), hi = std::numeric_limits<int>::min();
+    for (int s = 0; s < n; ++s) {
+        if (copy.pat[size_t(s)] >= 0) {
+            lo = std::min(lo, ed.relNote(s));
+            hi = std::max(hi, ed.relNote(s));
+        }
+        for (int v = 2; v <= ymseq::kPolyMax; ++v)
+            if (const auto r = ed.voiceRow(s, v)) {
+                lo = std::min(lo, *r);
+                hi = std::max(hi, *r);
+            }
+    }
+    if (lo > hi) {
+        grid_.refresh();
+        return;
+    }
+    int end = n - 1;
+    for (const ymseq::RectNote& note : ed.rectNotes({0, ymseq::kSteps - 1, lo, hi}))
+        if (note.s < n) end = std::max(end, note.s + note.len - 1);
+    grid_.rect_ = SeqGrid::RectSel{0, end, lo, hi};
+    grid_.refresh();
 }
 
 void SeqWindow::copyNote(int s, bool cut) {
@@ -2032,6 +2183,7 @@ void SeqWindow::setNoteLen(int s, int n) {
 bool SeqWindow::stepRecord(int note, int velocity) {
     // Writing at the cursor, then advance (step entry, window open).
     if (!ses().stepRec || !isOpen()) return false;
+    if (m_.iv(Global::Velocity) == 2) velocity = 127;  // Velocity Off: VOL stays 15
     armChan();
     pushUndo();
     const int s = ses().curStep;
@@ -2046,36 +2198,157 @@ bool SeqWindow::stepRecord(int note, int velocity) {
 }
 
 void SeqWindow::recordNote(int note, int velocity) {
+    if (m_.iv(Global::Velocity) == 2) velocity = 127;  // Velocity Off: VOL stays 15
     // Step entry first; otherwise, while playing with Rec armed, the note is written at the played step.
     if (stepRecord(note, velocity)) return;
     if (!ses().record || !playing_ || grid_.playStep() < 0) return;
     armChan();
     pushUndo();
-    const int s = grid_.playStep();
-    editLane([&](ymseq::LaneEditor& ed, ymseq::Lane&) {
+    const int s = grid_.playStep(), t = cur(), p = proj().current;
+    const bool hit = drum(), poly = chordsPlay(), monoChord = mono() && !mode3();
+    // A key pressed while others recorded on the track are held, or with those written at this step, joins them as a
+    // chord voice where the track plays chords. On a Monophonic track, the keys played together are all written
+    // too, their chord voices greyed until the track is Polyphonic again, but a key pressed later ends the held note
+    // there. In the 3-voice modes it is the only note: the held one ends here.
+    bool chord = false;
+    for (RecNote& r : recNotes_) {
+        if (r.track != t || r.pattern != p || !(r.abs == recAbs_ || (r.held && !r.hit))) continue;
+        if (poly || (monoChord && r.abs == recAbs_)) {
+            chord = true;
+            continue;
+        }
+        if (r.held && !r.hit) recordLength(r, int(recAbs_ - r.abs));
+        r.held = false;
+    }
+    // The notes written at this step before this pass are replaced, its chord voices included, greyed or not; the
+    // keys of this pass at the step join the first one. A drum track keeps its other hits.
+    const bool fresh = !hit && std::none_of(recNotes_.begin(), recNotes_.end(), [&](const RecNote& r) {
+        return r.track == t && r.pattern == p && r.step == s && r.abs == recAbs_;
+    });
+    int voice = 1, demoted = 0;
+    editLane([&](ymseq::LaneEditor& ed, ymseq::Lane& l) {
+        if (fresh) {
+            for (int v = 2; v <= ymseq::kPolyMax; ++v) ed.delVoiceAt(s, v);
+            if (chord && l.pat[size_t(s)] >= 0)  // the key joins a held note: the root of the step goes too
+                for (int k = 0, n = ed.noteLenAt(s); k < n; ++k) {
+                    l.pat[size_t(s + k)] = -1;
+                    l.oct[size_t(s + k)] = 0;
+                    l.tie[size_t(s + k)] = 0;
+                }
+        }
+        if (chord) {
+            voice = ed.recordVoiceAt(s, note);
+            // Monophonic: the lowest key of the chord is the root, the note heard and drawn in black.
+            if (voice > 1 && !poly && !hit && l.pat[size_t(s)] >= 0) {
+                const int root = ed.relNote(s);
+                const std::optional<int> row = ed.voiceRow(s, voice);
+                if (row && *row < root && ed.promoteVoice(s, {s, voice})) {
+                    demoted = ed.voiceAt(s, root);
+                    voice = 1;
+                }
+            }
+            return voice != 0;
+        }
         ed.recordAt(s, note, velocity);
+        if (!hit) ed.setNoteLen(s, 1);  // its hold follows the key, not that of the note it replaces
+        return true;
+    });
+    if (!voice) return;  // the six voices of the step are taken
+    if (demoted)  // the former root, now a chord voice, still follows its key
+        for (RecNote& r : recNotes_)
+            if (r.track == t && r.pattern == p && r.step == s && r.voice == 1) r.voice = demoted;
+    RecNote r;
+    r.note = note;
+    r.track = t;
+    r.pattern = p;
+    r.step = s;
+    r.voice = voice;
+    r.abs = recAbs_;
+    r.phase = recPhase();
+    r.hit = hit;
+    recNotes_.push_back(r);
+}
+
+void SeqWindow::recordRelease(int note) {
+    // Length: the time held, rounded to the nearest step, one at least.
+    for (RecNote& r : recNotes_) {
+        if (!r.held || r.note != note) continue;
+        r.held = false;
+        if (!r.hit) recordLength(r, int(std::lround(double(recAbs_ - r.abs) + recPhase() - r.phase)));
+    }
+}
+
+double SeqWindow::recPhase() const noexcept {
+    if (recStepMs_ <= 0) return 0;
+    return std::clamp((m_.nowMs_ - recStepAt_) / recStepMs_, 0.0, 0.99);
+}
+
+void SeqWindow::recordClock(const ymengine::Engine::SeqStatus& s) {
+    // Length of a step measured between the steps seen (several at once when they are shorter than a frame).
+    const int64_t abs = playing_ ? s.stepAbs : -1;
+    if (abs == recAbs_) return;
+    const int64_t k = abs - recAbs_;
+    if (recAbs_ >= 0 && abs >= 0 && k >= 1 && k <= 16) {
+        const double d = (m_.nowMs_ - recStepAt_) / double(k);
+        recStepMs_ = recStepMs_ > 0 ? recStepMs_ + (d - recStepMs_) * 0.25 : d;
+    }
+    recAbs_ = abs;
+    recStepAt_ = m_.nowMs_;
+}
+
+void SeqWindow::recordHold() {
+    const bool on = playing_ && ses().record && recAbs_ >= 0;
+    for (RecNote& r : recNotes_) {
+        if (!r.held || r.hit) continue;
+        // The note stops following its key when recording stops, or the track or the pattern changes.
+        if (!on || r.track != cur() || r.pattern != proj().current || recAbs_ < r.abs) {
+            r.held = false;
+            continue;
+        }
+        recordLength(r, int(recAbs_ - r.abs) + 1);  // up to the played step
+    }
+    std::erase_if(recNotes_, [&](const RecNote& r) { return !on || (!r.held && r.abs != recAbs_); });
+}
+
+void SeqWindow::recordLength(RecNote& r, int n) {
+    if (r.track != cur() || r.pattern != proj().current) return;
+    n = std::clamp(n, 1, std::max(1, length() - r.step));  // up to the end of the track
+    if (n == r.len) return;
+    r.len = n;
+    const RecNote at = r;
+    editLane([&at, n](ymseq::LaneEditor& ed, ymseq::Lane& l) {
+        if (l.vp(at.voice, at.step) < 0) return false;  // taken away meanwhile
+        if (at.voice == 1)
+            ed.setNoteLen(at.step, n);
+        else
+            ed.setVoiceLen(at.step, at.voice, n);
         return true;
     });
 }
 
 // ------------------------------------------------------------------------------------------- keyboard
 
+bool SeqWindow::clipKey(const gemui::KeyEvent& e) {
+    // Window in front (Indus, 28/10/2026 02:09): ^A selects every note, ^C ^X ^V act on the box, the block of
+    // steps or the note under the cursor, like Edit > Cut, Copy, Paste. Shift + ^ is left to the generators.
+    if (!e.mods.ctrl || e.mods.shift || e.mods.alt) return false;
+    // Letter of the key: its code when the host gives one, else the character typed, in capitals.
+    const int c = e.code ? e.code : (e.ch < 128 ? std::toupper(int(e.ch)) : 0);
+    switch (c) {
+    case 'A': selectAll(); return true;
+    case 'C': editClip(0); return true;
+    case 'X': editClip(1); return true;
+    case 'V': editClip(2); return true;
+    default: return false;
+    }
+}
+
 bool SeqWindow::noteKey(const gemui::KeyEvent& e) {
     // Note under the cursor (window in front, no rectangular selection, melodic track).
     const int s = noteUnderCursor();
+    if (e.mods.ctrl) return false;  // ^C ^X ^V: clipKey
     // Letter of the key: its code when the host gives one, else the character typed, in capitals.
     const int c = e.code ? e.code : (e.ch < 128 ? std::toupper(int(e.ch)) : 0);
-    if (e.mods.ctrl) {
-        if ((c == 'C' || c == 'X') && s >= 0) {
-            copyNote(s, c == 'X');
-            return true;
-        }
-        if (c == 'V' && ses().noteClip) {
-            pasteNote(ses().curStep, viewSemi() + 12 - ses().curRow);
-            return true;
-        }
-        return false;
-    }
     if (s < 0 || e.key != Key::Character) return false;
     ymseq::Lane copy = lane();
     const int len = ymseq::LaneEditor(copy, context()).noteLenAt(s);
@@ -2101,31 +2374,20 @@ bool SeqWindow::noteKey(const gemui::KeyEvent& e) {
 }
 
 bool SeqWindow::rectKey(const gemui::KeyEvent& e) {
-    const int c = e.code ? e.code : (e.ch < 128 ? std::toupper(int(e.ch)) : 0);
-    if (!e.mods.ctrl) {
-        switch (e.key) {
-        case Key::Left: rectMove(-1, 0); return true;
-        case Key::Right: rectMove(1, 0); return true;
-        case Key::Up: rectMove(0, e.mods.shift ? 12 : 1); return true;
-        case Key::Down: rectMove(0, e.mods.shift ? -12 : -1); return true;
-        case Key::Delete:
-        case Key::Backspace:
-            pushUndo();
-            rectClear();
-            return true;
-        case Key::Escape: grid_.clearRect(); return true;
-        default: return false;
-        }
-    }
-    if (c == 'C' || c == 'X') {
-        rectCopy(c == 'X');
+    if (e.mods.ctrl) return false;  // ^C ^X ^V: clipKey
+    switch (e.key) {
+    case Key::Left: rectMove(-1, 0); return true;
+    case Key::Right: rectMove(1, 0); return true;
+    case Key::Up: rectMove(0, e.mods.shift ? 12 : 1); return true;
+    case Key::Down: rectMove(0, e.mods.shift ? -12 : -1); return true;
+    case Key::Delete:
+    case Key::Backspace:
+        pushUndo();
+        rectClear();
         return true;
+    case Key::Escape: grid_.clearRect(); return true;
+    default: return false;
     }
-    if (c == 'V' && ses().rectClip) {
-        rectPaste();
-        return true;
-    }
-    return false;
 }
 
 bool SeqWindow::cursorKey(const gemui::KeyEvent& e) {
@@ -2221,7 +2483,9 @@ const gemui::Widget* SeqWindow::widgetOf(std::string_view id) const {
         {"scaleRoot", &scaleRoot_}, {"scaleSel", &scaleSel_}, {"scaleSnap", &scaleSnap_}, {"seqSig", &sig_},
         {"seqReso", &reso_},      {"seqFig", &fig_},      {"seqChord", &chord_},    {"seqPolySel", &poly_},
         {"seqGhost", &ghost_},    {"seqOver", &over_},    {"trPlay", &play_},       {"trRec", &rec_},
-        {"trLoop", &loop_},       {"seqMetro", &metro_},  {"overMap", &overMap_},   {"seqHint", &hint_},
+        {"trLoop", &loop_},       {"seqMetro", &metro_},  {"seqLaunch", &launch_}, {"overMap", &overMap_},
+        {"seqTrack", &trackSel_}, {"seqInsOpen", &insOpen_}, {"seqInsNum", &insNum_},
+        {"seqHint", &hint_},
         {"bpmVal", &bpmv_},       {"swingVal", &swingv_}, {"seqScrollv", &scrollv_},
     };
     for (const Named& n : named)

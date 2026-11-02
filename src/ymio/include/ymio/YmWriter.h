@@ -47,12 +47,15 @@ struct Ym6Info {
     ymcore::MasterClock clock{};  // written in whole Hz (rounded)
     uint32_t loopFrame = 0;       // frame the player loops back to (clamped to the last frame)
     std::string title, author, comment;
-    // Samples of the engine's Digidrum slots (4-bit values 0-15), designated by RegisterFrame::Effect::value.
-    std::array<std::span<const uint8_t>, 8> digidrums{};
+    // Samples of the engine's Digidrum slots (4-bit values 0-15), designated by RegisterFrame::Effect::value (0 to
+    // 254); the file carries the first kYm6Drums of those played, cuts included.
+    std::vector<std::span<const uint8_t>> digidrums;
 };
+// Digidrums a YM6 can hold: the volume register gives their number on 5 bits.
+inline constexpr size_t kYm6Drums = 32;
 // What the YM6 could not carry, in frames × channels.
 struct Ym6Report {
-    uint32_t droppedEffects = 0;  // effect without a free place (two per frame): frozen
+    uint32_t droppedEffects = 0;  // effect without a free place (two per frame), or digidrum past kYm6Drums: frozen
     uint32_t frozenDrums = 0;     // digidrum the player does not play (started with no place, or looped after its end)
     uint32_t cutDrums = 0;        // digidrum stopped before its end by the engine (one timer period of deviation)
 };

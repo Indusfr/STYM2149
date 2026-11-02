@@ -2,7 +2,7 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Scene: the 16 tracks play in layers (Layer), each with a timer-effect generator (SID, Sync Buzzer, Digidrum,
+// Scene: the 32 tracks play in layers (Layer), each with a timer-effect generator (SID, Sync Buzzer, Digidrum,
 // Chipdrum) or a modulated chip channel (ornament, vibrato, ADSR), and the notes are replayed at the chosen rate to
 // keep all the voices busy. With --gen dma (STE machine), the tracks play the DMA bank: eight looped samples of
 // 32 KB, every other one in stereo, at the four rates. With --seq, the sequencer plays a 16-step pattern where each
@@ -25,8 +25,8 @@ namespace {
 void usage() {
     std::fprintf(stderr,
                  "usage: ymbench [options]\n"
-                 "  --mode M        16 | 3 | dual (16)\n"
-                 "  --notes N       held notes per chord, each played by the 16 tracks; 0: idle engine (2)\n"
+                 "  --mode M        32 | 3 | dual (32)\n"
+                 "  --notes N       held notes per chord, each played by the 32 tracks; 0: idle engine (2)\n"
                  "  --rate N        output rate (48000)\n"
                  "  --output O      raw | rawbox | retro (raw)\n"
                  "  --timer T       mfp | free (mfp)\n"
@@ -39,7 +39,7 @@ void usage() {
                  "  --noise         noise on for all the tracks (otherwise every other track)\n"
                  "  --engines N     N independent engines rendered one after the other (1)\n"
                  "  --repeat N      repeated measurements, the fastest one is kept (5)\n"
-                 "  --tracks        also renders the 16 track outputs and the 2 chip outputs\n"
+                 "  --tracks        also renders the 32 track outputs and the 2 chip outputs\n"
                  "  --delay         delay on, every track sent at 50 %%\n"
                  "  --echo          echo of the notes on every track: 1/8, 3 repeats, drop of 3\n"
                  "  --hash          hash (FNV-1a 64) of everything rendered in the last pass, counted in the load\n");
@@ -107,13 +107,13 @@ int main(int argc, char** argv) {
     cfg.render.hostRate = rate;
     cfg.render.mode = output;
     if (tracks) cfg.trackOutputs = 0xFFFF;  // the separate outputs are only rendered for the prepared tracks
-    std::vector<uint8_t> sample(Engine::kMaxUserSample);
+    std::vector<uint8_t> sample(1u << 16);  // 8.4 s per Digidrum
     for (size_t i = 0; i < sample.size(); ++i) sample[i] = uint8_t((i * 7 + (i >> 5)) & 15);
-    // DMA bank: eight full samples (32 KB), looped so that held notes read to the end.
-    std::vector<int8_t> pcm(ymengine::kDmaMaxBytes);
+    // DMA bank: eight samples of 32 KB, looped so that held notes read to the end.
+    std::vector<int8_t> pcm(32768);
     for (size_t i = 0; i < pcm.size(); ++i) pcm[i] = int8_t(int((i * 13) & 255) - 128);
     ymengine::DmaParams bank;
-    for (int k = 0; k < ymengine::kDmaSlots; ++k) bank.slots[size_t(k)] = {uint8_t(k & 3), (k & 1) != 0, 60, true};
+    for (int k = 0; k < 8; ++k) bank.slots[size_t(k)] = {uint8_t(k & 3), (k & 1) != 0, 60, true};
     const ymengine::Generator gens[] = {ymengine::Generator::Sid, ymengine::Generator::SyncBuzzer,
                                         ymengine::Generator::Digidrum, ymengine::Generator::Chipdrum,
                                         ymengine::Generator::Chip};
@@ -148,9 +148,9 @@ int main(int argc, char** argv) {
             g.ste = ste;
             g.delay.on = delay;
             e->setGlobal(g);
-            for (int s = 0; s < ymengine::kDigidrumSlots; ++s) e->setUserSample(s, sample);
+            for (int s = 0; s < ymengine::kDigidrumPads; ++s) e->shareUserSample(s, sample);
             e->setDma(bank);
-            for (int s = 0; s < ymengine::kDmaSlots; ++s) e->setDmaSample(s, pcm);
+            for (int s = 0; s < 8; ++s) e->shareDmaSample(s, pcm);
             for (int t = 0; t < ymengine::kTracks; ++t) {
                 ymengine::TrackParams p;
                 p.mix.enabled = true;
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
     const double avgVoices = double(voiceSamples) / double(total);
     if (seq) std::printf("sequencer: %d voices per track and per step, 120 BPM in 1/16\n", notes);
     std::printf("%d engine(s), mode %s%s, %u Hz, output %s, timer %s, blocks of %u: %.0f voices average (max %llu)\n", engines,
-                mode == ymengine::VoiceMode::Studio16 ? "16 voices" : mode == ymengine::VoiceMode::Dual3 ? "dual chip" : "3ch",
+                mode == ymengine::VoiceMode::Studio16 ? "32 ch" : mode == ymengine::VoiceMode::Dual3 ? "dual chip" : "3ch",
                 ste ? " (STE)" : "",
                 rate, output == ymcore::OutputMode::Raw ? "raw" : output == ymcore::OutputMode::RawBox ? "rawbox" : "retro",
                 timer == ymengine::TimerMode::Mfp ? "mfp" : "free", block, avgVoices, (unsigned long long)maxVoices);

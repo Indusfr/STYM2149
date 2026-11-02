@@ -1,0 +1,3 @@
+add_executable(ttrakimport main.cpp)
+target_link_libraries(ttrakimport PRIVATE stym_tools_import stym_tools_common)
+stym_warnings(ttrakimport)

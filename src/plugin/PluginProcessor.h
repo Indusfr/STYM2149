@@ -29,6 +29,7 @@
 
 #include "plugincore/Driver.h"
 #include "plugincore/MidiLearn.h"
+#include "plugincore/MidiMonitor.h"
 #include "plugincore/EngineStatus.h"
 #include "pluginui/Session.h"
 
@@ -41,7 +42,7 @@ class StymProcessor final : public juce::AudioProcessor,
                             private ParamListener {
 public:
     // Output buses: main stereo, then one mono output per track and per chip, disabled by default. Bus
-    // indices: 0 main, 1-16 tracks, 17-18 chips.
+    // indices: 0 main, 1-32 tracks, 33-34 chips (1-16 and 17-18 in earlier versions).
     static constexpr int kTrackBusFirst = 1;
     static constexpr int kChipBusFirst = kTrackBusFirst + kTracks;
     static constexpr int kBusCount = kChipBusFirst + 2;
@@ -90,11 +91,18 @@ public:
     void pushScreenMidi(uint8_t status, uint8_t data1, uint8_t data2) noexcept;
     // Sequencer command (Play, Stop, pattern, preview of a step), through the same queue as on-screen playing.
     void pushSeqCommand(UiCommand command, uint8_t a = 0, uint8_t b = 0, uint8_t c = 0) noexcept;
+    // A MIDI input of the standalone application is gone: the keys held are released, in the engine and on
+    // the editor's keyboard (a CC 123 among the host notes).
+    void releaseMidiKeys() noexcept { pushSeqCommand(UiCommand::KeysOff); }
     // Note on and off received from the host (not those of the screen), CC 120 and 123 included, for the editor:
     // false when none is left. A single reader. Full queue (editor closed): the following ones are lost; the editor
     // empties it when it opens.
     bool popHostNote(std::array<uint8_t, 3>& message) noexcept;
     void dropHostNotes() noexcept;
+    // MIDI monitor: every message received from the host but the MIDI clock and active sensing, a SysEx as its
+    // first data bytes and its length; a single reader, the same queue rules as the host notes.
+    bool popMonitorMidi(MonitorMessage& message) noexcept;
+    void dropMonitorMidi() noexcept;
     // MIDI learn: map from the preferences (JSON text of midiMap), read when the plugin is created so that
     // the learned CCs and notes are caught even with the editor closed; keys and armed control given by the editor;
     // caught messages, for the editor (a single reader, full queue: the following ones are lost, the editor empties it
@@ -118,8 +126,9 @@ public:
     RegisterTake recordedTake() const;  // copy of the kept take (export)
     void clearTake();
     // YM Player, message thread: file read then loaded, stopped (alert of the refusal, empty if it is
-    // loaded), playback, back to the start, subsong, closing.
+    // loaded), project played instead, playback, back to the start, subsong, closing.
     std::string loadYm(std::span<const uint8_t> bytes, std::string fileName);
+    void playProject(const ParamValues& values, const NonParamState& extras, bool song, std::string name);
     void ymPlay(bool on);
     void ymRewind();
     void ymSubsong(int subsong);
@@ -139,12 +148,13 @@ public:
 private:
     static BusesProperties makeBuses();
     void parameterChangedByMidi(int index, float plainValue) noexcept override;
-    Snapshot makeSnapshot() const;  // under controlLock_
+    // Under controlLock_. On the heap: a Snapshot weighs over 100 KB, too much for a host thread's stack.
+    std::unique_ptr<Snapshot> makeSnapshot() const;
     // Non-automatable state read back (host state, preset): everything is rebuilt, the engine takes the current
     // pattern again; take: the recorder's take read back (nullptr: kept).
     void applyExtras(const NonParamState& extras, const RegisterTake* take, bool hasSequencer);
     void collectTake();             // message thread
-    uint16_t enabledTrackOutputs() const;
+    uint32_t enabledTrackOutputs() const;
 
     std::array<juce::RangedAudioParameter*, kParamCount> params_{};
     Driver driver_;
@@ -153,7 +163,7 @@ private:
     // Audio thread.
     ParamValues values_{};      // plain values of the block, read from the host parameters at its start
     std::vector<MidiEvent> midi_;  // events of the block: 4096 reserved by the constructor, never grown
-    uint16_t preparedOutputs_ = 0;  // track outputs enabled at prepareToPlay (bit t = track t); the others stay silent
+    uint32_t preparedOutputs_ = 0;  // track outputs enabled at prepareToPlay (bit t = track t); the others stay silent
     std::vector<float> click_;  // metronome of the block, as long as the longest block announced
 
     // On-screen playing, from the editor to the audio thread.
@@ -163,6 +173,9 @@ private:
     // Host notes, from the audio thread to the editor.
     juce::AbstractFifo hostNoteFifo_{256};
     std::array<std::array<uint8_t, 3>, 256> hostNoteBuffer_{};
+    // MIDI monitor, from the audio thread to the editor.
+    juce::AbstractFifo monitorFifo_{256};
+    std::array<MonitorMessage, 256> monitorBuffer_{};
     // MIDI learn: messages caught for the editor (neither engine nor host notes).
     MidiCapture capture_;
     juce::AbstractFifo learnFifo_{256};
@@ -173,14 +186,12 @@ private:
     std::array<int, 1024> notifyBuffer_{};  // parameter indices
 
     // Non-automatable settings (state) and their versions, under controlLock_. The versions travel in each Snapshot:
-    // the audio thread redoes the costly parts (Chipdrum kit, Digidrum and DMA samples, current pattern) only when
-    // theirs changes. extrasVersion_ tells the editor, without the lock, that the state changed.
+    // the audio thread redoes the costly parts (Chipdrum kit, current pattern) only when theirs changes; it compares
+    // the buffers of the samples. extrasVersion_ tells the editor, without the lock, that the state changed.
     mutable std::mutex controlLock_;
     NonParamState extras_;
     uint64_t kitVersion_ = 1;
     uint64_t patternSerial_ = 1;  // the engine takes the state's current pattern (preparation, state read back)
-    std::array<uint64_t, ymengine::kDigidrumSlots> sampleVersion_{};
-    std::array<uint64_t, ymengine::kDmaSlots> dmaVersion_{};
     std::atomic<uint64_t> extrasVersion_{1};
     RegisterTake take_;  // last take of the recorder, under controlLock_
 

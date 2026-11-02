@@ -7,6 +7,7 @@
 // CLKMODES).
 #include "plugincore/Parameters.h"
 
+#include <algorithm>
 #include <cmath>
 #include <unordered_map>
 
@@ -17,8 +18,9 @@ namespace {
 
 using namespace std::string_view_literals;
 
-constexpr std::array kVoiceModes = {"16 ch"sv, "Authentic 3ch"sv, "Dual chip 2x3ch"sv};
-// Custom clock in 16 ch (the former 2 MHz entry, 2 MHz in the other modes), Atari clock (PAL, named Atari
+// 32 ch last, added after the published three: the values of the others stay.
+constexpr std::array kVoiceModes = {"16 ch"sv, "Authentic 3ch"sv, "Dual chip 2x3ch"sv, "32 ch"sv};
+// Custom clock in 16 and 32 ch (the former 2 MHz entry, 2 MHz in the other modes), Atari clock (PAL, named Atari
 // ST), plus the AY ones of the ZX Spectrum and the Amstrad CPC, put back at Indus's request.
 constexpr std::array kClocks = {"Custom"sv, "Atari ST 2.0053 MHz"sv, "ZX Spectrum 1.7734 MHz"sv,
                                 "Amstrad CPC 1 MHz"sv};
@@ -32,6 +34,13 @@ constexpr std::array kVelocities = {"Accent"sv, "Vol 4-bit"sv, "Off"sv};
 constexpr std::array kBendTargets = {"Pitch"sv, "Volume"sv, "Envelope"sv};
 constexpr std::array kExpressTargets = {"Off"sv, "Vibrato"sv, "Volume"sv, "Envelope"sv, "LFO"sv};
 constexpr std::array kSlideTargets = {"Volume"sv, "Envelope"sv, "Vibrato"sv};
+// Drum pads: Off, then the 16 MIDI channels.
+constexpr std::array kDrumChannels = {"Off"sv,        "Channel 1"sv,  "Channel 2"sv,  "Channel 3"sv,  "Channel 4"sv,
+                                      "Channel 5"sv,  "Channel 6"sv,  "Channel 7"sv,  "Channel 8"sv,  "Channel 9"sv,
+                                      "Channel 10"sv, "Channel 11"sv, "Channel 12"sv, "Channel 13"sv, "Channel 14"sv,
+                                      "Channel 15"sv, "Channel 16"sv};
+// Velocity and aftertouch curves, plugin::Curve in its order.
+constexpr std::array kCurves = {"Linear"sv, "Soft"sv, "Hard"sv, "S-curve"sv};
 constexpr std::array kArpClocks = {"Internal"sv, "MIDI ext"sv};
 constexpr std::array kArpSyncs = {"Rate"sv, "Tempo"sv};
 constexpr std::array kDelaySyncs = {"Time"sv, "Tempo"sv};
@@ -40,8 +49,9 @@ constexpr std::array kDelayDivisions = {"1/2"sv, "1/4D"sv, "1/4"sv,  "1/4T"sv,  
 constexpr std::array kArpDivisions = {"1/4"sv,  "1/8"sv, "1/8T"sv,  "1/16"sv, "1/16T"sv,
                                       "1/32"sv, "Tick"sv, "1/32T"sv, "1/64"sv};  // order: kArpDivisionTicks
 constexpr std::array kVolModes = {"Vol 4-bit"sv, "Envelope"sv};
-// FXNAMES of the prototype, then DMA (STE DMA sound).
-constexpr std::array kGenerators = {"Chip Voice"sv, "SID Voice"sv, "Digidrum"sv, "Sync Buzzer"sv, "Chipdrum"sv, "DMA"sv};
+// FXNAMES of the prototype, then DMA (STE DMA sound) and FM Voice.
+constexpr std::array kGenerators = {"Chip Voice"sv, "SID Voice"sv, "Digidrum"sv, "Sync Buzzer"sv, "Chipdrum"sv, "DMA"sv,
+                                    "FM Voice"sv};
 static_assert(kGenerators.size() == size_t(ymengine::kGenerators));
 constexpr std::array kComputers = {"ST"sv, "STE"sv};
 constexpr std::array kAdsrModes = {"Smooth"sv, "Chip"sv};
@@ -156,6 +166,14 @@ ParamSpec globalSpec(Global g) {
     case Global::MpeBendRange:
         return since(num("mpeBendRange", "MPE Bend Range", ParamKind::Int, 0, 96, 1, 48, "st"), 8);
     case Global::MpeSlide: return since(choice("mpeSlide", "MPE Slide", kSlideTargets, 0), 8);
+    // Drum pads (Indus, 27/10/2026 20:47): channel 10, the GM drum channel, where a pad controller in drum mode
+    // sends its pads.
+    case Global::DrumPads: return since(choice("drumPads", "Drum Pads", kDrumChannels, 10), 10);
+    // Curves of a controller's velocity and aftertouch (Indus, 28/10/2026 10:03-10:05), each its own setting;
+    // Linear, as before, by default.
+    case Global::VelocityCurve: return since(choice("velocityCurve", "Velocity Curve", kCurves, 0), 11);
+    case Global::AftertouchCurve: return since(choice("aftertouchCurve", "Aftertouch Curve", kCurves, 0), 11);
+    case Global::MasterMono: return since(flag("masterMono", "Master Mono", false), 12);
     case Global::Count: break;
     }
     return {};
@@ -194,13 +212,15 @@ ParamSpec trackSpec(Track f, int t) {
     case Track::ArpOn: return flag("arpOn", "Arp On", false);
     case Track::ArpRate: return num("arpRate", "Arp Rate", ParamKind::Int, 4, 200, 1, 50, "Hz");
     case Track::Gate: return since(num("gate", "Gate", ParamKind::Int, 5, 95, 1, 50, "%"), 2);  // Gate slider
-    case Track::VibOn: return since(flag("vibOn", "Vibrato On", true), 4);  // VIBRATO frame
+    // VIBRATO frame; Off by default (Indus, 30/10/2026 03:57).
+    case Track::VibOn: return since(flag("vibOn", "Vibrato On", false), 4);
     case Track::Send: return since(num("send", "Send", ParamKind::Int, 0, 100, 1, 0, "%"), 6);  // Mixer
     // Right side of a stereo DMA sample (Mixer).
     case Track::LevelR: return since(num("levelR", "Level R", ParamKind::Int, 0, 100, 1, 75, "%"), 9);
     case Track::MuteR: return since(flag("muteR", "Mute R", false), 9);
     case Track::SoloR: return since(flag("soloR", "Solo R", false), 9);
     case Track::Link: return since(flag("link", "Link", true), 9);
+    case Track::Mono: return since(flag("mono", "Mono", false), 12);  // Mixer
     case Track::Count: break;
     }
     return {};
@@ -219,12 +239,15 @@ bool isMidiSetting(Global g) {
     case Global::Aftertouch:
     case Global::Mpe:
     case Global::MpeBendRange:
-    case Global::MpeSlide: return true;
+    case Global::MpeSlide:
+    case Global::DrumPads:
+    case Global::VelocityCurve:
+    case Global::AftertouchCurve: return true;
     default: return false;
     }
 }
 
-// The whole table in paramIndex order. Each track repeats trackSpec under its own id "tNN_<field>" (t01 to t16),
+// The whole table in paramIndex order. Each track repeats trackSpec under its own id "tNN_<field>" (t01 to t32),
 // name "Tn <name>" and group "Track n".
 std::array<ParamSpec, kParamCount> buildSpecs() {
     std::array<ParamSpec, kParamCount> specs;
@@ -246,6 +269,7 @@ std::array<ParamSpec, kParamCount> buildSpecs() {
             s.group = "Track " + std::to_string(t + 1);
             s.track = t;
             s.field = f;
+            if (t >= 16) s.version = std::max(s.version, 12);  // tracks 17 to 32
             specs[size_t(paramIndex(t, Track(f)))] = std::move(s);
         }
     }

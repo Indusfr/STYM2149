@@ -35,8 +35,6 @@ struct Kind {
 };
 // Rows in the order of CmdBox::kOrder.
 constexpr std::array<Kind, CmdBox::kOrder.size()> kKinds = {{
-    {"Ticks per Line", "Ticks per Line (Sxx): replay ticks of each line from this step (Ticks timing)", 1,
-     ymengine::kSpeedMax},
     {"Sync Mark", "Sync Mark (Zxx): silent mark written in the SNDH export for a demo", 0, 255},
     {"Volume Slide",
      "Volume Slide (Axy) of an older project: the volume goes up or down this many quarter steps per replay tick; 0 "
@@ -57,7 +55,7 @@ int slideXy(int speed, bool up) noexcept { return up ? speed << 4 : speed; }
 
 constexpr int kCurves = int(ymseq::kSlideCurveNames.size());
 const char* const kCurveTip =
-    "Curve (16 channels): Up, Down and the shapes of the CRV row, from this step to the next command of its kind";
+    "Curve (16 and 32 channels): Up, Down and the shapes of the CRV row, from this step to the next command of its kind";
 
 // Text of a slide's button: its direction, then the short name of its shape (CRV row) when it is not Linear.
 std::string dirText(bool up, int curve) {
@@ -125,6 +123,7 @@ CmdBox::CmdBox(Spec spec) : spec_(std::move(spec)), entries_(spec_.entries) {
                 r.curve = c.on ? std::clamp(c.value, 0, kCurves - 1) : 0;
             }
             r.dir.setTip(hasCurve(k) ? kCurveTip : "Direction of the slide: up or down");
+            r.dir.setPopup(hasCurve(k));  // a menu of curves: the GEM shadow of a pop-up button
             r.dir.onClick = [this, k] {
                 if (hasCurve(k)) return curveMenu(k);
                 Row& rw = rows_[row(k)];
@@ -144,6 +143,7 @@ CmdBox::CmdBox(Spec spec) : spec_(std::move(spec)), entries_(spec_.entries) {
     }
     cancel_.setTip("Close without changing the step");
     ok_.setTip("Write these commands into the step");
+    ok_.setExit(true);  // closes the box: GEM's EXIT border
     cancel_.onClick = [this] { finish(kCancel); };
     ok_.onClick = [this] { finish(kOk); };
     add(cancel_);
@@ -212,7 +212,7 @@ void CmdBox::curveMenu(SeqCmd k) {
         shapes.sub.push_back(std::move(m));
     }
     items.push_back(std::move(shapes));
-    gemui::MenuList::open(*d, std::move(items), r.up ? 0 : 1, r.dir.box(), false);
+    gemui::MenuList::open(*d, std::move(items), r.up ? 0 : 1, r.dir.box(), false, false, r.dir.popup());
 }
 
 void CmdBox::layout(const gemui::Desktop& d) {

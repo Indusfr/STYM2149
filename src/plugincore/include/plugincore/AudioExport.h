@@ -10,7 +10,7 @@
 // Stems: one isolated track per WAV, like isolate() of the prototype (only that track audible, even when muted, with
 // its level and pan; here through solo), in a stored ZIP. Tracks: those that play at least one note during the
 // render (the prototype took the tracks of the current pattern that have notes, even for the Song). Names
-// "stym2149-track-<track>.wav", with the channel names of the prototype (A, B, C, Digi; 01 to 16 in 16-channel mode).
+// "stym2149-track-<track>.wav", with the channel names of the prototype (A, B, C, Digi; 01 to 16 in 32-channel mode).
 // The files are written as the render goes (ymio::ByteSink); they stop at one hour of music (kOfflineMaxSeconds) or
 // at the limit of their format (4 GiB for a WAV or for the ZIP), and the export reports it.
 #pragma once

@@ -71,6 +71,21 @@ void Lane::clearStep(int s) noexcept {
     }
 }
 
+void Lane::repeat(int n, int to) noexcept {
+    n = std::clamp(n, 1, kSteps);
+    to = std::clamp(to, n, kSteps);
+    for (int s = n; s < to; ++s) {
+        const int from = s % n;
+        for (int r = 0; r < kRowCount; ++r) set(Row(r), s, get(Row(r), from));
+        for (auto& row : cmd) row[size_t(s)] = row[size_t(from)];
+        for (int v = 0; v < kExtraVoices; ++v) {
+            vpat[size_t(v)][size_t(s)] = vpat[size_t(v)][size_t(from)];
+            voct[size_t(v)][size_t(s)] = voct[size_t(v)][size_t(from)];
+            vdur[size_t(v)][size_t(s)] = vdur[size_t(v)][size_t(from)];
+        }
+    }
+}
+
 void Lane::copyBoxCmds(int s, const Lane& src, int ss) noexcept {
     for (int k = 1; k <= ymengine::kSeqCmdKinds; ++k)
         if (ymengine::seqCmdInBox(ymengine::SeqCmd(k)))

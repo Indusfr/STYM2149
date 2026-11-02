@@ -43,8 +43,10 @@ void litSine(TrackPatch& t) {
     t.sidWidth = 3;
 }
 
-// The state `bytes` decoded as if its TSEQ chunk had been written n bytes shorter, before the last fields came.
+// The state `bytes` decoded as if its TSEQ chunk had been written n bytes shorter, before the last fields of the SID
+// wave came, and so before the FM wave and its scale that follow them.
 DecodeResult olderChunk(std::vector<uint8_t> bytes, uint32_t n) {
+    n += 2 * (1 + ymengine::kSidWaveSteps);  // the FM wave, then its scale and semitones
     size_t at = 0;
     for (size_t i = 0; i + 4 <= bytes.size(); ++i)
         if (std::memcmp(bytes.data() + i, "TSEQ", 4) == 0) at = i;
@@ -88,9 +90,10 @@ TEST_CASE("Timer waves: end of the TSEQ chunk, written for a track that only has
         return size_t(0);
     }();
     REQUIRE(at > 0);
-    // Timer wave and buzzer fields, then after them (LFO, echo, SID wave),
-    // at the end of the track.
-    const size_t tail = 1 + ymengine::kSidWaveSteps + 1 + ymengine::kBuzzSteps + 1 + 1 + 1 + 8 + 1 + 21 + 1 + 5 + 5;
+    // Timer wave and buzzer fields, then after them (LFO, echo, SID wave,
+    // FM wave, its scale), at the end of the track.
+    const size_t tail = 1 + ymengine::kSidWaveSteps + 1 + ymengine::kBuzzSteps + 1 + 1 + 1 + 8 + 1 + 21 + 1 + 5 + 5 +
+                        2 * (1 + ymengine::kSidWaveSteps);
     auto u32 = [&](size_t i) { return uint32_t(b2[i]) | uint32_t(b2[i + 1]) << 8 | uint32_t(b2[i + 2]) << 16 | uint32_t(b2[i + 3]) << 24; };
     auto put = [&](size_t i, uint32_t v) {
         for (int k = 0; k < 4; ++k) b2[i + size_t(k)] = uint8_t(v >> (8 * k));

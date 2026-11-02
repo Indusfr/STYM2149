@@ -59,7 +59,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }
@@ -272,9 +271,10 @@ TEST_CASE("Sequences: drawn rows, wheel, right click, menus; one undo step per g
     pick(w, 4);
     CHECK(rows.mix[4] == 4);  // mode 3 + 1
     CHECK(h.editor.undo.undoSize() == beforeMix + 1);
-    // GEN: the generator of the note, then Chip, SID and Sync Buzzer.
+    // GEN: the generator of the note, then Chip, SID, Sync Buzzer and FM Voice.
     press(w, centre(cell(w, Row::Gen, 6)));
-    CHECK(labels(w) == std::vector<std::string>{"Note's generator", "Chip Voice", "SID Voice", "Sync Buzzer"});
+    CHECK(labels(w) ==
+          std::vector<std::string>{"Note's generator", "Chip Voice", "SID Voice", "Sync Buzzer", "FM Voice"});
     pick(w, 3);
     CHECK(rows.gen[6] == uint8_t(ymengine::SeqGen::SyncBuzzer));
 
@@ -405,7 +405,7 @@ TEST_CASE("Sequences: fixed note, detune, hard sync, matrix, chained instrument,
 
     // Chaining: None and the stored instruments.
     click(w, "seqxLink");
-    CHECK(labels(w) == std::vector<std::string>{"None", "04 Bass"});
+    CHECK(labels(w) == std::vector<std::string>{"None", "4 Bass"});
     pick(w, 1);
     CHECK(h.patch().link == 4);
     click(w, "seqxLink");
@@ -434,7 +434,7 @@ TEST_CASE("Sequences: fixed note, detune, hard sync, matrix, chained instrument,
 TEST_CASE("Modulation on a DMA track: what moves no sample greyed, with the reason (Indus, 26/10/2026)",
           "[ui][sequences][dma]") {
     TestHost h;
-    h.values[size_t(paramIndex(plugin::Global::Computer))] = 1;  // the STE, for the DMA type in 16 ch
+    h.values[size_t(paramIndex(plugin::Global::Computer))] = 1;  // the STE, for the DMA type in 32 ch
     const size_t gen = size_t(paramIndex(0, plugin::Track::Generator));
     h.values[gen] = float(int(ymengine::Generator::Dma));
     h.state.tracks[0].patch.ornamentOn = true;

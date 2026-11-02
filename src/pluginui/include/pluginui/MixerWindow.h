@@ -6,9 +6,11 @@
 // the outputs (Out L, Out R; a single "Out" output in 3-channel mode, the ST is mono). In 3-channel mode, one strip
 // per chip channel and one for the Digidrum (A, B, C, Digi; eight with two chips): faders inactive (the level comes
 // from the 4-bit volume), no pan. Positions and sizes: the prototype's CSS boxes at 100 % (window at 110, 110, as
-// wide as its strips or as the row of outputs). The 1344 × 984 px desktop never makes the window overflow (92 % of
-// the width, 70 % of the height of the prototype): no scroll bars; placed or grown near its right or bottom edge, it
-// moves back inside.
+// wide as its strips or as the row of outputs). Placed or grown near the desktop's right or bottom edge, it moves
+// back inside. The strips lie in a pane as wide as 16 strips of 32 channels at most: the 32 tracks
+// scroll under a horizontal scroll bar, Indus's choice against the rule of no scroll bars, the Master and the
+// outputs staying in place; the focused track's strip is scrolled into view when the window opens and when the focus
+// changes.
 //
 // VU meters (drawMeters): 48 dB scale, peak hold that falls by 50 % of the height per second (2.5 % per message at
 // 20 Hz in the prototype; here counted by the publications of the engine status), red #B00000 from 0.999.
@@ -18,15 +20,22 @@
 // active: parameters DMA Level, DMA Pan, DMA Mute, DMA Solo); its label opens the DMA window. In 3-channel mode, the
 // DMA track can be stereo: Out L and Out R are then shown.
 //
-// A DMA track playing a stereo sample: two oscilloscopes, two faders each with its meter, two values,
-// two M and two S, the left side's then the right side's, and Link on a row of its own (one Volume for both sides).
+// A DMA track playing a stereo sample, then every DMA track (Indus, 30/10/2026 03:29-03:52):
+// two oscilloscopes, two faders each with its meter, two values, two M and two S, the left side's then the right
+// side's, then Mono and Link on rows of their own. Link: one Volume, M and S for both sides. The meters and
+// oscilloscopes of the two sides are taken after the pan, as the outputs receive them. Mono: one fader, meter,
+// oscilloscope, M and S, Link greyed; a stereo sample plays its two channels mixed. A Mono on the Master too, where
+// the outputs are stereo: the outputs mixed, one Master, its Link greyed. The other generators are mono, in every
+// mode: one fader, meter and oscilloscope, the pan and the send (16 and 32 channels), one M and one S, without Mono
+// or Link (Indus, 30/10/2026 03:52 for the YM channels of the 3-channel modes, 31/10/2026 16:56 for the tracks of 16
+// and 32 channels).
 //
 // Values (eighth DAW test, item 99): each fader's and pan's value under it, in the 6×6 font; a right click on
 // any of the window's sliders opens a menu: Value... (typed) and Reset (the parameter's default). A click on a value
 // types it in place, Enter confirms, Escape cancels (24/10/2026), as the Value... box does.
 //
-// Send (eighth DAW test, item 98): in 16 channels, under the pan, the level that each track sends to the delay
-// (Edit > Effects), after its fader, with its value ("Send 35").
+// Send (eighth DAW test, item 98): in 16 and 32 channels, under the pan, the level that each track sends to the
+// delay (Edit > Effects), after its fader, with its value ("Send 35").
 #pragma once
 #include <array>
 #include <functional>
@@ -36,6 +45,7 @@
 #include <string_view>
 
 #include "gemui/Controls.h"
+#include "gemui/Scroll.h"
 #include "plugincore/Parameters.h"
 #include "plugincore/EngineStatus.h"
 #include "pluginui/Session.h"
@@ -100,7 +110,7 @@ public:
     }
 };
 
-// The Mixer window, a member of MainWindow (message thread). Its 16 strips always exist; layout() shows the first
+// The Mixer window, a member of MainWindow (message thread). Its 32 strips always exist; layout() shows the first
 // strips() of them.
 class MixerWindow : public gemui::FloatWindow {
 public:
@@ -116,12 +126,13 @@ public:
 
     // Rectangle of a control by the prototype's id (captures, tests): "mixWin", "mixFad3", "mixPan3", "vuhL",
     // "vuhR"; "mixLab3", "mixScope3", "mixVu3", "mixMute3", "mixSolo3" for the other elements of the fourth strip;
-    // with a stereo sample, "mixScopeR3" and "mixVuR3" for the right side's, "mixFadR3", "mixFadRVal3",
-    // "mixMuteR3", "mixSoloR3" and "mixLink3";
+    // with two sides, "mixScopeR3" and "mixVuR3" for the right side's, "mixFadR3", "mixFadRVal3",
+    // "mixMuteR3", "mixSoloR3" and "mixLink3", "mixMono3";
     // "mixSep", "mixMasterLab", "mixMaster" for the Master fader; with two Masters, "mixMaster2", "mixLink",
-    // the labels "mixMaster1Lab" / "mixMaster2Lab" and, with stereo outputs, "mixMasterPan"; "mixMasterArea":
+    // the labels "mixMaster1Lab" / "mixMaster2Lab" and, with stereo outputs, "mixMasterPan" and
+    // "mixMasterMono"; "mixMasterArea":
     // all of them. Values: "mixFadVal3", "mixPanVal3", "mixMasterVal", "mixMaster2Val", "mixMasterPanVal".
-    // Send of the delay: "mixSend3", "mixSendVal3".
+    // Send of the delay: "mixSend3", "mixSendVal3". "mixStrips": the pane of the strips.
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     // Text of a value (tests): the ids of rectOf ending in "Val".
     std::string valueText(std::string_view id) const;
@@ -132,6 +143,10 @@ public:
     const VuMeter& meter(int strip, bool right = false) const noexcept;
     // A Master slider (tests): "mixMaster", "mixMaster2", "mixMasterPan".
     const gemui::Slider* slider(std::string_view id) const noexcept;
+    // The pane of the strips: scrolled by its bar, the wheel with Shift, or reveal().
+    gemui::ScrollPane& stripPane() noexcept { return pane_; }
+    // Scrolls the strips so that the strip of `track` shows whole.
+    void reveal(int track);
 
     // amplitude -> height in % (vuPct).
     static double vuPct(double amplitude) noexcept;
@@ -139,8 +154,8 @@ public:
 private:
     // One track's strip (.mstrip). The fader is the track's Level (0-100), or its 4-bit Volume (0-15) for a chip
     // channel in 3-channel mode.
-    // A DMA track whose sample is stereo: two oscilloscopes and two meters, the left side's (scope, vu) and
-    // the right side's (scopeR, vuR); the right side's fader, value, M and S, and Link.
+    // Two sides: two oscilloscopes and two meters, the left side's (scope, vu) and the right side's
+    // (scopeR, vuR); the right side's fader, value, M and S, and Link; Mono above Link.
     struct Strip {
         gemui::Button label;
         MiniScope scope, scopeR;
@@ -149,9 +164,10 @@ private:
         PanSlider pan;
         gemui::Slider send;
         gemui::ValueField faderVal, faderRVal, panVal, sendVal;  // typed in place
-        gemui::Button mute{"M"}, solo{"S"}, muteR{"M"}, soloR{"S"}, link{"Link"};
+        gemui::Button mute{"M"}, solo{"S"}, muteR{"M"}, soloR{"S"}, mono{"Mono"}, link{"Link"};
         double hold = 0, holdR = 0;  // peak hold of the meters, in % of their height
-        bool stereo = false;
+        bool stereo = false;  // two sides shown
+        bool sided = false;   // a DMA track: Mono and Link shown
         // fArm, pArm: one undo step per drag
         bool faderArmed = false, faderRArmed = false, panArmed = false, sendArmed = false;
     };
@@ -166,8 +182,10 @@ private:
     bool stereoOut() const noexcept;           // Out L and Out R
     bool perChip() const noexcept;             // 2x3 channels: a Master per chip
     bool twoMasters() const noexcept;          // two Master faders: stereo outputs (left, right), or one per chip
-    bool panned(int track) const noexcept;     // pan and fader: 16-channel mode, or DMA track in 3-channel mode
-    bool stereo(int track) const noexcept;     // DMA track whose sample is stereo
+    bool panned(int track) const noexcept;     // pan and fader: 32-channel mode, or DMA track in 3-channel mode
+    bool sided(int track) const noexcept;      // a DMA track: two sides unless Mono, Mono and Link
+    bool stereo(int track) const noexcept;     // two sides: a DMA track without Mono
+    bool masterMono() const noexcept;          // the Master's Mono, where the outputs are stereo
     void setMaster(bool right, double v);       // a Master fader, both with Link
     void setRight(int track, double v);         // the right side's fader of a stereo sample, both with Link
     // Right click on a slider: Value... and Reset, applied like a move of the slider (its undo step); `param`
@@ -180,7 +198,11 @@ private:
     const gemui::ValueField* valueField(std::string_view id) const;
 
     MainWindow& m_;
+    gemui::ScrollPane pane_;  // the strips
     std::array<Strip, plugin::kTracks> strips_;
+    // Left edge and width of each strip shown in the pane's content, set by layout() (reveal).
+    std::array<double, plugin::kTracks> stripX_{}, stripW_{};
+    int revealed_ = -1;  // focused track last scrolled into view
     Rule masterSep_;  // Master fader set apart from the tracks (sixth DAW test, item 78)
     gemui::Label masterLab_{"Master"};
     gemui::Slider master_;
@@ -191,6 +213,7 @@ private:
     PanSlider masterPan_;
     gemui::ValueField masterVal_, master2Val_, masterPanVal_;
     gemui::Button link_{"Link"};
+    gemui::Button masterMono_{"Mono"};
     gemui::Label outLab_{"Out L"}, outRLab_{"Out R"};
     VuMeter outL_{true}, outR_{true};
     std::array<double, 2> outHold_{};  // peak holds of Out L and Out R, in %

@@ -1,6 +1,6 @@
 // STYM2149 — register exports: Export song > VBL dump, YM3, YM6 and SNDH
 // (Authentic 3ch only, empty Song refused, worker thread under the bee, alert with what the file does not render),
-// and export of the take from the Recorder window.
+// and export of the take from the Recorder window; the maxYMiser entry among them.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -83,15 +83,17 @@ TEST_CASE("Export song > VBL dump, YM3, YM6, SNDH: Authentic 3ch, files, alerts"
     double now = 0;
     w.tick(now);
 
-    // The prototype's regSub: register formats, separator, then MIDI, WAV and Stems; YM6 added.
+    // The prototype's regSub: register formats, separator, then MIDI, WAV and Stems; YM6 added, maxYMiser,
+    // YM-Tracker and TTrak after the register formats.
     std::vector<gemui::MenuItem> menu = songMenu(w);
-    REQUIRE(menu.size() == 8);
-    const std::vector<std::string> labels = {"VBL dump", "YM3", "YM6", "SNDH"};
-    for (size_t i = 0; i < 4; ++i) {
+    REQUIRE(menu.size() == 11);
+    const std::vector<std::string> labels = {"VBL dump", "YM3", "YM6", "SNDH", "maxYMiser", "YM-Tracker", "TTrak"};
+    for (size_t i = 0; i < 7; ++i) {
         CHECK(menu[i].label == labels[i]);
         CHECK_FALSE(menu[i].disabled);
     }
-    CHECK(menu[4].separator);
+    CHECK(menu[7].separator);
+    CHECK(menu[8].label == "MIDI");
     // 16 voices and dual chip: greyed out.
     for (const float mode : {0.0f, 2.0f}) {
         h.p(Global::VoiceMode) = mode;
@@ -101,18 +103,22 @@ TEST_CASE("Export song > VBL dump, YM3, YM6, SNDH: Authentic 3ch, files, alerts"
             CHECK(menu[i].disabled);
             CHECK(menu[i].why == "Register dumps carry three YM voices: switch to Authentic 3ch");
         }
-        CHECK_FALSE(menu[5].disabled);  // MIDI
+        CHECK(menu[4].disabled);
+        CHECK(menu[4].why == "maxYMiser plays the three channels of one chip: switch to Authentic 3ch");
+        CHECK(menu[5].disabled);
+        CHECK(menu[5].why == "YM-Tracker plays the three channels of one chip: switch to Authentic 3ch");
+        CHECK(menu[6].disabled);
+        CHECK(menu[6].why == "TTrak plays the three channels of one chip: switch to Authentic 3ch");
+        CHECK_FALSE(menu[8].disabled);  // MIDI
     }
     h.p(Global::VoiceMode) = 1;
     w.tick(now += 20);
 
-    // Empty Song: the prototype's requireSong.
+    // Empty Song: Export song greyed (the prototype's requireSong refused it with an alert).
     h.state.seq.song.entries.clear();
     ++h.serial;
     w.tick(now += 20);
-    fileMenu(w, "Export song", "SNDH");
-    CHECK(alertText(w) == "Song is empty. Add entries first.");
-    dismiss(w);
+    CHECK(fileEntry(w, "Export song").disabled);
     CHECK(h.saves.empty());
     h.state.seq.song.entries = {{0, 1, 0}};
     ++h.serial;

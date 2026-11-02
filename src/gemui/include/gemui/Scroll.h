@@ -3,8 +3,8 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Content larger than the area scrolls. The scrollbars only appear if it overflows: vertical on the right,
-// horizontal at the bottom, 26 px thick (like the title bar), halftoned corner when there are both. Drawing read in
-// Chromium 141 (prototype at 100 %):
+// horizontal at the bottom, 26 px thick (like the title bar; a pane can set its own), halftoned corner when
+// there are both. Drawing read in Chromium 141 (prototype at 100 %):
 // - arrow at the top and at the bottom (on the left and on the right): white cell, 2 px rules except on the side of
 //   the window frame, the prototype's 8 × 10 glyph centred in the cell; a single arrow at each end;
 // - track: pattern of dots (1,1) and (3,3) on 4 × 4 from its corner, 2 px left (top) rule;
@@ -28,7 +28,7 @@ namespace stym::gemui {
 // the content (paintOver).
 class ScrollPane : public Widget {
 public:
-    static constexpr int kBar = 26;          // thickness of a scrollbar, length of an arrow
+    static constexpr int kBar = 26;          // thickness of a scrollbar, length of an arrow (by default)
     static constexpr int kMinThumb = 15;     // shortest thumb (Chromium 141 on Linux, measured)
     static constexpr int kLineStep = 40;     // arrow (Chromium's kPixelsPerLineStep)
     static constexpr double kPageFraction = 0.875;  // track (Chromium's kMinFractionToStepWhenPaging)
@@ -55,6 +55,15 @@ public:
     bool hasHorizontal() const noexcept;
     // After a scroll (by the user or scrollTo).
     std::function<void()> onScroll;
+    // Thickness of the pane's scrollbars and length of their square arrows: kBar unless set (13 for the Mixer's bar,
+    // half of it: Indus, 30/10/2026 02:09); 12 at least, room for the 8 × 10 arrow glyph inside its rules.
+    void setBarSize(int px);
+    int barSize() const noexcept { return bar_; }
+    // Rules on the outer side of the scrollbars too (bottom of the horizontal bar, right of the vertical one), for a
+    // pane that does not sit against a window's frame, the Mixer's strips (Indus, 01/11/2026 12:03); 14 px at least,
+    // room for the arrow glyph between two rules.
+    void setClosed(bool on);
+    bool closed() const noexcept { return closed_; }
 
     // Parts of the scrollbars (tests, layout). Up, Down, TrackV, ThumbV: vertical bar; Left, Right, TrackH, ThumbH:
     // horizontal bar; Corner: the square where both meet. A part absent from the pane has an empty rectangle.
@@ -84,6 +93,8 @@ private:
     void paintTrack(Painter& p, bool vertical) const;
 
     int contentW_ = 0, contentH_ = 0;
+    int bar_ = kBar;
+    bool closed_ = false;
     Point scroll_;
 
     Part pressed_ = Part::None;

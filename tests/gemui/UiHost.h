@@ -42,6 +42,7 @@ public:
     std::vector<Midi> midi;           // notes played by the screen (screenMidi)
     std::vector<Command> commands;    // sequencer commands
     int quits = 0;
+    int copy = 1;  // copyNumber
     std::map<std::string, std::string, std::less<>> prefs;
     std::string patches, digidrums, dmaBanks;
     std::string systemLang = "en";       // systemLanguage
@@ -75,12 +76,12 @@ public:
     }
     pluginui::EditorSession& session() override { return editor; }
     bool standalone() const override { return true; }
+    int copyNumber() const override { return copy; }
     std::string midiStatus() const override { return "none"; }
     std::string version() const override { return "test"; }
     void quit() override { ++quits; }
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view key, std::string_view fallback) const override {
         const auto it = prefs.find(key);
         return it == prefs.end() ? std::string(fallback) : it->second;

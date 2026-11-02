@@ -238,7 +238,7 @@ TEST_CASE("Instruments: drums without INS, instrument Digidrum in 3-channel mode
         REQUIRE(r.triggers().size() == 2);
         CHECK(r.triggers()[1].a == int(Generator::Sid));
     }
-    SECTION("16-channel: instrument Digidrum on a melodic track") {
+    SECTION("32-channel: instrument Digidrum on a melodic track") {
         Rig r;
         r.bank[0].patch.generator = Generator::Digidrum;
         const std::vector<uint8_t> smp(7800, 8);

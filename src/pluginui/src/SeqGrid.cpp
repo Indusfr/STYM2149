@@ -73,13 +73,13 @@ constexpr int kMapDrum = 26;  // MAP_DRUM: height of the overview's percussion b
 constexpr std::array<const char*, kSeqLanes> kLaneNames = {"SLT", "OCT", "TON", "INS", "CMD", "SRC", "GEN", "ARP",
                                                            "HLD", "CUT", "SLD", "CRV", "GAT", "PAN", "RTG", "CND",
                                                            "VOL", "VIB", "BPM", "ENV", "DLY", "CUT", "LFO", "MOD",
-                                                           "SMP", "TUN"};
+                                                           "SMP", "TUN", "TIK"};
 constexpr std::array<const char*, kSeqLanes> kLaneHelp = {
     "SLT: Digidrum slot for this step",
     "OCT: shift this step by one or more octaves",
     "TON: tune this step by semitones",
     "INS: play this note with a project instrument (Instruments window, Ctrl+T)",
-    "CMD: commands of this step, click to set them (ticks per line, sync mark, slides); MUL: several",
+    "CMD: commands of this step, click to set them (sync mark, slides); MUL: several",
     "SRC: tone, noise or both on this step; the Env entries put its volume on the envelope. Right click: its settings",
     "GEN: use another generator on this step only. Right click: its settings",
     "ARP: switch the arpeggiator of the track on or off from this step",
@@ -102,6 +102,7 @@ constexpr std::array<const char*, kSeqLanes> kLaneHelp = {
     "MOD: switch the modulation table of the track on or off from this step",
     "SMP: the DMA sample of this step starts further in",
     "TUN: fine tune of the track in cents from this step on",
+    "TIK: replay ticks of each line from this step on, for every track (Ticks timing)",
 };
 
 bool isFlag(SeqLane l) noexcept {  // toggle rows (tie, slide, cut; afl was one until the twelfth DAW test, item 144)
@@ -113,11 +114,6 @@ std::string switchText(uint16_t cmd) { return cmd ? (ymengine::seqCmdParam(cmd) 
 
 int clampIdx(int v, int n) noexcept { return std::clamp(v, 0, n - 1); }
 
-// Instrument number in two-digit hexadecimal ($01 to $20, like the trackers).
-std::string hex2(int v) {
-    static const char* const kHex = "0123456789ABCDEF";
-    return {kHex[(v >> 4) & 15], kHex[v & 15]};
-}
 
 // Baseline of a text in a line box of height lineH (half-leading rounded down, like Chromium), metrics of the GEM font.
 int baselineIn(double lineTop, double lineH, int px) {
@@ -200,6 +196,14 @@ Bg cellBackground(unsigned f) {
 }
 
 // Root or chord voice that covers step c on row off of a melodic track: its start and voice (1 = root).
+// Select all ^A in the grid's right-click menus, as Edit > Select all.
+MenuItem selectAllItem(SeqWindow& w) {
+    MenuItem m;
+    m.label = "Select all ^A";
+    m.pick = [&w] { w.selectAll(); };
+    return m;
+}
+
 std::optional<ymseq::SelKey> noteCovering(const ymseq::LaneEditor& ed, const ymseq::Lane& l, int c, int off) {
     if (const auto v = ed.voiceStartCovering(c, off)) return ymseq::SelKey{v->start, v->voice};
     const int st = l.pat[size_t(c)] >= 0 ? c : ed.noteStart(c);
@@ -233,9 +237,13 @@ std::vector<SeqGrid::RowBox> SeqGrid::rows() const {
     y += kGap;
     out.push_back({RowBox::Kind::Sep, 0, y, kSepH});
     y += kSepH;
+    bool shared = false;
     for (const SeqLane lane : kSeqLaneOrder) {
         if (!laneShown_[size_t(lane)]) continue;
-        if (lane == SeqLane::Bpm) {  // shared by the tracks: behind a separator (twelfth DAW test, item 150)
+        // The rows shared by the tracks, TIK and BPM, behind a separator under VOL (twelfth DAW test, item 150; Indus,
+        // 29/10/2026 14:12).
+        if ((lane == SeqLane::Tik || lane == SeqLane::Bpm) && !shared) {
+            shared = true;
             y += kGap;
             out.push_back({RowBox::Kind::Sep, 1, y, kSepH});
             y += kSepH;
@@ -347,6 +355,7 @@ void SeqGrid::refresh() {
     const bool latinNames = w_.latin();
     const int sc = w_.scale(), root = w_.scaleRoot();
     const bool m3 = w_.mode3(), chords = w_.chordsPlay();
+    const bool cutFades = !m3 && w_.st().global.cutFade;  // a CUT fades out
     // Deviation: the notes picked one by one and the selection box belong to the track they were made on
     // (they stayed when another track was shown, and -1/+1, < and > then edited that track at the same places).
     if (w_.cur() != selTrack_) {
@@ -366,7 +375,7 @@ void SeqGrid::refresh() {
         std::string& lab = noteLabels_[size_t(r)];
         labelDis_[size_t(r)] = false;
         if (ndrum) lab = off >= 0 && off < 8 ? std::string(ymseq::kDrumNames[size_t(off)]) : "";
-        else if (digid) lab = off < 8 ? "Sl " + std::to_string(off + 1) : "";
+        else if (digid) lab = off >= 0 && off < 8 ? "Sl " + std::to_string(w_.m_.digiPad(w_.cur(), off) + 1) : "";
         else {
             const int pc = ((off % 12) + 12) % 12;
             const int oc = trackOct + int(std::floor(off / 12.0));
@@ -398,6 +407,7 @@ void SeqGrid::refresh() {
     show(SeqLane::Env, w_.envShown());
     show(SeqLane::Dly, w_.ownRowShown(ymengine::SeqCmd::Delay));
     show(SeqLane::NoteCut, w_.ownRowShown(ymengine::SeqCmd::Cut));
+    show(SeqLane::Tik, w_.ownRowShown(ymengine::SeqCmd::Speed));  // out of the CMD row
     show(SeqLane::Smp, w_.smpShown());
     show(SeqLane::Gat, !drum_);
     show(SeqLane::Pnr, !m3 || w_.m_.dmaTrack(w_.cur()));  // DMA track in 3-channel mode: pan
@@ -411,6 +421,8 @@ void SeqGrid::refresh() {
     const std::vector<ymseq::SelNote> picked = noteSel_.empty() ? std::vector<ymseq::SelNote>{} : ed.resolve(noteSel_);
     const bool hasRb = rect_.has_value();
     const ymseq::RectBounds rb = hasRb ? rectBounds() : ymseq::RectBounds{};
+    // Notes the box takes (those starting in it), drawn framed over their whole length.
+    const std::vector<ymseq::RectNote> boxed = hasRb && !drum_ ? ed.rectNotes(rb) : std::vector<ymseq::RectNote>{};
 
     // Each shown column c (absolute step a): its step number, then the classes of its 13 note cells and of its control
     // cells.
@@ -486,6 +498,14 @@ void SeqGrid::refresh() {
                         nc.psel = true;
                         break;
                     }
+            if (on || held)
+                for (const ymseq::RectNote& n : boxed)
+                    if (n.row == row && a >= n.s && a < n.s + n.len) {
+                        nc.boxed = true;
+                        nc.boxFirst = a == n.s;
+                        nc.boxLast = a == n.s + n.len - 1;
+                        break;
+                    }
             nc.offsc = !drum_ && !ymseq::inScale(row + octBase, sc, root);
             nc.sel = (!selRow_ && selA_ >= 0 && a >= blockLo() && a <= blockHi()) ||
                      (hasRb && a >= rb.a && a <= rb.b && row >= rb.r1 && row <= rb.r2);
@@ -515,11 +535,11 @@ void SeqGrid::refresh() {
                                 ? std::clamp<int>(lane.vol[a + 1 < effLen ? A + 1 : 0], 0, 15)
                                 : -1;
         static const std::array<const char*, 8> mixT = {"-", "T", "N", "TN", "E", "TE", "NE", "TNE"};
-        static const std::array<const char*, 5> fxT = {"-", "CV", "SID", "SB", "CD"};
+        static const std::array<const char*, 6> fxT = {"-", "CV", "SID", "SB", "CD", "FM"};  // FM Voice
         static const std::array<const char*, 4> rtgT = {"-", "2", "3", "4"};
         static const std::array<const char*, 8> cndT = {"-", "1:2", "2:2", "1:4", "4:4", "25", "50", "75"};
         lc(SeqLane::Mix).text = mixT[size_t(clampIdx(lane.mix[A], 8))];
-        lc(SeqLane::Fx).text = fxT[size_t(clampIdx(lane.fx[A], 5))];
+        lc(SeqLane::Fx).text = fxT[size_t(clampIdx(lane.fx[A], 6))];
         lc(SeqLane::Slt).text = lane.slt[A] ? std::to_string(std::clamp<int>(lane.slt[A], 1, 8)) : "-";
         {
             const int sv = lane.slc[A];
@@ -534,7 +554,8 @@ void SeqGrid::refresh() {
         const int o = lane.oct[A];
         lc(SeqLane::Oct).text = o ? (drum_ ? sg(o) : std::to_string(o)) : "-";
         lc(SeqLane::Ton).text = lane.ton[A] ? sg(lane.ton[A]) : "-";
-        lc(SeqLane::Ins).text = lane.ins[A] ? hex2(lane.ins[A]) : "-";
+        // The instrument in decimal, 1 to 127 (Indus, 29/10/2026 20:50; two hexadecimal digits until then).
+        lc(SeqLane::Ins).text = lane.ins[A] ? std::to_string(lane.ins[A]) : "-";
         lc(SeqLane::Cmd).text = ymseq::cmdCellText(lane, int(A));
         {  // rows of their own: On or Off, the tempo of the pattern, the
            // shape (8 to F) and R for a restart, a tick, the offset, the cents
@@ -552,8 +573,12 @@ void SeqGrid::refresh() {
             if (lane.cmdAt(SeqCmd::Retrig, int(A))) env += 'R';
             lc(SeqLane::Env).text = env.empty() ? "-" : env;
             lc(SeqLane::Dly).text = number(SeqCmd::Delay);
+            // The tick of the CUT, followed by F when it fades out: Fade on, in 16 and 32 ch (Indus, 01/11/2026
+            // 11:24-11:28).
             lc(SeqLane::NoteCut).text = number(SeqCmd::Cut);
+            if (lane.cmdAt(SeqCmd::Cut, int(A)) && cutFades) lc(SeqLane::NoteCut).text += 'F';
             lc(SeqLane::Smp).text = number(SeqCmd::Offset);
+            lc(SeqLane::Tik).text = number(SeqCmd::Speed);
             if (lane.cmdAt(SeqCmd::Fine, int(A))) {
                 const int ct = std::clamp(param(SeqCmd::Fine) - ymengine::kFineCmdCenter, -kFineShown, kFineShown);
                 lc(SeqLane::Tun).text = ct > 0 ? "+" + std::to_string(ct) : std::to_string(ct);
@@ -573,7 +598,8 @@ void SeqGrid::refresh() {
         // item 165).
         for (const SeqLane r : {SeqLane::Mix, SeqLane::Fx, SeqLane::Ins, SeqLane::Env, SeqLane::Smp, SeqLane::Gat,
                                 SeqLane::Rtg, SeqLane::Cnd, SeqLane::Oct, SeqLane::Ton, SeqLane::Afl, SeqLane::Vib,
-                                SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun, SeqLane::Dly, SeqLane::Slc, SeqLane::Bpm}) {
+                                SeqLane::Lfo, SeqLane::Mod, SeqLane::Tun, SeqLane::Dly, SeqLane::Slc, SeqLane::Tik,
+                                SeqLane::Bpm}) {
             if (!laneShown_[size_t(r)] || w_.cantAct(r, a).empty()) continue;
             const bool empty = lc(r).text == "-";
             lc(r).nope = !empty || !dead;
@@ -768,7 +794,16 @@ void SeqGrid::paintNoteCell(Painter& p, const Rect& r, const NoteCell& c, bool p
         if (bg.stripes) stripes(p, r, pad);
         else p.fill(r, bg.c);
     }
-    insetShadow(p, pad, (c.on && c.sel) || c.cur, c.bar);
+    insetShadow(p, pad, (c.on && c.sel && !c.boxed) || c.cur, c.bar);
+    if (c.boxed) {
+        // One 4 px green frame round the whole note taken by the box: top and bottom on each of its steps and
+        // across the gap to the next one, the left side on its first step, the right side on its last.
+        const int x0 = c.boxFirst ? pad.x : r.x, x1 = c.boxLast ? pad.right() : r.right() + kGap;
+        p.fill({x0, pad.y, x1 - x0, 4}, colors::kGreen);
+        p.fill({x0, pad.bottom() - 4, x1 - x0, 4}, colors::kGreen);
+        if (c.boxFirst) p.fill({pad.x, pad.y, 4, pad.h}, colors::kGreen);
+        if (c.boxLast) p.fill({pad.right() - 4, pad.y, 4, pad.h}, colors::kGreen);
+    }
     if (bt) {
         p.fill({r.x, r.y, r.w, 1}, colors::kWhite);
         p.fill({r.x, r.bottom() - 1, r.w, 1}, colors::kWhite);
@@ -1195,7 +1230,8 @@ void SeqGrid::laneMenu(const Hit& h, int c) {
         w_.openBpm(h.r, c);
         return;
     }
-    if (lane == SeqLane::Dly || lane == SeqLane::NoteCut || lane == SeqLane::Smp || lane == SeqLane::Tun) {
+    if (lane == SeqLane::Dly || lane == SeqLane::NoteCut || lane == SeqLane::Smp || lane == SeqLane::Tun ||
+        lane == SeqLane::Tik) {
         w_.openCmdValue(h.r, c, ymseq::cmdKind(laneRow(lane)));
         return;
     }
@@ -1224,7 +1260,10 @@ void SeqGrid::laneMenu(const Hit& h, int c) {
         labels = {"Channel", "Tone", "Noise", "Tone+Noise", "Env", "Tone+Env", "Noise+Env", "Tone+Noise+Env"};
         seps = {ymengine::kSeqMixEnv};
         break;
-    case SeqLane::Fx: labels = {"Channel", "Chip Voice", "SID Voice", "Sync Buzzer"}; break;
+    case SeqLane::Fx:  // FM Voice: value 5, after the Chipdrum of the imports
+        labels = {"Channel", "Chip Voice", "SID Voice", "Sync Buzzer", "FM Voice"};
+        values = {0, 1, 2, 3, ymengine::kSeqFxFm};
+        break;
     case SeqLane::Slt:
         labels = {"Channel", "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6", "Slot 7", "Slot 8"};
         break;
@@ -1338,19 +1377,19 @@ void SeqGrid::insMenu(const Hit& h, int c) {
     add("Channel", 0);
     for (int k = 0; k < plugin::kInstruments; ++k) {
         const plugin::Instrument& x = ins[size_t(k)];
-        if (x.used) add(hex2(k + 1) + " " + plugin::instrumentLabel(x, k), k + 1);
-        else if (k + 1 == cur) add(hex2(k + 1) + " (empty)", k + 1);
+        if (x.used) add(std::to_string(k + 1) + " " + plugin::instrumentLabel(x, k), k + 1);
+        else if (k + 1 == cur) add(std::to_string(k + 1) + " (empty)", k + 1);
     }
     items.push_back(MenuItem::separatorItem());
     MenuItem open;
     open.label = "Instruments...";
     open.pick = [this] { w_.m_.instruments().show(); };
     items.push_back(std::move(open));
-    w_.popupAt(h.r, std::move(items), checked);
+    w_.popupAt(h.r, std::move(items), checked, true);
 }
 
 // Plain press on a note cell, in this order: the tools that act at once (Select, Split, Join, Erase, Move on an empty
-// cell), a greyed voice promoted on a Monophonic track, a chord voice or a note grabbed by an edge (sizing_) or as a
+// cell), a greyed voice promoted where chords do not play, a chord voice or a note grabbed by an edge (sizing_) or as a
 // whole (moving_), then a write: new note, chord voice added or removed, new figure length, or the note removed.
 // `copy` and `ed` read the track as it was at the press; changes go through SeqWindow::editLane.
 void SeqGrid::pressNote(const Hit& h, int c, const gemui::MouseEvent& e) {
@@ -1398,8 +1437,9 @@ void SeqGrid::pressNote(const Hit& h, int c, const gemui::MouseEvent& e) {
         refresh();
         return;
     }
-    // Mono: promote a greyed voice.
-    if (const auto hitM = ed.voiceStartCovering(c, off); hitM && w_.mono() && !e.mods.shift) {
+    // A track that does not play chords, Monophonic or in a 3-voice mode (Indus, 28/10/2026 10:29): a click on
+    // a greyed voice makes it the note played, the black one going grey.
+    if (const auto hitM = ed.voiceStartCovering(c, off); hitM && !w_.chordsPlay() && !e.mods.shift) {
         if (w_.editLane([&](ymseq::LaneEditor& e2, ymseq::Lane&) { return e2.promoteVoice(c, *hitM); })) {
             w_.armChan();
             w_.previewNote(dr ? off : (w_.trackOct() + 1) * 12 + off);
@@ -1853,7 +1893,11 @@ void SeqGrid::contextMenu(const Hit& h) {
             MenuItem m;
             m.label = "Paste note here";
             m.pick = [this, c, off] { w_.pasteNote(c, off); };
-            w_.popupAt(h.r, {std::move(m)}, -1);
+            std::vector<MenuItem> items;
+            items.push_back(std::move(m));
+            items.push_back(MenuItem::separatorItem());
+            items.push_back(selectAllItem(w_));
+            w_.popupAt(h.r, std::move(items), -1);
             return;
         }
     }
@@ -1902,6 +1946,8 @@ void SeqGrid::noteMenu(const Hit& h, int c, int s, int off) {
             return true;
         });
     });
+    items.push_back(MenuItem::separatorItem());
+    items.push_back(selectAllItem(w_));
     w_.popupAt(h.r, std::move(items), -1);
 }
 
@@ -1928,6 +1974,7 @@ void SeqGrid::rectMenu(const Hit& h) {
                                                  {"-1 octave", -12}};
     for (const auto& [label, n] : moves) add(label, [this, dr = n] { w_.rectMove(0, dr); });
     items.push_back(MenuItem::separatorItem());
+    items.push_back(selectAllItem(w_));
     add("Deselect", [this] { clearRect(); });
     w_.popupAt(h.r, std::move(items), -1);
 }
@@ -1939,7 +1986,7 @@ void SeqGrid::blockMenu(const Hit& h, int c) {
         // Name of the row in capitals, like selRow.toUpperCase() (keys of the prototype).
         static const std::array<const char*, kSeqLanes> keys = {
             "SLT", "OCT", "TON", "INS", "CMD", "MIX", "FX",  "ARP",  "TIE", "CUT", "SLIDE", "SLC", "GAT",
-            "PNR", "RTG", "CND", "VOL", "VIB", "BPM", "ENV", "DLY", "NCUT", "LFO", "MOD", "SMP", "TUN"};
+            "PNR", "RTG", "CND", "VOL", "VIB", "BPM", "ENV", "DLY", "NCUT", "LFO", "MOD", "SMP", "TUN", "TIK"};
         return std::string(keys[size_t(l)]);
     };
     const std::string sc = selRow_ ? " " + upper(*selRow_) : "";
@@ -1969,6 +2016,7 @@ void SeqGrid::blockMenu(const Hit& h, int c) {
         if (has) w_.blockClear();
     });
     items.push_back(MenuItem::separatorItem());
+    items.push_back(selectAllItem(w_));
     add("Deselect", [this] { clearBlock(); });
     items.push_back(MenuItem::separatorItem());
     {

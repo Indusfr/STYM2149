@@ -1,0 +1,115 @@
+# STYM2149: lines of the interface kept in English on purpose, one per line; {1} to {9} stand for any part.
+# Programming: Pascal "Indus" Nowak (with Claude's help).
+# Copyright © 2026 Indus / PRISM. Licence: AGPLv3 (see LICENSE).
+#
+# tests/plugin/test_ui_language.cpp accepts a line of the interface that is in ui.txt (translated), that has nothing to
+# translate (numbers, units, note names, codes of up to four capitals) or that is here: names of the product, of its
+# features, of machines and formats, of presets and kits.
+STYM2149
+Chip Voice
+SID Voice
+Sync Buzzer
+Chipdrum
+Digidrum
+Digidrums
+Buzzer
+Sine-SID
+YM Pad
+Timer Wave
+Authentic 3ch
+EmuTOS
+Atari ST
+ZX Spectrum
+Amstrad CPC
+Atari ST {1}
+Amstrad CPC {1}
+ZX Spectrum {1}
+Direct2D
+AZERTY
+QWERTY
+QWERTZ
+Alt
+Bksp
+Caps
+Ctrl
+Del
+Ent
+Esc
+Home
+Ins
+Num
+PgDn
+PgUp
+PrtSc
+ScrLk
+Tab
+Win
+Shift + {1}
+Bz
+CHat
+OHat
+Snr
+Sq
+Tm
+Tom1
+Tom2
+Trk
+Digi1
+Digi2
+Sl {1}
+Classic
+TR-606-ish
+TR-808-ish
+TR-909-ish
+Hard EBM
+Industrial
+Lo-Fi 4bit
+Chiptune
+House
+Techno
+Hip-Hop
+Trap
+Drum'n'Bass
+VBL dump
+CHIP VOICE
+SID VOICE
+SYNC BUZZER
+CHIPDRUM
+DIGIDRUM
+Sus2
+Sus4
+7 sus4
+Add9
+Cumbia
+Tresillo
+Aksak
+Frank Zappa
+Cinquillo
+Bossa-Nova
+Tuareg
+Ruchenitza
+Rumba
+Nawakhat
+Mpre
+In Sen
+R0 TPlo
+R1 TPhi
+R11 EPlo
+R12 EPhi
+Copyright (c) 2026 Indus / PRISM
+Note{1}
+Rest{1}
+Off{1}
+Back{1}
+|:Rest{1}
+|:Off{1}
+|:Back{1}
+maxYMiser
+YM-Tracker
+TTrak
+Digidrum {1}
+RAM
+FM Voice
+FM VOICE
+0 x0.5  1 x1  2 x1.5  3 x2
+4 x3  5 x4  6 x5  7 x6

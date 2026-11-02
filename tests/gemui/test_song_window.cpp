@@ -18,6 +18,15 @@ using SongEntries = std::vector<ymseq::SongEntry>;
 
 namespace {
 
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
+
 class TestHost : public pluginui::Host {
 public:
     plugin::ParamValues values = plugin::defaultValues();
@@ -53,7 +62,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -178,9 +186,9 @@ TEST_CASE("Song: keyboard control when the window is in front", "[ui][song]") {
     CHECK(entries(h) == SongEntries{{0, 1, 0}, {2, 1, 0}, {0, 1, 0}, {0, 1, 0}, {1, 2, 0}});
     CHECK(song.cursor() == 1);
 
-    // With Ctrl, the letters go back to the main window's shortcuts (^D: the DMA generator).
+    // With Ctrl, the letters go back to the main window's shortcuts (Shift + ^D: the DMA generator).
     const auto before = entries(h);
-    CHECK(chr(w, U'd', {false, true, false}));
+    CHECK(chr(w, U'd', {true, true, false}));
     CHECK(entries(h) == before);
     // Step Sequencer in front: the Song no longer takes the keys.
     w.sequencer().show();
@@ -219,11 +227,10 @@ TEST_CASE("Song: click, Shift+click, block menu and drag and drop", "[ui][song]"
     CHECK(song.selection() == ymseq::SongSel{1, 2});
     CHECK(song.cursor() == 2);
 
-    // Block menu (its frame on the block's bottom rule, 20 px entries inside a 2 px frame): Repeat x4 on the selection.
+    // Block menu: Repeat x4 on the selection.
     click(w, "songChip2", {}, gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
-    const gemui::Rect chip = *w.rectOf("songChip2");
-    const gemui::Point x4{chip.x + 20, chip.bottom() - 2 + 2 + 2 * 20 + 10};
+    const gemui::Point x4 = entryAt(w, 2);
     w.desktop().mouseMove(x4, {});
     w.desktop().mouseDown(x4, gemui::MouseButton::Left, {});
     w.desktop().mouseUp(x4, {});

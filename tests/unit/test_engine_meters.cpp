@@ -53,7 +53,7 @@ struct Rig {
 
 }  // namespace
 
-TEST_CASE("16-channel meters: peak of a voice, oscilloscope of the track, 6 000 points per second", "[engine][mixer]") {
+TEST_CASE("32-channel meters: peak of a voice, oscilloscope of the track, 6 000 points per second", "[engine][mixer]") {
     Rig rig(ymengine::VoiceMode::Studio16);
     rig.e.noteOn(0, 69, 127, 2);  // volume 13 of the default patch, track level 0.75
     const float want = float(level(2 * 13 + 1) * 0.75);
@@ -88,7 +88,7 @@ TEST_CASE("16-channel meters: peak of a voice, oscilloscope of the track, 6 000 
     CHECK(std::all_of(rig.m.scope[2].begin(), rig.m.scope[2].end(), [](float v) { return v == 0.0f; }));
 }
 
-TEST_CASE("16-channel meters: chord on a track, peak of one voice and sum in the oscilloscope", "[engine][mixer]") {
+TEST_CASE("32-channel meters: chord on a track, peak of one voice and sum in the oscilloscope", "[engine][mixer]") {
     Rig rig(ymengine::VoiceMode::Studio16);  // polyphonic track (default setting)
     rig.e.noteOn(0, 60, 127, 0);
     rig.e.noteOn(0, 64, 127, 0);

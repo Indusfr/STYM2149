@@ -54,7 +54,8 @@ public:
     // Choice of a pattern (selectPattern): during playback, it is made pending and the player switches at the end of
     // the loop; when stopped, it becomes current. False if nothing changes.
     bool select(int idx, bool playing);
-    // The player has switched to this pattern (message "pa"): it becomes current.
+    // The player has switched to this pattern (message "pa"): it becomes current, and its bank the one shown when the
+    // shown one was that of the pattern it leaves.
     void applied(int idx);
 
     // Menu of the pattern buttons (patCopy, patCut, patPaste).

@@ -1,12 +1,13 @@
 // STYM2149 — Digidrum editor: opening (Edit > Samples), slots, loading and listening, name, rate and
 // presets, root note, fine tuning, sustain loop, 4-bit conversion, tools, undo steps (settings alone or bytes),
-// named banks (save, reload, delete, unreadable file), session; Digidrum frame of the main window (rate of the slot)
-// and tooltip of the SID ratio.
+// named banks (save, reload, delete, unreadable file), session, Stereo menu; Digidrum frame of the main window
+// (rate of the slot) and tooltip of the SID ratio.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,10 +69,24 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int slot) override { loads.push_back(slot); }
-    void loadDmaSample(int) override {}
-    std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
-    void setPreference(std::string_view, std::string_view) override {}
+    // The file dialog answers `chosen`; the load records the slot and the file.
+    std::string chosen = "/samples/snare.wav";
+    std::vector<FileDialog> dialogs;
+    std::vector<std::string> files;
+    void chooseFileToOpen(const FileDialog& d, std::function<void(const std::string&)> done) override {
+        dialogs.push_back(d);
+        if (!chosen.empty()) done(chosen);
+    }
+    void loadDigidrum(int slot, const std::string& path) override {
+        loads.push_back(slot);
+        files.push_back(path);
+    }
+    std::map<std::string, std::string, std::less<>> prefs;
+    std::string preference(std::string_view key, std::string_view fallback) const override {
+        const auto it = prefs.find(key);
+        return it != prefs.end() ? it->second : std::string(fallback);
+    }
+    void setPreference(std::string_view key, std::string_view value) override { prefs[std::string(key)] = value; }
     std::string patchLibrary() const override { return {}; }
     void setPatchLibrary(const std::string&) override {}
     std::string digidrumLibrary() const override { return library; }
@@ -139,6 +154,20 @@ bool undoKey(MainWindow& w, bool redo = false) {
     e.code = redo ? 'Y' : 'Z';
     e.mods.ctrl = true;
     return w.desktop().keyDown(e);
+}
+
+// Types `text` in the name field `id`: a click gives it the keys, the old name erased, Enter keeps it.
+void typeName(MainWindow& w, const std::string& id, const std::string& text) {
+    click(w, id);
+    for (int i = 0; i < 40; ++i) key(w, gemui::Key::Backspace);
+    for (char c : text) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    key(w, gemui::Key::Enter);
+    CHECK_FALSE(w.desktop().hasModal());
 }
 
 void answer(MainWindow& w, const std::string& text) {
@@ -318,9 +347,9 @@ TEST_CASE("Digidrums: name, rate, presets, root note, fine tuning; one step per 
     TestHost h;
     MainWindow w(h);
     open(h, w);
-    click(w, "digName");
-    answer(w, " Kick 1 ");
+    typeName(w, "digName", " Kick 1 ");
     CHECK(h.slot(0).name == "Kick 1");
+    CHECK(w.digidrums().nameField().text() == "Kick 1");
     CHECK(h.editor.undo.undoSize() == 1);
 
     click(w, "digPreset2");
@@ -412,8 +441,8 @@ TEST_CASE("Digidrums: 4-bit conversion and tools on the source, steps with the b
     CHECK(h.editor.undo.undoSize() == 6);
 
     // A setting alone: undoing it keeps the source and the values of the moment.
-    const std::vector<int8_t> src = h.slot(0).source;
-    const std::vector<uint8_t> nib = h.state.digidrums[0];
+    const std::vector<int8_t> src = h.slot(0).source.vec();
+    const std::vector<uint8_t> nib = h.state.digidrums[0].vec();
     click(w, "digPreset1");
     CHECK(h.slot(0).play.rateHz == 8000);
     undoKey(w);
@@ -661,8 +690,8 @@ TEST_CASE("Main window: the SID timer ratio explains the ratio, not a Digidrum r
     std::vector<std::string> tips;
     collectTips(tips, w);
     CHECK(std::count(tips.begin(), tips.end(),
-                     "SID timer rate as a multiple of the note's frequency: 1 plays the note, 2 one octave higher") ==
-          1);
+                     "Timer rate of the SID Voice or the FM Voice as a multiple of the note's frequency: 1 plays the "
+                     "note, 2 one octave higher") == 1);
     CHECK(std::none_of(tips.begin(), tips.end(),
                        [](const std::string& t) { return t.find("Digidrum playback rate") != std::string::npos; }));
 }
@@ -706,4 +735,182 @@ TEST_CASE("Digidrums: rate, root note, fine tuning and loop typed (sixth DAW tes
     CHECK(h.slot(0).play.start == 120);
     type("digEndV", "50");  // End stays after Start
     CHECK(h.slot(0).play.end == 121);
+}
+
+TEST_CASE("Digidrums: the Stereo menu chooses what Load takes from a stereo file (Indus, 29/10/2026)",
+          "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    // Mix by default, then Left and Right kept in the preferences; nothing else changes and no undo step.
+    REQUIRE(w.rectOf("digStereo"));
+    const size_t undoBefore = h.editor.undo.undoSize();
+    const plugin::NonParamState before = h.state;
+    click(w, "digStereo");
+    CHECK(labels(w) == std::vector<std::string>{"Left", "Right", "Mix"});
+    CHECK(menu(w).checked() == 2);
+    pick(w, 0);
+    CHECK(h.prefs["digiStereo"] == "left");
+    click(w, "digStereo");
+    CHECK(menu(w).checked() == 0);
+    pick(w, 1);
+    CHECK(h.prefs["digiStereo"] == "right");
+    click(w, "digStereo");
+    pick(w, 2);
+    CHECK(h.prefs["digiStereo"] == "mix");
+    CHECK(h.editor.undo.undoSize() == undoBefore);
+    CHECK(h.state.digiSlots == before.digiSlots);
+    // The row sits in the slot column, above Banks, and does not make the window taller.
+    const gemui::Rect st = *w.rectOf("digStereo"), bk = *w.rectOf("digBanks"), fine = *w.rectOf("digFine");
+    CHECK(st.y > fine.y);
+    CHECK(st.bottom() <= bk.y);
+    CHECK(st.right() < w.rectOf("digWave")->x);
+    CHECK(bk.bottom() <= w.rectOf("digWin")->bottom());
+}
+
+TEST_CASE("Digidrums: Resample on, a new rate resamples the source; one step per gesture, from the slot it began with "
+          "(Indus, 30/10/2026 02:51)",
+          "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    h.loaded(0, wave(7800), "Loop");  // one second at 7800 Hz
+    h.editExtras([](plugin::NonParamState& s) {
+        s.digiSlots[0].play.start = 780;
+        s.digiSlots[0].play.end = 3900;
+    });
+    w.tick(0);
+    REQUIRE(w.rectOf("digResample"));
+    CHECK_FALSE(h.prefs.count("digiResample"));
+
+    // Off (the default): the values kept, the pitch moves.
+    click(w, "digPreset2");
+    CHECK(h.slot(0).play.rateHz == 11025);
+    CHECK(h.state.digidrums[0].size() == 7800);
+    CHECK(h.editor.undo.undoSize() == 1);
+    click(w, "digPreset0");
+    CHECK(h.editor.undo.undoSize() == 2);
+
+    // On (a preference of the window): 7800 -> 11025 Hz, the same second, Start and End on the same moments.
+    click(w, "digResample");
+    CHECK(h.prefs["digiResample"] == "1");
+    click(w, "digPreset2");
+    CHECK(h.slot(0).play.rateHz == 11025);
+    CHECK(h.state.digidrums[0].size() == 11025);
+    CHECK(h.slot(0).source.size() == 11025);
+    CHECK(h.slot(0).play.start == 1103);
+    CHECK(h.slot(0).play.end == 5513);
+    CHECK(h.editor.undo.undoSize() == 3);
+    // Its undo step keeps the bytes.
+    CHECK(undoKey(w));
+    CHECK(h.slot(0).play.rateHz == 7800);
+    CHECK(h.state.digidrums[0].size() == 7800);
+    CHECK(h.slot(0).play.end == 3900);
+
+    // A slider gesture: one step, each move resampled from the slot as the gesture found it (to 20000 Hz).
+    const size_t before = h.editor.undo.undoSize();
+    dragSlider(w, "digRate", true);
+    CHECK(h.slot(0).play.rateHz == ymengine::kDigidrumRateMax);
+    CHECK(h.state.digidrums[0].size() == 20000);
+    CHECK(h.editor.undo.undoSize() == before + 1);
+    CHECK(undoKey(w));
+    CHECK(h.state.digidrums[0].size() == 7800);
+
+    // An empty slot only changes its rate.
+    w.digidrums().selectSlot(4);
+    w.tick(10);
+    click(w, "digPreset1");
+    CHECK(h.slot(4).play.rateHz == 8000);
+    CHECK(h.state.digidrums[4].empty());
+}
+
+TEST_CASE("Digidrums: Load asks before replacing a sample; a file dropped on the drawing loads the same way "
+          "(Indus, 30/10/2026 02:42-02:50)",
+          "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    // An empty slot: the file chosen loads at once.
+    click(w, "digLoad");
+    REQUIRE(h.dialogs.size() == 1);
+    CHECK(h.dialogs[0].title == "Load a sample into slot 1");
+    CHECK(h.dialogs[0].patterns == "*.wav;*.aif;*.aiff");
+    CHECK(h.loads == std::vector<int>{0});
+    CHECK(h.files == std::vector<std::string>{"/samples/snare.wav"});
+    CHECK_FALSE(w.desktop().hasModal());
+
+    // A slot that holds a sample: a GEM box first, Cancel by default, naming both.
+    h.loaded(0, wave(300), "Kick 1");
+    w.tick(0);
+    click(w, "digWave");
+    const auto* a = dynamic_cast<const gemui::Alert*>(w.desktop().topModal());
+    REQUIRE(a);
+    CHECK(a->text().find("Slot 1 already holds \"Kick 1\".") != std::string::npos);
+    CHECK(a->text().find("Replace it with \"snare\"?") != std::string::npos);
+    REQUIRE(a->buttonCount() == 2);
+    CHECK(a->button(0).text() == "Cancel");
+    CHECK(a->button(1).text() == "Replace");
+    CHECK(a->focusedButton() == 0);
+    key(w, gemui::Key::Enter);  // Cancel
+    CHECK(h.loads.size() == 1);
+    click(w, "digLoad");
+    a = dynamic_cast<const gemui::Alert*>(w.desktop().topModal());
+    REQUIRE(a);
+    press(w, centre(a->button(size_t(gemui::Alert::kConfirmOk)).bounds()));
+    CHECK(h.loads == std::vector<int>{0, 0});
+
+    // Dropped on the drawing: the slot shown, the first file that is not a MIDI file; the same box for a full slot.
+    const gemui::Point at = centre(*w.rectOf("digWave"));
+    CHECK(w.dropFiles({"/x/song.mid", "/x/hat.aiff"}, at));
+    a = dynamic_cast<const gemui::Alert*>(w.desktop().topModal());
+    REQUIRE(a);
+    CHECK(a->text().find("Replace it with \"hat\"?") != std::string::npos);
+    press(w, centre(a->button(size_t(gemui::Alert::kConfirmOk)).bounds()));
+    CHECK(h.files.back() == "/x/hat.aiff");
+    w.digidrums().selectSlot(9);
+    w.tick(10);
+    CHECK(w.dropFiles({"/x/clap.wav"}, at));
+    CHECK_FALSE(w.desktop().hasModal());
+    CHECK(h.loads.back() == 9);
+    CHECK(h.files.back() == "/x/clap.wav");
+    // Elsewhere, a sample is not taken (no MIDI file either).
+    const size_t n = h.loads.size();
+    CHECK_FALSE(w.dropFiles({"/x/clap.wav"}, gemui::Point{5, 300}));
+    CHECK_FALSE(w.dropFiles({"/x/clap.wav"}));
+    CHECK(h.loads.size() == n);
+}
+
+TEST_CASE("Digidrums: the name typed in its field goes to the slot it was typed for (Indus, 30/10/2026 02:55)",
+          "[ui][digidrum]") {
+    TestHost h;
+    MainWindow w(h);
+    open(h, w);
+    h.loaded(2, wave(100), "Snare");
+    w.digidrums().selectSlot(2);
+    w.tick(0);
+    CHECK(w.digidrums().nameField().text() == "Snare");
+    click(w, "digName");
+    for (char c : std::string(" 2")) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = char32_t(c);
+        w.desktop().keyDown(e);
+    }
+    // 16 characters at most while typed.
+    for (int i = 0; i < 20; ++i) {
+        gemui::KeyEvent e;
+        e.key = gemui::Key::Character;
+        e.ch = U'x';
+        w.desktop().keyDown(e);
+    }
+    CHECK(w.digidrums().nameField().text().size() == plugin::kDigidrumNameMax);
+    for (int i = 0; i < 9; ++i) key(w, gemui::Key::Backspace);
+    CHECK(w.digidrums().nameField().text() == "Snare 2");
+    // Another slot clicked: the name is kept by slot 3, not given to the new one.
+    click(w, "digSlot5");
+    CHECK(h.slot(2).name == "Snare 2");
+    CHECK(h.slot(5).name.empty());
+    CHECK(w.digidrums().slot() == 5);
+    CHECK(w.digidrums().nameField().text().empty());
+    CHECK(h.editor.undo.undoSize() == 1);
 }

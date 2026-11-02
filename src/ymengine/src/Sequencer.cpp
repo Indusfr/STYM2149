@@ -76,9 +76,10 @@ uint64_t Impl::at() noexcept {
     return eventCycle();
 }
 
-void Impl::seqLogPush(char op, int voice, int a, int b, double x, double y, double z, int track, double bpm) noexcept {
+void Impl::seqLogPush(char op, int voice, int a, int b, double x, double y, double z, int track, double bpm,
+                      int entry) noexcept {
     if (seqLog && seqLog->size() < seqLog->capacity())
-        seqLog->push_back({rStart + rI, op, int16_t(voice), a, b, x, y, z, int16_t(track), bpm});
+        seqLog->push_back({rStart + rI, op, int16_t(voice), a, b, x, y, z, int16_t(track), bpm, int16_t(entry)});
 }
 
 // ---------------------------------------------------------------------------------------------------- Data
@@ -98,6 +99,16 @@ int Impl::patternSteps(int pattern) const noexcept {
 int Impl::trackLen(int track) const noexcept {
     const int plen = tracks[size_t(track)].seq.length;
     return plen > 0 ? std::min(plen, kSeqSteps) : seq.len;
+}
+
+// Step that the track plays: the steps since the start in its length, as the prototype counts them (a track with its
+// own length loops on its own across the patterns; a pattern picked by hand runs on from the step count);
+// in the Song, a track without its own length plays each entry from its step 0, whatever the lengths of the patterns
+// before it.
+int Impl::trackStep(int track) const noexcept {
+    const int plen = tracks[size_t(track)].seq.length;
+    if (plen <= 0 && songActive()) return seq.step;
+    return int(modPos(seq.stepAbs, trackLen(track)));
 }
 
 // Absolute note of the voice (0 = root, 1-5 = chord voices) at step s, -1 if nothing (chanPayload, polyAbs).
@@ -181,10 +192,10 @@ bool Impl::cndPass(int cv, int64_t cycle, int track) const noexcept {
 }
 
 // Level given to the voice for a step VOL (0-15): level of the track × VOL / 15, in the order of computation of the
-// prototype (the 4-bit volume depends on it in 3-channel mode); in 16-channel mode, the level of the track applies
+// prototype (the 4-bit volume depends on it in 3-channel mode); in 32-channel mode, the level of the track applies
 // live (mixer) and the voice only receives the accent.
 double Impl::seqLevel(int track, double vol) const noexcept {
-    // A DMA track in 3-channel mode takes its level from the mixer, as in 16-channel mode.
+    // A DMA track in 3-channel mode takes its level from the mixer, as in 32-channel mode.
     return (studio() || dmaTrack(track) ? 1.0 : std::clamp(tracks[size_t(track)].mix.level, 0.0, 1.0)) * vol / 15.0;
 }
 
@@ -222,7 +233,7 @@ void Impl::laneOff(int i, uint64_t c) noexcept {
     forLaneVoices(i, [&](int vi, Voice& v) {
         if (v.tag == VoiceTag::Sequencer) {
             killLane(vi, false, c);
-        } else if (!v.fading() && v.stage != 4) {  // chord voice (16-channel)
+        } else if (!v.fading() && v.stage != 4) {  // chord voice (32-channel)
             relVoice(v, 64, c);
             seqLogPush('R', vi);
             touch(vi, c);
@@ -269,7 +280,7 @@ void Impl::seqHalt(uint64_t c) noexcept {
     killTag(VoiceTag::Sequencer, false, c);
     killTag(VoiceTag::Chord, false, c);  // the chord voices are released too
     clearLanes(true);
-    for (int i = 0; i < kTracks; ++i) setStepPan(i, kNoPan, c);
+    dropStepPans(c);
     seqLogPush('!', -1);
 }
 
@@ -511,7 +522,8 @@ void Impl::seqTick(uint64_t c) noexcept {
         const double bpm = ticksTiming() ? 60.0 * std::max<uint32_t>(1, global.vblHz) /
                                                (std::clamp(seq.speed, 1, kSpeedMax) * stepsPerBeat())
                                          : seqBpm();
-        seqLogPush('@', -1, seq.step, int(seq.stepAbs), seq.pattern, stepSamp, 0, -1, bpm);
+        seqLogPush('@', -1, seq.step, int(seq.stepAbs), seq.pattern, stepSamp, 0, -1, bpm,
+                   songActive() ? seq.songPos : -1);
     }
     if (global.metronome) metroTick();
     const int max = trackCount();
@@ -546,7 +558,11 @@ void Impl::seqSample(uint32_t dt) noexcept {
         const bool ticks = ticksTiming();
         seq.phase += (ticks ? double(std::max<uint32_t>(1, global.vblHz)) : seqBpm() / 60 * stepsPerBeat()) /
                      double(hostRate()) * dt;
-        while (seq.phase >= seq.dur) {
+        // Ticks: the sums of vblHz / hostRate can fall a hair short of a whole tick (60 / 44100 is not exact in
+        // binary); the step starts at the sample of its tick, not one later, after the VBL frame of the voices has
+        // read the step before. BPM keeps the crossing of the prototype.
+        const double slack = ticks ? 1e-9 : 0;
+        while (seq.phase >= seq.dur - slack) {
             seq.phase -= seq.dur;
             seqTick(at());
             if (!seq.on) break;
@@ -649,7 +665,7 @@ void Impl::hostLocate(int64_t k, double ppq, double pps) noexcept {
         killTag(VoiceTag::Sequencer, false, c);
         killTag(VoiceTag::Chord, false, c);
         clearLanes(true);
-        for (int i = 0; i < kTracks; ++i) setStepPan(i, kNoPan, c);
+        dropStepPans(c);
     }
     for (LaneState& L : lanes) L.polyDone = -1;
     seq.parkedAt = -1;
@@ -770,7 +786,9 @@ void Impl::metroTick() noexcept {
 void Impl::renderClicks(const Outputs& out, uint32_t n) noexcept {
     int next = 0;
     const double sr = double(hostRate());
-    const double level = std::min<int>(global.metronomeLevel, 100) / 100.0;
+    // Level 0 to 100 %; 100 % plays the beeps twice as loud as before (Indus, 29/10/2026 20:08): 0.8 at the
+    // peak of the first beat of the bar, 0.48 on the others.
+    const double level = 2.0 * std::min<int>(global.metronomeLevel, 100) / 100.0;
     for (uint32_t i = 0; i < n; ++i) {
         while (next < clickCount && clickAt[size_t(next)].first <= i) {
             const bool first = clickAt[size_t(next++)].second;
@@ -815,10 +833,13 @@ void Impl::laneTrigger(int i, double note, double level, int gen, double drumTr,
     if (!studio()) updateMutes(c);
 }
 
-void Impl::killLane(int vi, bool hard, uint64_t c) noexcept {
+// A CUT (`cut`: Cxx, the CUT row of the drums, the end of a hit) with Fade in 16 and 32 channels fades the voice out in
+// 5 ms (or the length set), to silence, a DMA sample without loop too (Indus, 30/10/2026 03:31-03:35).
+void Impl::killLane(int vi, bool hard, uint64_t c, bool cut) noexcept {
     Voice& v = voices[size_t(vi)];
     if (!v.on || v.tag != VoiceTag::Sequencer || v.fading() || (!hard && v.stage == 4)) return;
-    if (hard) hardFade(v, 8, c);
+    if (cut && softCut()) hardFade(v, 64, c, cutFadeRate());
+    else if (hard) hardFade(v, 8, c);
     else relVoice(v, 32, c);
     seqLogPush('K', vi, hard ? 1 : 0);
     touch(vi, c);
@@ -857,7 +878,7 @@ void Impl::applyMixDef(int vi, int track, int ins, int m, uint64_t c) noexcept {
 void Impl::liveFx(int vi, int track, int ins, int fxv, uint64_t c) noexcept {
     if (!fxv) return;
     Voice& v = voices[size_t(vi)];
-    const int eff = kSeqFxGen[size_t(std::min(fxv, 4))];
+    const int eff = kSeqFxGen[size_t(std::min(fxv, kSeqFxMax))];
     if (eff < 0 || eff == int(Generator::Chipdrum) || eff == int(v.gen) || isDrum(v.gen) || v.gen == Generator::Dma) return;
     v.gen = Generator(eff);
     if (v.gen == Generator::SyncBuzzer) {
@@ -904,7 +925,7 @@ void Impl::polyAge(int i, uint64_t c) noexcept {
     }
 }
 
-// Voices 2 to 6 of the step (16-channel, polyphonic tracks): five voices per track, one per rank, lent to another
+// Voices 2 to 6 of the step (32-channel, polyphonic tracks): five voices per track, one per rank, lent to another
 // rank while their own note is still held or in its release.
 void Impl::polyTrigger(int i, const SeqLane& l, int st, double level, int mix, int64_t gateHold, double drumTr,
                        int ins, uint64_t c) noexcept {
@@ -967,12 +988,12 @@ void Impl::polyTrigger(int i, const SeqLane& l, int st, double level, int mix, i
     }
 }
 
-// Polyphonic track in 16 channels (24/10/2026): before a new note, the note of the track's voice moves, as it
-// sounds (its envelope, its channel and its share of the buses), to a chord voice of the track, where it goes on to
-// its release, or carries on with it; the track's voice is then free for the new note. A chord voice that no chord
-// note holds: a silent one, otherwise the oldest of those in their release, which gives way. False (the note is cut,
-// as in the prototype) on a Monophonic track, in the 3-channel modes, for a drum, a note without release or one
-// already fading, and when the chords hold all five voices.
+// Polyphonic track in 16 and 32 channels (24/10/2026): before a new note, the note of the track's voice moves,
+// as it sounds (its envelope, its channel and its share of the buses), to a chord voice of the track, where it goes on
+// to its release, or carries on with it; the track's voice is then free for the new note. A chord voice that no chord
+// note holds: a silent one, otherwise the oldest of those in their release, which gives way. False (the note is cut, as
+// in the prototype) on a Monophonic track, in the 3-channel modes, for a drum, a note without release or one already
+// fading, and when the chords hold all five voices.
 bool Impl::laneTail(int i, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
     const int vi = laneVoice(i);
@@ -1017,14 +1038,17 @@ bool Impl::laneTail(int i, uint64_t c) noexcept {
     return true;
 }
 
-// Immediate silencing of the chord voices of the track (CUT of the drums, MIDI Start).
-void Impl::hardPoly(int i, uint64_t c) noexcept {
+// Immediate silencing of the chord voices of the track (CUT of the drums, MIDI Start); a CUT (`cut`) with Fade in 16
+// and 32 channels fades them out in 5 ms instead.
+void Impl::hardPoly(int i, uint64_t c, bool cut) noexcept {
     LaneState& L = lanes[size_t(i)];
+    const bool soft = cut && softCut();
     for (int k = 0; k < kSeqChordVoices; ++k) {
         const int vi = kLaneVoices + i * kSeqChordVoices + k;
         Voice& v = voices[size_t(vi)];
         if (v.on) {
-            v.on = false;
+            if (!soft) v.on = false;
+            else if (!v.fading()) hardFade(v, 64, c, cutFadeRate());
             seqLogPush('O', vi);
             touch(vi, c);
         }
@@ -1096,8 +1120,7 @@ void Impl::holdGlide(int vi, bool snap, uint64_t c) noexcept {
     if (snap && v.fTarget > 0 && v.fCur != v.fTarget) {
         v.fCur = v.fTarget;
         v.tp = tonePeriodFor(v.fCur, clock());
-        if (v.gen == Generator::Sid) v.timerHz = v.fCur * sidRate(v);
-        else if (v.gen == Generator::SyncBuzzer) v.timerHz = v.fCur * buzzRate(v);
+        if (pitchedTimer(v.gen)) v.timerHz = v.fCur * timerRate(v);
         retuneTimer(v, c);
     }
     seqLogPush('G', vi, snap ? 1 : 0);
@@ -1116,6 +1139,15 @@ void Impl::setStepPan(int i, double pan, uint64_t c) noexcept {
         if (voices[size_t(v)].on && voices[size_t(v)].track == i) touch(v, c);
 }
 
+// Stop or jump of the host: the tracks take the panning of the mixer again, but the sequencer notes being released
+// keep that of their PAN row to the end (a stereo song stays stereo while it stops).
+void Impl::dropStepPans(uint64_t c) noexcept {
+    for (Voice& v : voices)
+        if (v.on && v.track >= 0 && v.tag != VoiceTag::Manual && v.tag != VoiceTag::Arp && std::isnan(v.panHeld))
+            v.panHeld = panStep[size_t(v.track)];
+    for (int i = 0; i < kTracks; ++i) setStepPan(i, kNoPan, c);
+}
+
 // --------------------------------------------------------------------------------------------- One step
 // Step of track i at cycle c (stepSamp: duration of the step in samples): chords, CND, RTG and PAN, then the hits of
 // a drum track or the notes, ties, slides and arpeggio of a melodic track, with their gate countdowns.
@@ -1127,7 +1159,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     const SeqLane& l = seqLane(i);
     const int vi = laneVoice(i);
     const int len = trackLen(i);
-    const int st = int(modPos(seq.stepAbs, len));
+    const int st = trackStep(i);
     const size_t s = size_t(st);
     const bool drumTrack = isDrum(tp.patch.generator);
     // INS of the step, not applicable to the drums; 00: the instrument chosen by Program Change.
@@ -1162,7 +1194,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
         L.rtClk = L.rtPeriod;
         L.rtNote = n;
         L.rtLevel = lvl * 0.92;
-        L.rtGen = drumTrack || !l.fx[s] ? -1 : kSeqFxGen[size_t(std::min<int>(l.fx[s], 4))];
+        L.rtGen = drumTrack || !l.fx[s] ? -1 : kSeqFxGen[size_t(std::min<int>(l.fx[s], kSeqFxMax))];
         L.rtMix = drumTrack ? 0 : l.mix[s];
         L.rtDrumTr = drumTr;
         L.rtIns = insStep;
@@ -1170,7 +1202,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     // PAN row: v × 10 + 101 for v from −10 to +10, so −1 to 1; 0 leaves the panning of the mixer.
     setStepPan(i, l.pnr[s] ? (l.pnr[s] - 101) / 100.0 : kNoPan, c);
     // 3-channel: a Digidrum occupies the channel of the track (stolen channel); the melodic track gives up its step.
-    // (In 16-channel mode, the voice of the track is its own: a Digidrum there comes from an instrument of the
+    // (In 32-channel mode, the voice of the track is its own: a Digidrum there comes from an instrument of the
     // track.)
     if (!studio() && v->on && v->gen == Generator::Digidrum && tp.patch.generator != Generator::Digidrum) {
         L.offIn = 0;
@@ -1180,8 +1212,8 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     if (drumTrack) {
         if (tp.patch.generator == Generator::Chipdrum && l.tie[s] && v->on) return;  // TIE: no retriggering
         if (l.cut[s] && n < 0 && v->on && isDrum(v->gen)) {  // CUT alone: stops the current hit
-            killLane(vi, false, c);
-            hardPoly(i, c);
+            killLane(vi, false, c, true);
+            hardPoly(i, c, true);
         }
         if (n >= 0) {
             laneTrigger(i, n, lvl, -1, drumTr, 0, c);
@@ -1286,7 +1318,7 @@ void Impl::laneStep(int i, double stepSamp, uint64_t c) noexcept {
     } else {
         if (!laneTail(i, c)) killLane(vi, false, c);  // a polyphonic track lets the note before go on
         L.arpNote = -1;
-        const int fxv = std::min<int>(l.fx[s], 4);
+        const int fxv = std::min<int>(l.fx[s], kSeqFxMax);
         const int effOv = fxv ? kSeqFxGen[size_t(fxv)] : -1;
         if (L.arp && arpOn) {  // step played by the arpeggio of the track
             L.arpNote = int(n);
@@ -1340,7 +1372,7 @@ void Impl::heldStep(int i, const SeqLane& l, size_t s, double level, double step
         L.offIn = std::max<int64_t>(1, int64_t(std::floor(l.gat[s] / 100.0 * stepSamp)));
     forLaneVoices(i, [&](int k, Voice&) { relevel(k, i, L.ins, level, c); });
     L.arpLvl = level;
-    const int fxv = std::min<int>(l.fx[s], 4);
+    const int fxv = std::min<int>(l.fx[s], kSeqFxMax);
     if (arpOn && L.arp) {
         if (L.arpNote < 0) {  // the arpeggio starts on the held note, as on an ARP step
             L.arpNote = int(L.heldNote);
@@ -1390,7 +1422,7 @@ void Impl::heldStep(int i, const SeqLane& l, size_t s, double level, double step
 }
 
 // VOL of a held step: the level of a sounding voice of track i, as setupVoice gives it at the attack (the
-// 4-bit volume of the sound lowered in 3-channel mode, the audio gain in 16-channel mode and for DMA).
+// 4-bit volume of the sound lowered in 3-channel mode, the audio gain in 32-channel mode and for DMA).
 void Impl::relevel(int vi, int track, int ins, double level, uint64_t c) noexcept {
     Voice& v = voices[size_t(vi)];
     if (!v.on || v.fading() || v.stage == 4) return;
@@ -1416,7 +1448,7 @@ void Impl::setLevel(Voice& v, int track, int ins, double level) noexcept {
 // Command of kind k on the current row of an active track (0: none).
 uint16_t Impl::lineCmd(int i, SeqCmd k) const noexcept {
     if (!tracks[size_t(i)].mix.enabled) return 0;
-    return seqLane(i).cmdAt(k, int(modPos(seq.stepAbs, trackLen(i))));
+    return seqLane(i).cmdAt(k, trackStep(i));
 }
 
 // Switches of the row: Vxx, Lxx, Mxx and Jxx hold from their step until the next one of their kind (twelfth
@@ -1427,7 +1459,7 @@ void Impl::laneSwitches(int i) noexcept {
     if (!tracks[size_t(i)].mix.enabled) return;
     LaneState& L = lanes[size_t(i)];
     const SeqLane& l = seqLane(i);
-    const int s = int(modPos(seq.stepAbs, trackLen(i)));
+    const int s = trackStep(i);
     const bool chase = &l != L.switchLane;
     L.switchLane = &l;
     if (chase) L.vibOff = L.lfoOff = L.modOff = L.arp = false;
@@ -1466,7 +1498,7 @@ void Impl::seqTempoCmd() noexcept {
     if (const int bpm = p.bpm[size_t(std::clamp(seq.step, 0, kSeqSteps - 1))]; bpm >= kTempoCmdMin) seq.cmdBpm = bpm;
 }
 
-// Sequencer voices that play track i: its voice, then its chord voices (16-channel).
+// Sequencer voices that play track i: its voice, then its chord voices (32-channel).
 template <class F>
 void Impl::forLaneVoices(int i, F&& f) noexcept {
     auto visit = [&](int vi) {
@@ -1569,7 +1601,7 @@ void Impl::laneLineCmds(int i, double stepSamp, uint64_t c) noexcept {
     }
 }
 
-// Kxx and Qxx with a Bxy or Nxy (16-channel mode; the 3-channel modes keep the straight slides of the replay):
+// Kxx and Qxx with a Bxy or Nxy (32-channel mode; the 3-channel modes keep the straight slides of the replay):
 // the slide follows its curve from this row to the next command of its kind (the rest of the track if there is none),
 // covering there what the speed (perFrame per frame) covers in a straight line. Linear: the speed per frame.
 void Impl::armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, uint64_t c) noexcept {
@@ -1580,7 +1612,7 @@ void Impl::armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, u
     if (!studio() || !k) return;
     r.curve = std::min<int>(seqCmdParam(k), kSlideCurves - 1);
     const SeqLane& l = seqLane(i);
-    const int len = trackLen(i), st = int(modPos(seq.stepAbs, len));
+    const int len = trackLen(i), st = trackStep(i);
     int span = 1;
     while (span < len && !l.cmdAt(kind, (st + span) % len)) ++span;
     const double secs = stepSamp * span / std::max<uint32_t>(1, hostRate());
@@ -1594,8 +1626,8 @@ void Impl::armSlideCurve(int i, SeqCmd kind, double perFrame, double stepSamp, u
 // no arpeggio, the next note attacks.
 void Impl::cutLine(int i, uint64_t c) noexcept {
     LaneState& L = lanes[size_t(i)];
-    killLane(laneVoice(i), true, c);
-    hardPoly(i, c);
+    killLane(laneVoice(i), true, c, true);
+    hardPoly(i, c, true);
     L.offIn = 0;
     L.rtLeft = 0;
     L.arpNote = -1;
@@ -1624,7 +1656,7 @@ void Impl::laneCount(int i, uint32_t dt) noexcept {
     LaneState& L = lanes[size_t(i)];
     if (L.cutIn > 0 && (L.cutIn -= dt) <= 0) {  // CUT: cuts even a one-shot
         L.cutIn = 0;
-        killLane(laneVoice(i), false, at());
+        killLane(laneVoice(i), false, at(), true);
     }
     if (L.rtLeft > 0 && (L.rtClk -= dt) <= 0) {
         const uint64_t c = at();

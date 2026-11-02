@@ -1,6 +1,7 @@
-// STYM2149 — YM PLAYER window: File > Import > YM dump, alerts for a refused file, Play and Stop,
-// Rewind, position read again in steps of 8 frames, subsong of an SNDH, register monitor that follows the tune,
-// closing that stops playback and forgets the tune, window kept by the session.
+// STYM2149 — YM/MOD PLAYER window: File > Play... (one dialogue for every format),
+// alerts for a refused file, Play and Stop, Rewind, Load, position read again in steps of 8 frames, subsong of
+// an SNDH, register monitor that follows the tune, closing that stops playback and forgets the tune, window kept by
+// the session.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -57,7 +58,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }
@@ -120,15 +120,14 @@ void click(MainWindow& w, const std::string& id) {
     w.desktop().mouseUp(at, {});
 }
 
-void importYm(MainWindow& w) {
+// File > Play...: one entry, one dialogue for every format.
+void playYm(MainWindow& w) {
     w.openMenu(1);
     const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
     REQUIRE(list);
     std::function<void()> pick;
     for (const gemui::MenuItem& m : list->items())
-        if (m.label == "Import")
-            for (const gemui::MenuItem& s : m.sub)
-                if (s.label == "YM dump" && !s.disabled) pick = s.pick;
+        if (m.label == "Play..." && !m.disabled && m.sub.empty()) pick = m.pick;
     w.desktop().closePopups();
     REQUIRE(pick);
     pick();
@@ -154,7 +153,33 @@ TEST_CASE("YM Player: position of the prototype (ymSetPos)", "[gemui][ymplayer]"
     CHECK(YmPlayerWindow::positionText(15, 0, 50) == "16 / ? (? s)");  // SNDH without a duration
 }
 
-TEST_CASE("YM Player: Import > YM dump, Play and Stop, Rewind, closing", "[gemui][ymplayer]") {
+TEST_CASE("YM Player: File > Play... is one entry, Import the files that become the project's",
+          "[gemui][ymplayer]") {
+    YmHost h;
+    MainWindow w(h);
+    w.tick(0);
+    w.openMenu(1);
+    const auto* list = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(list);
+    auto subOf = [&](std::string_view label) {
+        std::vector<std::string> out;
+        for (const gemui::MenuItem& m : list->items())
+            if (m.label == label)
+                for (const gemui::MenuItem& s : m.sub) out.push_back(s.label);
+        return out;
+    };
+    bool play = false;
+    for (const gemui::MenuItem& m : list->items())
+        if (m.label == "Play...") play = m.sub.empty() && !m.disabled;
+    CHECK(play);
+    CHECK(subOf("Play").empty());
+    // Import: MIDI files, every tracker song from one entry, SNDH and YM files as patterns; no
+    // JSON entry.
+    CHECK(subOf("Import") == std::vector<std::string>{"MIDI file", "Tracker song", "SNDH / YM file"});
+    w.desktop().closePopups();
+}
+
+TEST_CASE("YM Player: File > Play > YM, Play and Stop, Rewind, closing", "[gemui][ymplayer]") {
     YmHost h;
     h.disk["/music/Mad Max/song.ym"] = "YM3!data";
     MainWindow w(h);
@@ -162,10 +187,12 @@ TEST_CASE("YM Player: Import > YM dump, Play and Stop, Rewind, closing", "[gemui
     YmPlayerWindow& y = w.ymPlayerWindow();
     CHECK_FALSE(y.isOpen());
 
-    importYm(w);
+    playYm(w);
     REQUIRE(h.opens.size() == 1);
-    CHECK(h.opens[0].title == "Import a YM dump");
-    CHECK(h.opens[0].patterns == "*.ym;*.ym2;*.ym3;*.ym5;*.ym6;*.snd;*.sndh");
+    CHECK(h.opens[0].title == "Play a file");
+    CHECK(h.opens[0].patterns ==
+          "*.ym;*.ym2;*.ym3;*.ym5;*.ym6;*.sndh;*.snd;*.mys;*.myv;*.ymt;*.tpm;*.xm;*.mod;*.s3m;*.okt;*.stym;*.stympat;"
+          "*.stymsng");
     CHECK(h.opens[0].path.empty());
     h.pick("/music/Mad Max/song.ym");
     REQUIRE(h.loads == std::vector<std::string>{"song.ym:YM3!data"});
@@ -176,9 +203,20 @@ TEST_CASE("YM Player: Import > YM dump, Play and Stop, Rewind, closing", "[gemui
     CHECK(w.rectOf("ymWin")->x == YmPlayerWindow::kX);
     CHECK(w.rectOf("ymWin")->w == YmPlayerWindow::kW);
     // The next dialogue proposes the same file.
-    importYm(w);
+    playYm(w);
     CHECK(h.opens.back().path == "/music/Mad Max/song.ym");
     h.pending = nullptr;
+    // Load: flush right in the row of Play, the dialogue of File > Play..., the window staying open.
+    const gemui::Rect load = *y.rectOf("ymLoad");
+    CHECK(load.y == y.rectOf("ymPlay")->y);
+    CHECK(load.x > y.rectOf("ymPos")->x + y.rectOf("ymPos")->w);
+    CHECK(load.x + load.w == YmPlayerWindow::kX + YmPlayerWindow::kW - 14);
+    click(w, "ymLoad");
+    REQUIRE(h.opens.size() == 3);
+    CHECK(h.opens.back().title == "Play a file");
+    CHECK(h.opens.back().path == "/music/Mad Max/song.ym");
+    h.pending = nullptr;
+    CHECK(y.isOpen());
 
     // Play: playback, "Stop" button; the register monitor follows channel A of the tune.
     click(w, "ymPlay");
@@ -188,7 +226,7 @@ TEST_CASE("YM Player: Import > YM dump, Play and Stop, Rewind, closing", "[gemui
     h.ym.regs[0] = 0x12;
     w.tick(200);
     CHECK(y.posText() == "9 / 200 (4.0 s)");  // read again every 8 frames
-    CHECK(w.registerInfo() == "CH A / YM PLAYER");
+    CHECK(w.registerInfo() == "CH A / YM/MOD PLAYER");
     h.ym.position = 15;
     w.tick(250);
     CHECK(y.posText() == "9 / 200 (4.0 s)");
@@ -201,7 +239,7 @@ TEST_CASE("YM Player: Import > YM dump, Play and Stop, Rewind, closing", "[gemui
     CHECK(h.plays == std::vector<bool>{true, false});
     CHECK_FALSE(y.playing());
     w.tick(500);
-    CHECK(w.registerInfo() != "CH A / YM PLAYER");
+    CHECK(w.registerInfo() != "CH A / YM/MOD PLAYER");
 
     // Rewind: restarts from the beginning.
     click(w, "ymRew");
@@ -225,23 +263,24 @@ TEST_CASE("YM Player: refused files", "[gemui][ymplayer]") {
     w.tick(0);
 
     // Not found or too big.
-    importYm(w);
+    playYm(w);
     h.pick("/a/missing.ym");
     CHECK(alertText(w) == "The file could not be read.");
     dismiss(w);
     CHECK(h.loads.empty());
 
-    // Unknown format: alert of the prototype, without the mention of PRISM.
+    // Unknown format (none of the readers takes it).
     h.refuse = "Unsupported file";
-    importYm(w);
+    playYm(w);
     h.pick("/a/x.bin");
-    CHECK(alertText(w) == "Unsupported file\n\nExpected a YM register dump (YM2 / YM3 / YM5 / YM6) or an SNDH file.");
+    CHECK(alertText(w) == "Unsupported file\n\nExpected a YM, SNDH, maxYMiser, YM-Tracker,\n"
+                          "TTrak, XM, MOD, S3M, OKT or STYM2149 file.");
     dismiss(w);
     CHECK_FALSE(w.ymPlayerWindow().isOpen());
 
     // Other refusal: the player's text.
     h.refuse = "Unsupported chip clock: 20000000 Hz.";
-    importYm(w);
+    playYm(w);
     h.pick("/a/x.bin");
     CHECK(alertText(w) == "Unsupported chip clock: 20000000 Hz.");
     dismiss(w);
@@ -256,13 +295,15 @@ TEST_CASE("YM Player: subsong of an SNDH, tune unloaded, session", "[gemui][ympl
         MainWindow w(h);
         w.tick(0);
         YmPlayerWindow& y = w.ymPlayerWindow();
-        importYm(w);
+        playYm(w);
         h.pick("/a.ym");
         const double ymHeight = w.rectOf("ymWin")->h;
         y.close();
         CHECK(h.closes == 1);
 
-        importYm(w);
+        // SNDH: the same entry and dialogue, the content decides; the path is remembered.
+        playYm(w);
+        CHECK(h.opens.back().path == "/a.ym");
         h.pick("/b.sndh");
         h.ym.sndh = true;
         h.ym.subsongs = 3;
@@ -282,6 +323,9 @@ TEST_CASE("YM Player: subsong of an SNDH, tune unloaded, session", "[gemui][ympl
         CHECK(y.subsongText() == "3 / 3");
         click(w, "ymSubPrev");
         CHECK(y.subsongText() == "2 / 3");
+        playYm(w);
+        CHECK(h.opens.back().path == "/b.sndh");
+        h.pending = nullptr;
     }
     // Window kept by the session as long as the tune is loaded.
     MainWindow again(h);

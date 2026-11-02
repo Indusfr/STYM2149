@@ -117,6 +117,8 @@ public:
     double layout(double x, double y, double width, double pad);
     // Content width that the settings need.
     static double settingsWidth() noexcept { return SeqRowsGrid::kWidth; }
+    // Left of the pitch matrix's column, from the content's left (the Track button of the window goes under it).
+    static constexpr double kMatrixX = 260;
 
     // Rectangle of an element (captures, tests): "seqxGrid", "seqxFix", "seqxDetune", "seqxAnalog", "seqxSync",
     // "seqxLink", "seqxMx0" to "seqxMx8" (source × 3 + target), "seqxVibMin", "seqxVibMax", "seqxVibCycles",

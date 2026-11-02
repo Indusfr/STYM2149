@@ -41,8 +41,8 @@ constexpr std::array<const char*, SeqRowsGrid::kRowCount> kRowNames = {"PER", "N
 constexpr std::array<const char*, ymengine::kChannelModes> kModes = {
     "Off", "Tone", "Noise", "Tone+Noise", "Env", "Tone+Env", "Noise+Env", "Tone+Noise+Env"};
 constexpr std::array<const char*, ymengine::kSeqGens> kGenNames = {"Note's generator", "Chip Voice", "SID Voice",
-                                                                   "Sync Buzzer"};
-constexpr std::array<const char*, ymengine::kSeqGens> kGenChars = {"", "C", "S", "B"};  // drawn in a GEN cell
+                                                                   "Sync Buzzer", "FM Voice"};
+constexpr std::array<const char*, ymengine::kSeqGens> kGenChars = {"", "C", "S", "B", "F"};  // drawn in a GEN cell
 // Pitch matrix: button labels and tooltip names of the targets (columns) and of the sources (rows).
 constexpr std::array<const char*, 3> kTargets = {"Sq", "Tm", "Bz"};
 constexpr std::array<const char*, 3> kTargetNames = {"the square (tone period)",
@@ -449,6 +449,7 @@ void SequencesPanel::wire() {
     cycv_.onCommit = typeInto(vibCyc_);
     rampv_.onCommit = typeInto(vibRamp_);
     sync_.onClick = [this] { editPatch([](ymengine::TrackPatch& p) { p.hardSync = !p.hardSync; }); };
+    link_.setPopup(true);  // a GEM pop-up button, with its shadow
     link_.onClick = [this] { linkMenu(); };
     // Button k toggles bit k of the matrix: source k / 3 drives target k % 3 (ymengine::pitchBit).
     for (int k = 0; k < 9; ++k)
@@ -530,17 +531,16 @@ void SequencesPanel::linkMenu() {
         m.pick = [this, v] { editPatch([v](ymengine::TrackPatch& p) { p.link = uint8_t(v); }); };
         items.push_back(std::move(m));
     };
-    // None, then the used instruments by their number ($01 to $20 = link 1 to 32); an empty slot still linked is listed
-    // too, so that it shows as checked.
+    // None, then the used instruments by their number (1 to 127 in decimal); an empty slot still linked is
+    // listed too, so that it shows as checked.
     add("None", 0);
     const auto& ins = m_.extras_.instruments;
     for (int k = 0; k < plugin::kInstruments; ++k) {
         const plugin::Instrument& x = ins[size_t(k)];
-        const std::string hex = std::string(1, "0123456789ABCDEF"[(k + 1) >> 4]) + "0123456789ABCDEF"[(k + 1) & 15];
-        if (x.used) add(hex + " " + plugin::instrumentLabel(x, k), k + 1);
-        else if (k + 1 == cur) add(hex + " (empty)", k + 1);
+        if (x.used) add(std::to_string(k + 1) + " " + plugin::instrumentLabel(x, k), k + 1);
+        else if (k + 1 == cur) add(std::to_string(k + 1) + " (empty)", k + 1);
     }
-    m_.trackPopup(link_, std::move(items), checked);
+    m_.trackPopup(link_, std::move(items), checked, true);
 }
 
 void SequencesPanel::refresh() {
@@ -557,7 +557,7 @@ void SequencesPanel::refresh() {
     const bool dm = dma();
     sync_.setEnabled(!dr && !dm);
     sync_.setTip(dm ? "Hard sync: a DMA track plays a sample, with no square or timer to restart"
-                    : "Hard sync: restart the square (16 voices) and the timer on tied and slid notes too");
+                    : "Hard sync: restart the square (16 and 32 ch) and the timer on tied and slid notes too");
     for (int k = 0; k < 9; ++k) {
         const int t = k % 3;
         const bool off = dm && t != 1;
@@ -593,9 +593,8 @@ void SequencesPanel::refresh() {
     if (!detv_.editing()) detv_.setText(signedText(int(std::lround(p.detuneCents))) + "c");
     if (!anav_.editing()) anav_.setText(std::to_string(int(std::lround(p.analogCents))) + "c");
     sync_.setOn(p.hardSync);
-    // Link: the instrument's number in two hexadecimal digits (1 to 32: $01 to $20).
-    link_.setText(p.link ? "Link: " + std::string(1, "0123456789ABCDEF"[p.link >> 4]) + "0123456789ABCDEF"[p.link & 15]
-                         : "Link: none");
+    // Link: the instrument's number, 1 to 127 in decimal.
+    link_.setText(p.link ? "Link: " + std::to_string(p.link) : "Link: none");
     for (int k = 0; k < 9; ++k) mx_[size_t(k)].setOn((p.pitchMatrix >> k) & 1);
     // The vibrato generator's values come from its own sliders, not from the track.
     if (!minv_.editing()) minv_.setText(signedText(int(vibMin_.value())));
@@ -640,7 +639,7 @@ double SequencesPanel::layout(double x, double y, double width, double pad) {
     std::vector<FlexItem> pitch = {btn(sync_), btn(link_)};
     y1 += flexRow(x, y1, lw1 + 120 + num + 2 * kGap, pitch, kGap, false);
 
-    const double x2 = x + 260, srcW = Font::width("Vibrato", 14);
+    const double x2 = x + kMatrixX, srcW = Font::width("Vibrato", 14);
     double y2 = y0;
     labMx_.setBox({x2, y2, labMx_.naturalWidth(), 16});
     y2 += 16 + 6;

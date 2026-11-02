@@ -7,8 +7,8 @@
 //   pat   note relative (0-12) to the track's octave, or percussion row (0-7); -1 = nothing
 //   oct   octave of the note: 0 = the track's octave (seqOct), -1 = octave 0, 1-9 = octave; percussion: OCT -3..+3
 //   tie   tie (HLD); slide (SLD); afl (ARP); vol 0-15 (default 15); mix (SRC) 0-3; slt (SLT) 0-8;
-//   cut; fx (GEN) 0-4; gat (GAT) 0-100 %; pnr (PAN) 0 or v·10+101 (v from -10 to +10); rtg (RTG) 0-3;
-//   cnd (CND) 0-7; slc (CRV) 0-12; ton (TON) -12..+12
+//   cut; fx (GEN) 0-5 (5: FM Voice); gat (GAT) 0-100 %; pnr (PAN) 0 or v·10+101 (v from -10 to +10);
+//   rtg (RTG) 0-3; cnd (CND) 0-7; slc (CRV) 0-12; ton (TON) -12..+12
 //   ins (INS) 0 = the track's sound, 1-32 = project instrument
 //   cmd (CMD) effect commands of the line, one row per kind (Xyz, Sxx, Rxx, Zxx, Txx, Vxx; Axy, Pxy, Dxx,
 //       Cxx, Bxy, Nxy, Exx, Oxx, Fxx, a step can hold one of each), letter × 256 + xx (ymengine::seqCmd);
@@ -29,14 +29,14 @@
 
 namespace stym::ymseq {
 
-inline constexpr int kTracks = 16;
+inline constexpr int kTracks = 32;  // 16 in earlier versions
 inline constexpr int kSteps = 256;       // NSTEP
 inline constexpr int kPolyMax = 6;       // POLYMAX: voices per step (root + 5)
 inline constexpr int kExtraVoices = kPolyMax - 1;
 inline constexpr int kPatterns = 32;     // 4 banks × 8
 inline constexpr int kDefaultSteps = 16;
-inline constexpr int kPlayLow = 23;      // PLAY_LO: B0, 12-bit period saturated below
-inline constexpr int kMapHigh = 120;     // MAP_HI: C9
+inline constexpr int kPlayLow = ymengine::kPlayLow;   // PLAY_LO: B0, 12-bit period saturated below
+inline constexpr int kMapHigh = ymengine::kPlayHigh;  // MAP_HI: C9
 inline constexpr int kPanCenter = 101;   // pnr = v·10 + 101
 static_assert(kSteps == ymengine::kSeqSteps && kExtraVoices == ymengine::kSeqChordVoices &&
               kPatterns == ymengine::kSeqPatterns && kTracks == ymengine::kTracks);
@@ -70,7 +70,7 @@ inline constexpr bool isCmdBoxRow(Row r) noexcept { return isCmdRow(r) && !ymeng
 inline constexpr Row rowPartner(Row r) noexcept {
     return r == Row::CmdShape ? Row::CmdRetrig : r == Row::Vol ? Row::CmdVolGlide : r;
 }
-inline constexpr int kInstrumentMax = ymengine::kInstruments;  // INS: 1 to 32 ($01 to $20)
+inline constexpr int kInstrumentMax = ymengine::kInstruments;  // INS: 1 to 127
 
 // One track of a pattern. Once stored in a Pattern it is shared and treated as immutable (LanePtr): it is changed only
 // through Pattern::edit, which copies it first when anything else (undo step, copy published to the audio thread)
@@ -86,6 +86,9 @@ struct Lane : ymengine::SeqLane {
     static int emptyValue(Row r) noexcept { return r == Row::Pat ? -1 : r == Row::Vol ? 15 : 0; }
     // Empties step s of all the rows (chord voices included).
     void clearStep(int s) noexcept;
+    // Steps n to to - 1 repeat steps 0 to n - 1, every row (chord voices included): the track plays its n steps again
+    // in a longer pattern (MIDI import).
+    void repeat(int n, int to) noexcept;
     // Commands of the CMD row at step s (the kinds of the Commands box): taken from step ss of src, or emptied.
     void copyBoxCmds(int s, const Lane& src, int ss) noexcept;
     void clearBoxCmds(int s) noexcept;
@@ -105,7 +108,7 @@ using LanePtr = std::shared_ptr<const Lane>;
 // Shared empty track (never modified).
 const LanePtr& emptyLane();
 
-// A pattern: its length and its 16 tracks. Copying one copies 16 pointers, not the steps (undo steps, clipboard,
+// A pattern: its length and its 32 tracks. Copying one copies 32 pointers, not the steps (undo steps, clipboard,
 // publishing). Edited on the message thread only.
 struct Pattern {
     int steps = kDefaultSteps;          // 1 to 256

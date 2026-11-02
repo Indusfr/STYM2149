@@ -15,6 +15,9 @@ the Slide Curve, scenes `curve` and `curve_custom`, the Computer Keyboard, scene
 `kbd_high`, the YM Player, scene `ym`, and the SHORTCUTS window, scene `help`, fit within
 1 %). A pixel differs when one of its channels is off by more than 4 out of 255, outside the areas that a scene ignores
 by naming the deviation that changes all their content (waveform and note of the frame in the `digidrum` scene).
+These scenes are drawn in the prototype's look (`gemui::usePrototypeLook`: 26 px menu bar, 20 px menu rows, 2 px
+frames, greyed controls at partial opacity), as with its glyphs; the STYM2149 scenes (`stym/`) and the plugin
+use GEM's, measured on Devpac 3.
 
 Taken on 15/10/2026 with Chromium 141.0.7390.37 (Playwright 1.56.1) on Linux, without text smoothing
 (`tools/proto_capture/fonts-noaa.conf`), prototype zoom at 100 %, without MIDI access; taken again the same day at

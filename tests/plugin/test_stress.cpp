@@ -139,7 +139,7 @@ TEST_CASE("Plugin: stress test, settings changed and editor opened during playba
         AudioThread audio(p, s.maxBlock, rng());
         for (int k = 0; k < 60; ++k) {
             switch (rng() % 6) {
-            case 0: setPlain(p, "voiceMode", float(rng() % 3)); break;
+            case 0: setPlain(p, "voiceMode", float(rng() % 4)); break;
             case 1: setPlain(p, "computer", float(rng() % 2)); break;
             case 2: setPlain(p, "chipClock", float(rng() % 4)); break;
             case 3: setPlain(p, "resampling", float(rng() % 3)); break;
@@ -226,10 +226,13 @@ TEST_CASE("Editor: painting by zones identical to a full paint, animated windows
     juce::AudioBuffer<float> buffer(p.getTotalNumOutputChannels(), 800);
     juce::MidiBuffer midi;
     size_t zones = 0;
+    // The editor's clock follows the audio (1600 samples a frame, 33 ms) and not the machine's: the register line,
+    // refreshed every 120 ms, falls on the same frames however fast the test runs.
+    const double t0 = juce::Time::getMillisecondCounterHiRes();
     for (int k = 0; k < 40; ++k) {
         for (int b = 0; b < 2; ++b) p.processBlock(buffer, midi);
         p.serviceMessageThread();
-        editor.frame();
+        editor.frame(t0 + (k + 1) * 2 * buffer.getNumSamples() * 1000.0 / 48000);
         zones = std::max(zones, w.desktop().painted().size());
         REQUIRE(sameAsFullRepaint(editor, 1.25f));  // anti-aliased glyphs
     }

@@ -20,6 +20,15 @@ using plugin::Track;
 
 namespace {
 
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
+
 class TestHost : public pluginui::Host {
 public:
     plugin::ParamValues values = plugin::defaultValues();
@@ -52,7 +61,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return patches; }
@@ -117,10 +125,7 @@ void menuPick(MainWindow& w, int patch, int index) {
     const std::string id = "libPatch" + std::to_string(patch);
     click(w, id, gemui::MouseButton::Right);
     REQUIRE(w.desktop().hasPopups());
-    const gemui::Rect r = *w.rectOf(id);
-    const int top = r.bottom() - 2;  // the menu's frame on the button's bottom rule
-    const int sep = index >= 3 ? 8 - 20 : 0;  // 8 px rule in place of an entry
-    press(w, {r.x + 20, top + 2 + 20 * index + sep + 10});
+    press(w, entryAt(w, index));
     CHECK_FALSE(w.desktop().hasPopups());
 }
 
@@ -145,8 +150,7 @@ TEST_CASE("Patches: button, Ctrl+P and Edit menu open the window; empty library"
     CHECK(w.patches().isOpen());
     key(w, gemui::Key::Escape);
     w.openMenu(2);  // Edit > Patches (seventh entry since Effects, below the bar)
-    const gemui::Rect edit = *w.rectOf("mEdit");
-    press(w, {edit.x + 20, edit.bottom() + 2 + 6 * 20 + 10});
+    press(w, entryAt(w, 6));
     CHECK(w.patches().isOpen());
 
     // Import and Export: host dialogues, which it has none of here (test_file_menu.cpp tries them).

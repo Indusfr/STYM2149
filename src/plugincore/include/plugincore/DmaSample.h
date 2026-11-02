@@ -3,9 +3,10 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
 // Loading like the Digidrums (toDigidrum): linear resampling to the slot rate (the next sample counts as 0 after the
-// end), then signed bytes round(v × 127) clamped to -128..127, 32 KB at most (16 KB per channel in stereo, bytes
-// interleaved left then right). Mono: first channel of the file, like the Digidrums; stereo: the first two (a single
-// channel: copied). Raw file (.raw, .spl, .sam): bytes taken as they are.
+// end), then signed bytes round(v × 127) clamped to -128..127, the whole file (bytes interleaved left then right in
+// stereo; once 32 KB at most, the memory of the chosen STE now limiting the samples, SteMemory.h). Mono:
+// first channel of the file, like the Digidrums; stereo: the first two (a single channel: copied). Raw file (.raw,
+// .spl, .sam): bytes taken as they are.
 // Destructive tools (X15: maxYMiser): Sign flips the most significant bit of each byte (signed ↔ unsigned), Gain
 // multiplies by a gain in dB and clips (steps in a row from the bytes before them); Normalize, Reverse and Fade
 // out are those of the Digidrums.
@@ -22,9 +23,9 @@ namespace stym::plugin {
 std::vector<int8_t> toDmaSample(std::span<const float> left, std::span<const float> right, double sampleRate,
                                 double targetRate);
 // Resample option of the DMA window: the bytes read at `fromHz` taken again at `toHz` by the same linear
-// interpolation, so that the sample keeps its length in time and its pitch; 32 KB at most (a longer one is cut).
+// interpolation, so that the sample keeps its length in time and its pitch.
 std::vector<int8_t> dmaResample(std::span<const int8_t> bytes, bool stereo, double fromHz, double toHz);
-// Raw file, cut to 32 KB; in stereo, to an even count so that each frame has both of its bytes.
+// Raw file; in stereo, cut to an even count so that each frame has both of its bytes.
 std::vector<int8_t> dmaRaw(std::span<const uint8_t> bytes, bool stereo);
 // The Sign and Gain tools (see above), in place.
 void dmaSign(std::vector<int8_t>& bytes) noexcept;

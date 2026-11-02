@@ -49,7 +49,7 @@ inline constexpr std::array<int, kSeqResolutions> kHalfPulsesPerStep = {48, 24, 
 //   step).
 // 24/10/2026: Gxx glides the volume of the step from its VOL to the next step's, frame after frame (G01; set from the
 //   VOL row); Kxx and Qxx give the Bxy and Nxy of their step a slide curve (xx: a SlideCurve, from the step to
-//   the next command of the kind; 16-channel mode).
+//   the next command of the kind; 32-channel mode).
 enum class SeqCmd : uint8_t {
     None, Arp, Speed, Retrig, Sync, Tempo, Vibrato,
     VolSlide, PitchSlide, Delay, Cut, EnvSlide, NoiseSlide, Shape, Offset, Fine,
@@ -79,10 +79,12 @@ inline constexpr int kSeqCmdKinds = kSeqCmds - 1;
 inline constexpr bool seqCmdRetired(SeqCmd k) noexcept { return k == SeqCmd::Arp || k == SeqCmd::PitchSlide; }
 // Items 132, 133 and 138 to 140: Vxx, Txx, Exx, Dxx and Cxx have rows of their own in
 // the Step Sequencer (VIB, BPM, ENV, DLY, CUT); twelfth DAW test, items 142 to 146, 152 and 153: Lxx (LFO), Mxx
-// (MOD), Jxx (ARP), Rxx (ENV with Exx), Oxx (SMP) and Fxx (TUN) too. The other kinds share the CMD row and its
-// Commands box. Txx has left the tracks for the BPM row of the pattern (item 150, SeqPattern::bpm).
+// (MOD), Jxx (ARP), Rxx (ENV with Exx), Oxx (SMP) and Fxx (TUN) too; 29/10/2026, Sxx (TIK). The other kinds
+// share the CMD row and its Commands box. Txx has left the tracks for the BPM row of the pattern (item 150,
+// SeqPattern::bpm).
 inline constexpr bool seqCmdOwnRow(SeqCmd k) noexcept {
     switch (k) {
+    case SeqCmd::Speed:
     case SeqCmd::Vibrato:
     case SeqCmd::Tempo:
     case SeqCmd::Shape:
@@ -112,9 +114,10 @@ inline constexpr bool seqCmdInBox(SeqCmd k) noexcept {
 // SRC row (mix): 0 the track's, 1 Tone, 2 Noise, 3 Tone+Noise; from kSeqMixEnv the same plus the envelope as volume
 // (4 Env to 7 Tone+Noise+Env).
 inline constexpr int kSeqMixEnv = 4, kSeqMixMax = 7;
-// GEN row (fx): 0 the generator of the note (track or instrument), then Chip Voice, SID Voice, Sync Buzzer, Chipdrum
-// (values of Generator).
-inline constexpr std::array<int, 5> kSeqFxGen = {-1, 0, 1, 3, 4};
+// GEN row (fx): 0 the generator of the note (track or instrument), then Chip Voice, SID Voice, Sync Buzzer, Chipdrum,
+// FM Voice (values of Generator).
+inline constexpr std::array<int, 6> kSeqFxGen = {-1, 0, 1, 3, 4, 6};
+inline constexpr int kSeqFxMax = int(kSeqFxGen.size()) - 1, kSeqFxFm = 5;
 
 // One track of a pattern: its rows, one value per step. ymseq/Pattern.h lists each row with its name on screen and
 // its range (tie HLD, slide SLD, afl ARP, mix SRC, fx GEN, gat GAT, pnr PAN, rtg RTG, cnd CND, slc CRV...). slt (SLT)

@@ -173,6 +173,10 @@ void ArpWindow::build() {
     rate_.setTip("Arpeggio speed in Hz");
     ratev_.setMinChars(3);  // #arpRatev{min-width:3ch}
     ratev_.setMask("999");
+    // Track and Land name the two glissando behaviours and stay in English: "Track" is translated as the noun (a
+    // track of the project) elsewhere in the interface.
+    track_.setRaw(true);
+    land_.setRaw(true);
     track_.setTip("Slide follows: during a glissando, the arpeggio rate rises with the pitch");
     land_.setTip(
         "Land: on the last tick of a glissando, fall back to the root so the target note joins without a jump");
@@ -202,6 +206,7 @@ void ArpWindow::wire() {
         m_.set(Track::ArpOn, now ? 1.0f : 0.0f);
         if (!now) m_.host_.screenMidi(0xB0, 123, 0);  // allOff: the stopped arpeggio leaves nothing sounding
     };
+    mode_.setPopup(true);  // a GEM pop-up button, with its shadow
     mode_.onClick = [this] {
         std::vector<MenuItem> items;
         for (int i = 0; i < int(kArpModes.size()); ++i) {
@@ -225,6 +230,7 @@ void ArpWindow::wire() {
     };
     track_.onClick = [this] { editArp([](ymengine::TrackArp& a) { a.track = !a.track; }); };
     land_.onClick = [this] { editArp([](ymengine::TrackArp& a) { a.land = !a.land; }); };
+    div_.setPopup(true);  // a GEM pop-up button, with its shadow
     div_.onClick = [this] {
         // sendClk: the musical order; Tick only on the MIDI clock, shown unchecked if a project kept it.
         const bool midi = m_.iv(Global::ArpClock) == 1;

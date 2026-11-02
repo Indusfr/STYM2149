@@ -2,9 +2,10 @@
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 //
-// Opened by File > Import > YM dump: name of the file and of the tune, Play (Stop during playback), Rewind, position
+// Opened by File > Play > YM or SNDH: name of the file and of the tune, Play (Stop during playback), Rewind, position
 // "n / total (s)" read again every 8 frames like the prototype, then the note. STYM2149 adds the choice of the
-// subsong of an SNDH (row absent for a YM dump). Closing stops playback and forgets the tune.
+// subsong of an SNDH (row absent for a YM dump) and Load at the right of the Play row, the dialogue of File > Play....
+// Closing stops playback and forgets the tune.
 #pragma once
 #include <optional>
 #include <string>
@@ -35,8 +36,8 @@ public:
     // `rate` in frames per second; frames 0 (an SNDH of unknown length): "?".
     static std::string positionText(uint32_t position, uint32_t frames, int rate);
 
-    // Rectangle of an element (captures, tests): "ymWin", "ymPlay", "ymRew", "ymPos", "ymName", "ymSubPrev",
-    // "ymSubNext".
+    // Rectangle of an element (captures, tests): "ymWin", "ymPlay", "ymRew", "ymPos", "ymLoad", "ymName",
+    // "ymSubPrev", "ymSubNext".
     std::optional<gemui::Rect> rectOf(std::string_view id) const;
     std::string nameText() const { return name_.text(); }
     std::string posText() const { return pos_.text(); }
@@ -55,7 +56,7 @@ private:
     Host::YmPlayer last_{};
     Paragraph name_, hint_;
     gemui::Label pos_{"-"};  // .readout: body font (16 px)
-    gemui::Button play_{"Play"}, rew_{"Rewind"};
+    gemui::Button play_{"Play"}, rew_{"Rewind"}, load_{"Load"};
     gemui::Label labSub_{"Subsong"}, subv_{""};
     gemui::Button subPrev_{"-"}, subNext_{"+"};
 };

@@ -4,13 +4,16 @@
 //
 // Expected boxes: the prototype's Chord... menu (#chordSel, chordCols = 1) measured in Chromium 141 (the browser of
 // the visual references, tests/data/visual/README.md) at 100 % zoom in a 1272 px wide page, for several page
-// heights, with the anchor at #chordSel's place (94, 258, 80 × 24, also STYM2149's).
+// heights, with the anchor at #chordSel's place (94, 258, 80 × 24, also STYM2149's). Those boxes are the prototype's
+// look (20 px entries, 2 px frame): the tests that measure them use it, as gemshot does; the GEM look keeps
+// the columns with its 16 px entries and its 2 px frame (last test).
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
 #include "gemui/Desktop.h"
+#include "gemui/Look.h"
 #include "gemui/Menu.h"
 #include "plugincore/Parameters.h"
 #include "pluginui/MainWindow.h"
@@ -26,6 +29,14 @@ using gemui::Rect;
 namespace {
 
 const Box kChordAnchor{94, 258, 80, 24};
+
+// The prototype's look while a test lives.
+struct PrototypeLook {
+    PrototypeLook() { gemui::usePrototypeLook(true); }
+    ~PrototypeLook() { gemui::usePrototypeLook(false); }
+    PrototypeLook(const PrototypeLook&) = delete;
+    PrototypeLook& operator=(const PrototypeLook&) = delete;
+};
 
 std::vector<MenuItem> chordItems(int* picked = nullptr) {
     std::vector<MenuItem> items;
@@ -118,7 +129,6 @@ public:
     void quit() override {}
     bool hasAudioSettings() const override { return false; }
     void openAudioSettings() override {}
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view, std::string_view fallback) const override { return std::string(fallback); }
     void setPreference(std::string_view, std::string_view) override {}
     std::string patchLibrary() const override { return {}; }
@@ -128,6 +138,7 @@ public:
 }  // namespace
 
 TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop height needs", "[gemui][menu]") {
+    const PrototypeLook look;
     SECTION("944 px (the editor's desktop): one column, moved above the anchor to the top margin") {
         Desktop d(1272, 944);
         const MenuList& m = MenuList::open(d, chordItems(), -1, kChordAnchor, false, true);
@@ -180,6 +191,7 @@ TEST_CASE("Menu columns: the 39 chords fill as many columns as the desktop heigh
 }
 
 TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside the menu", "[gemui][menu]") {
+    const PrototypeLook look;
     Desktop d(1272, 400);
     // Anchor near the right edge: the menu is pulled left, 4 px from the edge.
     const MenuList& m = MenuList::open(d, chordItems(), -1, Box{1200, 300, 60, 24}, false, true);
@@ -206,6 +218,7 @@ TEST_CASE("Menu columns: the menu stays inside the desktop, every entry inside t
 
 TEST_CASE("Menu columns: an entry of any column is hovered in inverse video and picked by a click",
           "[gemui][menu]") {
+    const PrototypeLook look;
     Desktop d(1272, 400);
     int picked = -1;
     const MenuList& m = MenuList::open(d, chordItems(&picked), -1, kChordAnchor, false, true);
@@ -225,6 +238,7 @@ TEST_CASE("Menu columns: an entry of any column is hovered in inverse video and 
 
 TEST_CASE("Menu columns: as in the prototype, the keyboard only closes the menu (Esc), other keys reach the page",
           "[gemui][menu][keyboard]") {
+    const PrototypeLook look;
     // openGemMenu has no keyboard navigation: arrows, Enter and Tab go to the page's keydown handler while the menu
     // stays open; Esc closes the menu first (closeGemMenu) and goes no further.
     Desktop d(1272, 400);
@@ -252,6 +266,7 @@ TEST_CASE("Menu columns: as in the prototype, the keyboard only closes the menu 
 
 TEST_CASE("Arpeggiator: Chord... opens the 39 chords with chordCols, the sequencer's Chord menu does not",
           "[ui][arp][menu]") {
+    const PrototypeLook look;
     TestHost h;
     h.values[size_t(plugin::paramIndex(0, plugin::Track::ArpOn))] = 1;
     h.state.tracks[0].arp.mode = ymengine::ArpMode::Table;
@@ -282,4 +297,23 @@ TEST_CASE("Arpeggiator: Chord... opens the 39 chords with chordCols, the sequenc
     REQUIRE(s->items().size() == ymengine::kChords.size() + 1);
     CHECK(s->itemRect(1).x == s->itemRect(39).x);
     CHECK(s->itemRect(39).y > s->itemRect(1).y);
+}
+
+TEST_CASE("Menu columns in the GEM look: 16 px entries inside a 2 px frame", "[gemui][menu]") {
+    // 944 px: the 39 chords fit in one column (4 + 39 × 16 = 628 px), moved above the anchor.
+    Desktop d(1272, 944);
+    const MenuList& m = MenuList::open(d, chordItems(), -1, kChordAnchor, false, true);
+    CHECK(m.bounds().h == 4 + 39 * 16);
+    for (int k = 0; k < 39; ++k) {
+        const Rect r = m.itemRect(k);
+        CHECK(r.x == m.bounds().x + 2);
+        CHECK(r.y == m.bounds().y + 2 + 16 * k);
+        CHECK(r.h == 16);
+        CHECK(r.w == m.bounds().w - 4);
+    }
+    // 400 px: columns of (400 − 120 − 4) / 16 = 17 entries at most.
+    Desktop d4(1272, 400);
+    const MenuList& m4 = MenuList::open(d4, chordItems(), -1, kChordAnchor, false, true);
+    CHECK(m4.itemRect(17).x > m4.itemRect(16).x);
+    CHECK(m4.itemRect(17).y == m4.bounds().y + 2);
 }

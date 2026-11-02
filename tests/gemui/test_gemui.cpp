@@ -7,6 +7,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Png.h"
@@ -14,6 +15,7 @@
 #include "gemui/Controls.h"
 #include "gemui/Desktop.h"
 #include "gemui/Font.h"
+#include "gemui/Look.h"
 #include "gemui/Menu.h"
 #include "gemui/Painter.h"
 
@@ -324,7 +326,11 @@ TEST_CASE("Colour blend: rounded per channel, an opacity outside [0, 1] at the n
     CHECK(mix(a, b, std::numeric_limits<double>::quiet_NaN()) == b);
 }
 
-TEST_CASE("Menu: a checked entry is taller", "[gemui]") {
+TEST_CASE("Menu: a checked entry is taller (the prototype's look)", "[gemui]") {
+    struct PrototypeLook {
+        PrototypeLook() { usePrototypeLook(true); }
+        ~PrototypeLook() { usePrototypeLook(false); }
+    } look;
     Desktop d(1016, 944);
     std::vector<MenuItem> items(2);
     items[0].label = "Chip Voice";
@@ -336,6 +342,54 @@ TEST_CASE("Menu: a checked entry is taller", "[gemui]") {
     CHECK(m.bounds().h == 4 + 22 + 20);
     const MenuList& m2 = MenuList::open(d, items, 0, Box{366.5, 152, 94, 24}, false);
     CHECK(m2.bounds().x == 367);
+}
+
+TEST_CASE("Menu: a GEM pop-up opens with its current entry over its button, rows of 16 px, a shadow",
+          "[gemui]") {
+    Desktop d(1016, 944);
+    std::vector<MenuItem> items(3);
+    items[0].label = "Base";
+    items[1].label = "Square";
+    items[2].label = "Sine";
+    // Devpac 3: the entries of the 8×16 font one per 16 px row, the current one level with the button's middle and its
+    // left edge on the button's, the menu at least as wide as the button; a 2 px shadow; a 2 px frame.
+    const MenuList& m = MenuList::open(d, items, 1, Box{565, 152, 94, 24}, false, false, true);
+    CHECK(m.bounds().x == 565);
+    CHECK(m.bounds().h == 4 + 3 * 16);
+    CHECK(m.itemRect(1) == Rect{567, 156, m.bounds().w - 4, 16});
+    CHECK(m.bounds().y == 138);
+    CHECK(m.bounds().w >= 94);
+    CHECK(m.drawnBounds() == Rect{565, 138, m.bounds().w + 2, m.bounds().h + 2});
+    // Without a current entry, below the button, its frame on the button's bottom rule.
+    const MenuList& n = MenuList::open(d, items, -1, Box{565, 152, 94, 24}, false, false, true);
+    CHECK(n.bounds().y == 174);
+    // A menu that is not a pop-up button's (a context menu) opens below its anchor, checked entry or not.
+    const MenuList& c = MenuList::open(d, items, 1, Box{565, 152, 94, 24}, false);
+    CHECK(c.bounds().y == 174);
+}
+
+TEST_CASE("Button: GEM borders of 2 px, pop-up buttons included; 3 px for the default button",
+          "[gemui]") {
+    // Black pixels from the left edge and from the top edge, half way along each.
+    auto edges = [](Button& b) {
+        b.setBounds({4, 4, 80, 24});
+        Surface s(90, 34, colors::kGreen);
+        Painter p(s);
+        b.paint(p);
+        int left = 0, top = 0;
+        while (left < 6 && s.at(4 + left, 16) == colors::kBlack) ++left;
+        while (top < 6 && s.at(44, 4 + top) == colors::kBlack) ++top;
+        return std::pair{left, top};
+    };
+    Button plain("Load"), exit("OK"), popup("Sine"), tab("1", Button::Style::Tab);
+    Button dflt("Cancel", Button::Style::Default);
+    exit.setExit(true);
+    popup.setPopup(true);
+    CHECK(edges(plain) == std::pair{2, 2});
+    CHECK(edges(exit) == std::pair{2, 2});
+    CHECK(edges(popup) == std::pair{2, 2});
+    CHECK(edges(tab) == std::pair{2, 2});
+    CHECK(edges(dflt) == std::pair{3, 3});
 }
 
 TEST_CASE("Menu: an unavailable entry does not open its submenu, on hover or on a click", "[gemui]") {

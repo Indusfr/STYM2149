@@ -3,7 +3,8 @@
 // floating window), outside the areas of an intended deviation that the scene declares. The band of
 // the menu bar, moved to the top of the desktop, and the desktop icons are not compared there: the
 // STYM2149 scene desk checks them. Nor are the rows of the main window that the ninth DAW test changed
-// and the twelfth aligned, which the STYM2149 scenes check to the pixel.
+// and the twelfth aligned, nor the MIDI monitor under Note, which the STYM2149 scenes
+// check to the pixel.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -47,9 +48,12 @@ TEST_CASE("Windows match the prototype's screenshots (deviation < 1 %, 2 % for a
         // top of the desktop down to the main window's title bar, the visible parts of the three desktop
         // icons, and those of the rows of the main window changed by the ninth DAW test: a slider row or the
         // four of ADSR, the info cell of the register monitor, the row of the window
-        // buttons across the oscilloscope's width, the rows of SOURCE aligned by the twelfth.
+        // buttons across the oscilloscope's width, the rows of SOURCE aligned by the twelfth, the
+        // oscilloscope's band with its two buttons, the instrument row of the GENERATOR frame, the
+        // Computer row of the SYSTEM frame in the place of the Clock row, the tabs of tracks 17 to 32 and their
+        // arrows, the 32 voice LEDs and the mode's button.
         long maskedArea = 0;
-        int icons = 0, rows = 0;
+        int icons = 0, rows = 0, monitor = 0, scope = 0, instrument = 0, tabs = 0;
         for (const gemshot::Mask& m : shot.masks) {
             CHECK(!m.decision.empty());
             if (m.decision == "menu-bar-top") {
@@ -63,6 +67,44 @@ TEST_CASE("Windows match the prototype's screenshots (deviation < 1 %, 2 % for a
                 ++icons;
                 CHECK(m.w <= gemui::DeskIcon::kW);
                 CHECK(m.h <= gemui::DeskIcon::kH);
+                continue;
+            }
+            // The oscilloscope, narrower, with its Main / Track and Merge buttons at its right: its band, as
+            // wide as the register monitor, checked to the pixel by the STYM2149 scenes.
+            if (m.decision == "scope-buttons") {
+                ++scope;
+                CHECK(m.w <= 944);
+                CHECK(m.h <= 90);
+                continue;
+            }
+            // Instrument row at the bottom of the GENERATOR frame: the rule, Instrument, the number and the name.
+            if (m.decision == "instrument-row") {
+                ++instrument;
+                CHECK(m.w <= 226);
+                CHECK(m.h <= 56);
+                continue;
+            }
+            // MIDI monitor under Note, down to the bottom of the SYSTEM frame: its label and its box, taller by
+            // the Clock row that went to Settings.
+            if (m.decision == "midi-monitor") {
+                ++monitor;
+                CHECK(m.w <= 206);
+                CHECK(m.h <= 200);
+                continue;
+            }
+            // Tabs of tracks 17 to 32 and their arrows, between the sixteenth tab and All on, one tab high; the voice
+            // LEDs and the mode's button.
+            if (m.decision == "tracks-32") {
+                ++tabs;
+                CHECK(m.w <= 400);
+                CHECK(m.h <= 28);
+                continue;
+            }
+            // Computer row of the SYSTEM frame in the place of the Clock row: one button row.
+            if (m.decision == "clock-to-settings") {
+                ++rows;
+                CHECK(m.w <= 226);
+                CHECK(m.h <= 36);
                 continue;
             }
             if (m.decision == "vibrato-widths" || m.decision == "source-widths" || m.decision == "register-monitor" ||
@@ -81,11 +123,14 @@ TEST_CASE("Windows match the prototype's screenshots (deviation < 1 %, 2 % for a
             maskedArea += long(m.w) * long(m.h);
         }
         CHECK(icons <= 3 * 4);  // three icons, cut by the windows in front of them in four parts at most
-        CHECK(rows <= 10 * 4);  // ten rows, cut the same way
+        CHECK(rows <= 11 * 4);  // eleven rows, cut the same way
+        CHECK(monitor <= 4);
+        CHECK(scope <= 4);
+        CHECK(instrument <= 4);
+        CHECK(tabs <= 3 * 4);
         CHECK(maskedArea * 50 < kBudgetArea);  // 2 %
-        // Inserted row (Computer in the SYSTEM frame): one button row (36 px at most), checked to the pixel by
-        // the STYM2149 scenes; the following rows compared at their former place, two rows lower at most. Removed rows
-        // (the eight first shapes of the Shape R13 menu): the same, up.
+        // Inserted rows: two rows lower at most, compared at their former place. Removed rows (the eight first shapes
+        // of the Shape R13 menu): the same, up.
         // Frames of the main window moved by the sixth DAW test: within the rows of the frames, by a column at
         // most sideways, a new row of one button at most not compared.
         // A moved frame whose former place a menu or an alert covers in the capture: compared with the capture of the
@@ -153,8 +198,12 @@ TEST_CASE("Windows specific to STYM2149 identical to their reference rendering",
     // seq_cmd_box, seq_cmd_plugin, seq_env_menu, seq_step_sid, seq_step_buzzer,
     // seq_step_source, seq_step_env, seq_vol_slide, seq_cmd_curve, sid_square, sid_sine,
     // sid_form_menu, sid_bounce, mixer_type, regs_off,
-    // settings_discard, note_off, seq_fit, seq and seq_demo, orn_dma
-    REQUIRE(gemshot::stymSceneNames().size() == 66);
+    // settings_discard, note_off, seq_fit, seq and seq_demo, orn_dma,
+    // midi_monitor, midi_monitor_up and midi_off, ui_fr, ui_de_settings and ui_de_mixer,
+    // ym_import_grid, info with its demo, scope_stereo and scope_track,
+    // gen_instrument and gen_instrument_menu, voices_32 and mixer_32, fm_voice and
+    // seq_step_fm, fm_semitones, seq_instrument and seq_song_instrument
+    REQUIRE(gemshot::stymSceneNames().size() == 84);
     for (const std::string& name : gemshot::stymSceneNames()) {
         CAPTURE(name);
         tools::Image ref;

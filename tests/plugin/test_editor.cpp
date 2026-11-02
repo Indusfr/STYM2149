@@ -4,19 +4,28 @@
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <memory>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "BuildId.h"
 #include "KeyboardLayout.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "StandaloneSlot.h"
+#include "plugincore/State.h"
 #include "pluginui/IconData.h"
+#include "pluginui/TipLanguage.h"
 
 using namespace stym;
 using namespace stym::plugin;
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter();  // the plugin's factory (PluginProcessor.cpp)
 
 namespace {
 
@@ -66,7 +75,9 @@ bool sameAsDesktop(StymEditor& editor, float scale, int k) {
     const gemui::Surface& s = desk.surface();
     if (shot.getWidth() != s.width() * k || shot.getHeight() != s.height() * k) return false;
     const gemui::Rect title = *editor.window().rectOf("mFuji");
-    const gemui::Rect logo{title.x + 10, title.y + 5, pluginui::icons::kFuji.w, pluginui::icons::kFuji.h};
+    // In the GEM look, the logo 8 px after the title's left edge, centred in its height (Menu.cpp).
+    const int fujiH = pluginui::icons::kFuji.h;
+    const gemui::Rect logo{title.x + 8, title.y + (title.h - fujiH) / 2, pluginui::icons::kFuji.w, fujiH};
     const juce::Image::BitmapData bd(shot, juce::Image::BitmapData::readOnly);
     int ink = 0;
     for (int y = 0; y < shot.getHeight(); ++y)
@@ -177,14 +188,30 @@ TEST_CASE("Editor: size set by resizing the window, kept in the preferences (ten
         CHECK(menu->items().front().label == "Audio/MIDI settings");
         for (const gemui::MenuItem& m : menu->items()) CHECK(m.label != "Zoom");
         editor.window().desktop().closePopups();
-        // Resized by the host, in the desktop's proportions, from 50 to 200 %: the size is remembered.
+        // Resized by the host, in the desktop's proportions, from 50 % up to the size that fills the largest display,
+        // 200 % at least: the size is remembered.
         const auto* c = editor.getConstrainer();
         CHECK(c->getMinimumWidth() == pluginui::MainWindow::kWidth * 50 / 160);
-        CHECK(c->getMaximumWidth() == pluginui::MainWindow::kWidth * 200 / 160);
+        int fill = 200;
+        for (const auto& d : juce::Desktop::getInstance().getDisplays().displays)
+            fill = std::max(fill, int(std::floor(std::min(d.userBounds.getWidth() * 160 / pluginui::MainWindow::kWidth,
+                                                          d.userBounds.getHeight() * 160 /
+                                                              pluginui::MainWindow::kHeight))));
+        CAPTURE(fill);
+        CHECK(c->getMaximumWidth() == pluginui::MainWindow::kWidth * fill / 160);
+        CHECK(c->getMaximumHeight() == pluginui::MainWindow::kHeight * fill / 160);
         CHECK(c->getFixedAspectRatio() == double(pluginui::MainWindow::kWidth) / pluginui::MainWindow::kHeight);
         editor.setSize(pluginui::MainWindow::kWidth * 125 / 160, pluginui::MainWindow::kHeight * 125 / 160);
         CHECK(host.preference("zoom", "") == "125");
         host.setPreference("noteNames", "1");
+    }
+    {
+        // A size remembered beyond the largest display (another screen, unplugged since) comes back to it.
+        juce::TemporaryFile other(".settings");
+        auto f = preferencesIn(other.getFile());
+        f->setValue("zoom", 5000);
+        StymEditor big(p, std::move(f));
+        CHECK(big.getWidth() == big.getConstrainer()->getMaximumWidth());
     }
     StymEditor editor(p, preferencesIn(prefs.getFile()));
     const pluginui::Host& host = editor;
@@ -282,6 +309,227 @@ TEST_CASE("Editor: Preferences.settings takes over the old STYM2149.settings onc
     CHECK(dir.deleteRecursively());
 }
 
+TEST_CASE("Editor: two copies writing Preferences.settings keep each other's changes", "[editor]") {
+    juce::ScopedJuceInitialiser_GUI juce;
+    juce::TemporaryFile temp(".settings");
+    juce::PropertiesFile::Options o;
+    o.millisecondsBeforeSaving = -1;
+    {
+        juce::PropertiesFile seed(temp.getFile(), o);
+        seed.setValue("zoom", 100);
+        seed.setValue("tipLanguage", "en");
+        REQUIRE(seed.save());
+    }
+    // Both copies read the file at their start; each changes one preference, then writes.
+    juce::PropertiesFile one(temp.getFile(), o), two(temp.getFile(), o);
+    juce::StringPairArray changedByOne(false), changedByTwo(false);
+    one.setValue("tipLanguage", "fr");
+    changedByOne.set("tipLanguage", "fr");
+    StymEditor::writePreferences(one, changedByOne);
+    two.setValue("zoom", 125);
+    changedByTwo.set("zoom", "125");
+    StymEditor::writePreferences(two, changedByTwo);
+    const juce::PropertiesFile after(temp.getFile(), o);
+    CHECK(after.getValue("tipLanguage") == "fr");  // a plain save of copy two would have put "en" back
+    CHECK(after.getIntValue("zoom") == 125);
+    CHECK(two.getValue("tipLanguage") == "fr");  // copy two now holds what copy one wrote
+}
+
+TEST_CASE("Editor: preferences of two editors on the same file both kept when they close", "[editor]") {
+    juce::ScopedJuceInitialiser_GUI gui;
+    juce::TemporaryFile prefs(".settings");
+    juce::PropertiesFile::Options o;
+    o.millisecondsBeforeSaving = -1;
+    {
+        StymProcessor p1, p2;
+        auto e1 = std::make_unique<StymEditor>(p1, std::make_unique<juce::PropertiesFile>(prefs.getFile(), o));
+        auto e2 = std::make_unique<StymEditor>(p2, std::make_unique<juce::PropertiesFile>(prefs.getFile(), o));
+        static_cast<pluginui::Host&>(*e1).setPreference("tipLanguage", "de");
+        static_cast<pluginui::Host&>(*e2).setPreference("noteNames", "1");
+        e1.reset();
+        e2.reset();
+    }
+    const juce::PropertiesFile after(prefs.getFile(), o);
+    CHECK(after.getValue("tipLanguage") == "de");
+    CHECK(after.getValue("noteNames") == "1");
+}
+
+TEST_CASE("Standalone copies: lowest free number, names, settings of a new copy", "[editor][standalone]") {
+    std::set<int> taken{1, 2, 4};
+    CHECK(lowestFreeSlot([&](int n) { return taken.insert(n).second; }) == 3);
+    CHECK(lowestFreeSlot([&](int n) { return taken.insert(n).second; }) == 5);
+    CHECK(lowestFreeSlot([](int) { return false; }) == 0);
+    CHECK(slotName("STYM2149", 1) == "STYM2149");
+    CHECK(slotName("STYM2149", 2) == "STYM2149 (2)");
+    CHECK(slotName("STYM2149", 10) == "STYM2149 (10)");
+
+    juce::PropertySet first;
+    first.setValue("audioSetup", juce::String("<DEVICESETUP deviceType=\"ALSA\" audioOutputDeviceName=\"hw:1\">"
+                                              "<MIDIINPUT name=\"Launchkey\" identifier=\"a\"/>"
+                                              "<MIDIINPUT name=\"Exquis\" identifier=\"b\"/></DEVICESETUP>"));
+    first.setValue("shouldMuteInput", true);
+    first.setValue("windowX", 100);
+    first.setValue("windowY", 80);
+    first.setValue("filterState", "AAAA");
+    first.setValue("lastStateFile", "/home/indus/song.stym");
+    juce::PropertySet second;
+    seedSlotSettings(first, second, 2);
+    const std::unique_ptr<juce::XmlElement> setup = second.getXmlValue("audioSetup");
+    REQUIRE(setup != nullptr);
+    CHECK(setup->getStringAttribute("audioOutputDeviceName") == "hw:1");  // the same audio output
+    CHECK(setup->getChildByName("MIDIINPUT") == nullptr);                 // each copy chooses its controller
+    CHECK(second.getBoolValue("shouldMuteInput"));
+    CHECK(second.getIntValue("windowX") == 132);
+    CHECK(second.getIntValue("windowY") == 112);
+    CHECK_FALSE(second.containsKey("filterState"));  // a new project
+    CHECK_FALSE(second.containsKey("lastStateFile"));
+    CHECK(slotWindowOffset(1) == 0);
+    CHECK(slotWindowOffset(3) == 64);
+    CHECK(slotWindowOffset(17) == 0);  // back to the first place every 16 copies
+
+    juce::PropertySet fresh, third;  // the first copy never closed: no place, no device
+    seedSlotSettings(fresh, third, 3);
+    CHECK(third.getAllProperties().size() == 0);
+}
+
+TEST_CASE("Standalone copies: a number held while the copy lives", "[editor][standalone]") {
+    const juce::String app = "STYM2149 slot test";  // its own lock, apart from the application's
+    CHECK(standaloneCopyNumber() == 1);
+    {
+        const StandaloneSlot slot(app);
+        CHECK(slot.number() == 1);
+        CHECK(standaloneCopyNumber() == slot.number());
+    }
+    CHECK(standaloneCopyNumber() == 1);
+}
+
+TEST_CASE("Standalone copies: each copy's MIDI learn map, the ASIO alert of a new copy",
+          "[editor][standalone]") {
+    juce::PropertySet prefs, first, second;
+    prefs.setValue("midiMap", R"({"CC21":{"id":"np","kind":"range"}})");
+    adoptMidiMap(prefs, first, 1);
+    CHECK(first.getValue("midiMap") == prefs.getValue("midiMap"));  // the first copy keeps the map learned before
+    adoptMidiMap(prefs, second, 2);
+    CHECK_FALSE(second.containsKey("midiMap"));  // another copy starts without a map: its controller is another
+    first.setValue("midiMap", "{}");
+    adoptMidiMap(prefs, first, 1);
+    CHECK(first.getValue("midiMap") == "{}");  // taken once
+    juce::PropertySet none, fresh;
+    adoptMidiMap(none, fresh, 1);
+    CHECK(fresh.getValue("midiMap") == "{}");  // a map learned later in a host stays apart
+
+    juce::PropertySet asio, wasapi;
+    asio.setValue("audioSetup", juce::String(R"(<DEVICESETUP deviceType="ASIO" audioOutputDeviceName="USB ASIO"/>)"));
+    wasapi.setValue("audioSetup", juce::String(R"(<DEVICESETUP deviceType="Windows Audio"/>)"));
+    CHECK(usesAsio(asio));
+    CHECK_FALSE(usesAsio(wasapi));
+    CHECK_FALSE(usesAsio(none));
+    // Every line of the alert is a line of the interface catalogue, translated in the PO files.
+    const std::set<std::string> catalogue(pluginui::tipcatalog::kUiLines,
+                                          pluginui::tipcatalog::kUiLines + pluginui::tipcatalog::kUiLineCount);
+    for (const bool asioOpen : {true, false}) {
+        for (const bool anyOpen : {true, false}) {
+            const std::vector<std::string> lines = asioNotice(asioOpen, anyOpen);
+            CHECK(lines.size() == 2);
+            for (const std::string& line : lines) CHECK(catalogue.count(line) == 1);
+        }
+    }
+    CHECK(asioNotice(false, true)[1] != asioNotice(false, false)[1]);
+}
+
+TEST_CASE("Editor: in a copy of the standalone application, the MIDI learn map is the copy's own",
+          "[editor][learn][standalone]") {
+    juce::ScopedJuceInitialiser_GUI gui;
+    juce::TemporaryFile prefs(".settings");
+    const juce::String shared = R"({"CC22":{"id":"np","kind":"range"}})";
+    {
+        auto f = preferencesIn(prefs.getFile());
+        f->setValue("midiMap", shared);
+        f->saveIfNeeded();
+    }
+    juce::PropertySet copy;
+    copy.setValue("midiMap", R"({"CC21":{"id":"np","kind":"range"}})");
+    setStandaloneSettings(&copy);
+    {
+        // The processor of the standalone application takes the copy's map at its creation: CC21 is caught.
+        const std::unique_ptr<juce::AudioProcessor> created(createPluginFilter());
+        auto& p = dynamic_cast<StymProcessor&>(*created);
+        p.prepareToPlay(48000, 512);
+        juce::AudioBuffer<float> buffer(p.getTotalNumOutputChannels(), 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::controllerEvent(1, 21, 64), 0);
+        p.processBlock(buffer, midi);
+        std::array<uint8_t, 3> m{};
+        CHECK(p.popLearnMidi(m));
+        CHECK(m == std::array<uint8_t, 3>{0xB0, 21, 64});
+    }
+    juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+    StymProcessor p;  // as the standalone application makes it
+    juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+    {
+        StymEditor editor(p, preferencesIn(prefs.getFile()));
+        REQUIRE(editor.window().midiMap().size() == 1);
+        CHECK(editor.window().midiMap()[0].key == "CC21");
+        editor.window().clearMidiMap();
+        CHECK(copy.getValue("midiMap") == "{}");
+    }
+    CHECK(preferencesIn(prefs.getFile())->getValue("midiMap") == shared);  // the map of hosts left as it was
+    setStandaloneSettings(nullptr);
+}
+
+TEST_CASE("Standalone: the session an earlier version saved at Quit is dropped, a configuration kept",
+          "[editor][standalone]") {
+    juce::PropertySet old;
+    old.setValue("filterState", "AAAA");
+    forgetUnsavedSession(old);
+    CHECK_FALSE(old.containsKey("filterState"));  // the work not saved is lost, as the Quit box says
+    juce::PropertySet kept;
+    kept.setValue("filterState", "AAAA");
+    kept.setValue("configFile", "/home/indus/live.stymcfg");
+    forgetUnsavedSession(kept);
+    CHECK(kept.getValue("filterState") == "AAAA");  // the configuration last saved or loaded reopens
+}
+
+TEST_CASE("Editor: configuration of the standalone application saved, loaded and reopened at the next start",
+          "[editor][standalone]") {
+    juce::ScopedJuceInitialiser_GUI gui;
+    juce::TemporaryFile prefs(".settings");
+    juce::PropertySet copy;
+    setStandaloneSettings(&copy);
+    juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
+    StymProcessor p;  // as the standalone application makes it
+    juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
+    {
+        StymEditor editor(p, preferencesIn(prefs.getFile()));
+        pluginui::Host& host = editor;
+        CHECK(host.configurationFile().empty());
+        const int level = findParam("t01_level");
+        REQUIRE(level >= 0);
+        host.setParam(level, 42.0f);
+        const std::string saved = host.configuration();
+        juce::MemoryBlock state;
+        p.getStateInformation(state);
+        CHECK(saved == std::string(static_cast<const char*>(state.getData()), state.getSize()));  // as a host saves it
+
+        host.setParam(level, 10.0f);
+        CHECK(host.loadConfiguration(saved).empty());
+        CHECK(host.param(level) == 42.0f);
+        CHECK_FALSE(host.loadConfiguration("not a STYM2149 file").empty());
+        PluginState pattern;
+        pattern.values[size_t(level)] = 7.0f;
+        const std::vector<uint8_t> bytes = encodeState(pattern, StateKind::Pattern);
+        CHECK_FALSE(host.loadConfiguration({reinterpret_cast<const char*>(bytes.data()), bytes.size()}).empty());
+        CHECK(host.param(level) == 42.0f);  // a pattern file is not a configuration: nothing changed
+
+        host.keepConfiguration("/home/indus/live.stymcfg", saved);
+        CHECK(host.configurationFile() == "/home/indus/live.stymcfg");
+        juce::MemoryBlock reopened;
+        REQUIRE(reopened.fromBase64Encoding(copy.getValue("filterState")));  // what JUCE's holder reloads
+        CHECK(std::string(static_cast<const char*>(reopened.getData()), reopened.getSize()) == saved);
+    }
+    setStandaloneSettings(nullptr);
+}
+
 TEST_CASE("Editor: MIDI learn, map from the preferences given to the processor, learned CC up to the slider",
           "[editor][learn]") {
     juce::ScopedJuceInitialiser_GUI gui;
@@ -343,6 +591,56 @@ TEST_CASE("Editor: click on the on-screen keyboard, note played then released by
     editor.reset();
     play(p, 200);
     CHECK(play(p, 4) == 0.0);
+}
+
+TEST_CASE("Editor: a MIDI input gone releases the keys it held, sound and keyboard", "[editor]") {
+    juce::ScopedJuceInitialiser_GUI juce;
+    juce::TemporaryFile prefs(".settings");
+    StymProcessor p;
+    p.prepareToPlay(48000, 512);
+    StymEditor editor(p, preferencesIn(prefs.getFile()));
+    // Every input available is enabled here.
+    auto seen = [&editor](const juce::StringArray& inputs) { return editor.midiInputsSeen(inputs, inputs); };
+    seen({"exquis", "keys"});
+    // A key held on the controller: it sounds, lit on the on-screen keyboard.
+    juce::AudioBuffer<float> buffer(p.getTotalNumOutputChannels(), 512);
+    juce::MidiBuffer midi;
+    midi.addEvent(juce::MidiMessage::noteOn(2, 60, uint8_t(100)), 0);
+    p.processBlock(buffer, midi);
+    CHECK(play(p, 8) > 0.0);
+    editor.frame();
+    CHECK(editor.window().piano().held(60));
+    // Another input switched on: nothing changes.
+    seen({"exquis", "keys", "pads"});
+    play(p, 2);
+    editor.frame();
+    CHECK(editor.window().piano().held(60));
+    // The controller unplugged: no note off will come; the key is released and goes dark.
+    seen({"keys", "pads"});
+    play(p, 200);
+    CHECK(play(p, 4) == 0.0);
+    editor.frame();
+    CHECK_FALSE(editor.window().piano().held(60));
+}
+
+TEST_CASE("Editor: a MIDI input plugged back is opened again", "[editor]") {
+    juce::ScopedJuceInitialiser_GUI juce;
+    juce::TemporaryFile prefs(".settings");
+    StymProcessor p;
+    p.prepareToPlay(48000, 512);
+    StymEditor editor(p, preferencesIn(prefs.getFile()));
+    CHECK(editor.midiInputsSeen({"exquis", "keys"}, {"exquis", "keys"}).isEmpty());
+    // Unplugged: JUCE still counts it as enabled, but it is no longer available.
+    CHECK(editor.midiInputsSeen({"keys"}, {"keys"}).isEmpty());
+    CHECK(editor.midiInputsSeen({"keys", "pads"}, {"keys"}).isEmpty());  // another device plugged in, not enabled
+    // Plugged back, still enabled: to be closed and opened again, once.
+    CHECK(editor.midiInputsSeen({"exquis", "keys", "pads"}, {"exquis", "keys"}) == juce::StringArray{"exquis"});
+    CHECK(editor.midiInputsSeen({"exquis", "keys", "pads"}, {"exquis", "keys"}).isEmpty());
+    // Unplugged, then switched off in the settings before it comes back: it stays off.
+    CHECK(editor.midiInputsSeen({"exquis", "pads"}, {"exquis"}).isEmpty());
+    CHECK(editor.midiInputsSeen({"exquis", "keys", "pads"}, {"exquis"}).isEmpty());
+    // An input never seen enabled is not opened by STYM2149: the device manager opens those it remembers.
+    CHECK(editor.midiInputsSeen({"exquis", "keys", "pads", "new"}, {"exquis", "new"}).isEmpty());
 }
 
 TEST_CASE("Editor: parameter set by the window with a host gesture", "[editor]") {

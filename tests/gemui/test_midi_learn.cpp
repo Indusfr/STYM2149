@@ -1,5 +1,5 @@
-// STYM2149 — MIDI learn: Options menu, banner, control armed by a click, learnt CCs and notes that
-// drive sliders and buttons, shared map kept in the preferences.
+// STYM2149 — MIDI learn: Options menu, banner, control armed by a click (Escape disarms it),
+// learnt CCs and notes that drive sliders and buttons, shared map kept in the preferences.
 // Programming: Pascal "Indus" Nowak (with Claude's help).
 // Copyright © 2026 Indus / PRISM. Licence : AGPLv3 (voir LICENSE).
 #include <catch2/catch_test_macros.hpp>
@@ -20,6 +20,15 @@ using plugin::paramIndex;
 using plugin::Track;
 
 namespace {
+
+// Centre of entry `item` of the open menu, where the menu placed it (GEM look).
+gemui::Point entryAt(MainWindow& w, int item) {
+    const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+    REQUIRE(m);
+    const gemui::Rect e = m->itemRect(item);
+    REQUIRE(e.w > 0);
+    return {e.x + e.w / 2, e.y + e.h / 2};
+}
 
 class TestHost : public pluginui::Host {
 public:
@@ -70,7 +79,6 @@ public:
     bool hasAudioSettings() const override { return audioSettings; }
     bool rendererChoice() const override { return renderers; }
     void openAudioSettings() override { ++audioOpened; }
-    void loadDigidrum(int) override {}
     std::string preference(std::string_view key, std::string_view fallback) const override {
         const auto it = prefs.find(std::string(key));
         return it == prefs.end() ? std::string(fallback) : it->second;
@@ -105,9 +113,7 @@ void send(TestHost& h, MainWindow& w, uint8_t status, uint8_t a, uint8_t b) {
 // Entry of the Options menu: Audio/MIDI settings, ---, MIDI learn (1), Clear MIDI map (2), ---...
 void options(MainWindow& w, int entry) {
     w.openMenu(3);
-    const gemui::Rect bar = *w.rectOf("mOptions");
-    const int seps = entry >= 1 ? 1 : 0;
-    press(w, {bar.x + 20, bar.bottom() + 2 + 20 * entry + 8 * seps + 10});
+    press(w, entryAt(w, entry + (entry >= 1 ? 1 : 0)));  // after the separator
     CHECK_FALSE(w.desktop().hasPopups());
 }
 
@@ -217,17 +223,16 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
         FAIL("no Oscilloscope entry");
         return {};
     };
+    // A check mark while shown, no submenu.
     gemui::MenuItem o = scope();
-    REQUIRE(o.sub.size() == 2);
-    CHECK(o.sub[0].label == "On");
-    CHECK(o.sub[1].label == "Off");
-    CHECK(o.subMarks);
-    CHECK(o.subCur == 0);
+    CHECK(o.sub.empty());
+    CHECK(o.checkable);
+    CHECK(o.marked);
     REQUIRE(w.rectOf("scope"));
     const gemui::Rect regs = *w.rectOf("regs"), kbd = *w.rectOf("kbd"), btn = *w.rectOf("kbdMapBtn");
-    o.sub[1].pick();
+    o.pick();
     CHECK(h.prefs["mainScope"] == "0");
-    CHECK(scope().subCur == 1);
+    CHECK_FALSE(scope().marked);
     CHECK_FALSE(w.rectOf("scope"));
     CHECK(w.rectOf("regs")->y == regs.y - 100);
     CHECK(w.rectOf("kbd")->y == kbd.y - 100);
@@ -238,7 +243,7 @@ TEST_CASE("Options > Oscilloscope: the main window's shown by default, hidden as
         CHECK_FALSE(w2.rectOf("scope"));
         CHECK(w2.rectOf("regs")->y == regs.y - 100);
     }
-    scope().sub[0].pick();
+    scope().pick();
     CHECK(h.prefs["mainScope"] == "1");
     CHECK(w.rectOf("scope"));
     CHECK(*w.rectOf("regs") == regs);
@@ -264,18 +269,16 @@ TEST_CASE("Options > Register monitor: shown by default, hidden as a preference 
         return {};
     };
     gemui::MenuItem r = regs();
-    REQUIRE(r.sub.size() == 2);
-    CHECK(r.sub[0].label == "On");
-    CHECK(r.sub[1].label == "Off");
-    CHECK(r.subMarks);
-    CHECK(r.subCur == 0);
+    CHECK(r.sub.empty());
+    CHECK(r.checkable);
+    CHECK(r.marked);
     REQUIRE(w.rectOf("regs"));
     REQUIRE(w.rectOf("regInfo"));
     const gemui::Rect scope = *w.rectOf("scope"), kbd = *w.rectOf("kbd"), btn = *w.rectOf("kbdMapBtn"),
                       bottom = *w.rectOf("mainBottom");
-    r.sub[1].pick();
+    r.pick();
     CHECK(h.prefs["mainRegs"] == "0");
-    CHECK(regs().subCur == 1);
+    CHECK_FALSE(regs().marked);
     CHECK_FALSE(w.rectOf("regs"));
     CHECK_FALSE(w.rectOf("regInfo"));
     CHECK(*w.rectOf("scope") == scope);  // the oscilloscope stays where it is
@@ -294,7 +297,7 @@ TEST_CASE("Options > Register monitor: shown by default, hidden as a preference 
         CHECK(w2.rectOf("kbd")->y == kbd.y - 150);
         h.prefs["mainScope"] = "1";
     }
-    regs().sub[0].pick();
+    regs().pick();
     CHECK(h.prefs["mainRegs"] == "1");
     CHECK(w.rectOf("regs"));
     CHECK(*w.rectOf("kbd") == kbd);
@@ -321,16 +324,14 @@ TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden
         return {};
     };
     gemui::MenuItem n = note();
-    REQUIRE(n.sub.size() == 2);
-    CHECK(n.sub[0].label == "On");
-    CHECK(n.sub[1].label == "Off");
-    CHECK(n.subMarks);
-    CHECK(n.subCur == 0);
+    CHECK(n.sub.empty());
+    CHECK(n.checkable);
+    CHECK(n.marked);
     REQUIRE(w.rectOf("noteRow"));
     const gemui::Rect row = *w.rectOf("noteRow"), regs = *w.rectOf("regs"), bottom = *w.rectOf("mainBottom");
-    n.sub[1].pick();
+    n.pick();
     CHECK(h.prefs["mainNote"] == "0");
-    CHECK(note().subCur == 1);
+    CHECK_FALSE(note().marked);
     CHECK_FALSE(w.rectOf("noteRow"));
     CHECK(*w.rectOf("regs") == regs);
     CHECK(*w.rectOf("mainBottom") == bottom);
@@ -338,9 +339,36 @@ TEST_CASE("Options > Note monitor: the SYSTEM Note line shown by default, hidden
         MainWindow w2(h);  // kept for the next opening
         CHECK_FALSE(w2.rectOf("noteRow"));
     }
-    note().sub[0].pick();
+    note().pick();
     CHECK(h.prefs["mainNote"] == "1");
     CHECK(*w.rectOf("noteRow") == row);
+}
+
+TEST_CASE("Options menu: the shown parts checked, the mark's column kept with all of them hidden", "[ui][menu]") {
+    // Indus, 29/10/2026 18:31: no On/Off submenu, a check in front while on, none while off.
+    TestHost h;
+    auto open = [&h](std::vector<gemui::MenuItem>& items) {
+        MainWindow w(h);
+        w.openMenu(3);
+        const auto* m = dynamic_cast<const gemui::MenuList*>(w.desktop().topPopup());
+        REQUIRE(m);
+        items = m->items();
+        const double width = m->box().w;
+        w.desktop().closePopups();
+        return width;
+    };
+    std::vector<gemui::MenuItem> items;
+    const double shown = open(items);
+    int marked = 0;
+    for (const auto& it : items) {
+        CHECK(it.sub.empty());
+        marked += it.marked ? 1 : 0;
+    }
+    CHECK(marked == 4);
+    for (const char* key : {"mainScope", "mainRegs", "mainNote", "mainMidi"}) h.prefs[key] = "0";
+    const double hidden = open(items);
+    for (const auto& it : items) CHECK_FALSE(it.marked);
+    CHECK(hidden == shown);  // the labels do not move
 }
 
 TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without acting", "[ui][learn]") {
@@ -373,6 +401,25 @@ TEST_CASE("MIDI learn: Options menu, banner, a click arms the control without ac
     click(w, "kbd");
     CHECK_FALSE(h.screen.empty());
     CHECK(w.learnBadge() == "MIDI learn: [openMixBtn] armed - move a knob or press a pad");
+
+    // Escape (Indus, 28/10/2026 10:25): the armed control disarmed, MIDI learn still on to arm another, the
+    // window in front left open; with nothing armed, Escape closes it as before.
+    w.mixer().show();
+    gemui::KeyEvent esc;
+    esc.key = gemui::Key::Escape;
+    CHECK(w.desktop().keyDown(esc));
+    CHECK(w.midiLearn());
+    CHECK_FALSE(h.armed);
+    CHECK(w.learnBadge() == "MIDI learn: [openMixBtn] disarmed - click another control or exit via Options");
+    CHECK(w.mixer().isOpen());
+    CHECK(w.desktop().keyDown(esc));
+    CHECK_FALSE(w.mixer().isOpen());
+    CHECK(w.midiLearn());
+    click(w, "np");
+    CHECK(h.armed);
+    CHECK(w.learnBadge() == "MIDI learn: [np] armed - move a knob or press a pad");
+    click(w, "openMixBtn");
+    CHECK_FALSE(w.mixer().isOpen());
 
     // The banner stays in front of the windows opened afterwards (z-index 95) and takes the presses.
     w.sequencer().show();
@@ -469,4 +516,64 @@ TEST_CASE("MIDI learn: learnt CCs and notes drive sliders and buttons; shared ma
     w.setMidiLearn(false);
     send(h, w, 0xB0, 21, 127);
     CHECK(h.p(0, Track::NoisePeriod) == 16.0f);
+}
+
+TEST_CASE("Launch: the MIDI keys C2 to B2 pick the patterns and the banks; their buttons can be learnt",
+          "[ui][learn]") {
+    TestHost h;
+    MainWindow w(h);
+    w.tick(0);
+    w.sequencer().show();
+    // Off when the plugin starts: the keys play.
+    CHECK_FALSE(h.editor.launch);
+    CHECK_FALSE(h.keys.notes.test(36));
+    click(w, "seqLaunch");
+    REQUIRE(h.editor.launch);
+    for (int n = 36; n <= 47; ++n) CHECK(h.keys.notes.test(size_t(n)));
+    CHECK_FALSE(h.keys.notes.test(35));
+    CHECK_FALSE(h.keys.notes.test(48));
+    // D2: pattern 3 of bank A; the release does nothing. A2 on the drum channel: bank B, then C2: its pattern 1.
+    send(h, w, 0x90, 38, 100);
+    CHECK(h.state.seq.current == 2);
+    send(h, w, 0x80, 38, 0);
+    CHECK(h.state.seq.current == 2);
+    send(h, w, 0x99, 45, 100);
+    CHECK(h.state.seq.viewBank == 1);
+    send(h, w, 0x90, 36, 100);
+    CHECK(h.state.seq.current == 8);
+
+    // The Patterns button 2 learnt on C4: C4 picks it, C#2 plays again; the other default keys stay.
+    w.setMidiLearn(true);
+    click(w, "seqPat2");
+    send(h, w, 0x90, 60, 100);
+    w.setMidiLearn(false);
+    CHECK(h.prefs["midiMap"] == R"({"Note60":{"id":"seqPat2","kind":"btn"}})");
+    CHECK(h.keys.notes.test(60));
+    CHECK_FALSE(h.keys.notes.test(37));
+    CHECK(h.keys.notes.test(38));
+    send(h, w, 0x90, 60, 100);
+    CHECK(h.state.seq.current == 9);
+    send(h, w, 0x80, 60, 0);
+    // Launch off (it can itself be learnt): neither the default keys nor the learnt ones come to the editor.
+    click(w, "seqLaunch");
+    CHECK_FALSE(h.editor.launch);
+    CHECK_FALSE(h.keys.notes.test(60));
+    CHECK_FALSE(h.keys.notes.test(36));
+    send(h, w, 0x90, 60, 100);
+    send(h, w, 0x90, 38, 100);
+    CHECK(h.state.seq.current == 9);
+
+    // Launch learnt on a controller button (CC 20): its press switches Launch on, the next press off.
+    w.setMidiLearn(true);
+    click(w, "seqLaunch");
+    send(h, w, 0xB0, 20, 127);
+    w.setMidiLearn(false);
+    CHECK_FALSE(h.editor.launch);
+    send(h, w, 0xB0, 20, 127);
+    send(h, w, 0xB0, 20, 0);
+    CHECK(h.editor.launch);
+    CHECK(h.keys.notes.test(36));
+    send(h, w, 0xB0, 20, 127);
+    send(h, w, 0xB0, 20, 0);
+    CHECK_FALSE(h.editor.launch);
 }
