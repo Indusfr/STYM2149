@@ -46,12 +46,13 @@ The application folder also receives `LICENSE.txt`, `README.md`, `README.fr.md`,
 
 | DAW (Windows) | Format to use | Notes |
 |---|---|---|
-| FL Studio | VST3 (CLAP: **TO CONFIRM**) | |
-| Ableton Live 11 | VST3 | Live 11 has no CLAP support |
+| FL Studio | VST3 or CLAP | |
+| Ableton Live | VST3 | Live has no CLAP support |
 | Cubase | VST3 | |
-| ACID Pro | VST3 (**TO CONFIRM**) | |
-| Maschine | VST3 (**TO CONFIRM**) | STYM2149 has no VST2 version |
-| Reason | VST3 (**TO CONFIRM**) | No Rack Extension version |
+| Studio One | VST3 or CLAP | |
+| ACID Pro | VST3 | |
+| Maschine 3 | VST3 | STYM2149 has no VST2 version |
+| Reason | VST3 | No Rack Extension version |
 
 In the plugin list, STYM2149 appears as an instrument from the vendor **PRISM**.
 
@@ -1069,7 +1070,7 @@ STYM2149 opens no network connection and sends no telemetry. It exchanges data o
 
 **The DAW does not list STYM2149.**
 - Check that the files are where section 1 says. On Windows, check that your DAW's plugin folders include `C:\Program Files\Common Files\VST3` (or `…\CLAP`), then rescan. On Linux, let the host rescan.
-- Use a format your DAW supports: there is no VST2 build, no AU and no AAX in 0.9.0, and Ableton Live 11 has no CLAP.
+- Use a format your DAW supports: there is no VST2 build, no AU and no AAX in 0.9.0, and Ableton Live has no CLAP.
 - STYM2149 is listed under the vendor "PRISM", as an instrument.
 
 **Windows blocks the installer.** SmartScreen shows "Windows protected your PC" because the installer is not signed: click **More info**, then **Run anyway**.
